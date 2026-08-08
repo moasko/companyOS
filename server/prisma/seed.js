@@ -183,6 +183,15 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "conges",
+    name: "Congés",
+    description:
+      "Le guichet des congés : chaque salarié demande et suit son solde de jours ouvrables, le responsable approuve ou refuse — chacun est notifié. Les fiches sont celles des RH, l'Agenda affiche les absences validées.",
+    icon: "conges",
+    category: "Gestion",
+    kind: "NATIVE",
+  },
+  {
     slug: "campagnes",
     name: "Campagnes",
     description:

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Congés">
+  <path d="M13 0h22a13 13 0 0 1 13 13v22a13 13 0 0 1-13 13H4a4 4 0 0 1-4-4V13A13 13 0 0 1 13 0Z" fill="#0D9488"/>
+  <path d="M21.5 8.5A13.5 13.5 0 0 0 8.5 22l13-6.6 13 .8A13.5 13.5 0 0 0 21.5 8.5Z" fill="#fff"/>
+  <path d="M8.5 22c4-3.4 9-5.3 13-6.6 4.7-.4 9.4-.1 13 .8" fill="none" stroke="#0D9488" stroke-width="1.2" opacity=".4"/>
+  <path d="M21 16.5 27 39" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M9 40c3-2.4 6.5-2.4 9.5 0s6.5 2.4 9.5 0 6.5-2.4 9.5 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>
+</svg>

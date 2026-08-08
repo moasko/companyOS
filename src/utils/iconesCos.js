@@ -43,6 +43,7 @@ export const ICONES_COS = new Set([
   "signature",
   "courrier",
   "campagnes",
+  "conges",
   // média
   "photos",
   "video",

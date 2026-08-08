@@ -1,0 +1,342 @@
+// Congés — voir index.jsx.
+//
+// Le guichet : des onglets, le solde en gros chiffres, des cartes de
+// demande à cadre plein. L'état d'une demande se lit par une étiquette
+// de couleur — jamais par une bordure latérale.
+
+.cgsApp {
+  --cg-bg: #ffffff;
+  --cg-panel: #f7f8fa;
+  --cg-line: #e3e6eb;
+  --cg-text: #1f2733;
+  --cg-muted: #6b7684;
+  --cg-accent: #0d9488; // sarcelle : le repos, la plage
+  --cg-accent-soft: #e3f4f2;
+  --cg-ok: #047857;
+  --cg-danger: #c0392b;
+  --cg-attente: #b45309;
+
+  background: var(--cg-bg);
+  color: var(--cg-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 68%;
+    height: 78%;
+    top: 10%;
+    left: 16%;
+    min-width: 720px;
+    min-height: 520px;
+  }
+
+  .cgsVerrou {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    font-size: 0.84em;
+    color: var(--cg-muted);
+  }
+
+  .cgsShell {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .cgsNav {
+    display: flex;
+    gap: 4px;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid var(--cg-line);
+  }
+
+  .cgsOnglet {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 13px;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.8em;
+    color: var(--cg-muted);
+
+    .uicon {
+      display: flex;
+    }
+
+    &:hover {
+      background: color-mix(in srgb, var(--cg-text) 5%, transparent);
+    }
+
+    &[data-actif="true"] {
+      color: var(--cg-accent);
+      font-weight: 600;
+      box-shadow: inset 0 -2px 0 var(--cg-accent);
+    }
+  }
+
+  .cgsCompte {
+    padding: 1px 8px;
+    border-radius: 100px;
+    background: var(--cg-accent);
+    color: #fff;
+    font-size: 0.82em;
+    font-weight: 700;
+  }
+
+  .cgsCentre {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 22px;
+  }
+
+  .cgsAide {
+    font-size: 0.76em;
+    color: var(--cg-muted);
+    margin: 4px 0;
+  }
+
+  // ---- Solde --------------------------------------------------------------
+
+  .cgsSolde {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+    max-width: 640px;
+  }
+
+  .cgsSoldeCase {
+    padding: 14px;
+    border: 1px solid var(--cg-line);
+    border-radius: 11px;
+    text-align: center;
+
+    b {
+      display: block;
+      font-size: 1.5em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    span {
+      font-size: 0.68em;
+      color: var(--cg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    &[data-fort="true"] {
+      border-color: var(--cg-accent);
+      background: var(--cg-accent-soft);
+
+      b {
+        color: var(--cg-accent);
+      }
+    }
+  }
+
+  // ---- Blocs et formulaire ------------------------------------------------
+
+  .cgsBloc {
+    margin-bottom: 18px;
+    padding: 15px 18px;
+    border: 1px solid var(--cg-line);
+    border-radius: 11px;
+    max-width: 640px;
+
+    h3 {
+      margin: 0 0 12px;
+      font-size: 0.8em;
+      font-weight: 700;
+      color: var(--cg-accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input,
+    select {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--cg-line);
+      border-radius: 8px;
+      background: var(--cg-bg);
+      color: var(--cg-text);
+      font-family: inherit;
+      font-size: 0.82em;
+
+      &:focus {
+        outline: none;
+        border-color: var(--cg-accent);
+      }
+    }
+  }
+
+  .cgsFormulaire {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1.4fr;
+    gap: 12px;
+  }
+
+  .cgsFormulairePied {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .cgsJours {
+    font-size: 0.8em;
+    font-weight: 700;
+    color: var(--cg-accent);
+  }
+
+  // ---- Lignes (mes demandes, planning) ------------------------------------
+
+  .cgsLigne {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 11px;
+    border-radius: 8px;
+
+    &:nth-child(even) {
+      background: var(--cg-panel);
+    }
+
+    &[data-encours="true"] .cgsLigneType {
+      color: var(--cg-accent);
+    }
+  }
+
+  .cgsLigneType {
+    width: 180px;
+    flex-shrink: 0;
+    font-size: 0.8em;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cgsLigneDates {
+    flex-grow: 1;
+    font-size: 0.76em;
+    color: var(--cg-muted);
+  }
+
+  .cgsEtat {
+    flex-shrink: 0;
+    padding: 3px 11px;
+    border-radius: 100px;
+    font-size: 0.68em;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--cg-muted) 14%, transparent);
+    color: var(--cg-muted);
+
+    &[data-ton="ok"] {
+      background: color-mix(in srgb, var(--cg-ok) 13%, transparent);
+      color: var(--cg-ok);
+    }
+
+    &[data-ton="warn"] {
+      background: color-mix(in srgb, var(--cg-attente) 14%, transparent);
+      color: var(--cg-attente);
+    }
+
+    &[data-ton="bad"] {
+      background: color-mix(in srgb, var(--cg-danger) 13%, transparent);
+      color: var(--cg-danger);
+    }
+  }
+
+  .cgsRetirer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    color: var(--cg-muted);
+
+    &:hover {
+      background: color-mix(in srgb, var(--cg-danger) 12%, transparent);
+      color: var(--cg-danger);
+    }
+  }
+
+  // ---- Validation ----------------------------------------------------------
+
+  .cgsValidation {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 640px;
+  }
+
+  .cgsCarte {
+    padding: 14px 17px;
+    border: 1px solid var(--cg-line);
+    border-radius: 11px;
+
+    .uiNotice {
+      margin: 10px 0 0;
+    }
+  }
+
+  .cgsCarteHaut {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .cgsCarteNom {
+    font-size: 0.88em;
+    font-weight: 700;
+  }
+
+  .cgsCarteType {
+    font-size: 0.74em;
+    color: var(--cg-accent);
+    font-weight: 600;
+  }
+
+  .cgsCarteDates {
+    margin-top: 3px;
+    font-size: 0.78em;
+    color: var(--cg-muted);
+  }
+
+  .cgsCarteMotif {
+    margin-top: 6px;
+    font-size: 0.76em;
+    font-style: italic;
+    color: var(--cg-muted);
+  }
+
+  .cgsCarteActions {
+    display: flex;
+    gap: 9px;
+    margin-top: 12px;
+  }
+
+  .cgsPlanning {
+    max-width: 640px;
+  }
+}
+
+body[data-theme="dark"] .cgsApp {
+  --cg-bg: #1f2226;
+  --cg-panel: #17191d;
+  --cg-line: #33383f;
+  --cg-text: #e6e8ea;
+  --cg-muted: #9aa2ad;
+  --cg-accent: #2dd4bf;
+  --cg-accent-soft: #16302d;
+  --cg-ok: #34d399;
+  --cg-danger: #f87171;
+  --cg-attente: #d9a15c;
+}
