@@ -26,6 +26,11 @@ export const CAMPAGNE_VIDE = {
   nom: "",
   sujet: "",
   texte: "",
+  // Le bouton d'action — facultatif : « Voir l'offre » vers le site, un
+  // catalogue, un numéro WhatsApp. C'est lui qui porte le suivi des clics.
+  cta: { label: "", url: "" },
+  // La couleur d'en-tête de l'email, aux couleurs de l'entreprise.
+  couleur: "#e8590c",
   filtres: { statut: "tous", ville: "", secteur: "" },
   statut: "brouillon", // brouillon | programmee | envoi | terminee
   // Vide = dès que possible ; sinon l'instant (ISO) avant lequel le
@@ -96,19 +101,84 @@ export const variablesPour = (destinataire, entreprise = "") => ({
 });
 
 // ---------------------------------------------------------------------------
-// Progression
+// L'email HTML
 // ---------------------------------------------------------------------------
+//
+// Le gabarit des outils d'emailing professionnels : un bandeau aux
+// couleurs de l'entreprise, le message, un bouton d'action, un pied avec
+// la désinscription. En tableaux HTML — la seule mise en page que les
+// clients mail respectent tous. Partagé : le serveur l'envoie, l'éditeur
+// l'affiche en aperçu — le destinataire reçoit exactement ce qu'on a vu.
+
+const echapperHtml = (t) =>
+  String(t || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+export const htmlDe = (
+  campagne,
+  { entreprise = "", lienCta = "", lienDesinscription = "", pixel = "" } = {},
+) => {
+  const couleur = campagne.couleur || "#e8590c";
+  const paragraphes = String(campagne.texte || "")
+    .split(/\n{2,}/)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:#26313d">${echapperHtml(p).replace(/\n/g, "<br>")}</p>`,
+    )
+    .join("");
+
+  const bouton =
+    campagne.cta?.label && lienCta
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px auto 8px"><tr><td style="border-radius:9px;background:${couleur}">
+           <a href="${lienCta}" style="display:inline-block;padding:12px 30px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none">${echapperHtml(campagne.cta.label)}</a>
+         </td></tr></table>`
+      : "";
+
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#f2f4f7">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f4f7;padding:26px 12px">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Segoe UI,Arial,sans-serif">
+  <tr><td style="background:${couleur};padding:20px 32px">
+    <span style="color:#ffffff;font-size:19px;font-weight:bold;letter-spacing:.02em">${echapperHtml(entreprise)}</span>
+  </td></tr>
+  <tr><td style="padding:30px 32px 12px">${paragraphes}${bouton}</td></tr>
+  <tr><td style="padding:18px 32px 24px;border-top:1px solid #edf0f3">
+    <p style="margin:0;font-size:12px;line-height:1.6;color:#8a94a1">
+      Vous recevez ce message parce que vous êtes en relation avec ${echapperHtml(entreprise)}.
+      ${lienDesinscription ? `<a href="${lienDesinscription}" style="color:#8a94a1">Se désinscrire</a>` : ""}
+    </p>
+  </td></tr>
+</table>
+${pixel ? `<img src="${pixel}" width="1" height="1" alt="" style="display:block">` : ""}
+</td></tr></table></body></html>`;
+};
+
+// ---------------------------------------------------------------------------
+// Progression et statistiques
+// ---------------------------------------------------------------------------
+
+const taux = (part, sur) => (sur ? Math.round((part / sur) * 100) : 0);
 
 export const resumeDe = (destinataires = []) => {
   const total = destinataires.length;
   const envoyes = destinataires.filter((d) => d.statut === "envoye").length;
   const echecs = destinataires.filter((d) => d.statut === "echec").length;
+  const ouverts = destinataires.filter((d) => d.ouvert).length;
+  const cliques = destinataires.filter((d) => d.clique).length;
+  const desinscrits = destinataires.filter((d) => d.desinscrit).length;
   const attente = total - envoyes - echecs;
   return {
     total,
     envoyes,
     echecs,
     attente,
+    ouverts,
+    cliques,
+    desinscrits,
+    tauxOuverture: taux(ouverts, envoyes),
+    tauxClic: taux(cliques, envoyes),
     pourcent: total ? Math.round(((envoyes + echecs) / total) * 100) : 0,
   };
 };

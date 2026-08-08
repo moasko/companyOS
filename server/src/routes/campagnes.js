@@ -6,7 +6,11 @@
 // forger sans le secret du serveur, et il ne désigne qu'une seule fiche.
 
 import { prisma } from "../db.js";
-import { verifierJeton } from "../campagnes.js";
+import { marquerDestinataire, urlCtaDe, verifierJeton } from "../campagnes.js";
+
+// Un GIF d'un pixel transparent — le plus petit accusé de lecture du
+// monde, celui que tous les outils d'emailing utilisent.
+const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 
 const page = (titre, corps) => `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><title>${titre}</title>
@@ -17,6 +21,36 @@ h1{font-size:1.15em}p{color:#6b7684;font-size:.92em;line-height:1.6}</style></he
 <body><main><h1>${titre}</h1><p>${corps}</p></main></body></html>`;
 
 export default async function campagnesRoutes(app) {
+  /// Le pixel d'ouverture. Toujours répondre l'image, jeton valide ou
+  /// non : un pixel qui casse, c'est une image cassée dans le mail du
+  /// client.
+  app.get("/ouverture", async (request, reply) => {
+    const infos = verifierJeton(request.query?.jeton || "");
+    if (infos) await marquerDestinataire(infos, "ouvert").catch(() => {});
+    reply
+      .type("image/gif")
+      .header("Cache-Control", "no-store, must-revalidate")
+      .send(PIXEL);
+  });
+
+  /// Le clic sur le bouton : on marque, puis on redirige vers l'URL de la
+  /// campagne — relue en base, jamais prise dans la requête.
+  app.get("/clic", async (request, reply) => {
+    const infos = verifierJeton(request.query?.jeton || "");
+    if (!infos) {
+      reply.type("text/html; charset=utf-8");
+      return reply.code(400).send(page("Lien invalide", "Ce lien est incomplet ou périmé."));
+    }
+    await marquerDestinataire(infos, "ouvert").catch(() => {});
+    await marquerDestinataire(infos, "clique").catch(() => {});
+    const url = await urlCtaDe(infos);
+    if (!url) {
+      reply.type("text/html; charset=utf-8");
+      return reply.send(page("Lien expiré", "Cette campagne n'existe plus."));
+    }
+    return reply.redirect(url, 302);
+  });
+
   app.get("/desinscription", async (request, reply) => {
     const infos = verifierJeton(request.query?.jeton || "");
     reply.type("text/html; charset=utf-8");
@@ -53,6 +87,9 @@ export default async function campagnesRoutes(app) {
         },
       });
     }
+
+    // La statistique de la campagne d'origine, quand le jeton la porte.
+    await marquerDestinataire(infos, "desinscrit").catch(() => {});
 
     return reply.send(
       page(

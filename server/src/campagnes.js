@@ -22,7 +22,12 @@ import { env } from "./env.js";
 import { creerTransporteur, envoyerVia } from "./mail.js";
 import { journaliser } from "./audit.js";
 import { appliquerModele } from "../../src/apps/modules/courrier/domaine.js";
-import { estMure, resumeDe, variablesPour } from "../../src/apps/modules/campagnes/domaine.js";
+import {
+  estMure,
+  htmlDe,
+  resumeDe,
+  variablesPour,
+} from "../../src/apps/modules/campagnes/domaine.js";
 
 const LOT = 8; // messages par passage et par campagne
 const PAUSE_MS = 700; // entre deux messages d'un lot
@@ -31,30 +36,78 @@ const PAUSE_MS = 700; // entre deux messages d'un lot
 // Désinscription signée
 // ---------------------------------------------------------------------------
 
-export const jetonDesinscription = (tenantId, clientId) => {
-  const corps = `${tenantId}.${clientId}`;
-  const signature = createHmac("sha256", env.jwtSecret).update(corps).digest("hex").slice(0, 24);
-  return Buffer.from(`${corps}.${signature}`).toString("base64url");
+const signer = (corps) =>
+  createHmac("sha256", env.jwtSecret).update(corps).digest("hex").slice(0, 24);
+
+/// Le jeton de suivi : espace, campagne, fiche client — signé. Le même
+/// jeton sert à l'ouverture (pixel), au clic (redirection) et à la
+/// désinscription : trois routes, une seule preuve.
+export const jetonSuivi = (tenantId, campagneId, clientId) => {
+  const corps = `${tenantId}.${campagneId}.${clientId}`;
+  return Buffer.from(`${corps}.${signer(corps)}`).toString("base64url");
 };
 
+/// Vérifie un jeton — le format à trois champs, et l'ancien à deux
+/// (désinscriptions envoyées avant le suivi) pour que les vieux liens
+/// restent honorés.
 export const verifierJeton = (jeton) => {
   try {
-    const [tenantId, clientId, signature] = Buffer.from(jeton, "base64url")
-      .toString()
-      .split(".");
-    const attendue = createHmac("sha256", env.jwtSecret)
-      .update(`${tenantId}.${clientId}`)
-      .digest("hex")
-      .slice(0, 24);
-    return signature === attendue ? { tenantId, clientId } : null;
+    const morceaux = Buffer.from(jeton, "base64url").toString().split(".");
+    if (morceaux.length === 4) {
+      const [tenantId, campagneId, clientId, signature] = morceaux;
+      return signature === signer(`${tenantId}.${campagneId}.${clientId}`)
+        ? { tenantId, campagneId, clientId }
+        : null;
+    }
+    const [tenantId, clientId, signature] = morceaux;
+    return signature === signer(`${tenantId}.${clientId}`)
+      ? { tenantId, campagneId: null, clientId }
+      : null;
   } catch {
     return null;
   }
 };
 
-const lienDesinscription = (tenantId, clientId) => {
-  const base = env.apiPublique || `http://localhost:${env.port}`;
-  return `${base}/api/campagnes/desinscription?jeton=${jetonDesinscription(tenantId, clientId)}`;
+const baseApi = () => env.apiPublique || `http://localhost:${env.port}`;
+
+const liens = (tenantId, campagneId, clientId) => {
+  const jeton = jetonSuivi(tenantId, campagneId, clientId);
+  return {
+    desinscription: `${baseApi()}/api/campagnes/desinscription?jeton=${jeton}`,
+    pixel: `${baseApi()}/api/campagnes/ouverture?jeton=${jeton}`,
+    clic: `${baseApi()}/api/campagnes/clic?jeton=${jeton}`,
+  };
+};
+
+/// Marque un destinataire d'une campagne — ouvert, cliqué, désinscrit.
+/// Silencieux si la campagne ou le destinataire n'existe plus : un pixel
+/// chargé deux ans après ne doit casser personne.
+export const marquerDestinataire = async ({ tenantId, campagneId, clientId }, marque) => {
+  if (!campagneId) return;
+  const fiche = await prisma.record.findFirst({
+    where: { id: campagneId, tenantId, module: "campagnes", collection: "campagnes" },
+  });
+  if (!fiche) return;
+  const destinataires = fiche.data.destinataires || [];
+  const dest = destinataires.find((d) => d.clientId === clientId);
+  if (!dest || dest[marque]) return;
+  dest[marque] = true;
+  dest[`${marque}Le`] = new Date().toISOString();
+  await prisma.record.update({
+    where: { id: fiche.id },
+    data: { data: { ...fiche.data, destinataires } },
+  });
+};
+
+/// L'URL du bouton d'une campagne — relue depuis la fiche, jamais depuis
+/// la requête : pas de redirection ouverte possible.
+export const urlCtaDe = async ({ tenantId, campagneId }) => {
+  if (!campagneId) return null;
+  const fiche = await prisma.record.findFirst({
+    where: { id: campagneId, tenantId, module: "campagnes", collection: "campagnes" },
+  });
+  const url = fiche?.data?.cta?.url;
+  return url && /^https?:\/\//i.test(url) ? url : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -118,12 +171,33 @@ const avancerCampagne = async (fiche) => {
 
   for (const dest of enAttente) {
     const variables = variablesPour(dest, tenant.name);
+    const suivi = liens(tenantId, fiche.id, dest.clientId);
     const sujet = appliquerModele(c.sujet, variables);
-    const texte =
-      appliquerModele(c.texte, variables) +
-      `\n\n—\nPour ne plus recevoir ces messages de ${tenant.name} :\n${lienDesinscription(tenantId, dest.clientId)}`;
+    const corps = appliquerModele(c.texte, variables);
 
-    const resultat = await envoyerVia(transport, { de: expediteur, a: dest.email, sujet, texte });
+    // Version texte pour les clients mail austères, version HTML habillée
+    // — bandeau, bouton suivi, pixel d'ouverture — pour tous les autres.
+    const texte =
+      corps +
+      (c.cta?.url ? `\n\n${c.cta.label || c.cta.url} : ${c.cta.url}` : "") +
+      `\n\n—\nPour ne plus recevoir ces messages de ${tenant.name} :\n${suivi.desinscription}`;
+    const html = htmlDe(
+      { ...c, texte: corps },
+      {
+        entreprise: tenant.name,
+        lienCta: c.cta?.url ? suivi.clic : "",
+        lienDesinscription: suivi.desinscription,
+        pixel: suivi.pixel,
+      },
+    );
+
+    const resultat = await envoyerVia(transport, {
+      de: expediteur,
+      a: dest.email,
+      sujet,
+      texte,
+      html,
+    });
     dest.statut = resultat.envoye ? "envoye" : "echec";
     dest.erreur = resultat.erreur || null;
     if (resultat.envoye) partis += 1;

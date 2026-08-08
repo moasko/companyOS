@@ -447,10 +447,40 @@ const Editeur = ({
             onChange={(e) => maj({ texte: e.target.value })}
           />
         </Champ>
+
+        <div className="cmpCtaGrille">
+          <Champ label="Bouton d'action" aide="Facultatif — c'est lui qui mesure les clics">
+            <input
+              value={c.cta?.label || ""}
+              placeholder="Voir l'offre"
+              onChange={(e) => maj({ cta: { ...c.cta, label: e.target.value } })}
+            />
+          </Champ>
+          <Champ label="Lien du bouton">
+            <input
+              value={c.cta?.url || ""}
+              placeholder="https://…"
+              onChange={(e) => maj({ cta: { ...c.cta, url: e.target.value } })}
+            />
+          </Champ>
+          <Champ label="Couleur" aide="Le bandeau et le bouton">
+            <input
+              type="color"
+              value={c.couleur || "#e8590c"}
+              onChange={(e) => maj({ couleur: e.target.value })}
+            />
+          </Champ>
+        </div>
         <p className="cmpAide">
-          Le lien de désinscription s'ajoute automatiquement au bas de chaque
-          message.
+          Le message part en HTML habillé — bandeau, bouton, pied avec
+          désinscription — et en version texte pour les boîtes austères.
+          L'ouverture et le clic sont mesurés.
         </p>
+      </div>
+
+      <div className="cmpSection">
+        <h3>Aperçu</h3>
+        <ApercuMail campagne={c} />
       </div>
 
       <div className="cmpSection">
@@ -489,6 +519,40 @@ const Editeur = ({
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// L'aperçu du mail, tel que le destinataire le recevra
+// ---------------------------------------------------------------------------
+
+const ApercuMail = ({ campagne }) => {
+  const session = useSelector((state) => state.session);
+  const variables = {
+    client: "Koné Distribution",
+    ville: "Abidjan",
+    entreprise: session.tenant?.name || "Votre entreprise",
+  };
+  const html = D.htmlDe(
+    {
+      ...campagne,
+      texte: appliquerModele(campagne.texte || "Votre message apparaîtra ici…", variables),
+      sujet: appliquerModele(campagne.sujet || "", variables),
+    },
+    {
+      entreprise: session.tenant?.name || "Votre entreprise",
+      lienCta: campagne.cta?.url ? "#" : "",
+      lienDesinscription: "#",
+    },
+  );
+  return (
+    <div className="cmpApercu">
+      <div className="cmpApercuSujet">
+        <Icon fafa="faEnvelope" width={12} />
+        {appliquerModele(campagne.sujet, variables) || "(objet du message)"}
+      </div>
+      <iframe title="Aperçu du mail" srcDoc={html} sandbox="" />
     </div>
   );
 };
@@ -535,7 +599,23 @@ const Detail = ({ fiche, onRetour, onSupprimer }) => {
           <b>{bilan.attente}</b>
           <span>en attente</span>
         </div>
+        <div className="cmpChiffre" data-ton="accent">
+          <b>{bilan.tauxOuverture}%</b>
+          <span>{bilan.ouverts} ouvert(s)</span>
+        </div>
+        <div className="cmpChiffre" data-ton="accent">
+          <b>{bilan.tauxClic}%</b>
+          <span>{bilan.cliques} clic(s)</span>
+        </div>
+        <div className="cmpChiffre" data-ton={bilan.desinscrits ? "erreur" : undefined}>
+          <b>{bilan.desinscrits}</b>
+          <span>désinscrit(s)</span>
+        </div>
       </div>
+      <p className="cmpAide" style={{ padding: "0 22px" }}>
+        Les ouvertures reposent sur une image invisible : certaines boîtes la
+        bloquent, le taux réel est donc au moins celui affiché.
+      </p>
 
       {c.statut === "envoi" ? (
         <div className="cmpBarre cmpBarreGrande">
@@ -558,6 +638,11 @@ const Detail = ({ fiche, onRetour, onSupprimer }) => {
             <div key={d.email} className="cmpDestLigne" data-statut={d.statut}>
               <span className="cmpDestNom">{d.nom}</span>
               <span className="cmpDestEmail">{d.email}</span>
+              <span className="cmpDestBadges">
+                {d.ouvert ? <span className="cmpBadge" title="A ouvert le message">ouvert</span> : null}
+                {d.clique ? <span className="cmpBadge" data-fort="true" title="A cliqué sur le bouton">clic</span> : null}
+                {d.desinscrit ? <span className="cmpBadge" data-negatif="true">désinscrit</span> : null}
+              </span>
               <span className="cmpDestEtat">
                 {d.statut === "envoye" ? (
                   <Icon fafa="faCircleCheck" width={11} />
