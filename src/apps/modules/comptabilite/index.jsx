@@ -69,6 +69,7 @@ import {
   ecriturePaiement as ecriturePaiementAchat,
 } from "../achats/domaine";
 import { ecritureDeBulletin } from "../paie/domaine";
+import { ecritureDeNote } from "../frais/domaine";
 import * as D from "./domaine";
 import "./comptabilite.scss";
 
@@ -110,6 +111,7 @@ function ComptabiliteApp() {
   const [ticketsCaisse, setTicketsCaisse] = useState([]);
   const [achats, setAchats] = useState({ factures: [], paiements: [], fournisseurs: [] });
   const [paie, setPaie] = useState({ bulletins: [], salaries: [] });
+  const [notesFrais, setNotesFrais] = useState([]);
 
   // Période observée. L'exercice entier par défaut : une PME regarde son
   // année, et se restreint au mois quand elle déclare la TVA.
@@ -125,7 +127,7 @@ function ComptabiliteApp() {
   const [occupe, setOccupe] = useState(false);
 
   const charger = useCallback(async () => {
-    const [e, f, r, g, tk, af, ap, four, bul, sal] = await Promise.all([
+    const [e, f, r, g, tk, af, ap, four, bul, sal, ndf] = await Promise.all([
       api.records.list(manifest.slug, "ecritures"),
       // La Facturation peut ne pas être installée : la comptabilité reste
       // utilisable, simplement sans reprise automatique.
@@ -141,6 +143,8 @@ function ComptabiliteApp() {
       // La Paie : chaque bulletin propose son écriture de salaire.
       api.records.list("paie", "bulletins").catch(() => []),
       api.records.list("rh", "salaries").catch(() => []),
+      // Les Notes de frais : chaque note approuvée propose sa charge.
+      api.records.list("frais", "notes").catch(() => []),
     ]);
     setEcritures(e);
     setDocuments(f);
@@ -149,6 +153,7 @@ function ComptabiliteApp() {
     setTicketsCaisse(tk);
     setAchats({ factures: af, paiements: ap, fournisseurs: four });
     setPaie({ bulletins: bul, salaries: sal });
+    setNotesFrais(ndf);
   }, []);
   const etat = useChargement(ouvert, charger);
 
@@ -171,6 +176,17 @@ function ComptabiliteApp() {
           nomF(fac?.data?.fournisseurId),
         );
       }),
+      // Une note de frais compte dès qu'elle est approuvée — la charge est
+      // née, même si le remboursement attend.
+      ...notesFrais
+        .filter((n) => ["approuvee", "remboursee"].includes(n.data.etat))
+        .map((n) => {
+          const sal = paie.salaries.find((x) => x.id === n.data.salarieId);
+          const nom = sal
+            ? `${sal.data.prenom || ""} ${sal.data.nom || ""}`.trim()
+            : "salarié";
+          return ecritureDeNote(n.data, n.id, nom);
+        }),
       ...paie.bulletins.map((bul) => {
         const sal = paie.salaries.find((x) => x.data.matricule === bul.data.matricule);
         return ecritureDeBulletin(bul.data.calcul, sal?.data || {}, bul.data.mois);
@@ -185,7 +201,7 @@ function ComptabiliteApp() {
       ecritures,
       totauxDe: totaux,
     });
-  }, [documents, reglements, ticketsCaisse, achats, paie, ecritures]);
+  }, [documents, reglements, ticketsCaisse, achats, paie, notesFrais, ecritures]);
 
   // Période et axe voyagent ensemble : c'est le contexte d'observation, et
   // toutes les restitutions le respectent sans le savoir (voir lignesDe).

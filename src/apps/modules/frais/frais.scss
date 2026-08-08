@@ -1,0 +1,353 @@
+// Notes de frais — voir index.jsx.
+//
+// Le même gabarit de guichet que les Congés : onglets, totaux en gros
+// chiffres, lignes et cartes à cadre plein. L'état d'une note se lit par
+// son étiquette — jamais par une bordure latérale.
+
+.frsApp {
+  --fr-bg: #ffffff;
+  --fr-panel: #f7f8fa;
+  --fr-line: #e3e6eb;
+  --fr-text: #1f2733;
+  --fr-muted: #6b7684;
+  --fr-accent: #b45309; // l'ambre des reçus froissés
+  --fr-accent-soft: #f9efe2;
+  --fr-ok: #047857;
+  --fr-danger: #c0392b;
+  --fr-attente: #b45309;
+
+  background: var(--fr-bg);
+  color: var(--fr-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 68%;
+    height: 78%;
+    top: 10%;
+    left: 16%;
+    min-width: 720px;
+    min-height: 520px;
+  }
+
+  .frsVerrou {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    font-size: 0.84em;
+    color: var(--fr-muted);
+  }
+
+  .frsShell {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .frsNav {
+    display: flex;
+    gap: 4px;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid var(--fr-line);
+  }
+
+  .frsOnglet {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 13px;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.8em;
+    color: var(--fr-muted);
+
+    .uicon {
+      display: flex;
+    }
+
+    &:hover {
+      background: color-mix(in srgb, var(--fr-text) 5%, transparent);
+    }
+
+    &[data-actif="true"] {
+      color: var(--fr-accent);
+      font-weight: 600;
+      box-shadow: inset 0 -2px 0 var(--fr-accent);
+    }
+  }
+
+  .frsCompte {
+    padding: 1px 8px;
+    border-radius: 100px;
+    background: var(--fr-accent);
+    color: #fff;
+    font-size: 0.82em;
+    font-weight: 700;
+  }
+
+  .frsCentre {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 22px;
+  }
+
+  .frsAide {
+    font-size: 0.76em;
+    color: var(--fr-muted);
+    margin: 4px 0 10px;
+    max-width: 64ch;
+  }
+
+  // ---- Totaux -------------------------------------------------------------
+
+  .frsTotaux {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+    max-width: 640px;
+  }
+
+  .frsTotal {
+    padding: 13px;
+    border: 1px solid var(--fr-line);
+    border-radius: 11px;
+    text-align: center;
+
+    b {
+      display: block;
+      font-size: 1.15em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    span {
+      font-size: 0.66em;
+      color: var(--fr-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    &[data-ton="ok"] b {
+      color: var(--fr-ok);
+    }
+
+    &[data-ton="warn"] b {
+      color: var(--fr-attente);
+    }
+  }
+
+  // ---- Blocs, formulaire --------------------------------------------------
+
+  .frsBloc {
+    margin-bottom: 18px;
+    padding: 15px 18px;
+    border: 1px solid var(--fr-line);
+    border-radius: 11px;
+    max-width: 640px;
+
+    h3 {
+      margin: 0 0 12px;
+      font-size: 0.8em;
+      font-weight: 700;
+      color: var(--fr-accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input,
+    select {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--fr-line);
+      border-radius: 8px;
+      background: var(--fr-bg);
+      color: var(--fr-text);
+      font-family: inherit;
+      font-size: 0.82em;
+
+      &:focus {
+        outline: none;
+        border-color: var(--fr-accent);
+      }
+    }
+  }
+
+  .frsFormulaire {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr 1.8fr;
+    gap: 12px;
+  }
+
+  .frsRecu {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .frsRecuChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--fr-line);
+    border-radius: 100px;
+    background: var(--fr-panel);
+    font-size: 0.76em;
+
+    .uicon {
+      display: flex;
+      color: var(--fr-accent);
+    }
+  }
+
+  .frsRecuRetirer {
+    display: flex;
+    color: var(--fr-muted);
+
+    &:hover {
+      color: var(--fr-danger);
+    }
+  }
+
+  // ---- Lignes -------------------------------------------------------------
+
+  .frsLigne {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 11px;
+    border-radius: 8px;
+
+    &:nth-child(even) {
+      background: var(--fr-panel);
+    }
+  }
+
+  .frsLigneIcone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: var(--fr-accent-soft);
+    color: var(--fr-accent);
+  }
+
+  .frsLigneCorps {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .frsLigneDesc {
+    display: block;
+    font-size: 0.8em;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .frsLigneSous {
+    font-size: 0.7em;
+    color: var(--fr-muted);
+  }
+
+  .frsLien {
+    color: var(--fr-accent);
+    margin-left: 4px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .frsLigneMontant {
+    flex-shrink: 0;
+    font-size: 0.82em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .frsEtat {
+    flex-shrink: 0;
+    padding: 3px 11px;
+    border-radius: 100px;
+    font-size: 0.68em;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--fr-muted) 14%, transparent);
+    color: var(--fr-muted);
+
+    &[data-ton="ok"] {
+      background: color-mix(in srgb, var(--fr-ok) 13%, transparent);
+      color: var(--fr-ok);
+    }
+
+    &[data-ton="warn"] {
+      background: color-mix(in srgb, var(--fr-attente) 14%, transparent);
+      color: var(--fr-attente);
+    }
+
+    &[data-ton="bad"] {
+      background: color-mix(in srgb, var(--fr-danger) 13%, transparent);
+      color: var(--fr-danger);
+    }
+  }
+
+  // ---- Files du responsable -----------------------------------------------
+
+  .frsFile {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 640px;
+  }
+
+  .frsCarte {
+    padding: 14px 17px;
+    border: 1px solid var(--fr-line);
+    border-radius: 11px;
+  }
+
+  .frsCarteHaut {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .frsCarteNom {
+    font-size: 0.88em;
+    font-weight: 700;
+  }
+
+  .frsCarteSous {
+    margin-top: 3px;
+    font-size: 0.76em;
+    color: var(--fr-muted);
+  }
+
+  .frsCarteActions {
+    display: flex;
+    gap: 9px;
+    margin-top: 12px;
+  }
+}
+
+body[data-theme="dark"] .frsApp {
+  --fr-bg: #1f2226;
+  --fr-panel: #17191d;
+  --fr-line: #33383f;
+  --fr-text: #e6e8ea;
+  --fr-muted: #9aa2ad;
+  --fr-accent: #d9a15c;
+  --fr-accent-soft: #33270f;
+  --fr-ok: #34d399;
+  --fr-danger: #f87171;
+  --fr-attente: #d9a15c;
+}

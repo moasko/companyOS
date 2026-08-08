@@ -183,6 +183,15 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "frais",
+    name: "Notes de frais",
+    description:
+      "Le taxi, le carburant, le déjeuner client : le salarié photographie son reçu et soumet, le responsable valide puis rembourse — chacun notifié. Chaque note approuvée propose son écriture à la Comptabilité, au bon compte de charge.",
+    icon: "frais",
+    category: "Gestion",
+    kind: "NATIVE",
+  },
+  {
     slug: "conges",
     name: "Congés",
     description:
