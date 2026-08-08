@@ -171,6 +171,14 @@ function App() {
   useEffect(() => {
     const boot = async () => {
       if (!getToken()) {
+        // Un visiteur sans compte arrive sur la vitrine, pas sur un écran
+        // de connexion nu. La landing ramène ici avec `?connexion` pour
+        // s'inscrire ou entrer — et quiconque a déjà un jeton ne voit
+        // jamais ce détour.
+        if (!window.location.search.includes("connexion")) {
+          window.location.replace("landing.html");
+          return;
+        }
         dispatch({ type: "SESSION_CLEAR" });
         return;
       }

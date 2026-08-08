@@ -190,6 +190,10 @@ const apps = [
     icon: "plateforme",
     category: "Système",
     kind: "NATIVE",
+    // Jamais dans la Boutique : la console de l'exploitant ne se propose
+    // pas aux clients, elle s'installe à la main pour son espace. La
+    // route serveur (PLATFORM_ADMINS) reste le vrai verrou.
+    published: false,
   },
   {
     slug: "frais",
