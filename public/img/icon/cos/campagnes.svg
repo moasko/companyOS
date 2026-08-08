@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Campagnes">
+  <path d="M13 0h22a13 13 0 0 1 13 13v22a13 13 0 0 1-13 13H4a4 4 0 0 1-4-4V13A13 13 0 0 1 13 0Z" fill="#E8590C"/>
+  <path d="M31 10 14 18h-3a4 4 0 0 0-4 4v4a4 4 0 0 0 4 4h3l17 8Z" fill="#fff"/>
+  <path d="M14 30v4a3.5 3.5 0 0 0 7 0v-1.2L14 30Z" fill="#fff" opacity=".8"/>
+  <g stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".75">
+    <path d="M36 18.5c1.8 1.4 1.8 9.6 0 11"/>
+    <path d="M40 15c3.4 2.6 3.4 15.4 0 18"/>
+  </g>
+</svg>

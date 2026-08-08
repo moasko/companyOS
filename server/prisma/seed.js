@@ -183,6 +183,15 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "campagnes",
+    name: "Campagnes",
+    description:
+      "L'email marketing sans se faire griller : audience choisie dans le CRM, message à variables, envoi cadencé par petits lots, lien de désinscription dans chaque courriel et statistiques d'envoi. Programmez pour lundi 8 h, l'OS s'en charge.",
+    icon: "campagnes",
+    category: "Gestion",
+    kind: "NATIVE",
+  },
+  {
     slug: "courrier",
     name: "Courrier",
     description:

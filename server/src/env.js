@@ -32,4 +32,7 @@ export const env = {
   // L'adresse publique du front, glissée dans les mails pour que le
   // destinataire sache où aller. En pratique : la même que CORS_ORIGIN.
   urlPublique: process.env.PUBLIC_URL || process.env.CORS_ORIGIN || "",
+  // L'adresse publique de l'API — les liens de désinscription des
+  // campagnes pointent dessus.
+  apiPublique: process.env.PUBLIC_API_URL || "",
 };

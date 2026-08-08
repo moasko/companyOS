@@ -13,6 +13,8 @@ import webRoutes from "./routes/web.js";
 import billingRoutes from "./routes/billing.js";
 import courrierRoutes from "./routes/courrier.js";
 import { demarrerRelances } from "./relances.js";
+import campagnesRoutes from "./routes/campagnes.js";
+import { demarrerCampagnes } from "./campagnes.js";
 
 const app = Fastify({ logger: true });
 
@@ -39,6 +41,7 @@ await app.register(notificationRoutes, { prefix: "/api/notifications" });
 await app.register(webRoutes, { prefix: "/api/web" });
 await app.register(billingRoutes, { prefix: "/api/facturation" });
 await app.register(courrierRoutes, { prefix: "/api/courrier" });
+await app.register(campagnesRoutes, { prefix: "/api/campagnes" });
 
 const shutdown = async () => {
   await app.close();
@@ -53,6 +56,8 @@ try {
   await app.listen({ port: env.port, host: "0.0.0.0" });
   // Le moteur de relances de factures — voir src/relances.js.
   demarrerRelances();
+  // Le moteur d'envoi des campagnes — voir src/campagnes.js.
+  demarrerCampagnes();
 } catch (err) {
   app.log.error(err);
   process.exit(1);

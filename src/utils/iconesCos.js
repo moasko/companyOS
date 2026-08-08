@@ -42,6 +42,7 @@ export const ICONES_COS = new Set([
   "agenda",
   "signature",
   "courrier",
+  "campagnes",
   // média
   "photos",
   "video",

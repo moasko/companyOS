@@ -50,6 +50,8 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
       PUBLIC_URL: ${CORS_ORIGIN}
+      # Les liens de désinscription des campagnes pointent sur l'API.
+      PUBLIC_API_URL: ${VITE_API_URL}
     volumes:
       - storage-data:/data/storage
     expose:
