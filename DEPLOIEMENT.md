@@ -93,14 +93,14 @@ d'envoi (SPF + DKIM) pour ne pas finir en indésirable.
 ## 7. Landing page et console de l'exploitant
 
 - **Landing page** : le front sert une page publique de présentation sur
-   (héros, applications, tarifs). Pour un domaine
-  marketing dédié (), ajoutez ce domaine au service
-   dans Dokploy — la racine reste l'OS, la page vit sur
-  /landing.html ; un lien « Créer mon espace » ramène vers l'application.
+  `/landing.html` (héros, applications, tarifs). Pour un domaine marketing
+  dédié (`www.mondomaine.com`), ajoutez ce domaine au service `web` dans
+  Dokploy — la racine reste l'OS, la page vit sur `/landing.html` ; son
+  bouton « Créer mon espace » ramène vers l'application.
 - **Console Plateforme** : l'application « Plateforme » montre tous les
   espaces clients (formules, membres, stockage, revenu mensuel) et change
   une formule en un clic. Elle n'obéit qu'aux comptes listés dans
-   (variable d'environnement, emails séparés par des
+  `PLATFORM_ADMINS` (variable d'environnement, emails séparés par des
   virgules) — quiconque d'autre voit une porte fermée.
 
 ## 8. Données et sauvegardes
