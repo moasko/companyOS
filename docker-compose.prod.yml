@@ -52,6 +52,8 @@ services:
       PUBLIC_URL: ${CORS_ORIGIN}
       # Les liens de désinscription des campagnes pointent sur l'API.
       PUBLIC_API_URL: ${VITE_API_URL}
+      # La console Plateforme : les emails des exploitants du SaaS.
+      PLATFORM_ADMINS: ${PLATFORM_ADMINS:-}
     volumes:
       - storage-data:/data/storage
     expose:

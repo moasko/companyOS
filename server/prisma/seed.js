@@ -183,6 +183,15 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "plateforme",
+    name: "Plateforme",
+    description:
+      "La console de l'exploitant du SaaS : tous les espaces clients, leurs formules, leurs membres et leur stockage — et le changement de formule en un clic. Réservée aux comptes exploitants (PLATFORM_ADMINS côté serveur).",
+    icon: "plateforme",
+    category: "Système",
+    kind: "NATIVE",
+  },
+  {
     slug: "frais",
     name: "Notes de frais",
     description:

@@ -35,4 +35,13 @@ export const env = {
   // L'adresse publique de l'API — les liens de désinscription des
   // campagnes pointent dessus.
   apiPublique: process.env.PUBLIC_API_URL || "",
+
+  // Les exploitants de la plateforme : les adresses email autorisées à
+  // ouvrir la console Plateforme (tous les espaces, toutes les formules).
+  // Au-dessus des rôles d'espace — un OWNER ne voit que son entreprise,
+  // l'exploitant voit le SaaS.
+  plateformeAdmins: (process.env.PLATFORM_ADMINS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
 };

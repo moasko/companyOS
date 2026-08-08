@@ -34,6 +34,7 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `VITE_API_URL` | `https://api.mondomaine.com` | figée dans le build du front |
 | `JWT_EXPIRES_IN` | `7d` (défaut) | durée d'une session |
 | `DEFAULT_TENANT_QUOTA` | `5368709120` (défaut, 5 Go) | quota d'un nouvel espace |
+| `PLATFORM_ADMINS` | `patron@mondomaine.com` | les comptes exploitants (console Plateforme) |
 
 > `VITE_API_URL` est cuite **au build** : la changer exige un redéploiement,
 > pas seulement un redémarrage.
@@ -89,7 +90,20 @@ d'envoi (SPF + DKIM) pour ne pas finir en indésirable.
 > un `docker-mailserver` séparé peut fournir le relais SMTP ci-dessus —
 > mais un relais géré coûte zéro et arrive dans la boîte de réception.
 
-## 7. Données et sauvegardes
+## 7. Landing page et console de l'exploitant
+
+- **Landing page** : le front sert une page publique de présentation sur
+   (héros, applications, tarifs). Pour un domaine
+  marketing dédié (), ajoutez ce domaine au service
+   dans Dokploy — la racine reste l'OS, la page vit sur
+  /landing.html ; un lien « Créer mon espace » ramène vers l'application.
+- **Console Plateforme** : l'application « Plateforme » montre tous les
+  espaces clients (formules, membres, stockage, revenu mensuel) et change
+  une formule en un clic. Elle n'obéit qu'aux comptes listés dans
+   (variable d'environnement, emails séparés par des
+  virgules) — quiconque d'autre voit une porte fermée.
+
+## 8. Données et sauvegardes
 
 Deux volumes portent tout l'état :
 
@@ -101,7 +115,7 @@ PostgreSQL vers un stockage S3. Pour les fichiers, archivez le volume
 `storage-data` (le chemin réel est visible dans **Volumes**) — un `tar`
 planifié vers le même bucket suffit.
 
-## 8. Mises à jour
+## 9. Mises à jour
 
 `git push`, puis **Deploy** (ou activez l'auto-deploy par webhook dans
 l'onglet **Deployments**). Les migrations s'appliquent au démarrage ; les

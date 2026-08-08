@@ -98,6 +98,11 @@ export const api = {
   courrierEnvoyer: (data) =>
     request("/courrier/envoyer", { method: "POST", body: data }),
 
+  // Console de l'exploitant du SaaS — réservée aux emails PLATFORM_ADMINS.
+  plateforme: () => request("/plateforme"),
+  plateformeFormule: (tenantId, plan) =>
+    request(`/plateforme/espaces/${tenantId}/formule`, { method: "PUT", body: { plan } }),
+
   catalog: () => request("/apps/catalog"),
   installedApps: () => request("/apps/installed"),
   /// `version` est celle que le shell livre : c'est lui qui porte le code,
