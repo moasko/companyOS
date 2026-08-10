@@ -1,66 +1,41 @@
 {
   "name": "companyos",
-  "description": "CompanyOS — l'OS web qui réunit les applications de gestion de l'entreprise",
   "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "@ai-sdk/react": "^4.0.59",
-    "@docx-editor.dev/core": "^2.1.3",
-    "@docx-editor.dev/react": "^2.1.3",
-    "@fortawesome/fontawesome-svg-core": "^6.6.0",
-    "@fortawesome/free-regular-svg-icons": "^6.6.0",
-    "@fortawesome/free-solid-svg-icons": "^6.6.0",
-    "@fortawesome/react-fontawesome": "^0.2.2",
-    "ai": "^7.0.56",
-    "docx": "^9.7.1",
-    "fast-xml-parser": "^5.10.1",
-    "framer-motion": "^13.0.0",
-    "i18next": "^26.3.6",
-    "i18next-browser-languagedetector": "^8.2.1",
-    "i18next-http-backend": "^4.0.1",
-    "jspdf": "^4.2.1",
-    "jszip": "^3.10.1",
-    "lucide-react": "^1.30.0",
-    "monaco-editor": "^0.56.0",
-    "pdfjs-dist": "^6.2.108",
-    "pptx-react-viewer": "^2.15.3",
-    "qrcode": "^1.5.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-error-boundary": "^3.1.4",
-    "react-i18next": "^17.0.11",
-    "react-icons": "^5.7.0",
-    "react-lazy-load-image-component": "^1.6.2",
-    "react-redux": "^8.1.3",
-    "redux": "^4.2.1",
-    "sass": "^1.77.8",
-    "three": "^0.185.1"
+  "description": "CompanyOS — l'OS web qui réunit les applications de gestion de l'entreprise",
+  "license": "CC0-1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "prettier": "prettier --write ."
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "dev": "npm run dev --workspace @companyos/web",
+    "dev:web": "npm run dev --workspace @companyos/web",
+    "dev:api": "npm run dev --workspace @companyos/api",
+    "build": "npm run build --workspace @companyos/web",
+    "preview": "npm run preview --workspace @companyos/web",
+    "start": "npm run start --workspace @companyos/api",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "npm run prisma:migrate --workspace @companyos/api",
+    "db:deploy": "npm run prisma:deploy --workspace @companyos/api",
+    "db:studio": "npm run prisma:studio --workspace @companyos/api",
+    "db:seed": "npm run seed --workspace @companyos/api",
+    "audit:prod": "npm audit --omit=dev"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.7.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.41",
-    "prettier": "^2.8.8",
-    "tailwindcss": "^3.4.9",
-    "vite": "^6.4.3",
-    "vite-plugin-pwa": "^0.21.2"
+    "eslint": "^9.17.0",
+    "@eslint/js": "^9.17.0",
+    "eslint-plugin-react": "^7.37.3",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2"
   }
 }

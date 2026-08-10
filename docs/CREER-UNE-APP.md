@@ -9,7 +9,7 @@ Guide complet et autonome. Il suppose seulement que vous savez lire du React.
 CompanyOS a trois couches.
 
 **Le shell** (`src/`) — le bureau, les fenêtres, la barre des tâches, le menu
-Démarrer. C'est un fork de win11React : React 18 + Vite + Redux (sans Toolkit)
+Démarrer. Le shell est dérivé de win11React : React 18 + Vite + Redux (sans Toolkit)
 + SCSS. Pas de TypeScript.
 
 **L'API** (`server/`) — Fastify + Prisma + PostgreSQL. Elle porte les comptes,
@@ -184,7 +184,7 @@ const goToSection = (id) => {
   ))}
 </aside>
 
-<div className="rhMain win11Scroll" ref={mainRef}>
+<div className="rhMain cosScroll" ref={mainRef}>
   <section className="rhSection" data-hidden={section !== "salaries"}>
     <h2><span className="rhNum">1.</span> Salariés</h2>
     <p className="rhHint">Une phrase qui explique la section</p>
