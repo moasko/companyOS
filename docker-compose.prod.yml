@@ -8,6 +8,24 @@
 #   - domaine de l'API → service api, port 4000
 #
 # ─────────────────────────────────────────────────────────────────────────
+# LES IMAGES SONT CONSTRUITES AILLEURS
+#
+# Ce fichier ne construit rien : il tire deux images déjà faites depuis
+# ghcr.io, publiées par .github/workflows/images.yml à chaque poussée sur
+# master.
+#
+# Construire le shell sur le serveur demandait plus de 3 Go de tas
+# JavaScript — Monaco, les visionneuses Word et PowerPoint, pdf.js, le
+# moteur 3D. Le VPS a 7,75 Go dont près de 4 déjà pris par les autres
+# piles : le build s'y terminait par « Reached heap limit ». Les runners
+# GitHub ont 16 Go et ne font rien d'autre.
+#
+# Conséquence pratique : un déploiement ne compile plus, il télécharge.
+# Et changer de domaine impose de **reconstruire** l'image du shell, pas
+# seulement de redéployer — l'URL de l'API est figée dans son bundle.
+# ─────────────────────────────────────────────────────────────────────────
+#
+# ─────────────────────────────────────────────────────────────────────────
 # LA BASE N'EST PAS ICI
 #
 # PostgreSQL est un service Dokploy à part, avec ses sauvegardes et son
@@ -33,9 +51,11 @@
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ${IMAGE_API:-ghcr.io/moasko/companyos-api:latest}
+    # `latest` ne change pas de nom quand son contenu change : sans cela,
+    # Docker garderait indéfiniment la première version téléchargée et un
+    # redéploiement ne déploierait rien.
+    pull_policy: always
     restart: unless-stopped
     environment:
       # Fournie en entier depuis Dokploy — voir l'en-tête de ce fichier.
@@ -81,16 +101,8 @@ services:
       - dokploy-network
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        # Figée dans le build du shell : le domaine public de l'API.
-        VITE_API_URL: ${VITE_API_URL}
-        # Le tas de Node pendant le build. Voir apps/web/Dockerfile : sur un
-        # petit VPS, la valeur par défaut fait tuer le processus par le
-        # noyau, et Dokploy n'affiche qu'un « killed » sans explication.
-        NODE_HEAP_MO: ${NODE_HEAP_MO:-3072}
+    image: ${IMAGE_WEB:-ghcr.io/moasko/companyos-web:latest}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       - api

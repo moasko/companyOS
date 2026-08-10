@@ -1,0 +1,101 @@
+# Construction des images de production, hors du serveur.
+#
+# ─────────────────────────────────────────────────────────────────────────
+# POURQUOI PAS SUR LE VPS
+#
+# Construire le shell demande plus de 3 Go de tas JavaScript : il empaquette
+# Monaco, les visionneuses Word et PowerPoint, pdf.js et le moteur 3D. Le
+# VPS a 7,75 Go dont près de 4 déjà pris par les autres piles — le build s'y
+# terminait par « Reached heap limit », et relever le plafond n'aurait fait
+# que remplacer l'erreur de V8 par une mise à mort par le noyau.
+#
+# Les runners GitHub ont 16 Go et ne font rien d'autre. Le serveur, lui, se
+# contente désormais de télécharger une image déjà faite : un déploiement
+# passe de plusieurs minutes de compilation à quelques secondes de
+# téléchargement, et un VPS saturé ne peut plus faire échouer une mise en
+# production.
+# ─────────────────────────────────────────────────────────────────────────
+
+name: Images
+
+on:
+  push:
+    branches: [master, main]
+  # Permet de reconstruire à la demande — utile après un changement de
+  # domaine, puisque l'URL de l'API est figée dans le build du shell.
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # Indispensable pour pousser sur ghcr.io avec le jeton fourni
+      # automatiquement au workflow : aucun secret à créer à la main.
+      packages: write
+
+    strategy:
+      # Les deux images sont indépendantes : si le shell échoue, l'API a
+      # quand même sa nouvelle image, et inversement.
+      fail-fast: false
+      matrix:
+        include:
+          - nom: web
+            dockerfile: apps/web/Dockerfile
+          - nom: api
+            dockerfile: apps/api/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Les noms d'images doivent être en minuscules ; le dépôt s'appelle
+      # « moasko/companyOS ». `github.repository` garde la casse d'origine,
+      # et ghcr.io la refuse.
+      - name: Nom de l'image
+        id: nom
+        run: echo "image=${REGISTRY}/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-${{ matrix.nom }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.nom.outputs.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # L'adresse de l'API est figée dans le bundle du shell : la
+          # changer impose de reconstruire. Réglable sans toucher au code
+          # via une variable de dépôt (Settings → Variables).
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL || 'http://companyos-apps-companyos-occsws-fcfac4-187-77-163-41.sslip.io' }}
+            NODE_HEAP_MO=6144
+          # Le cache du runner : une reconstruction ne refait pas
+          # `npm ci` ni les couches inchangées.
+          cache-from: type=gha,scope=${{ matrix.nom }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.nom }}
+
+      - name: Récapitulatif
+        run: |
+          echo "### Image \`${{ matrix.nom }}\` publiée" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
