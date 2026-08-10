@@ -67,8 +67,18 @@ await app.register(rateLimit, {
   // derrière le même NAT d'entreprise ne doivent pas se gêner.
   keyGenerator: (request) => request.user?.id || request.ip,
   addHeaders: { "retry-after": true },
+  // `statusCode: 429` est **obligatoire** ici. Sans lui, @fastify/rate-limit
+  // lève l'objet renvoyé comme une erreur ordinaire, que le gestionnaire de
+  // Fastify sérialise alors en **500** : la limite se déclenchait bien —
+  // requêtes bloquées, en-tête Retry-After correct — mais sous un code
+  // « erreur serveur » qui trompe le client et les sondes de supervision, et
+  // empêche le front d'afficher « trop de tentatives » plutôt qu'une panne.
+  // Trouvé en testant l'application déployée : 8 connexions en 401, puis des
+  // 500 au lieu des 429 attendus.
   errorResponseBuilder: (_request, contexte) => ({
-    error: `Trop de requêtes. Réessayez dans ${Math.ceil(contexte.ttl / 1000)} secondes.`,
+    statusCode: 429,
+    error: "Too Many Requests",
+    message: `Trop de requêtes. Réessayez dans ${Math.ceil(contexte.ttl / 1000)} secondes.`,
   }),
 });
 
