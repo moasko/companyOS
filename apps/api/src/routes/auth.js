@@ -4,6 +4,7 @@ import { prisma, serialize } from "../db.js";
 import { env } from "../env.js";
 import {
   authenticate,
+  estExploitant,
   exigerRole,
   hashPassword,
   signToken,
@@ -145,6 +146,18 @@ export default async function authRoutes(app) {
     // Message identique dans les deux cas : ne pas révéler quels e-mails existent.
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       return reply.code(401).send({ error: "Identifiants incorrects" });
+    }
+
+    // Espace suspendu : on le dit ici, avec le motif. `authenticate`
+    // refuserait de toute façon chaque requête suivante, mais l'utilisateur
+    // n'y verrait qu'une application qui ne répond plus — sans savoir que
+    // c'est une décision, ni laquelle.
+    if (user.tenant?.suspendu && !estExploitant(user.email)) {
+      return reply.code(403).send({
+        error: "Cet espace de travail est suspendu.",
+        motif: user.tenant.motifSuspension || null,
+        suspendu: true,
+      });
     }
 
     await journaliserPour(request, user, "session.connexion");

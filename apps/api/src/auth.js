@@ -39,9 +39,33 @@ export const authenticate = async (request, reply) => {
     return reply.code(401).send({ error: "Compte introuvable" });
   }
 
+  // Espace suspendu : la porte est fermée pour tout le monde, y compris
+  // pour son propriétaire.
+  //
+  // Le contrôle est ici et nulle part ailleurs. Le placer route par route,
+  // c'est en oublier une — et il suffit d'une seule pour qu'un espace
+  // suspendu continue d'envoyer du courrier.
+  //
+  // **Sauf pour l'exploitant de la plateforme.** Sans cette exception, il
+  // s'enfermerait dehors en suspendant son propre espace, et personne ne
+  // pourrait plus lever la suspension : les routes de la console exigent
+  // elles aussi d'être authentifié.
+  if (user.tenant?.suspendu && !estExploitant(user.email)) {
+    return reply.code(403).send({
+      error: "Cet espace de travail est suspendu.",
+      motif: user.tenant.motifSuspension || null,
+      suspendu: true,
+    });
+  }
+
   request.user = user;
   request.tenantId = user.tenantId;
 };
+
+/// L'exploitant du SaaS, reconnu à son adresse déclarée dans
+/// l'environnement. On ne devient pas exploitant depuis l'application.
+export const estExploitant = (email) =>
+  !!email && env.plateformeAdmins.includes(String(email).toLowerCase());
 
 /// Hiérarchie des rôles. Un rang plus élevé peut tout ce que peut le rang
 /// en dessous : inutile d'énumérer les combinaisons.

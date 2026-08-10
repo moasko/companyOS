@@ -119,6 +119,23 @@ export const api = {
   /// Configuration du stockage, côté exploitant. Le secret part en écriture
   /// mais ne revient jamais : la réponse n'en porte que les quatre derniers
   /// caractères.
+  /// Suspendre un espace, ou lever sa suspension. Rien n'est supprimé :
+  /// les données reviennent telles quelles à la levée.
+  plateformeSuspension: (tenantId, suspendu, motif) =>
+    request(`/plateforme/espaces/${tenantId}/suspension`, {
+      method: "PUT",
+      body: { suspendu, motif },
+    }),
+
+  /// Les membres d'un espace, vus par l'exploitant. Ni mot de passe ni
+  /// empreinte : savoir qui compose l'espace, pas se faire passer pour eux.
+  plateformeMembres: (tenantId) => request(`/plateforme/espaces/${tenantId}/membres`),
+  plateformeRoleMembre: (tenantId, userId, role) =>
+    request(`/plateforme/espaces/${tenantId}/membres/${userId}/role`, {
+      method: "PUT",
+      body: { role },
+    }),
+
   plateformeStockageLire: () => request("/plateforme/stockage"),
   plateformeStockageTest: (config) =>
     request("/plateforme/stockage/test", { method: "POST", body: config }),

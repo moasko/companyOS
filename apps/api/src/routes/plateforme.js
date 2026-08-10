@@ -52,6 +52,9 @@ export default async function plateformeRoutes(app) {
       slug: t.slug,
       plan: t.plan,
       prixMois: formuleDe(t.plan).prixMois,
+      suspendu: t.suspendu,
+      suspenduLe: t.suspenduLe,
+      motifSuspension: t.motifSuspension,
       utilisateurs: t._count.users,
       applications: t._count.installations,
       fiches: t._count.records,
@@ -113,6 +116,162 @@ export default async function plateformeRoutes(app) {
   // bonne clé, pas assez pour la reconstituer. Un navigateur, un cache ou
   // un journal de proxy n'ont pas à voir passer un secret qui donne accès
   // aux fichiers de toute la plateforme.
+
+  /// Les membres d'un espace, pour l'exploitant.
+  ///
+  /// C'est le premier appel du support : « je n'arrive plus à me
+  /// connecter », « mon associé est parti avec le compte propriétaire ».
+  /// Sans cette vue, aucune de ces deux phrases ne peut être traitée.
+  ///
+  /// Volontairement maigre, et **jamais le mot de passe ni son empreinte** :
+  /// l'exploitant a besoin de savoir qui compose un espace et avec quel
+  /// rôle, pas de pouvoir se faire passer pour quelqu'un.
+  app.get("/espaces/:id/membres", async (request, reply) => {
+    const espace = await prisma.tenant.findUnique({
+      where: { id: request.params.id },
+      select: { id: true, name: true },
+    });
+    if (!espace) {
+      return reply.code(404).send({ error: "Espace introuvable." });
+    }
+
+    const membres = await prisma.user.findMany({
+      where: { tenantId: espace.id },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      orderBy: { name: "asc" },
+    });
+
+    // Le propriétaire d'abord : c'est lui qu'on cherche neuf fois sur dix.
+    //
+    // Le tri se fait ici et non en base : Prisma ordonne un enum selon son
+    // **ordre de déclaration** dans le schéma, pas selon un rang métier.
+    // `orderBy: { role: "desc" }` remontait donc MEMBER en tête — l'inverse
+    // de ce qu'on veut, et sans rien signaler.
+    const RANG = { OWNER: 0, ADMIN: 1, MEMBER: 2 };
+    membres.sort((x, y) => RANG[x.role] - RANG[y.role] || x.name.localeCompare(y.name, "fr"));
+
+    const invitations = await prisma.invitation.count({
+      where: { tenantId: espace.id, acceptedAt: null },
+    });
+
+    return serialize({ espace, membres, invitationsEnAttente: invitations });
+  });
+
+  /// Changer le rôle d'un membre, depuis la console.
+  ///
+  /// La route équivalente existe déjà côté espace (`/auth/members/:id/role`)
+  /// mais elle est cloisonnée à l'espace de l'appelant — c'est justement ce
+  /// qu'on veut d'elle. L'exploitant a besoin de la même action **sur un
+  /// autre espace** : le cas réel est le propriétaire parti sans avoir
+  /// promu personne, et une entreprise entière bloquée derrière son compte.
+  app.put("/espaces/:id/membres/:userId/role", async (request, reply) => {
+    const parsed = z
+      .object({ role: z.enum(["OWNER", "ADMIN", "MEMBER"]) })
+      .safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Rôle inconnu." });
+    }
+
+    // Le membre est cherché **dans cet espace**, pas par son seul
+    // identifiant : sans ce filtre, une URL bricolée changerait le rôle de
+    // n'importe qui, dans n'importe quel espace.
+    const membre = await prisma.user.findFirst({
+      where: { id: request.params.userId, tenantId: request.params.id },
+      select: { id: true, name: true, email: true, role: true, tenantId: true },
+    });
+    if (!membre) {
+      return reply.code(404).send({ error: "Ce membre n'appartient pas à cet espace." });
+    }
+    if (membre.role === parsed.data.role) {
+      return { id: membre.id, role: membre.role, inchange: true };
+    }
+
+    // Un espace sans propriétaire n'a plus personne pour inviter, facturer
+    // ni régler quoi que ce soit — et rien dans l'application ne permet
+    // d'en refaire un. Rétrograder le dernier, c'est le condamner.
+    if (membre.role === "OWNER" && parsed.data.role !== "OWNER") {
+      const proprietaires = await prisma.user.count({
+        where: { tenantId: membre.tenantId, role: "OWNER" },
+      });
+      if (proprietaires <= 1) {
+        return reply.code(400).send({
+          error:
+            "C'est le dernier propriétaire de cet espace. Promouvez d'abord quelqu'un d'autre.",
+        });
+      }
+    }
+
+    const maj = await prisma.user.update({
+      where: { id: membre.id },
+      data: { role: parsed.data.role },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    await journaliser(request, "plateforme.role", membre.email, {
+      avant: membre.role,
+      apres: parsed.data.role,
+    });
+
+    return serialize(maj);
+  });
+
+  /// Suspendre un espace, ou lever sa suspension.
+  ///
+  /// Le seul levier de l'exploitant face à un client qui ne paie plus ou
+  /// qui abuse du service. **Rien n'est supprimé** : les données restent
+  /// intactes et reviennent telles quelles à la levée. C'est ce qui rend
+  /// l'action utilisable sans crainte — on suspend d'abord, on discute
+  /// ensuite.
+  ///
+  /// Le contrôle qui compte n'est pas ici mais dans `authenticate` : un
+  /// membre d'un espace suspendu est refusé sur **toutes** les routes, pas
+  /// seulement à la connexion.
+  app.put("/espaces/:id/suspension", async (request, reply) => {
+    const parsed = z
+      .object({
+        suspendu: z.boolean(),
+        // Le motif est montré à l'utilisateur qui tente de se connecter :
+        // « suspendu » sans explication transforme un litige commercial en
+        // incident technique, et fait perdre du temps aux deux parties.
+        motif: z.string().trim().max(280).optional(),
+      })
+      .safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0].message });
+    }
+
+    const espace = await prisma.tenant.findUnique({ where: { id: request.params.id } });
+    if (!espace) {
+      return reply.code(404).send({ error: "Espace introuvable." });
+    }
+
+    // On refuse de suspendre l'espace depuis lequel on agit : l'exploitant
+    // y échapperait par l'exception d'`authenticate`, mais ses collègues
+    // non — et la console deviendrait injoignable pour eux.
+    if (parsed.data.suspendu && espace.id === request.tenantId) {
+      return reply
+        .code(400)
+        .send({ error: "On ne suspend pas l'espace depuis lequel on administre la plateforme." });
+    }
+
+    const maj = await prisma.tenant.update({
+      where: { id: espace.id },
+      data: {
+        suspendu: parsed.data.suspendu,
+        suspenduLe: parsed.data.suspendu ? new Date() : null,
+        motifSuspension: parsed.data.suspendu ? parsed.data.motif || null : null,
+      },
+    });
+
+    await journaliser(
+      request,
+      parsed.data.suspendu ? "plateforme.suspension" : "plateforme.reprise",
+      espace.name,
+      { motif: parsed.data.motif || null },
+    );
+
+    return serialize({ id: maj.id, suspendu: maj.suspendu, suspenduLe: maj.suspenduLe });
+  });
 
   app.get("/stockage", async () => {
     const config = await chargerConfig();

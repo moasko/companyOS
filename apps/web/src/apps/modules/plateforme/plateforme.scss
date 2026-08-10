@@ -611,3 +611,115 @@ body[data-theme="dark"] .pltApp {
 }
 
 .pltApp .pltNoteEssai { margin: 0; }
+
+// ---------------------------------------------------------------------------
+// Espace suspendu
+// ---------------------------------------------------------------------------
+
+.pltApp {
+  // La ligne s'efface sans disparaître : un espace suspendu reste dans la
+  // liste — c'est justement lui qu'on vient chercher — mais il ne doit plus
+  // se lire comme un client actif.
+  tbody tr[data-suspendu="true"] {
+    opacity: 0.62;
+  }
+
+  // Une pastille, jamais une bordure latérale colorée.
+  .pltSuspendu {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 100px;
+    font-size: 0.62em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #fdece9;
+    color: #9a3412;
+    cursor: help;
+  }
+
+  .pltBascule {
+    border: 1px solid var(--plt-line, #e3e6eb);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.72em;
+    padding: 4px 12px;
+    border-radius: 100px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) { background: var(--plt-survol, rgb(31 39 51 / 6%)); }
+    &:disabled { opacity: 0.5; cursor: default; }
+
+    // Rouvrir est l'action franche ; suspendre reste sobre, parce qu'on ne
+    // suspend pas un client par mégarde.
+    &[data-suspendu="true"] {
+      border-color: #1d7a4c;
+      color: #1d7a4c;
+      font-weight: 600;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Membres d'un espace, dépliés sous sa ligne
+// ---------------------------------------------------------------------------
+
+.pltApp {
+  // Le nom devient l'affordance : c'est sur lui qu'on clique pour savoir
+  // qui compose l'espace, et c'est là que le doigt va d'instinct.
+  .pltNomBtn {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  .pltMembresLigne > td {
+    background: var(--plt-card, #f8f9fb);
+    padding: 10px 14px 12px;
+  }
+
+  .pltMembres ul {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 6px;
+  }
+
+  .pltMembres li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--plt-line, #e3e6eb);
+    border-radius: 8px;
+  }
+
+  .pltMembreNom {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    b { font-size: 0.8em; }
+    em {
+      font-style: normal;
+      font-size: 0.7em;
+      opacity: 0.7;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .pltDiscret { margin: 0; font-size: 0.72em; opacity: 0.7; }
+}

@@ -152,6 +152,22 @@ model Tenant {
   /// La configuration correspondante. La clé secrète y est chiffrée, comme
   /// celle de la plateforme — elle ne ressort jamais en clair.
   stockageS3 Json?
+  /// Espace suspendu : ses membres ne peuvent plus se connecter ni agir.
+  ///
+  /// C'est le seul levier de l'exploitant face à un client qui ne paie plus
+  /// ou qui abuse du service — un envoi de courrier en masse, par exemple,
+  /// où c'est la réputation de l'IP de la plateforme qui est en jeu.
+  ///
+  /// **Rien n'est supprimé.** Les données restent intactes et reviennent
+  /// telles quelles à la levée : une suspension est une porte fermée, pas
+  /// un effacement. C'est ce qui la rend utilisable sans crainte — on peut
+  /// suspendre d'abord et discuter ensuite.
+  suspendu   Boolean  @default(false)
+  suspenduLe DateTime?
+  /// Montré à l'utilisateur qui tente de se connecter : « suspendu » sans
+  /// motif transforme un litige commercial en incident technique, et fait
+  /// perdre du temps aux deux parties.
+  motifSuspension String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

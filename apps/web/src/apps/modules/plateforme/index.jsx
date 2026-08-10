@@ -116,6 +116,10 @@ function PlateformeApp() {
   const [filtre, setFiltre] = useState("tous");
   const [tri, setTri] = useState({ colonne: "stockage", croissant: false });
   const [occupe, setOccupe] = useState(false);
+  // Les membres de l'espace déplié, s'il y en a un. Chargés à la demande :
+  // les rapatrier pour tous les espaces à chaque affichage du tableau
+  // coûterait une requête par ligne pour une ligne qu'on ouvrira.
+  const [membres, setMembres] = useState(null);
 
   const charger = useCallback(async () => {
     try {
@@ -211,6 +215,87 @@ function PlateformeApp() {
     }
   };
 
+  /// Déplie ou replie la liste des membres d'un espace.
+  const basculerMembres = async (espace) => {
+    if (membres?.tenantId === espace.id) {
+      setMembres(null);
+      return;
+    }
+    setMembres({ tenantId: espace.id, chargement: true });
+    try {
+      const d = await api.plateformeMembres(espace.id);
+      setMembres({ tenantId: espace.id, ...d });
+    } catch (e) {
+      setMembres(null);
+      modal.alert({ title: "Membres illisibles", message: e.message, tone: "error" });
+    }
+  };
+
+  const changerRoleMembre = async (tenantId, membre, role) => {
+    if (role === membre.role) return;
+    setOccupe(true);
+    try {
+      await api.plateformeRoleMembre(tenantId, membre.id, role);
+      const d = await api.plateformeMembres(tenantId);
+      setMembres({ tenantId, ...d });
+    } catch (e) {
+      // Le refus le plus fréquent est « dernier propriétaire » : le message
+      // du serveur dit déjà quoi faire, on le montre tel quel.
+      modal.alert({ title: "Changement refusé", message: e.message, tone: "error" });
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  /// Suspendre un espace, ou lever sa suspension.
+  ///
+  /// La suspension demande un motif : il est montré à l'utilisateur qui
+  /// tente de se connecter. « Suspendu » sans explication transforme un
+  /// litige commercial en incident technique, et fait perdre du temps aux
+  /// deux parties.
+  const basculerSuspension = async (espace) => {
+    if (espace.suspendu) {
+      const ok = await modal.confirm({
+        title: `Rouvrir « ${espace.nom} » ?`,
+        message: "Ses membres pourront se reconnecter immédiatement.",
+        detail: espace.motifSuspension ? `Motif enregistré : ${espace.motifSuspension}` : undefined,
+        confirmLabel: "Rouvrir l'accès",
+      });
+      if (!ok) return;
+      await appliquerSuspension(espace, false, "");
+      return;
+    }
+
+    const motif = await modal.prompt({
+      title: `Suspendre « ${espace.nom} » ?`,
+      message:
+        "Ses membres ne pourront plus se connecter. Aucune donnée n'est supprimée : " +
+        "tout revient tel quel à la réouverture.",
+      detail: "Le motif sera montré à la personne qui tente de se connecter.",
+      placeholder: "Facture de mars impayée",
+      confirmLabel: "Suspendre l'espace",
+      danger: true,
+    });
+    if (motif === null) return;
+    await appliquerSuspension(espace, true, motif);
+  };
+
+  const appliquerSuspension = async (espace, suspendu, motif) => {
+    setOccupe(true);
+    try {
+      await api.plateformeSuspension(espace.id, suspendu, motif);
+      await etat.rafraichir();
+    } catch (e) {
+      modal.alert({
+        title: suspendu ? "Suspension impossible" : "Réouverture impossible",
+        message: e.message,
+        tone: "error",
+      });
+    } finally {
+      setOccupe(false);
+    }
+  };
+
   if (!ouvert) {
     return (
       <ModuleWindow manifest={manifest} className="pltApp">
@@ -280,6 +365,10 @@ function PlateformeApp() {
                         trierPar={trierPar}
                         occupe={occupe}
                         onChangerFormule={changerFormule}
+                        membres={membres}
+                        onVoirMembres={basculerMembres}
+                        onChangerRoleMembre={changerRoleMembre}
+                        onBasculerSuspension={basculerSuspension}
                       />
                     ) : null}
 
@@ -424,6 +513,11 @@ const FILTRES = [
 const Espaces = ({
   espaces, total, formules, recherche, setRecherche, filtre, setFiltre,
   tri, trierPar, occupe, onChangerFormule,
+  // Le tableau vit dans ce composant, l'état dans le parent : tout ce qu'il
+  // manipule doit lui arriver en propriété. Les avoir seulement déclarés
+  // au-dessus ne suffit pas — et `?.` ne protège pas d'un identifiant qui
+  // n'existe pas, il lève un ReferenceError et emporte l'écran entier.
+  membres, onVoirMembres, onChangerRoleMembre, onBasculerSuspension,
 }) => (
   <>
     <header className="pltTete">
@@ -488,6 +582,9 @@ const Espaces = ({
                   </button>
                 </th>
               ))}
+              {/* Colonne d'action : pas de tri, donc pas de bouton
+                  d'en-tête — un intitulé pour les lecteurs d'écran suffit. */}
+              <th scope="col">Accès</th>
             </tr>
           </thead>
           <tbody>
@@ -497,9 +594,28 @@ const Espaces = ({
                 ? Math.min(100, (Number(e.usedBytes) / Number(e.quota)) * 100)
                 : 0;
               return (
-                <tr key={e.id} data-alerte={alerte?.ton}>
+                <React.Fragment key={e.id}>
+                <tr data-alerte={alerte?.ton} data-suspendu={e.suspendu}>
                   <th scope="row" className="pltNom">
-                    <span>{e.nom}</span>
+                    <span>
+                      <button
+                        type="button"
+                        className="pltNomBtn"
+                        aria-expanded={membres?.tenantId === e.id}
+                        onClick={() => onVoirMembres(e)}
+                      >
+                        {e.nom}
+                      </button>
+                      {/* Une pastille, jamais une bordure latérale colorée.
+                          Elle porte le motif en infobulle : la question qui
+                          suit « pourquoi est-il fermé ? » ne doit pas
+                          obliger à rouvrir une fiche. */}
+                      {e.suspendu && (
+                        <b className="pltSuspendu" title={e.motifSuspension || "Sans motif"}>
+                          suspendu
+                        </b>
+                      )}
+                    </span>
                     <em>{e.slug}</em>
                   </th>
                   <td>
@@ -533,7 +649,59 @@ const Espaces = ({
                     </div>
                   </td>
                   <td data-num>{new Date(e.creeLe).toLocaleDateString("fr-FR")}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="pltBascule"
+                      data-suspendu={e.suspendu}
+                      disabled={occupe}
+                      onClick={() => onBasculerSuspension(e)}
+                    >
+                      {e.suspendu ? "Rouvrir" : "Suspendre"}
+                    </button>
+                  </td>
                 </tr>
+                {membres?.tenantId === e.id && (
+                  <tr className="pltMembresLigne">
+                    <td colSpan={COLONNES.length + 1}>
+                      {membres.chargement ? (
+                        <p className="pltDiscret">Chargement…</p>
+                      ) : (
+                        <div className="pltMembres">
+                          <ul>
+                            {membres.membres.map((m) => (
+                              <li key={m.id}>
+                                <span className="pltMembreNom">
+                                  <b>{m.name}</b>
+                                  <em>{m.email}</em>
+                                </span>
+                                <select
+                                  value={m.role}
+                                  disabled={occupe}
+                                  aria-label={`Rôle de ${m.name}`}
+                                  onChange={(ev) => onChangerRoleMembre(e.id, m, ev.target.value)}
+                                >
+                                  <option value="OWNER">Propriétaire</option>
+                                  <option value="ADMIN">Administrateur</option>
+                                  <option value="MEMBER">Membre</option>
+                                </select>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="pltDiscret">
+                            {membres.membres.length} membre
+                            {membres.membres.length > 1 ? "s" : ""}
+                            {membres.invitationsEnAttente > 0 &&
+                              ` · ${membres.invitationsEnAttente} invitation${
+                                membres.invitationsEnAttente > 1 ? "s" : ""
+                              } en attente`}
+                          </p>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
               );
             })}
           </tbody>
