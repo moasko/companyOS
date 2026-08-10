@@ -152,6 +152,7 @@ model Tenant {
   invitations   Invitation[]
   auditEvents   AuditEvent[]
   notifications Notification[]
+  mailCompteurs MailCompteur[]
 
   @@map("tenants")
 }
@@ -316,6 +317,47 @@ model FsNode {
   @@index([tenantId, parentId])
   @@index([tenantId, trashId])
   @@map("fs_nodes")
+}
+
+/// Compteur d'envois de courriels, par espace et par jour.
+///
+/// ─────────────────────────────────────────────────────────────────────────
+/// POURQUOI
+///
+/// Trois chemins font partir un courriel : l'app Courrier (envoi manuel),
+/// le moteur de campagnes, et les relances de factures. Tous les trois
+/// finissent sur le même relais SMTP, avec le nom de l'entreprise en
+/// expéditeur et la réputation SPF/DKIM du domaine en garantie.
+///
+/// Sans compteur, un seul compte membre — ou un jeton volé — suffit à
+/// transformer la plateforme en relais de spam : le temps qu'on s'en
+/// aperçoive, l'IP d'envoi est sur liste noire et **tous** les espaces ne
+/// reçoivent plus leurs factures. Le plafond est volontairement commun aux
+/// trois chemins : le compter par chemin laisserait additionner les trois.
+///
+/// Une ligne par espace et par jour, purgée au-delà de 90 jours par la
+/// tâche de fond. Le compteur sert aussi de piste : un pic est visible.
+/// ─────────────────────────────────────────────────────────────────────────
+model MailCompteur {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+
+  /// Le jour au format AAAA-MM-JJ, en UTC. Une chaîne et pas une date :
+  /// c'est une clé de regroupement, et la comparer ne doit pas dépendre du
+  /// fuseau du serveur.
+  jour String
+
+  /// Nombre de messages **effectivement remis au relais** — un envoi en
+  /// échec ne consomme pas le quota, sans quoi un relais mal configuré
+  /// épuiserait le plafond sans qu'un seul message parte.
+  envoyes Int @default(0)
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, jour])
+  @@map("mail_compteurs")
 }
 
 /// Réglages de la plateforme elle-même, au-dessus des espaces de travail.

@@ -41,6 +41,17 @@ const telechargementSchema = urlSchema.extend({
 /// De quoi lire un titre de page sans avaler le document entier.
 const APERCU_MAX = 64 * 1024;
 
+/// Le plafond des routes qui font sortir une requête du serveur.
+///
+/// Ces routes-là font émettre au serveur une connexion vers une adresse
+/// choisie par l'appelant. Les gardes anti-SSRF de `web.js` interdisent les
+/// adresses privées, mais rien n'empêchait de balayer les ports d'une
+/// machine publique un par un — le code d'erreur renvoyé distingue
+/// « connexion refusée » de « délai dépassé » — ni de retenir des
+/// connexions sortantes en série. Trente par minute suffisent largement à
+/// l'usage normal du Navigateur.
+const LIMITE_SORTANTE = { rateLimit: { max: 30, timeWindow: "1 minute" } };
+
 /// Plafond par téléchargement, indépendamment du quota. Il protège d'un
 /// serveur distant qui annonce 2 Ko et en envoie 20 Go.
 const FICHIER_MAX = 512 * 1024 * 1024;
@@ -215,13 +226,43 @@ export default async function webRoutes(app) {
       (cible) => `/api/web/voir/${creerVue(cible, vue.tenantId)}`,
     );
 
-    return reply
-      // Aucun en-tête du site distant n'est recopié : ni sa politique de
-      // sécurité, ni ses cookies, ni son refus de cadre.
-      .type("text/html; charset=utf-8")
-      .header("cache-control", "no-store")
-      .header("x-robots-tag", "noindex")
-      .send(html);
+    return (
+      reply
+        // Aucun en-tête du site distant n'est recopié : ni sa politique de
+        // sécurité, ni ses cookies, ni son refus de cadre.
+        .type("text/html; charset=utf-8")
+        .header("cache-control", "no-store")
+        .header("x-robots-tag", "noindex")
+        // La politique de sécurité de **notre** réponse.
+        //
+        // Ce document est du HTML tiers servi depuis l'origine de l'API.
+        // Jusqu'ici, la seule barrière était l'attribut `sandbox` du cadre
+        // côté client — c'est-à-dire une décision que le serveur ne
+        // contrôle pas et qu'une fenêtre échappée au bac à sable annule.
+        //
+        // La directive `sandbox` **en en-tête** ne peut, elle, pas être
+        // retirée par le client : elle s'applique au document lui-même, où
+        // qu'il soit chargé. `allow-popups` est conservé pour que les liens
+        // vers l'extérieur continuent de s'ouvrir ; volontairement pas
+        // `allow-popups-to-escape-sandbox`, ni `allow-same-origin`, ni
+        // `allow-scripts`.
+        .header(
+          "content-security-policy",
+          [
+            "sandbox allow-popups",
+            "default-src 'none'",
+            "img-src https: data:",
+            "style-src https: 'unsafe-inline'",
+            "font-src https: data:",
+            "frame-ancestors 'self'",
+            "form-action 'none'",
+            "base-uri 'none'",
+          ].join("; "),
+        )
+        .header("x-content-type-options", "nosniff")
+        .header("referrer-policy", "no-referrer")
+        .send(html)
+    );
   });
 
   /// Ce qu'il y a au bout de l'adresse, sans rien rapporter.
@@ -229,7 +270,7 @@ export default async function webRoutes(app) {
   /// Répond toujours, même pour un site en panne : c'est le Navigateur qui
   /// décide quoi montrer, et « ce site ne répond pas » est une information
   /// utile, pas une erreur de l'appel.
-  app.post("/inspecter", async (request, reply) => {
+  app.post("/inspecter", { config: LIMITE_SORTANTE }, async (request, reply) => {
     const donnees = lire(urlSchema, request.body, reply);
     if (!donnees) return reply;
     const { url } = donnees;
@@ -289,7 +330,7 @@ export default async function webRoutes(app) {
   });
 
   /// Rapporte le contenu d'une adresse dans le cloud de l'espace.
-  app.post("/telecharger", async (request, reply) => {
+  app.post("/telecharger", { config: LIMITE_SORTANTE }, async (request, reply) => {
     const donnees = lire(telechargementSchema, request.body, reply);
     if (!donnees) return reply;
     const { url, parentId } = donnees;

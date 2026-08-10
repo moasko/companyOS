@@ -78,10 +78,44 @@ export const decoder = (buffer, contentType) => {
 export const preparer = (html, base, lien) => {
   const $ = cheerio.load(html);
 
-  // 1. Les scripts partent. Ils ne s'exécuteraient pas de toute façon — le
-  //    cadre est sans `allow-scripts` — mais les laisser ferait télécharger
-  //    des mégaoctets pour rien.
-  $("script").remove();
+  // 1. Tout ce qui peut exécuter du code ou ouvrir un contexte part.
+  //
+  //    Retirer `<script>` ne suffisait pas, et c'était le trou : survivaient
+  //    les gestionnaires en ligne (`onload`, `onerror`, `onclick`…), les
+  //    `href="javascript:…"`, `<iframe srcdoc>`, `<object>`, `<embed>`,
+  //    `<svg onload>` et la balise `<base target="_blank">` du site distant.
+  //
+  //    Le cadre côté client est sans `allow-scripts` — mais il porte
+  //    `allow-popups-to-escape-sandbox` : une fenêtre ouverte par la page
+  //    naît **hors** du bac à sable, de premier niveau, sur l'origine de
+  //    l'API, et là les gestionnaires en ligne s'exécutent. La barrière ne
+  //    peut donc pas vivre côté client seul.
+  $(
+    "script, iframe, object, embed, applet, frame, frameset, base, link[rel~='import']",
+  ).remove();
+
+  // Les attributs `on*`, sur n'importe quelle balise. cheerio expose les
+  // attributs d'un nœud dans `el.attribs` : on les parcourt plutôt que
+  // d'énumérer une liste de noms, qui serait forcément incomplète.
+  $("*").each((_, el) => {
+    for (const nom of Object.keys(el.attribs || {})) {
+      if (/^on/i.test(nom)) $(el).removeAttr(nom);
+    }
+  });
+
+  // Les schémas exotiques dans les attributs qui déclenchent un chargement
+  // ou une navigation. `javascript:`, `data:` (qui peut porter du HTML) et
+  // `vbscript:` n'ont rien à faire ici ; `http(s)`, `mailto`, `tel` et les
+  // ancres restent.
+  $("[href], [src], [action], [formaction], [xlink\\:href]").each((_, el) => {
+    for (const attr of ["href", "src", "action", "formaction", "xlink:href"]) {
+      const valeur = String($(el).attr(attr) || "").trim();
+      if (!valeur) continue;
+      if (/^(javascript|data|vbscript|blob|file):/i.test(valeur)) {
+        $(el).removeAttr(attr);
+      }
+    }
+  });
 
   // 2. La politique de sécurité du document est celle du site distant.
   //    Servie depuis notre origine, elle bloquerait ses propres feuilles

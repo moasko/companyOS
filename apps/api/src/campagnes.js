@@ -21,7 +21,8 @@ import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { creerTransporteur, envoyerVia } from "./mail.js";
 import { journaliser } from "./audit.js";
-import { appliquerModele } from "@companyos/shared/courrier";
+import { compterEnvois, resteAEnvoyer } from "./quota-mail.js";
+import { adresseValide, appliquerModele } from "@companyos/shared/courrier";
 import {
   estMure,
   htmlDe,
@@ -158,6 +159,52 @@ export const passerLesCampagnes = async () => {
   return partis;
 };
 
+/// Les destinataires que le moteur accepte réellement de servir.
+///
+/// ─────────────────────────────────────────────────────────────────────────
+/// POURQUOI CE FILTRE EXISTE
+///
+/// Une campagne est une fiche `Record`, et les fiches s'écrivent par le
+/// CRUD générique (`POST /api/records/campagnes/campagnes`). L'écran
+/// compose la liste des destinataires à partir du CRM, en écartant les
+/// adresses invalides et les personnes désinscrites — mais l'écran n'est
+/// pas un contrôle : rien n'oblige à passer par lui.
+///
+/// Sans cette revalidation, n'importe quel membre écrivait une fiche avec
+/// les destinataires de son choix et le moteur envoyait, avec le nom de
+/// l'entreprise en expéditeur et un relais SPF/DKIM valide en garantie.
+/// C'est le scénario de phishing le plus crédible qu'on puisse offrir.
+///
+/// La règle est donc : on n'écrit qu'à une adresse valide, connue du CRM
+/// **du même espace**, et qui ne s'est pas désinscrite.
+/// ─────────────────────────────────────────────────────────────────────────
+const destinatairesServables = async (tenantId, destinataires) => {
+  const candidats = destinataires.filter(
+    (d) => d.statut === "attente" && adresseValide(d.email || ""),
+  );
+  if (!candidats.length) return [];
+
+  const clients = await prisma.record.findMany({
+    where: {
+      tenantId,
+      module: "crm",
+      collection: "clients",
+      id: { in: [...new Set(candidats.map((d) => d.clientId).filter(Boolean))] },
+    },
+  });
+
+  // Indexé par adresse et pas par identifiant : une fiche CRM peut être
+  // renommée ou recréée, c'est bien l'adresse qui doit avoir été saisie
+  // dans l'espace.
+  const connues = new Map(
+    clients
+      .filter((f) => !f.data?.emailDesinscrit)
+      .map((f) => [String(f.data?.email || "").toLowerCase(), f]),
+  );
+
+  return candidats.filter((d) => connues.has(String(d.email).toLowerCase()));
+};
+
 const avancerCampagne = async (fiche) => {
   const { tenantId } = fiche;
   const c = { ...fiche.data };
@@ -165,9 +212,28 @@ const avancerCampagne = async (fiche) => {
   const { transport, de, smtpUser } = await transporteurDe(tenantId);
   if (!transport) return 0; // pas de relais : la campagne attend, sans rien perdre
 
+  // Le plafond de l'espace, tous chemins d'envoi confondus. Atteint, la
+  // campagne n'échoue pas : elle attend demain. Une campagne marquée en
+  // échec parce qu'on a beaucoup écrit dans la journée serait une perte de
+  // travail, pas une protection.
+  const reste = await resteAEnvoyer(tenantId);
+  if (reste <= 0) return 0;
+
   const expediteur = de || `${tenant.name} <${smtpUser || "no-reply@localhost"}>`;
-  const enAttente = c.destinataires.filter((d) => d.statut === "attente").slice(0, LOT);
+  const servables = await destinatairesServables(tenantId, c.destinataires);
+  const enAttente = servables.slice(0, Math.min(LOT, reste));
   let partis = 0;
+
+  // Les destinataires écartés sont marqués une fois pour toutes : sans
+  // cela le moteur les réexaminerait à chaque passage, toutes les
+  // quarante-cinq secondes, indéfiniment.
+  for (const dest of c.destinataires) {
+    if (dest.statut !== "attente" || servables.includes(dest)) continue;
+    dest.statut = "echec";
+    dest.erreur = adresseValide(dest.email || "")
+      ? "Destinataire absent du CRM de l'espace, ou désinscrit."
+      : "Adresse invalide.";
+  }
 
   for (const dest of enAttente) {
     const variables = variablesPour(dest, tenant.name);
@@ -205,6 +271,8 @@ const avancerCampagne = async (fiche) => {
     // La pause qui fait la différence entre un expéditeur et un spammeur.
     await new Promise((r) => setTimeout(r, PAUSE_MS));
   }
+
+  if (partis) await compterEnvois(tenantId, partis);
 
   const bilan = resumeDe(c.destinataires);
   c.statut = bilan.attente === 0 ? "terminee" : "envoi";

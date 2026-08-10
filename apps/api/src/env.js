@@ -4,7 +4,7 @@ const required = (key) => {
   const value = process.env[key];
   if (!value) {
     throw new Error(
-      `Variable d'environnement manquante : ${key}. Copiez server/.env.example vers server/.env.`,
+      `Variable d'environnement manquante : ${key}. Copiez apps/api/.env.example vers apps/api/.env.`,
     );
   }
   return value;
@@ -21,6 +21,28 @@ export const env = {
   defaultTenantQuota: BigInt(
     process.env.DEFAULT_TENANT_QUOTA || 5 * 1024 * 1024 * 1024,
   ),
+
+  // Nombre de sauts de reverse-proxy à qui faire confiance pour lire
+  // l'adresse du client dans `X-Forwarded-For`. 0 = aucun (développement,
+  // le serveur est joint directement). 1 = un proxy devant, le cas normal
+  // en production. Ne jamais mettre `true` : cela reviendrait à croire
+  // n'importe quel client qui envoie l'en-tête lui-même, ce qui permet de
+  // maquiller son adresse dans le journal d'audit et de contourner la
+  // limitation de débit.
+  trustProxy: Number(process.env.TRUST_PROXY || 0),
+
+  // Taille maximale d'un fichier importé. 512 Mo était la valeur d'origine,
+  // mais le pilote S3 assemble l'objet en mémoire avant de l'envoyer :
+  // quatre imports simultanés à cette taille suffisaient à faire sortir le
+  // processus par manque de mémoire, et le conteneur emportait tous les
+  // espaces avec lui.
+  uploadMaxOctets: Number(process.env.UPLOAD_MAX_OCTETS || 128 * 1024 * 1024),
+
+  // Plafond d'envoi de courriels par espace et par 24 h — tous chemins
+  // confondus (Courrier, campagnes, relances de factures). Sans lui, un
+  // seul compte membre suffit à transformer la plateforme en relais de
+  // spam, avec la réputation SPF/DKIM du domaine en garantie.
+  mailQuotaJour: Number(process.env.MAIL_QUOTA_JOUR || 500),
 
   // Relais SMTP sortant — facultatif. Sans SMTP_HOST, aucun mail ne part
   // et les invitations fonctionnent par code, comme toujours.

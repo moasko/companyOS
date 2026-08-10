@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import { env } from "./env.js";
 import { prisma } from "./db.js";
 import authRoutes from "./routes/auth.js";
@@ -17,7 +19,57 @@ import campagnesRoutes from "./routes/campagnes.js";
 import plateformeRoutes from "./routes/plateforme.js";
 import { demarrerCampagnes } from "./campagnes.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  logger: true,
+  // Derrière le reverse-proxy de production, `request.ip` vaut sinon
+  // l'adresse du proxy : la limitation de débit compterait toutes les
+  // requêtes du monde comme venant d'une seule IP, et le journal d'audit
+  // enregistrerait la même adresse pour tout le monde. Avec ce réglage,
+  // Fastify lit `X-Forwarded-For` **lui-même**, en ne faisant confiance
+  // qu'au nombre de sauts déclaré — ce qui empêche un client de maquiller
+  // son adresse en envoyant l'en-tête à la main.
+  trustProxy: env.trustProxy,
+});
+
+// En-têtes de sécurité par défaut sur toutes les réponses de l'API.
+//
+// `contentSecurityPolicy: false` : l'API renvoie du JSON, pour lequel une
+// CSP n'a pas de sens — et les deux routes qui servent vraiment du HTML
+// (`/api/web/voir`, les pages de campagne) posent leur propre politique,
+// bien plus stricte que ce qu'un réglage global permettrait.
+//
+// `crossOriginResourcePolicy: false` : le shell vit sur un autre domaine
+// que l'API et doit pouvoir afficher les images et les vidéos servies par
+// `/api/files`. Le contrôle d'accès reste porté par le jeton, pas par
+// l'en-tête.
+await app.register(helmet, {
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false,
+});
+
+// Limitation de débit.
+//
+// Le plafond global est large : il ne sert qu'à écrêter l'abus grossier.
+// Les routes qui coûtent cher ou qui gardent un secret — connexion,
+// inscription, acceptation d'invitation, envoi de courriel, récupération
+// d'URL distante — posent le leur, bien plus bas, à leur déclaration.
+//
+// Sans cela, `bcrypt` à 12 tours n'est qu'un ralentisseur face au bourrage
+// d'identifiants, et rien n'empêche d'essayer des codes d'invitation en
+// boucle.
+await app.register(rateLimit, {
+  global: true,
+  max: 600,
+  timeWindow: "1 minute",
+  // La clé est l'IP, sauf pour une requête authentifiée : deux personnes
+  // derrière le même NAT d'entreprise ne doivent pas se gêner.
+  keyGenerator: (request) => request.user?.id || request.ip,
+  addHeaders: { "retry-after": true },
+  errorResponseBuilder: (_request, contexte) => ({
+    error: `Trop de requêtes. Réessayez dans ${Math.ceil(contexte.ttl / 1000)} secondes.`,
+  }),
+});
 
 await app.register(cors, {
   origin: env.corsOrigin,
@@ -28,7 +80,7 @@ await app.register(cors, {
   exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length"],
 });
 await app.register(multipart, {
-  limits: { fileSize: 512 * 1024 * 1024 }, // 512 Mo par fichier
+  limits: { fileSize: env.uploadMaxOctets },
 });
 
 app.get("/health", async () => ({ status: "ok" }));

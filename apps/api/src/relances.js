@@ -33,7 +33,8 @@ import {
   totaux,
   encaisse,
 } from "@companyos/shared/facturation";
-import { appliquerModele } from "@companyos/shared/courrier";
+import { adresseValide, appliquerModele } from "@companyos/shared/courrier";
+import { compterEnvois, peutEnvoyer } from "./quota-mail.js";
 
 const PALIERS_DEFAUT = [7, 15, 30];
 
@@ -139,7 +140,17 @@ const relancerEspace = async (installation) => {
     if (d.type !== "facture") continue;
     if (d.statut === "annule" || d.statut === "brouillon") continue;
     if (!d.echeance || d.echeance >= aujourdhui) continue;
-    if (!d.clientEmail) continue;
+    // L'adresse est validée ici, et pas seulement à la saisie : `clientEmail`
+    // vient d'une fiche `facturation/factures`, écrite par le CRUD
+    // générique. Sans ce contrôle, une « facture » forgée suffisait à faire
+    // écrire le robot à n'importe qui, six heures plus tard, au nom de
+    // l'entreprise.
+    if (!d.clientEmail || !adresseValide(d.clientEmail)) continue;
+
+    // Le plafond d'envoi de l'espace, partagé avec Courrier et Campagnes.
+    // Atteint, les relances restantes attendent le lendemain : elles ne
+    // sont pas marquées comme faites, donc rien n'est perdu.
+    if (!(await peutEnvoyer(tenantId, 1))) break;
 
     // Le reste dû, calculé par les règles de la Facturation elle-même.
     const du = totaux(d).ttc;
@@ -207,6 +218,7 @@ const relancerEspace = async (installation) => {
     });
 
     if (resultat.envoye) {
+      await compterEnvois(tenantId, 1);
       // L'état qui empêche le doublon — posé seulement si le mail est
       // vraiment parti : un échec de relais se retentera au passage suivant.
       await prisma.record.create({

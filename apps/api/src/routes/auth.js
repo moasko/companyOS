@@ -1,4 +1,5 @@
-﻿import { z } from "zod";
+﻿import { randomInt } from "node:crypto";
+import { z } from "zod";
 import { prisma, serialize } from "../db.js";
 import { env } from "../env.js";
 import {
@@ -8,7 +9,6 @@ import {
   signToken,
   verifyPassword,
 } from "../auth.js";
-import { randomInt } from "node:crypto";
 import { journaliser, journaliserPour } from "../audit.js";
 import { formuleDe } from "../formules.js";
 import { envoyerMail, mailInvitation } from "../mail.js";
@@ -47,11 +47,25 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/// Le plafond des routes qui gardent un secret : mot de passe pour la
+/// connexion, code pour l'invitation. Il s'ajoute au plafond global déclaré
+/// dans `index.js`, qui lui ne sert qu'à écrêter l'abus grossier.
+const LIMITE_SENSIBLE = {
+  rateLimit: { max: 8, timeWindow: "15 minutes" },
+};
+
+/// Créer un espace est plus coûteux qu'une simple écriture — une
+/// transaction, un hachage bcrypt, des dossiers, un catalogue — et chaque
+/// espace créé consomme un quota de stockage offert.
+const LIMITE_INSCRIPTION = {
+  rateLimit: { max: 5, timeWindow: "1 hour" },
+};
+
 export default async function authRoutes(app) {
   /// Inscription : crée l'espace de travail, son propriétaire, son quota
   /// et sa racine de fichiers — le tout en une transaction, pour ne jamais
   /// laisser un tenant à moitié construit.
-  app.post("/register", async (request, reply) => {
+  app.post("/register", { config: LIMITE_INSCRIPTION }, async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
@@ -115,7 +129,12 @@ export default async function authRoutes(app) {
     );
   });
 
-  app.post("/login", async (request, reply) => {
+  /// Huit tentatives par quart d'heure et par adresse IP.
+  ///
+  /// bcrypt à 12 tours coûte ~250 ms : c'est un ralentisseur, pas un mur.
+  /// Sans plafond, un attaquant qui parallélise essaie des milliers de mots
+  /// de passe par minute — et sature l'event loop du serveur au passage.
+  app.post("/login", { config: LIMITE_SENSIBLE }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides" });
@@ -535,7 +554,7 @@ export default async function authRoutes(app) {
 
   /// Rejoindre un espace avec un code. Route publique : la personne
   /// invitée n'a pas encore de compte.
-  app.post("/join", async (request, reply) => {
+  app.post("/join", { config: LIMITE_SENSIBLE }, async (request, reply) => {
     const parsed = z
       .object({
         code: z.string().min(6),

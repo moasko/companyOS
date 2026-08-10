@@ -21,6 +21,12 @@ import { piloteLecture } from "../storage.js";
 import { env } from "../env.js";
 import { creerTransporteur, envoyerVia } from "../mail.js";
 import { chiffrer } from "../chiffrement.js";
+import { compterEnvois, messageQuotaAtteint, peutEnvoyer } from "../quota-mail.js";
+import {
+  adresseValide,
+  adressesDe,
+  adressesInvalides,
+} from "@companyos/shared/courrier";
 
 /// L'installation de l'app Courrier pour cet espace — c'est elle qui
 /// porte les réglages SMTP.
@@ -35,6 +41,18 @@ const installationCourrier = async (tenantId) => {
 };
 
 const PIECE_JOINTE_MAX = 15 * 1024 * 1024; // 15 Mo : la limite des boîtes courantes.
+
+/// Nombre de destinataires acceptés dans un même message (`a` et `cc`
+/// comptés séparément). Au-delà, ce n'est plus du courrier : c'est un
+/// envoi de masse, et il a son module, avec son suivi et son lien de
+/// désinscription.
+const DESTINATAIRES_MAX = 25;
+
+/// Trente messages par quart d'heure et par personne. Un envoi manuel
+/// demande d'écrire le message : personne n'en compose deux par minute
+/// pendant un quart d'heure. Le plafond journalier de l'espace, lui, est
+/// tenu par `quota-mail.js`.
+const LIMITE_ENVOI = { rateLimit: { max: 30, timeWindow: "15 minutes" } };
 
 export default async function courrierRoutes(app) {
   app.addHook("preHandler", authenticate);
@@ -122,13 +140,51 @@ export default async function courrierRoutes(app) {
   });
 
   /// Envoi d'un courriel, pièce jointe du cloud comprise.
-  app.post("/envoyer", async (request, reply) => {
+  ///
+  /// ───────────────────────────────────────────────────────────────────────
+  /// CE QUE CETTE ROUTE NE DOIT PAS DEVENIR
+  ///
+  /// Un relais ouvert. Elle prend un destinataire, un sujet et un corps
+  /// libres, et les remet à un vrai relais SMTP avec le nom de l'entreprise
+  /// en expéditeur. Trois garde-fous, tous côté serveur :
+  ///
+  ///   1. les adresses sont validées ici — `adresseValide` existait déjà,
+  ///      mais n'était appliquée que par l'écran, c'est-à-dire nulle part ;
+  ///   2. le nombre de destinataires et la taille du message sont bornés ;
+  ///   3. l'envoi passe par le compteur commun de `quota-mail.js`.
+  ///
+  /// Elle reste ouverte aux MEMBER : envoyer un courriel est le geste
+  /// quotidien du module, l'interdire aux non-administrateurs reviendrait à
+  /// donner ADMIN à tout le monde — ce qui supprimerait le contrôle plutôt
+  /// que de l'appliquer.
+  /// ───────────────────────────────────────────────────────────────────────
+  app.post("/envoyer", { config: LIMITE_ENVOI }, async (request, reply) => {
+    /// Une liste d'adresses séparées par des virgules, dont **chaque**
+    /// entrée est une adresse valide. Nodemailer accepte la liste : sans
+    /// cette vérification, `a` valait n'importe quelle chaîne de trois
+    /// caractères et pouvait porter autant de destinataires qu'on voulait.
+    const listeAdresses = (max, champ) =>
+      z
+        .string()
+        .trim()
+        .refine((v) => adressesDe(v).length > 0, `${champ} : aucune adresse valide.`)
+        .refine(
+          (v) => adressesDe(v).every(adresseValide),
+          (v) => ({
+            message: `${champ} : adresse invalide (${adressesInvalides(v).slice(0, 3).join(", ")}).`,
+          }),
+        )
+        .refine(
+          (v) => adressesDe(v).length <= max,
+          `${champ} : ${max} destinataires au plus. Pour un envoi de masse, utilisez Campagnes.`,
+        );
+
     const parsed = z
       .object({
-        a: z.string().trim().min(3),
-        cc: z.string().trim().optional(),
-        sujet: z.string().trim().min(1, "Le sujet est requis."),
-        texte: z.string().min(1, "Le message est vide."),
+        a: listeAdresses(DESTINATAIRES_MAX, "Destinataire"),
+        cc: listeAdresses(DESTINATAIRES_MAX, "Copie").optional(),
+        sujet: z.string().trim().min(1, "Le sujet est requis.").max(200, "Sujet trop long (200 caractères)."),
+        texte: z.string().min(1, "Le message est vide.").max(100_000, "Message trop long."),
         // Jusqu'à cinq fichiers du cloud. `pieceJointeId` (singulier) reste
         // accepté pour les intégrations écrites avant le pluriel.
         piecesJointes: z.array(z.string()).max(5, "Cinq pièces jointes au plus.").optional(),
@@ -143,6 +199,13 @@ export default async function courrierRoutes(app) {
       ...(parsed.data.piecesJointes || []),
       ...(parsed.data.pieceJointeId ? [parsed.data.pieceJointeId] : []),
     ].filter((id, i, l) => l.indexOf(id) === i);
+
+    // Le plafond du jour est vérifié **avant** de lire les pièces jointes :
+    // inutile de sortir 15 Mo du stockage pour un message qui ne partira pas.
+    const destinataires = adressesDe(a).length + adressesDe(cc || "").length;
+    if (!(await peutEnvoyer(request.tenantId, destinataires))) {
+      return reply.code(429).send({ error: messageQuotaAtteint() });
+    }
 
     // Le relais de l'espace d'abord, celui de la plateforme en secours.
     const installation = await installationCourrier(request.tenantId);
@@ -200,6 +263,14 @@ export default async function courrierRoutes(app) {
       texte,
       piecesJointes: piecesJointes.length ? piecesJointes : undefined,
     });
+
+    // Seuls les messages effectivement remis au relais consomment le
+    // quota : un relais mal configuré épuiserait sinon le plafond de
+    // l'espace sans qu'un seul courriel n'arrive, et l'administrateur
+    // chercherait longtemps d'où vient le blocage.
+    if (resultat.envoye) {
+      await compterEnvois(request.tenantId, destinataires);
+    }
 
     // L'historique dit aussi les échecs : un mail qu'on croit parti et
     // qui n'est jamais arrivé est le pire des silences.
