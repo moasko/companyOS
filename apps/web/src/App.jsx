@@ -5,6 +5,7 @@ import "./i18nextConf";
 import { appliquerLangue } from "./utils/langue";
 import "./index.css";
 import "./utils/scroll.scss";
+import "./utils/mobile.scss";
 
 import {
   BandPane,
