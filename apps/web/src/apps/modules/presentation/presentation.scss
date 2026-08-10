@@ -1,0 +1,377 @@
+// Présentations — voir index.jsx.
+//
+// La feuille est courte à dessein : tout le chrome d'édition (ruban,
+// miniatures, zone de diapositive) vient du moteur lui-même, avec son
+// propre thème clair/sombre. Ne reste à habiller que la coquille : le
+// volet des présentations, la barre du document et l'écran d'accueil.
+
+.pptApp {
+  --ppt-bg: #ffffff;
+  --ppt-panel: #f5f6f8;
+  --ppt-line: #e3e6eb;
+  --ppt-text: #1f2733;
+  --ppt-muted: #6b7684;
+  --ppt-accent: #c43e1c; // l'orange PowerPoint, celui de l'icône
+  --ppt-accent-soft: #fbe9e4;
+
+  background: var(--ppt-bg);
+  color: var(--ppt-text);
+
+  // Une diapositive 16:9 avec ruban et miniatures demande de la largeur.
+  &.floatTab[data-size="mini"] {
+    width: 84%;
+    height: 86%;
+    top: 6%;
+    left: 8%;
+    min-width: 900px;
+    min-height: 580px;
+  }
+
+  .pptVerrou {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    font-size: 0.84em;
+    color: var(--ppt-muted);
+  }
+
+  .pptShell {
+    display: flex;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  // ---- Volet des documents ------------------------------------------------
+
+  .pptVolet {
+    width: 218px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--ppt-panel);
+    border-right: 1px solid var(--ppt-line);
+
+    &[data-replie="true"] {
+      display: none;
+    }
+  }
+
+  .pptVoletBarre {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 10px 8px 14px;
+  }
+
+  .pptVoletTitre {
+    font-size: 0.78em;
+    font-weight: 600;
+  }
+
+  .pptVoletActions {
+    display: flex;
+    gap: 2px;
+  }
+
+  .pptOutil {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    color: var(--ppt-muted);
+
+    &:hover {
+      background: color-mix(in srgb, var(--ppt-text) 8%, transparent);
+      color: var(--ppt-text);
+    }
+  }
+
+  // Volet replié : une poignée fine pour le rouvrir.
+  .pptVoletPoignee {
+    width: 22px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ppt-panel);
+    border-right: 1px solid var(--ppt-line);
+    color: var(--ppt-muted);
+
+    &:hover {
+      color: var(--ppt-text);
+      background: color-mix(in srgb, var(--ppt-text) 6%, var(--ppt-panel));
+    }
+  }
+
+  .pptVoletCorps {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 0 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 0.8em;
+  }
+
+  .pptVoletVide {
+    padding: 14px 8px;
+    font-size: 0.92em;
+    line-height: 1.55;
+    color: var(--ppt-muted);
+  }
+
+  .pptVoletSection {
+    margin: 12px 6px 4px;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ppt-muted);
+  }
+
+  .pptDoc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    color: var(--ppt-text);
+
+    .uicon {
+      display: flex;
+      color: var(--ppt-accent);
+      flex-shrink: 0;
+    }
+
+    &:hover {
+      background: color-mix(in srgb, var(--ppt-text) 7%, transparent);
+    }
+
+    &[data-actif="true"] {
+      background: var(--ppt-accent-soft);
+      font-weight: 600;
+    }
+  }
+
+  .pptDocNom {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pptDocPoubelle {
+    display: none;
+    padding: 3px;
+    border-radius: 4px;
+    color: var(--ppt-muted);
+
+    &:hover {
+      color: #d93025;
+    }
+  }
+
+  .pptDoc:hover .pptDocPoubelle {
+    display: flex;
+  }
+
+  .pptDocHeritage .uicon {
+    color: var(--ppt-muted);
+  }
+
+  // ---- Scène --------------------------------------------------------------
+
+  .pptScene {
+    flex-grow: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+
+    // L'éditeur remplit son parent — c'est son contrat : « donnez-lui une
+    // boîte avec une vraie hauteur ».
+    > * {
+      flex-grow: 1;
+      min-height: 0;
+    }
+  }
+
+  // ---- Barre du document --------------------------------------------------
+
+  .pptBarreDoc {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--ppt-line);
+    background: var(--ppt-bg);
+
+    .uicon {
+      display: flex;
+      color: var(--ppt-accent);
+      flex-shrink: 0;
+    }
+  }
+
+  .pptTitreDoc {
+    flex-grow: 1;
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 4px 8px;
+    background: transparent;
+    color: var(--ppt-text);
+    font-size: 0.84em;
+    font-weight: 600;
+    font-family: inherit;
+
+    &:hover {
+      border-color: var(--ppt-line);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--ppt-accent);
+      background: var(--ppt-bg);
+    }
+  }
+
+  .pptEtatDoc {
+    flex-shrink: 0;
+    font-size: 0.7em;
+    color: var(--ppt-muted);
+
+    &[data-modifie="true"] {
+      color: #b26a00;
+    }
+
+    // L'échec prime sur tout le reste : c'est le seul état où l'utilisateur
+    // risque de perdre son travail sans le savoir.
+    &[data-echec="true"] {
+      color: #d93025;
+      font-weight: 600;
+      cursor: help;
+    }
+  }
+
+  // Enregistrer vit dans la barre de CompanyOS : le bouton du moteur, lui,
+  // téléchargerait le fichier sur la machine — hors du produit.
+  .pptEnregistrer {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+    padding: 5px 12px;
+    border-radius: 6px;
+    background: var(--ppt-accent);
+    color: #ffffff;
+    font-size: 0.74em;
+    font-weight: 600;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ppt-accent) 88%, #000);
+    }
+
+    &[data-inactif="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  // ---- Le moteur incrusté -------------------------------------------------
+  //
+  // Il apporte son ruban, ses miniatures et sa zone de diapositive ; on ne
+  // lui demande que de remplir la place restante.
+  .pptMoteur {
+    flex-grow: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+
+    > div {
+      flex-grow: 1;
+      min-height: 0;
+    }
+
+    // Sa barre de titre fait double emploi avec celle de CompanyOS : même
+    // nom de fichier, plus un réglage d'enregistrement automatique qui
+    // parle d'un chemin sur la machine — notion sans objet ici, où le
+    // document vit dans le cloud. Le bouton « Present » qu'elle portait se
+    // retrouve tel quel dans l'onglet « Slide Show », donc rien ne se perd.
+    //
+    // Le sélecteur est structurel faute de mieux : à l'intérieur, tout est
+    // habillé de classes utilitaires générées.
+    > div > div > div:first-child {
+      display: none;
+    }
+  }
+
+  .pptPatiente,
+  .pptAccueil {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    gap: 12px;
+    padding: 40px;
+    text-align: center;
+    color: var(--ppt-muted);
+
+    p {
+      max-width: 52ch;
+      font-size: 0.8em;
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    .uicon {
+      display: flex;
+    }
+  }
+
+  .pptAccueilTitre {
+    font-size: 1.25em;
+    font-weight: 600;
+    color: var(--ppt-text);
+  }
+
+  .pptAccueilActions {
+    margin-top: 8px;
+  }
+
+  .pptAccueilBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: 7px;
+    background: var(--ppt-accent);
+    color: #ffffff;
+    font-size: 0.8em;
+    font-weight: 600;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ppt-accent) 88%, #000);
+    }
+  }
+}
+
+body[data-theme="dark"] .pptApp {
+  --ppt-bg: #1f2226;
+  --ppt-panel: #17191d;
+  --ppt-line: #33383f;
+  --ppt-text: #e6e8ea;
+  --ppt-muted: #9aa2ad;
+  --ppt-accent: #e8795c;
+  --ppt-accent-soft: #45261f;
+
+  .pptAccueilBtn {
+    color: #14161a;
+  }
+}

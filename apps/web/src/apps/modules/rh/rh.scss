@@ -1,0 +1,1016 @@
+// Ressources humaines — trois colonnes : filtres, personnel, dossier.
+//
+// Même architecture que le Stock, la Facturation et le CRM : la liste reste
+// visible pendant qu'on travaille un dossier. Jetons de thème de la charte
+// CompanyOS, thème sombre en fin de fichier.
+
+.rhApp {
+  --rh-bg: #ffffff;
+  --rh-panel: #f8f9fb;
+  --rh-card: #ffffff;
+  --rh-line: #e3e6eb;
+  --rh-text: #1f2733;
+  --rh-muted: #6b7684;
+  --rh-accent: #1a73e8;
+  --rh-accent-soft: #e8f0fe;
+  --rh-field: #ffffff;
+  --rh-green: #188038;
+  --rh-amber: #b06000;
+  --rh-red: #d93025;
+  --rh-rayon: 8px;
+
+  background: var(--rh-bg);
+  color: var(--rh-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 82%;
+    height: 80%;
+    top: 9%;
+    left: 9%;
+    min-width: 980px;
+    min-height: 560px;
+  }
+
+  .rhLocked {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-grow: 1;
+    color: var(--rh-muted);
+    font-size: 0.85em;
+  }
+
+  .rhShell {
+    position: relative;
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr) 380px;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  // ---- Barre latérale -----------------------------------------------------
+
+  .rhNav {
+    border-right: 1px solid var(--rh-line);
+    padding: 10px 8px;
+    overflow-y: auto;
+    min-height: 0;
+    background: var(--rh-panel);
+  }
+
+  .rhNavItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.78em;
+    color: var(--rh-muted);
+    margin-bottom: 2px;
+
+    .uicon {
+      display: flex;
+      flex-shrink: 0;
+    }
+
+    span:not(.rhPastille) {
+      flex-grow: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &:hover {
+      background: rgb(107 118 132 / 10%);
+    }
+
+    &[data-actif="true"] {
+      background: var(--rh-accent-soft);
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+  }
+
+  // Les demandes en attente sont la seule chose du module qui exige une
+  // action : elles doivent se voir sans ouvrir l'onglet.
+  .rhPastille {
+    flex-shrink: 0;
+    min-width: 18px;
+    padding: 1px 6px;
+    border-radius: 100px;
+    background: var(--rh-amber);
+    color: #fff;
+    font-size: 0.82em;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .rhNavTitre {
+    margin: 18px 10px 6px;
+    font-size: 0.66em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--rh-muted);
+  }
+
+  .rhFiltre {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 0.78em;
+    color: var(--rh-text);
+
+    &:hover {
+      background: rgb(107 118 132 / 10%);
+    }
+
+    &[data-actif="true"] {
+      background: var(--rh-accent-soft);
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+  }
+
+  .rhFiltreCompte {
+    flex-shrink: 0;
+    font-size: 0.85em;
+    font-weight: 400;
+    color: var(--rh-muted);
+  }
+
+  // ---- Contenu ------------------------------------------------------------
+
+  .rhMain {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .rhStats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rh-line);
+    border-bottom: 1px solid var(--rh-line);
+    flex-shrink: 0;
+  }
+
+  .rhStat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+    background: var(--rh-bg);
+    min-width: 0;
+
+    &[data-ton="info"] .rhStatVal {
+      color: var(--rh-accent);
+    }
+
+    &[data-ton="bad"] .rhStatVal {
+      color: var(--rh-red);
+    }
+
+    &.handcr:hover {
+      background: var(--rh-panel);
+    }
+  }
+
+  .rhStatVal {
+    font-size: 1.02em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rhStatLbl {
+    font-size: 0.68em;
+    color: var(--rh-muted);
+  }
+
+  .rhBarre {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rh-line);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .rhRecherche {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-grow: 1;
+    min-width: 180px;
+    padding: 6px 10px;
+    border: 1px solid var(--rh-line);
+    border-radius: 6px;
+    background: var(--rh-field);
+    color: var(--rh-muted);
+
+    &:focus-within {
+      border-color: var(--rh-accent);
+    }
+
+    input {
+      flex-grow: 1;
+      min-width: 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.78em;
+      color: var(--rh-text);
+
+      &::placeholder {
+        color: var(--rh-muted);
+      }
+    }
+
+    .uicon {
+      display: flex;
+      cursor: pointer;
+    }
+  }
+
+  // ---- Tableaux -----------------------------------------------------------
+
+  .rhTable {
+    min-height: 0;
+    padding-bottom: 10px;
+  }
+
+  .rhTr {
+    display: grid;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--rh-line);
+    font-size: 0.76em;
+
+    &:hover:not(.rhTh) {
+      background: var(--rh-panel);
+    }
+
+    &[data-actif="true"] {
+      background: var(--rh-accent-soft);
+    }
+  }
+
+  .rhTh {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--rh-bg);
+    font-size: 0.66em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--rh-muted);
+  }
+
+  .rhTrSal {
+    grid-template-columns: 32px minmax(0, 1.7fr) minmax(0, 1.2fr) 130px 110px 116px 74px 96px;
+  }
+
+  .rhTrAbs {
+    grid-template-columns: minmax(0, 1.4fr) 150px 100px 100px 60px 110px 28px;
+  }
+
+  .rhTdNom {
+    min-width: 0;
+
+    strong {
+      display: block;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    em {
+      font-style: normal;
+      font-size: 0.86em;
+      color: var(--rh-muted);
+    }
+  }
+
+  // Marqueur « · absent » posé à côté du nom dans la liste. Nommé à part de
+  // `.rhAbsent`, qui est une ligne de grille : deux règles sur une même
+  // classe finissent toujours par se marcher dessus.
+  .rhEstAbsent {
+    font-style: normal;
+    color: var(--rh-accent);
+    font-weight: 400;
+  }
+
+  .rhNum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+
+    // Un solde négatif est une anomalie de gestion, pas une nuance.
+    &[data-alerte="true"] {
+      color: var(--rh-red);
+      font-weight: 600;
+    }
+  }
+
+  .rhMuted {
+    color: var(--rh-muted);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rhTag {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 100px;
+    font-size: 0.86em;
+    white-space: nowrap;
+    background: rgb(107 118 132 / 14%);
+    color: var(--rh-muted);
+
+    &[data-ton="ok"] {
+      background: rgb(24 128 56 / 12%);
+      color: var(--rh-green);
+    }
+
+    &[data-ton="info"] {
+      background: var(--rh-accent-soft);
+      color: var(--rh-accent);
+    }
+
+    &[data-ton="warn"] {
+      background: rgb(176 96 0 / 12%);
+      color: var(--rh-amber);
+    }
+
+    &[data-ton="bad"] {
+      background: rgb(217 48 37 / 12%);
+      color: var(--rh-red);
+    }
+  }
+
+  .rhSens {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    color: var(--rh-muted);
+
+    &[data-ton="info"] {
+      color: var(--rh-accent);
+    }
+
+    &[data-ton="warn"] {
+      color: var(--rh-amber);
+    }
+
+    &[data-ton="bad"] {
+      color: var(--rh-red);
+    }
+
+    .uicon {
+      display: flex;
+      flex-shrink: 0;
+    }
+  }
+
+  .rhRetirer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    color: var(--rh-muted);
+
+    &:hover {
+      background: rgb(217 48 37 / 12%);
+      color: var(--rh-red);
+    }
+  }
+
+  // ---- Demandes à décider -------------------------------------------------
+
+  .rhSousTitre {
+    font-size: 0.68em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--rh-muted);
+    margin: 18px 16px 10px;
+  }
+
+  .rhDemande {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    margin: 0 14px 8px;
+    // Cadre complet en ambre : une demande en attente se voit sans qu'on
+    // ait besoin d'un filet à gauche.
+    border: 1px solid var(--rh-amber);
+    border-radius: var(--rh-rayon);
+    background: var(--rh-card);
+  }
+
+  .rhDemandeInfo {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .rhDemandeNom {
+    font-size: 0.8em;
+    font-weight: 600;
+  }
+
+  .rhDemandeMeta {
+    font-size: 0.7em;
+    color: var(--rh-muted);
+    margin-top: 1px;
+  }
+
+  .rhDemandeSolde {
+    font-size: 0.7em;
+    color: var(--rh-muted);
+    margin-top: 3px;
+
+    &[data-alerte="true"] {
+      color: var(--rh-red);
+      font-weight: 600;
+    }
+  }
+
+  .rhDemandeActions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .rhAbsent {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    margin: 0 14px 6px;
+    border: 1px solid var(--rh-line);
+    border-radius: 6px;
+    font-size: 0.76em;
+
+    &:hover {
+      border-color: var(--rh-accent);
+    }
+  }
+
+  .rhAbsentNom {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // ---- Analyse et réglages ------------------------------------------------
+
+  .rhAnalyse {
+    padding: 16px 18px;
+    min-height: 0;
+
+    .rhSousTitre {
+      margin: 6px 0 10px;
+
+      &:not(:first-child) {
+        margin-top: 26px;
+      }
+    }
+  }
+
+  .rhAlerte {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border: 1px solid var(--rh-line);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 0.76em;
+
+    &:hover {
+      border-color: var(--rh-accent);
+    }
+  }
+
+  .rhAlerteNom {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rhJauge {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) 170px;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.76em;
+    margin-bottom: 8px;
+  }
+
+  .rhJaugeNom {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rhJaugeFond {
+    height: 8px;
+    border-radius: 100px;
+    background: rgb(107 118 132 / 14%);
+    overflow: hidden;
+  }
+
+  .rhJaugeVal {
+    display: block;
+    height: 100%;
+    border-radius: 100px;
+    background: var(--rh-accent);
+  }
+
+  .rhJaugeChiffre {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+
+    em {
+      font-style: normal;
+      color: var(--rh-muted);
+    }
+  }
+
+  .rhJours {
+    display: flex;
+    gap: 5px;
+
+    span {
+      flex: 1;
+      text-align: center;
+      padding: 7px 4px;
+      border: 1px solid var(--rh-line);
+      border-radius: 6px;
+      font-size: 0.72em;
+      color: var(--rh-muted);
+      background: var(--rh-card);
+
+      &[data-actif="true"] {
+        border-color: var(--rh-accent);
+        background: var(--rh-accent-soft);
+        color: var(--rh-accent);
+        font-weight: 600;
+      }
+    }
+  }
+
+  .rhReadonly {
+    padding: 7px 9px;
+    border: 1px solid var(--rh-line);
+    border-radius: 6px;
+    background: var(--rh-panel);
+    font-size: 0.76em;
+    color: var(--rh-muted);
+  }
+
+  // ---- Panneau ------------------------------------------------------------
+
+  .rhPanneau {
+    border-left: 1px solid var(--rh-line);
+    background: var(--rh-panel);
+    padding: 14px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .rhPanVide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 100%;
+    padding: 30px 16px;
+    text-align: center;
+    font-size: 0.76em;
+    color: var(--rh-muted);
+  }
+
+  .rhPanTitre {
+    font-size: 0.88em;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .rhPanTete {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .rhPhoto {
+    position: relative;
+    flex-shrink: 0;
+    line-height: 0;
+  }
+
+  .rhPhotoBtn {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--rh-panel);
+    background: var(--rh-accent);
+    color: #fff;
+
+    &:hover {
+      background: #1667d2;
+    }
+
+    .uicon {
+      display: flex;
+    }
+  }
+
+  .rhPanInfo {
+    min-width: 0;
+  }
+
+  .rhPanNom {
+    font-size: 0.92em;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rhPanMeta {
+    font-size: 0.7em;
+    color: var(--rh-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rhResume {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--rh-line);
+    border-radius: var(--rh-rayon);
+    background: var(--rh-card);
+    margin-bottom: 12px;
+
+    strong {
+      display: block;
+      font-size: 0.94em;
+      font-variant-numeric: tabular-nums;
+
+      &[data-ton="ok"] {
+        color: var(--rh-green);
+      }
+
+      &[data-ton="bad"] {
+        color: var(--rh-red);
+      }
+    }
+  }
+
+  .rhResumeLbl {
+    display: block;
+    font-size: 0.66em;
+    color: var(--rh-muted);
+    margin-bottom: 1px;
+  }
+
+  .rhOnglets {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 7px;
+    background: rgb(107 118 132 / 10%);
+    margin-bottom: 14px;
+
+    span {
+      flex: 1;
+      text-align: center;
+      padding: 6px 4px;
+      border-radius: 5px;
+      font-size: 0.74em;
+      color: var(--rh-muted);
+
+      &[data-actif="true"] {
+        background: var(--rh-card);
+        color: var(--rh-text);
+        font-weight: 600;
+      }
+    }
+  }
+
+  .rhField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+
+  .rhLabel {
+    font-size: 0.7em;
+    color: var(--rh-muted);
+  }
+
+  // `minmax(0, …)` : la valeur par défaut d'une piste est `auto`, donc un
+  // champ au contenu large refuserait de rétrécir et pousserait son voisin.
+  .rhDeux {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 10px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    width: 100%;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.76em;
+    color: var(--rh-text);
+    background: var(--rh-field);
+    border: 1px solid var(--rh-line);
+    border-radius: 6px;
+    padding: 7px 9px;
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: var(--rh-accent);
+    }
+
+    &:disabled {
+      background: var(--rh-panel);
+      color: var(--rh-muted);
+    }
+  }
+
+  .rhRecap {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 0.76em;
+    color: var(--rh-muted);
+    padding: 6px 0;
+    border-top: 1px solid var(--rh-line);
+
+    strong {
+      color: var(--rh-text);
+      font-variant-numeric: tabular-nums;
+
+      &[data-ton="ok"] {
+        color: var(--rh-green);
+      }
+
+      &[data-ton="bad"] {
+        color: var(--rh-red);
+      }
+    }
+  }
+
+  .rhRecapFort {
+    font-size: 0.86em;
+    color: var(--rh-text);
+    border-top: 2px solid var(--rh-line);
+    padding-top: 8px;
+  }
+
+  .rhHisto {
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+  }
+
+  .rhHistoLigne {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--rh-line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .rhHistoIcone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: rgb(107 118 132 / 14%);
+    color: var(--rh-muted);
+
+    &[data-ton="info"] {
+      background: var(--rh-accent-soft);
+      color: var(--rh-accent);
+    }
+
+    &[data-ton="warn"] {
+      background: rgb(176 96 0 / 14%);
+      color: var(--rh-amber);
+    }
+
+    &[data-ton="bad"] {
+      background: rgb(217 48 37 / 14%);
+      color: var(--rh-red);
+    }
+  }
+
+  .rhHistoInfo {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .rhHistoTitre {
+    font-size: 0.78em;
+  }
+
+  .rhHistoMeta {
+    font-size: 0.68em;
+    color: var(--rh-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  // ---- Boutons et états vides ---------------------------------------------
+
+  .rhPrimary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 0.74em;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 6px;
+    background: var(--rh-accent);
+    color: #fff;
+    white-space: nowrap;
+
+    .uicon {
+      display: flex;
+    }
+
+    &:hover {
+      background: #1667d2;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  .rhBtnGhost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.73em;
+    padding: 7px 13px;
+    border: 1px solid var(--rh-line);
+    border-radius: 6px;
+    background: var(--rh-card);
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #c7d0dd;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    &.rhDanger {
+      color: var(--rh-red);
+
+      &:hover {
+        border-color: var(--rh-red);
+      }
+    }
+  }
+
+  .rhFormActions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 14px 0 10px;
+  }
+
+  .rhNote {
+    font-size: 0.72em;
+    line-height: 1.55;
+    color: var(--rh-muted);
+    background: var(--rh-accent-soft);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+
+  .rhVide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-grow: 1;
+    padding: 40px;
+    text-align: center;
+    font-size: 0.8em;
+    color: var(--rh-muted);
+  }
+
+  .rhEmptyBox {
+    margin: 0 14px;
+    padding: 14px;
+    border: 1px dashed var(--rh-line);
+    border-radius: 6px;
+    font-size: 0.74em;
+    line-height: 1.5;
+    color: var(--rh-muted);
+  }
+
+  .rhNotice {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    border-radius: 100px;
+    background: #1f2733;
+    color: #fff;
+    font-size: 0.74em;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
+    z-index: 5;
+  }
+}
+
+body[data-theme="dark"] .rhApp {
+  --rh-bg: #1e1e26;
+  --rh-panel: #262630;
+  --rh-card: #2b2b36;
+  --rh-line: #35353f;
+  --rh-text: #e8e8ee;
+  --rh-muted: #9a9aa8;
+  --rh-accent: #6ea8ff;
+  --rh-accent-soft: #26344a;
+  --rh-field: #23232c;
+  --rh-green: #6cc98a;
+  --rh-amber: #e0a458;
+  --rh-red: #e2716a;
+
+  .rhBtnGhost:hover {
+    border-color: #4a4a58;
+  }
+
+  .rhNotice {
+    background: #3a3a48;
+  }
+}

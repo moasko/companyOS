@@ -1,0 +1,627 @@
+// Moteur d'exécution des applications du Studio — même charte que les
+// modules livrés dans le dépôt, pour qu'une app créée ne détonne pas.
+
+.cstApp {
+  --cst-bg: #ffffff;
+  --cst-panel: #f8f9fb;
+  --cst-card: #ffffff;
+  --cst-line: #e3e6eb;
+  --cst-text: #1f2733;
+  --cst-muted: #6b7684;
+  --cst-accent: #1a73e8;
+  --cst-accent-soft: #e8f0fe;
+  --cst-field: #ffffff;
+  --cst-red: #d93025;
+
+  background: var(--cst-bg);
+  color: var(--cst-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 70%;
+    height: 72%;
+    top: 12%;
+    left: 15%;
+    min-width: 660px;
+    min-height: 440px;
+  }
+
+  .cstLocked {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    padding: 30px;
+    text-align: center;
+    font-size: 0.82em;
+    color: var(--cst-muted);
+    line-height: 1.5;
+  }
+
+  .cstShell {
+    display: flex;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .cstNav {
+    width: 172px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--cst-line);
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .cstNavItem {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 11px;
+      border-radius: 6px;
+      font-size: 0.76em;
+      color: var(--cst-muted);
+
+      .uicon {
+        display: flex;
+      }
+
+      &:hover {
+        background: rgb(0 0 0 / 3%);
+      }
+
+      &[data-active="true"] {
+        background: var(--cst-accent-soft);
+        color: var(--cst-accent);
+        font-weight: 600;
+      }
+    }
+  }
+
+  .cstMain {
+    flex-grow: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 24px 28px;
+  }
+
+  .cstSection {
+    padding-bottom: 22px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--cst-line);
+
+    &:last-of-type {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    h2 {
+      font-size: 0.92em;
+      font-weight: 600;
+      margin: 0;
+    }
+  }
+
+  .cstSectionHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .cstHeadBtns {
+    display: flex;
+    gap: 7px;
+    flex-shrink: 0;
+  }
+
+  .cstHint {
+    font-size: 0.72em;
+    color: var(--cst-muted);
+    margin: 3px 0 14px;
+  }
+
+  .cstLabel {
+    font-size: 0.72em;
+    color: var(--cst-muted);
+  }
+
+  .cstField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+    min-width: 0;
+
+    &[data-large="true"] {
+      grid-column: 1 / -1;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      font-size: 0.76em;
+      font-family: inherit;
+      color: var(--cst-text);
+      background: var(--cst-field);
+      border: 1px solid var(--cst-line);
+      border-radius: 6px;
+      padding: 8px 11px;
+      resize: none;
+
+      &::placeholder {
+        color: #9aa4b2;
+      }
+
+      &:focus {
+        border-color: var(--cst-accent);
+        outline: none;
+      }
+    }
+  }
+
+  .cstCheck {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.76em;
+    padding: 7px 0;
+
+    input {
+      width: auto;
+      accent-color: var(--cst-accent);
+    }
+  }
+
+  .cstGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+
+  .cstEmptyBox {
+    font-size: 0.74em;
+    color: var(--cst-muted);
+    line-height: 1.5;
+    padding: 16px;
+    border: 1px dashed var(--cst-line);
+    border-radius: 7px;
+    background: var(--cst-panel);
+  }
+
+  .cstTable {
+    border: 1px solid var(--cst-line);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .cstTHead,
+  .cstTRow {
+    display: grid;
+    gap: 12px;
+    padding: 8px 12px;
+    align-items: center;
+  }
+
+  .cstTHead {
+    background: var(--cst-panel);
+    border-bottom: 1px solid var(--cst-line);
+    font-size: 0.66em;
+    font-weight: 600;
+    color: var(--cst-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .cstTRow {
+    font-size: 0.76em;
+    border-bottom: 1px solid var(--cst-line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background: var(--cst-panel);
+    }
+
+    &[data-active="true"] {
+      background: var(--cst-accent-soft);
+    }
+
+    .cstCell {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .cstBtnGhost {
+    font-size: 0.73em;
+    padding: 7px 14px;
+    border: 1px solid var(--cst-line);
+    border-radius: 6px;
+    background: var(--cst-card);
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #c7d0dd;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    &.cstDanger {
+      color: var(--cst-red);
+
+      &:hover {
+        border-color: var(--cst-red);
+      }
+    }
+  }
+
+  .cstFormActions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .cstPrimary {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 6px;
+    background: var(--cst-accent);
+    color: #fff;
+
+    .uicon {
+      display: flex;
+    }
+
+    &:hover {
+      background: #1667d2;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  .cstNotice {
+    position: sticky;
+    bottom: 0;
+    margin-top: 16px;
+    padding: 8px 0;
+    font-size: 0.73em;
+    color: var(--cst-accent);
+    background: var(--cst-bg);
+  }
+}
+
+body[data-theme="dark"] .cstApp {
+  --cst-bg: #1b1b22;
+  --cst-panel: #202029;
+  --cst-card: #262630;
+  --cst-line: #35353f;
+  --cst-text: #e8e8ee;
+  --cst-muted: #9a9aa8;
+  --cst-accent: #6f8dff;
+  --cst-accent-soft: #2a3050;
+  --cst-field: #262630;
+  --cst-red: #f08078;
+
+  .cstNav .cstNavItem:hover,
+  .cstBtnGhost:hover {
+    border-color: #4a4a58;
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .cstPrimary:hover {
+    background: #5f7cf0;
+  }
+}
+
+// ---- Vues alternatives : cartes et kanban ---------------------------------
+
+.cstApp {
+  .cstCartes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+
+  .cstCarte {
+    padding: 12px 14px;
+    border: 1px solid var(--cst-line, #e3e6eb);
+    border-radius: 10px;
+
+    &:hover {
+      border-color: var(--cst-accent, #7c3aed);
+    }
+
+    &[data-active="true"] {
+      border-color: var(--cst-accent, #7c3aed);
+      background: var(--cst-accent-soft, #f6f2ff);
+    }
+  }
+
+  .cstCarteTitre {
+    font-size: 0.86em;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .cstCarteLigne {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.74em;
+    padding: 2px 0;
+  }
+
+  .cstCarteLabel {
+    color: var(--cst-muted, #6b7684);
+  }
+
+  .cstKanban {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+
+  .cstKColonne {
+    flex: 0 0 210px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cstKTitre {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 7px;
+    background: var(--cst-panel, #f7f8fa);
+    font-size: 0.76em;
+    font-weight: 600;
+
+    em {
+      font-style: normal;
+      color: var(--cst-muted, #6b7684);
+      font-weight: 400;
+    }
+  }
+
+  .cstKCarte {
+    padding: 9px 11px;
+    border: 1px solid var(--cst-line, #e3e6eb);
+    border-radius: 8px;
+    background: var(--cst-bg, #fff);
+
+    &:hover {
+      border-color: var(--cst-accent, #7c3aed);
+    }
+
+    &[data-active="true"] {
+      border-color: var(--cst-accent, #7c3aed);
+    }
+  }
+
+  .cstKCarteTitre {
+    font-size: 0.78em;
+    font-weight: 600;
+  }
+
+  .cstKCarteSous {
+    font-size: 0.72em;
+    color: var(--cst-muted, #6b7684);
+    margin-top: 2px;
+  }
+
+  // ---- Tableau de bord ----------------------------------------------------
+
+  .cstWidgets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+  }
+
+  .cstWidget {
+    padding: 16px 18px;
+    border: 1px solid var(--cst-line, #e3e6eb);
+    border-radius: 10px;
+
+    &[data-large="true"] {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .cstWidgetTitre {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cst-muted, #6b7684);
+    margin-bottom: 8px;
+  }
+
+  .cstWidgetValeur {
+    font-size: 1.7em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cstWidgetParts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cstWidgetPart {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 100px 34px;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.76em;
+  }
+
+  .cstWidgetPartNom {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cstWidgetPiste {
+    height: 8px;
+    border-radius: 100px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    overflow: hidden;
+  }
+
+  .cstWidgetRemplie {
+    display: block;
+    height: 100%;
+    border-radius: 100px;
+    background: var(--cst-accent, #7c3aed);
+  }
+
+  .cstWidgetPart b {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Un titre de section dans la fiche : coupe la grille en blocs.
+  .cstFicheSection {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--cst-line, #e3e6eb);
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cst-muted, #6b7684);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Applications « site web » du Studio
+//
+// Deux présentations : le site dans la fenêtre quand il accepte le cadre,
+// et un message franc quand il le refuse. Voir src/apps/CustomWebApp.jsx.
+// ---------------------------------------------------------------------------
+
+.customWebApp {
+  .webAppCadre {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--cst-bg, #f7f8f9);
+  }
+
+  .webAppBarre {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: var(--cst-panel, #fff);
+    border-bottom: 1px solid var(--cst-line, rgb(0 0 0 / 8%));
+    font-size: 12px;
+
+    code {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--cst-muted, #6b7684);
+      font-family: inherit;
+    }
+
+    button {
+      border: 1px solid var(--cst-line, rgb(0 0 0 / 12%));
+      background: transparent;
+      color: inherit;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+
+      &:hover { background: var(--cst-accent-soft, #e8f3f3); }
+    }
+  }
+
+  iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+    min-height: 0;
+    background: #fff;
+  }
+
+  .webAppMessage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 100%;
+    padding: 32px;
+    text-align: center;
+    background: var(--cst-panel, #fff);
+
+    h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0;
+      max-width: 420px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--cst-muted, #6b7684);
+    }
+  }
+
+  .webAppAdresse {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    span {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    code {
+      font-size: 12.5px;
+      color: var(--cst-text, #16232b);
+      word-break: break-all;
+    }
+  }
+
+  .webAppBouton {
+    margin-top: 4px;
+    border: none;
+    background: var(--cst-accent, #057378);
+    color: #fff;
+    font-size: 13px;
+    padding: 7px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+}

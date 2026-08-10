@@ -1,0 +1,6 @@
+# CompanyOS — application privée : chaque espace de travail est derrière
+# une authentification. Seule la page de présentation a vocation à être
+# indexée.
+
+User-agent: *
+Disallow: /

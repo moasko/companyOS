@@ -1,0 +1,52 @@
+import React, { Suspense } from "react";
+import { createRoot } from "react-dom/client";
+import { Provider } from "react-redux";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import App from "./App";
+import store from "./reducers";
+
+// Deux gestionnaires d'état, et c'est voulu :
+//
+//   Redux         l'état de l'OS lui-même — fenêtres ouvertes, position,
+//                 thème, fond d'écran, menu Démarrer. Rien à voir avec le
+//                 serveur : c'est de l'état local, synchrone, qu'on ne
+//                 recharge pas.
+//   React Query   tout ce qui vient de l'API. Ce n'est pas de l'état, c'est
+//                 un cache : il a une fraîcheur, il peut échouer, et deux
+//                 fenêtres qui affichent la même liste doivent voir la même
+//                 chose. Voir src/api/queries.js.
+//
+// La confusion entre les deux est ce qui produisait quarante copies de la
+// même liste de factures, une par module qui en avait besoin.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Les données de gestion changent à l'échelle de la minute, pas de la
+      // seconde. Recharger à chaque prise de focus faisait clignoter les
+      // listes dès qu'on passait d'une fenêtre de l'OS à une autre.
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      // Une seule reprise : au-delà, l'erreur est réelle et il vaut mieux
+      // la montrer que faire attendre devant un écran vide.
+      retry: 1,
+    },
+  },
+});
+
+const root = createRoot(document.getElementById("root"));
+
+root.render(
+  <Suspense
+    fallback={
+      <div id="sus-fallback">
+        <h1>Loading</h1>
+      </div>
+    }
+  >
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <App />
+      </Provider>
+    </QueryClientProvider>
+  </Suspense>,
+);

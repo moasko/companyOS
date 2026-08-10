@@ -1,11 +1,14 @@
 # CompanyOS en production — pensé pour Dokploy.
 #
-# Trois services : la base, l'API, le front. Dokploy lit ce fichier tel
-# quel (service « Docker Compose »), fournit les variables d'environnement
-# depuis son onglet Environment, et attache les domaines via son interface :
+# Trois services : la base, l'API, le shell. Dokploy lit ce fichier tel quel
+# (service « Docker Compose »), fournit les variables d'environnement depuis
+# son onglet Environment, et attache les domaines via son interface :
 #
-#   - domaine du front  → service web,  port 80
-#   - domaine de l'API  → service api,  port 4000
+#   - domaine du shell → service web, port 80
+#   - domaine de l'API → service api, port 4000
+#
+# Les deux images se construisent depuis la **racine du dépôt** : c'est là
+# que vivent le package.json des workspaces et le lockfile.
 #
 # Les données vivent dans deux volumes : la base et les fichiers du cloud.
 # Sans eux, chaque redéploiement effacerait les espaces de travail.
@@ -28,7 +31,8 @@ services:
 
   api:
     build:
-      context: ./server
+      context: .
+      dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
@@ -37,11 +41,18 @@ services:
       DATABASE_URL: postgresql://companyos:${POSTGRES_PASSWORD}@postgres:5432/companyos?schema=public
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      # Le domaine public du front, pour le CORS — https compris.
+      # Clé de chiffrement des secrets de configuration (S3, SMTP). Distincte
+      # du secret JWT : une rotation de session ne doit pas rendre les
+      # secrets stockés illisibles.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Le domaine public du shell, pour le CORS — https compris.
       CORS_ORIGIN: ${CORS_ORIGIN}
       STORAGE_DRIVER: local
       STORAGE_LOCAL_PATH: /data/storage
       DEFAULT_TENANT_QUOTA: ${DEFAULT_TENANT_QUOTA:-5368709120}
+      # Plafond d'envoi de courriels par espace et par 24 h — garde-fou
+      # contre l'usage de la plateforme comme relais de spam.
+      MAIL_QUOTA_JOUR: ${MAIL_QUOTA_JOUR:-500}
       # Relais SMTP sortant (invitations par mail). Facultatif : sans
       # SMTP_HOST, les invitations fonctionnent par code uniquement.
       SMTP_HOST: ${SMTP_HOST:-}
@@ -54,6 +65,9 @@ services:
       PUBLIC_API_URL: ${VITE_API_URL}
       # La console Plateforme : les emails des exploitants du SaaS.
       PLATFORM_ADMINS: ${PLATFORM_ADMINS:-}
+      # Derrière le reverse-proxy de Dokploy : sans cela, la limitation de
+      # débit compterait toutes les requêtes comme venant d'une seule IP.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
     volumes:
       - storage-data:/data/storage
     expose:
@@ -62,9 +76,9 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: apps/web/Dockerfile
       args:
-        # Figée dans le build du front : le domaine public de l'API.
+        # Figée dans le build du shell : le domaine public de l'API.
         VITE_API_URL: ${VITE_API_URL}
     restart: unless-stopped
     depends_on:

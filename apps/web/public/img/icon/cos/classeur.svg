@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Classeur">
+  <path d="M13 0h22a13 13 0 0 1 13 13v22a13 13 0 0 1-13 13H4a4 4 0 0 1-4-4V13A13 13 0 0 1 13 0Z" fill="#107c41"/>
+  <rect x="9" y="13" width="30" height="24" rx="3" fill="#fff"/>
+  <rect x="9" y="13" width="30" height="6" rx="3" fill="#107c41" opacity=".5"/>
+  <rect x="9" y="16" width="30" height="3" fill="#107c41" opacity=".5"/>
+  <g stroke="#107c41" stroke-width="1.3" opacity=".32">
+    <path d="M19 19v18M29 19v18"/>
+    <path d="M9 25h30M9 31h30"/>
+  </g>
+  <path d="M21.4 26.6 26.6 33M26.6 26.6 21.4 33" stroke="#107c41" stroke-width="2.1"
+        stroke-linecap="round" fill="none"/>
+</svg>

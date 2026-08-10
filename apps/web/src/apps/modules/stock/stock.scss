@@ -1,0 +1,1091 @@
+// Stock — trois colonnes : catégories, catalogue, fiche produit.
+//
+// L'ancien module tenait en une colonne parce qu'il n'avait que trois
+// champs à montrer. Un vrai catalogue se navigue par rayons, se regarde en
+// images et se corrige sans quitter la grille : les trois zones sont donc
+// visibles en permanence, comme dans n'importe quel logiciel de gestion.
+//
+// Les jetons de thème restent ceux de la charte CompanyOS (voir le
+// générateur QR) : mêmes noms, mêmes valeurs, thème sombre en fin de
+// fichier.
+
+.stkApp {
+  --stk-bg: #ffffff;
+  --stk-panel: #f8f9fb;
+  --stk-card: #ffffff;
+  --stk-line: #e3e6eb;
+  --stk-text: #1f2733;
+  --stk-muted: #6b7684;
+  --stk-accent: #1a73e8;
+  --stk-accent-soft: #e8f0fe;
+  --stk-field: #ffffff;
+  --stk-green: #188038;
+  --stk-amber: #b06000;
+  --stk-red: #d93025;
+  --stk-rayon: 8px;
+
+  background: var(--stk-bg);
+  color: var(--stk-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 82%;
+    height: 80%;
+    top: 9%;
+    left: 9%;
+    min-width: 940px;
+    min-height: 560px;
+  }
+
+  .stkLocked {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-grow: 1;
+    color: var(--stk-muted);
+    font-size: 0.85em;
+  }
+
+  .stkShell {
+    position: relative;
+    display: grid;
+    // La colonne centrale est en `minmax(0, 1fr)` : sans le 0, une grille
+    // de produits large pousserait les deux autres colonnes hors de la
+    // fenêtre au lieu de défiler.
+    //
+    // Le panneau de droite porte la fiche produit entière — image, prix,
+    // seuil, mouvements — avec des champs par paires. En dessous de 380 px
+    // ces paires deviennent illisibles, et l'image se réduit à une vignette.
+    grid-template-columns: 216px minmax(0, 1fr) 380px;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  // ---- Barre latérale -----------------------------------------------------
+
+  .stkNav {
+    border-right: 1px solid var(--stk-line);
+    padding: 10px 8px;
+    overflow-y: auto;
+    min-height: 0;
+    background: var(--stk-panel);
+  }
+
+  .stkNavItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.78em;
+    color: var(--stk-muted);
+    margin-bottom: 2px;
+
+    .uicon {
+      display: flex;
+      flex-shrink: 0;
+    }
+
+    &:hover {
+      background: rgb(107 118 132 / 10%);
+    }
+
+    &[data-actif="true"] {
+      background: var(--stk-accent-soft);
+      color: var(--stk-accent);
+      font-weight: 600;
+    }
+  }
+
+  .stkNavTitre {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 18px 6px 6px;
+    font-size: 0.66em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--stk-muted);
+  }
+
+  .stkNavPlus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    color: var(--stk-muted);
+
+    &:hover {
+      background: var(--stk-accent-soft);
+      color: var(--stk-accent);
+    }
+  }
+
+  .stkCat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    font-size: 0.78em;
+    color: var(--stk-text);
+
+    &:hover {
+      background: rgb(107 118 132 / 10%);
+
+      .stkCatEdit {
+        opacity: 1;
+      }
+    }
+
+    &[data-actif="true"] {
+      background: var(--stk-accent-soft);
+      color: var(--stk-accent);
+      font-weight: 600;
+    }
+  }
+
+  // Gouttière réservée même sans chevron : sinon les libellés d'un même
+  // niveau ne s'alignent pas selon qu'ils ont ou non des enfants.
+  .stkCatChevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    flex-shrink: 0;
+    color: var(--stk-muted);
+  }
+
+  .stkCatNom {
+    flex-grow: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stkCatCompte {
+    flex-shrink: 0;
+    font-size: 0.85em;
+    font-weight: 400;
+    color: var(--stk-muted);
+  }
+
+  .stkCatEdit {
+    display: flex;
+    flex-shrink: 0;
+    opacity: 0;
+    color: var(--stk-muted);
+
+    &:hover {
+      color: var(--stk-accent);
+    }
+  }
+
+  .stkCatActions {
+    display: flex;
+    gap: 12px;
+    padding: 10px 10px 4px;
+    margin-top: 6px;
+    border-top: 1px solid var(--stk-line);
+    font-size: 0.72em;
+    color: var(--stk-muted);
+
+    span:hover {
+      color: var(--stk-accent);
+      text-decoration: underline;
+    }
+
+    .stkDanger:hover {
+      color: var(--stk-red);
+    }
+  }
+
+  // ---- Contenu ------------------------------------------------------------
+
+  .stkMain {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .stkStats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--stk-line);
+    border-bottom: 1px solid var(--stk-line);
+    flex-shrink: 0;
+  }
+
+  .stkStat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+    background: var(--stk-bg);
+
+    &[data-ton="warn"] .stkStatVal {
+      color: var(--stk-amber);
+    }
+
+    &[data-ton="bad"] .stkStatVal {
+      color: var(--stk-red);
+    }
+
+    &.handcr:hover {
+      background: var(--stk-panel);
+    }
+  }
+
+  .stkStatVal {
+    font-size: 1.05em;
+    font-weight: 600;
+  }
+
+  .stkStatLbl {
+    font-size: 0.68em;
+    color: var(--stk-muted);
+  }
+
+  .stkBarre {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--stk-line);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .stkRecherche {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-grow: 1;
+    min-width: 180px;
+    padding: 6px 10px;
+    border: 1px solid var(--stk-line);
+    border-radius: 6px;
+    background: var(--stk-field);
+    color: var(--stk-muted);
+
+    &:focus-within {
+      border-color: var(--stk-accent);
+    }
+
+    input {
+      flex-grow: 1;
+      min-width: 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.78em;
+      color: var(--stk-text);
+
+      &::placeholder {
+        color: var(--stk-muted);
+      }
+    }
+
+    .uicon {
+      display: flex;
+      cursor: pointer;
+    }
+  }
+
+  .stkVues {
+    display: flex;
+    border: 1px solid var(--stk-line);
+    border-radius: 6px;
+    overflow: hidden;
+
+    span {
+      display: flex;
+      align-items: center;
+      padding: 6px 9px;
+      color: var(--stk-muted);
+      background: var(--stk-card);
+
+      &[data-actif="true"] {
+        background: var(--stk-accent-soft);
+        color: var(--stk-accent);
+      }
+    }
+  }
+
+  // ---- Grille de produits -------------------------------------------------
+
+  .stkGrille {
+    display: grid;
+    // `auto-fill` plutôt qu'un nombre fixe de colonnes : la fenêtre est
+    // redimensionnable, la grille doit suivre sans point de rupture écrit
+    // à la main.
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 14px;
+    overflow-y: auto;
+    min-height: 0;
+    align-content: start;
+  }
+
+  .stkCarte {
+    border: 1px solid var(--stk-line);
+    border-radius: var(--stk-rayon);
+    background: var(--stk-card);
+    padding: 8px;
+    transition: border-color 120ms ease, transform 120ms ease;
+
+    &:hover {
+      border-color: #c7d0dd;
+      transform: translateY(-1px);
+    }
+
+    &[data-actif="true"] {
+      border-color: var(--stk-accent);
+      box-shadow: 0 0 0 1px var(--stk-accent);
+    }
+  }
+
+  .stkCarteImg {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    // Carré : un catalogue dont les vignettes n'ont pas toutes la même
+    // hauteur se lit mal, quelles que soient les photos fournies.
+    aspect-ratio: 1;
+    border-radius: 6px;
+    background: rgb(107 118 132 / 8%);
+    color: var(--stk-muted);
+    overflow: hidden;
+    margin-bottom: 8px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .stkPastille {
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    min-width: 22px;
+    padding: 2px 6px;
+    border-radius: 100px;
+    font-size: 0.66em;
+    font-weight: 600;
+    text-align: center;
+    color: #fff;
+    background: var(--stk-green);
+
+    &[data-ton="warn"] {
+      background: var(--stk-amber);
+    }
+
+    &[data-ton="bad"] {
+      background: var(--stk-red);
+    }
+  }
+
+  .stkCarteNom {
+    font-size: 0.78em;
+    font-weight: 600;
+    // Deux lignes au plus : au-delà, les cartes d'une même rangée cessent
+    // d'avoir la même hauteur et la grille se déforme.
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+    min-height: 2.6em;
+  }
+
+  .stkCarteMeta {
+    font-size: 0.68em;
+    color: var(--stk-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .stkCartePrix {
+    font-size: 0.76em;
+    font-weight: 600;
+    color: var(--stk-accent);
+    margin-top: 4px;
+  }
+
+  // ---- Tableaux -----------------------------------------------------------
+
+  .stkTable {
+    overflow-y: auto;
+    min-height: 0;
+    padding-bottom: 10px;
+  }
+
+  .stkTr {
+    display: grid;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--stk-line);
+    font-size: 0.76em;
+
+    &:hover:not(.stkTh) {
+      background: var(--stk-panel);
+    }
+
+    &[data-actif="true"] {
+      background: var(--stk-accent-soft);
+    }
+  }
+
+  .stkTh {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--stk-bg);
+    font-size: 0.66em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--stk-muted);
+  }
+
+  .stkTrArt {
+    grid-template-columns: 32px minmax(0, 2.2fr) minmax(0, 1.4fr) 90px 60px 110px 100px;
+  }
+
+  .stkTrMvt {
+    grid-template-columns: 92px minmax(0, 1.6fr) 110px 90px minmax(0, 1.4fr) 110px;
+  }
+
+  .stkTrFrn {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 130px 110px 28px;
+  }
+
+  .stkTdImg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    background: rgb(107 118 132 / 8%);
+    color: var(--stk-muted);
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .stkTdNom {
+    min-width: 0;
+
+    strong {
+      display: block;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    em {
+      font-style: normal;
+      font-size: 0.86em;
+      color: var(--stk-muted);
+    }
+  }
+
+  .stkTdNum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stkMuted {
+    color: var(--stk-muted);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stkLien {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &:hover {
+      color: var(--stk-accent);
+      text-decoration: underline;
+    }
+  }
+
+  .stkTag {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 100px;
+    font-size: 0.86em;
+    background: rgb(24 128 56 / 12%);
+    color: var(--stk-green);
+    white-space: nowrap;
+
+    &[data-ton="warn"] {
+      background: rgb(176 96 0 / 12%);
+      color: var(--stk-amber);
+    }
+
+    &[data-ton="bad"] {
+      background: rgb(217 48 37 / 12%);
+      color: var(--stk-red);
+    }
+  }
+
+  .stkSens {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--stk-green);
+
+    &[data-ton="bad"] {
+      color: var(--stk-red);
+    }
+
+    &[data-ton="info"] {
+      color: var(--stk-accent);
+    }
+
+    .uicon {
+      display: flex;
+    }
+  }
+
+  .stkRetirer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    color: var(--stk-muted);
+
+    &:hover {
+      background: rgb(217 48 37 / 12%);
+      color: var(--stk-red);
+    }
+  }
+
+  // ---- Analyse ------------------------------------------------------------
+
+  .stkAnalyse {
+    padding: 16px 18px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .stkSousTitre {
+    font-size: 0.68em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--stk-muted);
+    margin: 6px 0 10px;
+
+    &:not(:first-child) {
+      margin-top: 26px;
+    }
+  }
+
+  .stkJauge {
+    display: grid;
+    grid-template-columns: 140px minmax(0, 1fr) 120px;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.76em;
+    margin-bottom: 8px;
+  }
+
+  .stkJaugeNom {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stkJaugeFond {
+    height: 8px;
+    border-radius: 100px;
+    background: rgb(107 118 132 / 14%);
+    overflow: hidden;
+  }
+
+  .stkJaugeVal {
+    display: block;
+    height: 100%;
+    border-radius: 100px;
+    background: var(--stk-accent);
+  }
+
+  .stkJaugeChiffre {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--stk-muted);
+  }
+
+  .stkAlerte {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1.6fr) 140px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border: 1px solid var(--stk-line);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 0.76em;
+
+    &:hover {
+      border-color: var(--stk-accent);
+    }
+  }
+
+  .stkAlerteNom {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // ---- Panneau ------------------------------------------------------------
+
+  .stkPanneau {
+    border-left: 1px solid var(--stk-line);
+    background: var(--stk-panel);
+    padding: 14px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .stkPanVide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 100%;
+    padding: 30px 16px;
+    text-align: center;
+    font-size: 0.76em;
+    color: var(--stk-muted);
+  }
+
+  .stkPanTitre {
+    font-size: 0.86em;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .stkPhoto {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    border-radius: var(--stk-rayon);
+    border: 1px solid var(--stk-line);
+    background: var(--stk-card);
+    color: var(--stk-muted);
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .stkPhotoActions {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    padding: 8px 0 4px;
+    font-size: 0.72em;
+    color: var(--stk-muted);
+
+    span:hover {
+      color: var(--stk-accent);
+      text-decoration: underline;
+    }
+
+    .stkDanger:hover {
+      color: var(--stk-red);
+    }
+  }
+
+  .stkStockGros {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 0 12px;
+    border-bottom: 1px solid var(--stk-line);
+    margin-bottom: 10px;
+  }
+
+  .stkStockVal {
+    font-size: 1.8em;
+    font-weight: 600;
+    color: var(--stk-green);
+
+    &[data-ton="warn"] {
+      color: var(--stk-amber);
+    }
+
+    &[data-ton="bad"] {
+      color: var(--stk-red);
+    }
+  }
+
+  .stkStockUnite {
+    font-size: 0.74em;
+    color: var(--stk-muted);
+  }
+
+  .stkOnglets {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 7px;
+    background: rgb(107 118 132 / 10%);
+    margin-bottom: 14px;
+
+    span {
+      flex: 1;
+      text-align: center;
+      padding: 6px 4px;
+      border-radius: 5px;
+      font-size: 0.74em;
+      color: var(--stk-muted);
+
+      &[data-actif="true"] {
+        background: var(--stk-card);
+        color: var(--stk-text);
+        font-weight: 600;
+      }
+    }
+  }
+
+  .stkField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+
+  .stkLabel {
+    font-size: 0.7em;
+    color: var(--stk-muted);
+  }
+
+  // `minmax(0, 1fr)` et non `1fr` : la valeur par défaut d'une piste de
+  // grille est `auto`, donc un champ au contenu large refuse de rétrécir
+  // et pousse son voisin. Les deux colonnes doivent pouvoir se serrer.
+  .stkDeux {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 10px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    width: 100%;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.76em;
+    color: var(--stk-text);
+    background: var(--stk-field);
+    border: 1px solid var(--stk-line);
+    border-radius: 6px;
+    padding: 7px 9px;
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: var(--stk-accent);
+    }
+  }
+
+  .stkBarre select {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .stkMarge {
+    font-size: 0.72em;
+    color: var(--stk-green);
+    margin: -4px 0 10px;
+
+    &[data-negatif="true"] {
+      color: var(--stk-red);
+    }
+  }
+
+  .stkSens3 {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+
+    span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      flex: 1;
+      padding: 7px 4px;
+      border: 1px solid var(--stk-line);
+      border-radius: 6px;
+      font-size: 0.7em;
+      color: var(--stk-muted);
+      background: var(--stk-card);
+
+      .uicon {
+        display: flex;
+      }
+
+      &[data-actif="true"][data-ton="ok"] {
+        border-color: var(--stk-green);
+        color: var(--stk-green);
+        background: rgb(24 128 56 / 10%);
+      }
+
+      &[data-actif="true"][data-ton="bad"] {
+        border-color: var(--stk-red);
+        color: var(--stk-red);
+        background: rgb(217 48 37 / 10%);
+      }
+
+      &[data-actif="true"][data-ton="info"] {
+        border-color: var(--stk-accent);
+        color: var(--stk-accent);
+        background: var(--stk-accent-soft);
+      }
+    }
+  }
+
+  .stkNote {
+    font-size: 0.7em;
+    line-height: 1.5;
+    color: var(--stk-muted);
+    background: var(--stk-accent-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+  }
+
+  .stkRecap {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.74em;
+    color: var(--stk-muted);
+    padding: 6px 0;
+    border-top: 1px solid var(--stk-line);
+
+    strong {
+      color: var(--stk-text);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .stkHisto {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stkHistoLigne {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--stk-line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .stkHistoInfo {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  .stkHistoTitre {
+    font-size: 0.76em;
+  }
+
+  .stkHistoMeta {
+    font-size: 0.68em;
+    color: var(--stk-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  // ---- Boutons et états vides ---------------------------------------------
+
+  .stkPrimary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 0.74em;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 6px;
+    background: var(--stk-accent);
+    color: #fff;
+    white-space: nowrap;
+
+    .uicon {
+      display: flex;
+    }
+
+    &:hover {
+      background: #1667d2;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  .stkBtnGhost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.73em;
+    padding: 7px 13px;
+    border: 1px solid var(--stk-line);
+    border-radius: 6px;
+    background: var(--stk-card);
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #c7d0dd;
+    }
+
+    &.stkDanger {
+      color: var(--stk-red);
+
+      &:hover {
+        border-color: var(--stk-red);
+      }
+    }
+  }
+
+  .stkFormActions {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0 4px;
+  }
+
+  .stkVide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-grow: 1;
+    padding: 40px;
+    text-align: center;
+    font-size: 0.8em;
+    color: var(--stk-muted);
+  }
+
+  .stkEmptyBox {
+    padding: 14px;
+    border: 1px dashed var(--stk-line);
+    border-radius: 6px;
+    font-size: 0.74em;
+    line-height: 1.5;
+    color: var(--stk-muted);
+  }
+
+  .stkNotice {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    border-radius: 100px;
+    background: #1f2733;
+    color: #fff;
+    font-size: 0.74em;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
+    z-index: 5;
+  }
+}
+
+// Liste de choix d'une catégorie parente, rendue dans une boîte de dialogue :
+// elle vit donc hors de `.stkApp` et porte ses propres couleurs.
+.stkChoix {
+  max-height: 320px;
+  overflow-y: auto;
+
+  .stkChoixLigne {
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 0.86em;
+
+    &:hover {
+      background: rgb(26 115 232 / 10%);
+      color: #1a73e8;
+    }
+  }
+}
+
+body[data-theme="dark"] .stkApp {
+  --stk-bg: #1e1e26;
+  --stk-panel: #262630;
+  --stk-card: #2b2b36;
+  --stk-line: #35353f;
+  --stk-text: #e8e8ee;
+  --stk-muted: #9a9aa8;
+  --stk-accent: #6ea8ff;
+  --stk-accent-soft: #26344a;
+  --stk-field: #23232c;
+  --stk-green: #6cc98a;
+  --stk-amber: #e0a458;
+  --stk-red: #e2716a;
+
+  .stkCarte:hover,
+  .stkBtnGhost:hover {
+    border-color: #4a4a58;
+  }
+
+  .stkNotice {
+    background: #3a3a48;
+  }
+}
+
+body[data-theme="dark"] .stkChoix .stkChoixLigne:hover {
+  background: rgb(110 168 255 / 16%);
+  color: #6ea8ff;
+}

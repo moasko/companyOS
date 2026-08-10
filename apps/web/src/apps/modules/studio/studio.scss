@@ -1,0 +1,868 @@
+// Studio — charte commune aux modules CompanyOS.
+
+.stdApp {
+  --std-bg: #ffffff;
+  --std-panel: #f8f9fb;
+  --std-card: #ffffff;
+  --std-line: #e3e6eb;
+  --std-text: #1f2733;
+  --std-muted: #6b7684;
+  --std-accent: #1a73e8;
+  --std-accent-soft: #e8f0fe;
+  --std-field: #ffffff;
+  --std-green: #188038;
+  --std-red: #d93025;
+
+  background: var(--std-bg);
+  color: var(--std-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 76%;
+    height: 78%;
+    top: 9%;
+    left: 12%;
+    min-width: 760px;
+    min-height: 500px;
+  }
+
+  .stdLocked {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    font-size: 0.84em;
+    color: var(--std-muted);
+  }
+
+  .stdShell {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .stdNav {
+    border-right: 1px solid var(--std-line);
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .stdNavItem {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 11px;
+      border-radius: 6px;
+      font-size: 0.76em;
+      color: var(--std-muted);
+
+      .uicon {
+        display: flex;
+      }
+
+      &:hover {
+        background: rgb(0 0 0 / 3%);
+      }
+
+      &[data-active="true"] {
+        background: var(--std-accent-soft);
+        color: var(--std-accent);
+        font-weight: 600;
+      }
+    }
+  }
+
+  .stdMain {
+    overflow-y: auto;
+    padding: 18px 24px 28px;
+    min-height: 0;
+  }
+
+  .stdSection {
+    padding-bottom: 4px;
+    margin-bottom: 18px;
+
+    // Onglet inactif : le panneau n'existe pas à l'écran.
+    &[data-hidden="true"] {
+      display: none;
+    }
+
+    h2 {
+      font-size: 0.92em;
+      font-weight: 600;
+      margin: 0;
+    }
+  }
+
+  .stdSectionHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .stdHint {
+    font-size: 0.72em;
+    color: var(--std-muted);
+    margin: 3px 0 14px;
+    max-width: 62ch;
+    line-height: 1.5;
+  }
+
+  // ---- Champs -------------------------------------------------------------
+
+  .stdLabel {
+    font-size: 0.72em;
+    color: var(--std-muted);
+  }
+
+  .stdField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+    min-width: 0;
+
+    &.stdFull {
+      grid-column: 1 / -1;
+    }
+
+    input,
+    select {
+      width: 100%;
+      font-size: 0.76em;
+      font-family: inherit;
+      color: var(--std-text);
+      background: var(--std-field);
+      border: 1px solid var(--std-line);
+      border-radius: 6px;
+      padding: 8px 11px;
+
+      &::placeholder {
+        color: #9aa4b2;
+      }
+
+      &:focus {
+        border-color: var(--std-accent);
+        outline: none;
+      }
+
+      &:disabled {
+        background: var(--std-panel);
+        color: var(--std-muted);
+      }
+    }
+  }
+
+  .stdGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+
+  .stdCheck {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72em;
+    color: var(--std-muted);
+
+    input {
+      width: auto;
+      accent-color: var(--std-accent);
+    }
+  }
+
+  // ---- Choix de l'icône ---------------------------------------------------
+
+  .stdIcons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .stdIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--std-line);
+    border-radius: 8px;
+    background: var(--std-card);
+
+    &:hover {
+      border-color: #c7d0dd;
+    }
+
+    &[data-active="true"] {
+      border-color: var(--std-accent);
+      background: var(--std-accent-soft);
+    }
+  }
+
+  // ---- Liste des applications ---------------------------------------------
+
+  .stdList {
+    border: 1px solid var(--std-line);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .stdRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--std-line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background: var(--std-panel);
+    }
+
+    &[data-active="true"] {
+      background: var(--std-accent-soft);
+    }
+
+    .stdRowInfo {
+      flex-grow: 1;
+      min-width: 0;
+    }
+
+    .stdRowName {
+      font-size: 0.8em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stdRowMeta {
+      font-size: 0.68em;
+      color: var(--std-muted);
+      margin-top: 1px;
+    }
+  }
+
+  .stdTag {
+    font-size: 0.65em;
+    padding: 3px 10px;
+    border-radius: 100px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: rgb(107 118 132 / 14%);
+    color: var(--std-muted);
+
+    &[data-tone="ok"] {
+      background: rgb(24 128 56 / 12%);
+      color: var(--std-green);
+    }
+  }
+
+  // ---- Collections et champs ----------------------------------------------
+
+  .stdCollection {
+    border: 1px solid var(--std-line);
+    border-radius: 8px;
+    background: var(--std-panel);
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .stdCollHead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+
+    .stdCollName {
+      flex-grow: 1;
+      min-width: 0;
+      font-size: 0.82em;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--std-text);
+      background: var(--std-card);
+      border: 1px solid var(--std-line);
+      border-radius: 6px;
+      padding: 7px 10px;
+
+      &:focus {
+        border-color: var(--std-accent);
+        outline: none;
+      }
+    }
+  }
+
+  .stdChamps {
+    border: 1px solid var(--std-line);
+    border-radius: 7px;
+    background: var(--std-card);
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+
+  .stdChampHead,
+  .stdChampRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) 140px minmax(0, 1fr) 26px;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 10px;
+  }
+
+  .stdChampHead {
+    background: var(--std-panel);
+    border-bottom: 1px solid var(--std-line);
+    font-size: 0.66em;
+    font-weight: 600;
+    color: var(--std-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .stdChampRow {
+    border-bottom: 1px solid var(--std-line);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      min-width: 0;
+      font-size: 0.74em;
+      font-family: inherit;
+      color: var(--std-text);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      padding: 5px 7px;
+
+      &:hover {
+        border-color: var(--std-line);
+      }
+
+      &:focus {
+        border-color: var(--std-accent);
+        background: var(--std-field);
+        outline: none;
+      }
+    }
+  }
+
+  .stdDel {
+    font-size: 0.78em;
+    color: var(--std-muted);
+    text-align: center;
+
+    &:hover {
+      color: var(--std-red);
+    }
+  }
+
+  // ---- Publication --------------------------------------------------------
+
+  .stdRecap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--std-line);
+    border-radius: 9px;
+    background: var(--std-panel);
+    margin-bottom: 14px;
+
+    .stdRecapInfo {
+      flex-grow: 1;
+      min-width: 0;
+    }
+
+    .stdRecapName {
+      font-size: 0.88em;
+      font-weight: 600;
+    }
+
+    .stdRecapMeta {
+      font-size: 0.7em;
+      color: var(--std-muted);
+      margin-top: 2px;
+    }
+  }
+
+  .stdActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stdEmptyBox {
+    font-size: 0.74em;
+    color: var(--std-muted);
+    line-height: 1.5;
+    padding: 16px;
+    border: 1px dashed var(--std-line);
+    border-radius: 7px;
+    background: var(--std-panel);
+  }
+
+  .stdBtnGhost {
+    font-size: 0.73em;
+    padding: 7px 14px;
+    border: 1px solid var(--std-line);
+    border-radius: 6px;
+    background: var(--std-card);
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #c7d0dd;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    &.stdDanger {
+      color: var(--std-red);
+
+      &:hover {
+        border-color: var(--std-red);
+      }
+    }
+  }
+
+  .stdPrimary {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 6px;
+    background: var(--std-accent);
+    color: #fff;
+
+    .uicon {
+      display: flex;
+    }
+
+    &:hover {
+      background: #1667d2;
+    }
+
+    &[data-off="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+  }
+
+  .stdNotice {
+    position: sticky;
+    bottom: 0;
+    margin-top: 16px;
+    padding: 8px 0;
+    font-size: 0.73em;
+    color: var(--std-accent);
+    background: var(--std-bg);
+  }
+}
+
+body[data-theme="dark"] .stdApp {
+  --std-bg: #1b1b22;
+  --std-panel: #202029;
+  --std-card: #262630;
+  --std-line: #35353f;
+  --std-text: #e8e8ee;
+  --std-muted: #9a9aa8;
+  --std-accent: #6f8dff;
+  --std-accent-soft: #2a3050;
+  --std-field: #262630;
+  --std-green: #6cd08a;
+  --std-red: #f08078;
+
+  .stdNav .stdNavItem:hover,
+  .stdBtnGhost:hover,
+  .stdIcon:hover {
+    border-color: #4a4a58;
+    background: rgb(255 255 255 / 4%);
+  }
+
+  .stdPrimary:hover {
+    background: #5f7cf0;
+  }
+}
+
+// ---- Modèles de départ -----------------------------------------------------
+//
+// Posés en modale, donc hors de `.studioApp` : la modale vit à la racine du
+// DOM, pas dans la fenêtre.
+
+.stdModeles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  min-width: 380px;
+  max-width: 560px;
+}
+
+.stdModele {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 13px;
+  border: 1px solid #e3e6eb;
+  border-radius: 10px;
+  text-align: left;
+
+  .uicon {
+    display: flex;
+  }
+
+  b {
+    font-size: 0.84em;
+  }
+
+  span {
+    font-size: 0.74em;
+    line-height: 1.45;
+    color: #6b7684;
+  }
+
+  &:hover {
+    border-color: #7c3aed;
+    background: #f6f2ff;
+  }
+}
+
+body[data-theme="dark"] .stdModele {
+  border-color: #33383f;
+
+  span {
+    color: #9aa2ad;
+  }
+
+  &:hover {
+    border-color: #a78bfa;
+    background: #2a2140;
+  }
+}
+
+// ---- Aperçu en direct ------------------------------------------------------
+//
+// Deux colonnes : la liste telle qu'elle sera, la fiche telle qu'elle sera.
+// Les contrôles sont réels et manipulables — c'est ce qui permet d'éprouver
+// une formule sans rien publier.
+
+.stdApp {
+  .stdApercu {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stdApercuOnglets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .stdApercuOnglet {
+    padding: 5px 12px;
+    border: 1px solid var(--std-line);
+    border-radius: 100px;
+    font-size: 0.74em;
+
+    &[data-active="true"] {
+      background: var(--std-accent);
+      border-color: var(--std-accent);
+      color: #fff;
+      font-weight: 600;
+    }
+  }
+
+  .stdApercuCorps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  .stdApercuBloc {
+    padding: 12px 14px;
+    border: 1px solid var(--std-line);
+    border-radius: 10px;
+  }
+
+  .stdApercuTitre {
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--std-muted);
+    margin-bottom: 8px;
+  }
+
+  .stdApercuTable {
+    border: 1px solid var(--std-line);
+    border-radius: 7px;
+    overflow: hidden;
+    font-size: 0.74em;
+    margin-bottom: 8px;
+  }
+
+  .stdApercuTHead,
+  .stdApercuTRow {
+    display: grid;
+    gap: 8px;
+    padding: 6px 9px;
+  }
+
+  .stdApercuTHead {
+    background: var(--std-panel);
+    font-weight: 600;
+    color: var(--std-muted);
+  }
+
+  .stdApercuTRow > div[data-aligne="true"] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stdApercuGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 9px;
+    margin-bottom: 8px;
+  }
+
+  .stdApercuChamp {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.72em;
+
+    &[data-large="true"] {
+      grid-column: 1 / -1;
+    }
+
+    > span {
+      color: var(--std-muted);
+    }
+
+    input,
+    select,
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--std-line);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 1em;
+      background: var(--std-field);
+      color: var(--std-text);
+    }
+
+    input[type="checkbox"] {
+      width: auto;
+    }
+  }
+
+  // Un calcul se lit : même gabarit qu'un champ, mais rien à saisir.
+  .stdApercuCalcul {
+    display: block;
+    padding: 5px 8px;
+    border: 1px dashed var(--std-line);
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+}
+
+// Le même traitement dans le moteur d'exécution : les deux doivent se
+// ressembler, sinon l'aperçu tromperait sur la forme.
+.cstApp .cstCalcul {
+  display: block;
+  padding: 7px 10px;
+  border: 1px dashed #cfd4db;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+// ---- Constructeur avancé : vue, mise en page, tableau de bord --------------
+
+.stdApp {
+  .stdVue {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0 10px;
+    font-size: 0.74em;
+
+    > span {
+      color: var(--std-muted);
+    }
+
+    select {
+      padding: 5px 9px;
+      border: 1px solid var(--std-line);
+      border-radius: 6px;
+      background: var(--std-field);
+      color: var(--std-text);
+      font-family: inherit;
+      font-size: 1em;
+    }
+  }
+
+  .stdVueAstuce {
+    font-style: normal;
+    color: var(--std-muted);
+    font-size: 0.92em;
+  }
+
+  // La mise en page d'un champ : discrète, sous la ligne principale.
+  .stdChampMEP {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    padding-left: 2px;
+
+    select,
+    input {
+      padding: 4px 8px;
+      border: 1px solid var(--std-line);
+      border-radius: 6px;
+      background: var(--std-field);
+      color: var(--std-text);
+      font-family: inherit;
+      font-size: 0.86em;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  .stdWidgetsEditeur {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stdWidgetRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) 1fr 1fr 1fr auto;
+    gap: 8px;
+    align-items: center;
+
+    input,
+    select {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 6px 9px;
+      border: 1px solid var(--std-line);
+      border-radius: 6px;
+      background: var(--std-field);
+      color: var(--std-text);
+      font-family: inherit;
+      font-size: 0.78em;
+    }
+  }
+
+  .stdWidgetVide {
+    display: block;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Genre d'application, et essai d'adresse (apps « site web »)
+// ---------------------------------------------------------------------------
+
+.stdApp {
+  .stdGenres {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .stdGenre {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    padding: 12px 14px;
+    border: 1px solid var(--std-line, rgb(0 0 0 / 10%));
+    border-radius: 10px;
+    background: var(--std-card, #fff);
+    color: inherit;
+    cursor: pointer;
+
+    strong { font-size: 13.5px; font-weight: 600; }
+
+    span {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--std-muted, #6b7684);
+    }
+
+    &:hover { border-color: var(--std-accent, #057378); }
+
+    // Fond et contour, jamais de bordure latérale colorée.
+    &[data-active="true"] {
+      border-color: var(--std-accent, #057378);
+      background: var(--std-accent-soft, #e8f3f3);
+    }
+  }
+
+  .stdActionsLigne {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .stdEssai {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--std-card, #fff);
+    border: 1px solid var(--std-line, rgb(0 0 0 / 10%));
+
+    strong { display: block; font-size: 13px; margin-bottom: 4px; }
+
+    p {
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: var(--std-muted, #6b7684);
+    }
+
+    // La nuance passe par une pastille en tête, pas par un liseré latéral.
+    strong::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: 1px;
+      background: #9aa7ad;
+    }
+
+    &[data-etat="ok"] strong::before { background: #1d7a4c; }
+    &[data-etat="onglet"] strong::before { background: #b8791f; }
+    &[data-etat="erreur"] strong::before { background: #b23b2e; }
+  }
+}

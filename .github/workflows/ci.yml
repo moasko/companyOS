@@ -1,0 +1,88 @@
+# Intégration continue.
+#
+# Trois travaux volontairement séparés : quand la chaîne casse, l'onglet
+# Actions doit dire *quoi* est cassé sans avoir à ouvrir les journaux.
+#
+# Aucun test unitaire pour l'instant — il n'y en a pas dans le dépôt. Le
+# jour où il y en aura, ils rejoignent le travail `verifier`.
+
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+# Une seule exécution par branche : pousser trois fois de suite ne doit pas
+# occuper trois runners à valider deux états déjà périmés.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Lint et format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+
+  construire:
+    name: Build du shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # L'URL de l'API est figée au build ; en CI, seule la réussite du
+      # build compte, pas la valeur.
+      - run: npm run build
+        env:
+          VITE_API_URL: https://api.example.invalid
+
+  api:
+    name: Schéma Prisma et démarrage de l'API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `validate` relit le schéma ; `format --check` attrape les schémas
+      # modifiés à la main et jamais reformatés, qui produisent ensuite des
+      # diffs illisibles.
+      - run: npx prisma validate --schema apps/api/prisma/schema.prisma
+      - run: npx prisma format --check --schema apps/api/prisma/schema.prisma
+      # Chaque module du serveur doit au moins s'analyser. Sans base de
+      # données, on ne peut pas le démarrer en CI — mais une erreur de
+      # syntaxe ou un import cassé se voit ici.
+      - run: |
+          for f in $(find apps/api/src packages/shared/src -name '*.js'); do
+            node --check "$f" || exit 1
+          done
+
+  securite:
+    name: Audit des dépendances livrées
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `--omit=dev` : une faille dans un outil de build n'expose pas les
+      # utilisateurs. Elle reste à corriger, mais elle ne bloque pas une
+      # livraison — la distinction évite d'apprendre à ignorer le rouge.
+      - run: npm audit --omit=dev --audit-level=high

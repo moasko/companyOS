@@ -1,0 +1,8 @@
+node_modules
+build
+dist
+apps/api/storage
+apps/api/prisma/migrations
+apps/web/public
+package-lock.json
+*.scss

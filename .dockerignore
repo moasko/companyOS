@@ -1,11 +1,20 @@
-node_modules
-server/node_modules
-build
-dist
+# Contexte de build : la racine du dépôt (voir apps/*/Dockerfile).
+# Tout ce qui est listé ici n'entre jamais dans une image.
+
+**/node_modules
+**/build
+**/dist
 .git
+.github
+.claude
+
+# Secrets et données : jamais dans une image, jamais dans un registre.
 .env
 *.env
-server/.env
-server/storage
-.claude
+!*.env.example
+apps/api/storage
+
+docs
 *.log
+*.md
+!apps/api/README.md

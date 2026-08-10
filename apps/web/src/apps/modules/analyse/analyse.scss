@@ -1,0 +1,588 @@
+// Analyse — habillage.
+//
+// Les jetons `--app-*` viennent de la charte commune (src/apps/ui/theme.scss).
+// Ce fichier n'ajoute que les jetons propres aux graphiques : la palette de
+// séries et la rampe séquentielle.
+//
+// La palette est **choisie**, pas inversée : le mode sombre reprend les
+// mêmes huit teintes, repas­sées dans la bande de clarté du fond sombre.
+// Les deux jeux ont été validés (écart minimal entre voisines ΔE 9,1 en
+// clair et 8,4 en sombre, sur les huit formes de daltonisme, contre les
+// surfaces réelles de l'OS : #ffffff et #2d2d38).
+
+.anaApp {
+  --vz-1: #2a78d6;
+  --vz-2: #eb6834;
+  --vz-3: #1baf7a;
+  --vz-4: #eda100;
+  --vz-5: #e87ba4;
+  --vz-6: #008300;
+  --vz-7: #4a3aa7;
+  --vz-8: #e34948;
+  --vz-muet: #b9c0c9;
+
+  // Rampe séquentielle : une seule teinte, du clair au foncé. Une
+  // grandeur continue ne se colorie pas en arc-en-ciel.
+  --vz-seq-0: #f2f6fd;
+  --vz-seq-1: #cde2fb;
+  --vz-seq-2: #9ec5f4;
+  --vz-seq-3: #6da7ec;
+  --vz-seq-4: #3987e5;
+  --vz-seq-5: #256abf;
+  --vz-seq-6: #184f95;
+  --vz-seq-texte: #0d366b;
+
+  --vz-grille: #eceef2;
+  --vz-axe: #7a8494;
+}
+
+body[data-theme="dark"] .anaApp {
+  --vz-1: #3987e5;
+  --vz-2: #d95926;
+  --vz-3: #199e70;
+  --vz-4: #c98500;
+  --vz-5: #d55181;
+  --vz-6: #008300;
+  --vz-7: #9085e9;
+  --vz-8: #e66767;
+  --vz-muet: #565d68;
+
+  --vz-seq-0: #23303f;
+  --vz-seq-1: #1c4370;
+  --vz-seq-2: #184f95;
+  --vz-seq-3: #256abf;
+  --vz-seq-4: #3987e5;
+  --vz-seq-5: #6da7ec;
+  --vz-seq-6: #9ec5f4;
+  --vz-seq-texte: #eaf2ff;
+
+  --vz-grille: #3a3a45;
+  --vz-axe: #8b93a1;
+}
+
+// ---------------------------------------------------------------------------
+// Ossature
+// ---------------------------------------------------------------------------
+
+.anaApp .anaShell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.anaApp .anaVerrou {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--app-muted);
+}
+
+.anaApp .anaNav {
+  flex: none;
+  width: 176px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.anaApp .anaOnglet {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--app-rayon);
+  color: var(--app-muted);
+  font-size: 12.5px;
+
+  &:hover { background: rgb(128 128 128 / 12%); }
+
+  &[data-actif="true"] {
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+    font-weight: 600;
+  }
+}
+
+.anaApp .anaCentre {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 14px 16px 24px;
+}
+
+// Une seule rangée de filtres, collée en haut : elle cadre tous les écrans.
+.anaApp .anaFiltres {
+  position: sticky;
+  top: -14px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  margin: -14px -16px 14px;
+  background: var(--app-panneau);
+  border-bottom: 1px solid var(--app-line);
+
+  .uiChamp { min-width: 132px; }
+}
+
+.anaApp select,
+.anaApp input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-champ);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.anaApp .anaGrille { display: grid; gap: 14px; }
+
+.anaApp .anaBloc {
+  background: var(--app-carte);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon-large);
+  padding: 14px 16px;
+
+  h4 { font-size: 13.5px; margin-bottom: 4px; }
+}
+
+.anaApp .anaEntete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.anaApp .anaAide {
+  font-size: 11.5px;
+  color: var(--app-muted);
+  margin-bottom: 10px;
+}
+
+.anaApp .anaResume {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.anaApp .anaReglages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+
+  .uiChamp { min-width: 150px; }
+}
+
+.anaApp .anaFiltreLigne {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1.2fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.anaApp .anaRetirer {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--app-muted);
+
+  &:hover { background: rgb(128 128 128 / 15%); color: var(--app-danger); }
+}
+
+// ---------------------------------------------------------------------------
+// Tuiles de chiffres
+// ---------------------------------------------------------------------------
+
+.anaApp .anaTuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+// Le ton se signale par une pastille, jamais par un filet latéral : une
+// bordure sur un côté décale le contenu d'une carte à l'autre et jure avec
+// le reste du produit, où le cadre reste complet. Même règle qu'aux
+// notifications de la barre des tâches.
+.anaApp .vzTuile {
+  position: relative;
+  background: var(--app-carte);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon-large);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  &[data-ton="ok"]::before,
+  &[data-ton="attention"]::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  &[data-ton="ok"]::before { background: var(--app-ok); }
+  &[data-ton="attention"]::before { background: var(--app-attention); }
+}
+
+// La pastille occupe le coin : le libellé s'arrête avant, plutôt que de
+// passer dessous.
+.anaApp .vzTuileLib {
+  font-size: 11px;
+  color: var(--app-muted);
+  padding-right: 14px;
+}
+
+// Chiffres proportionnels sur un grand nombre isolé : la chasse fixe
+// ferait flotter « 121 » à cette taille.
+.anaApp .vzTuileVal {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.anaApp .vzTuileVar {
+  font-size: 11.5px;
+  font-weight: 600;
+
+  &[data-sens="haut"] { color: var(--app-ok); }
+  &[data-sens="bas"] { color: var(--app-danger); }
+}
+
+.anaApp .vzTuileAide { font-size: 10.5px; color: var(--app-muted); }
+
+// ---------------------------------------------------------------------------
+// Cadre de graphique
+// ---------------------------------------------------------------------------
+
+.anaApp .vzCadre {
+  background: var(--app-carte);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon-large);
+  padding: 14px 16px;
+  margin: 0;
+}
+
+.anaApp .vzTete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+
+  h4 { font-size: 13.5px; }
+  p { font-size: 11.5px; color: var(--app-muted); margin-top: 2px; }
+}
+
+.anaApp .vzBascule {
+  flex: none;
+  border: 1px solid var(--app-line);
+  background: transparent;
+  color: var(--app-muted);
+  border-radius: 100px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+
+  &:hover { border-color: var(--app-accent); color: var(--app-accent); }
+  &[aria-pressed="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
+}
+
+.anaApp .vzLegende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  color: var(--app-muted);
+}
+
+.anaApp .vzLegendeItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  i { width: 9px; height: 9px; border-radius: 2px; }
+}
+
+.anaApp .vzPlot { position: relative; }
+.anaApp .vzSvg { width: 100%; height: auto; display: block; overflow: visible; }
+
+.anaApp .vzVide {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+// ---------------------------------------------------------------------------
+// Marques
+// ---------------------------------------------------------------------------
+
+// Filet plein, une nuance au-dessus du fond. Jamais de pointillés : ils se
+// lisent comme un seuil ou une projection.
+.anaApp .vzGrille { stroke: var(--vz-grille); stroke-width: 1; }
+.anaApp .vzAxe { fill: var(--vz-axe); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+.anaApp .vzLigne {
+  fill: none;
+  stroke: var(--vz-1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.anaApp .vzLisse {
+  fill: none;
+  stroke: var(--vz-1);
+  stroke-width: 2;
+  opacity: 0.32;
+}
+
+.anaApp .vzLignePrevue {
+  fill: none;
+  stroke: var(--vz-1);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;   // le seul pointillé du module : il dit « pas encore arrivé »
+  opacity: 0.8;
+}
+
+.anaApp .vzBande { fill: var(--vz-1); opacity: 0.12; }
+
+.anaApp .vzPoint {
+  fill: var(--vz-1);
+  stroke: var(--app-carte);
+  stroke-width: 2;          // anneau de la surface, plutôt qu'un contour foncé
+}
+
+.anaApp .vzEtiquette {
+  fill: var(--app-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.anaApp .vzZone { fill: transparent; cursor: crosshair; }
+.anaApp .vzViseur { stroke: var(--vz-axe); stroke-width: 1; opacity: 0.5; }
+
+.anaApp .vzBarreSvg { transition: opacity 120ms ease; &:hover { opacity: 0.82; } }
+.anaApp .vzSeuil { stroke: var(--app-attention); stroke-width: 1.5; opacity: 0.7; }
+
+.anaApp .vzRegression {
+  stroke: var(--vz-2);
+  stroke-width: 2;
+  opacity: 0.9;
+}
+
+.anaApp .vzDot {
+  fill: var(--vz-1);
+  fill-opacity: 0.75;
+  stroke: var(--app-carte);
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.anaApp .vzEtincelle {
+  width: 100%;
+  height: 30px;
+  path { fill: none; stroke: var(--vz-1); stroke-width: 2; }
+}
+
+// ---------------------------------------------------------------------------
+// Barres horizontales
+// ---------------------------------------------------------------------------
+
+.anaApp .vzBarres { display: grid; gap: 7px; }
+
+.anaApp .vzBarreLigne {
+  display: grid;
+  grid-template-columns: minmax(80px, 168px) 1fr auto;
+  gap: 10px;
+  align-items: center;
+
+  &[data-survol="true"] .vzBarre { opacity: 0.82; }
+}
+
+.anaApp .vzBarreNom {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--app-text);
+}
+
+.anaApp .vzBarrePiste {
+  height: 15px;
+  background: rgb(128 128 128 / 10%);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.anaApp .vzBarre {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;   // extrémité arrondie, base ancrée à zéro
+  transition: width 220ms ease;
+}
+
+.anaApp .vzBarreVal {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 68px;
+  text-align: right;
+}
+
+// ---------------------------------------------------------------------------
+// Infobulle
+// ---------------------------------------------------------------------------
+
+.anaApp .vzBulle {
+  position: absolute;
+  transform: translate(-50%, -125%);
+  pointer-events: none;
+  background: var(--app-text);
+  color: var(--app-bg);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: var(--app-ombre);
+  z-index: 4;
+
+  b { display: block; font-weight: 700; }
+  span { display: block; font-variant-numeric: tabular-nums; }
+  em { display: block; font-style: normal; opacity: 0.75; font-size: 10.5px; }
+}
+
+// ---------------------------------------------------------------------------
+// Cohortes
+// ---------------------------------------------------------------------------
+
+.anaApp .vzCohortes { overflow-x: auto; }
+
+.anaApp .vzGrilleC {
+  border-collapse: separate;
+  border-spacing: 2px;      // l'écart de 2 px sépare les cases, pas un contour
+  font-size: 11.5px;
+
+  th {
+    font-weight: 600;
+    color: var(--app-muted);
+    padding: 4px 8px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 5px 9px;
+    text-align: center;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text);
+  }
+}
+
+.anaApp .vzTaille { color: var(--app-muted); }
+
+.anaApp .vzCellule {
+  min-width: 42px;
+  cursor: default;
+
+  // Sur les pas foncés de la rampe, l'encre passe en clair : la valeur
+  // reste lisible, c'est elle qui fait foi — la teinte ne donne que
+  // l'allure d'ensemble.
+  &[data-fort="true"] { color: #fff; font-weight: 600; }
+}
+
+.anaApp .vzNoteC { margin-top: 8px; font-size: 11.5px; color: var(--app-muted); }
+
+// ---------------------------------------------------------------------------
+// Vue tableau — la jumelle sans couleur de chaque graphique
+// ---------------------------------------------------------------------------
+
+.anaApp .vzTableauEnveloppe {
+  overflow-x: auto;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.anaApp .vzTableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--app-line);
+    white-space: nowrap;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--app-carte);
+    color: var(--app-muted);
+    font-weight: 600;
+    font-size: 11px;
+    z-index: 1;
+  }
+
+  [data-num] { text-align: right; font-variant-numeric: tabular-nums; }
+
+  tbody tr:hover { background: rgb(128 128 128 / 7%); }
+}
+
+// ---------------------------------------------------------------------------
+// Lecture automatique
+// ---------------------------------------------------------------------------
+
+.anaApp .anaLecture {
+  background: var(--app-carte);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon-large);
+  padding: 14px 16px;
+
+  h4 { font-size: 13.5px; }
+
+  ul { list-style: none; display: grid; gap: 8px; }
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: 12.5px;
+    line-height: 1.45;
+
+    // L'icône double la couleur : le ton ne se lit jamais à la teinte seule.
+    &[data-ton="ok"] > :first-child { color: var(--app-ok); }
+    &[data-ton="attention"] > :first-child { color: var(--app-attention); }
+    &[data-ton="info"] > :first-child { color: var(--app-muted); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anaApp * { transition: none !important; }
+}

@@ -1,0 +1,526 @@
+// Tableur CSV — habillage.
+//
+// Les jetons `--app-*` viennent de la charte commune (src/apps/ui/theme.scss) :
+// rien à redéclarer ici, et le thème sombre suit tout seul.
+//
+// Règle de maison respectée : le cadre d'une carte reste complet et
+// uniforme ; aucun filet coloré sur un côté.
+
+.tblApp .tblShell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.tblApp .tblVerrou {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--app-muted);
+}
+
+// ---------------------------------------------------------------------------
+// Barre d'outils
+// ---------------------------------------------------------------------------
+
+.tblApp .tblBarre {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  flex-wrap: wrap;
+}
+
+.tblApp .tblSep {
+  width: 1px;
+  height: 20px;
+  background: var(--app-line);
+}
+
+.tblApp .tblEspace { flex: 1; }
+
+.tblApp .tblIcone {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-champ);
+  color: var(--app-text);
+  cursor: pointer;
+
+  &:hover:not(:disabled) { border-color: var(--app-accent); color: var(--app-accent); }
+  &:disabled { opacity: 0.4; cursor: default; }
+}
+
+.tblApp .tblChercher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-champ);
+  color: var(--app-muted);
+
+  input {
+    border: none;
+    background: transparent;
+    color: var(--app-text);
+    font: inherit;
+    font-size: 12.5px;
+    padding: 6px 0;
+    width: 130px;
+    outline: none;
+  }
+}
+
+.tblApp .tblRemplacer {
+  width: 130px;
+  padding: 6px 8px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-champ);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+// ---------------------------------------------------------------------------
+// Alerte d'encodage
+// ---------------------------------------------------------------------------
+
+.tblApp .tblAlerte {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--app-accent-soft);
+  border-bottom: 1px solid var(--app-line);
+  color: var(--app-attention);
+
+  div { flex: 1; display: flex; flex-direction: column; }
+  b { font-size: 12.5px; color: var(--app-text); }
+  span { font-size: 11.5px; color: var(--app-muted); }
+}
+
+// ---------------------------------------------------------------------------
+// Réglages du fichier
+// ---------------------------------------------------------------------------
+
+.tblApp .tblReglages {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--app-line);
+  font-size: 11.5px;
+  color: var(--app-muted);
+  flex-wrap: wrap;
+
+  label { display: inline-flex; align-items: center; gap: 6px; }
+
+  select {
+    padding: 4px 6px;
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    background: var(--app-champ);
+    color: var(--app-text);
+    font: inherit;
+    font-size: 11.5px;
+  }
+}
+
+.tblApp .tblCase { cursor: pointer; input { cursor: pointer; } }
+
+.tblApp .tblCompte { font-variant-numeric: tabular-nums; }
+.tblApp .tblModifie { color: var(--app-attention); font-style: normal; font-weight: 600; }
+
+// ---------------------------------------------------------------------------
+// Barre de formule
+// ---------------------------------------------------------------------------
+
+.tblApp .tblFormule {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--app-line);
+  color: var(--app-muted);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 8px;
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    background: var(--app-champ);
+    color: var(--app-text);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px;
+
+    &:focus { outline: none; border-color: var(--app-accent); }
+  }
+}
+
+.tblApp .tblRefActive {
+  min-width: 52px;
+  padding: 4px 8px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-panneau);
+  color: var(--app-text);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+// ---------------------------------------------------------------------------
+// Grille
+// ---------------------------------------------------------------------------
+
+.tblApp .tblZone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.tblApp .tblGrille {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  outline: none;
+
+  // Le cadre reçoit le clavier : un liseré discret dit où va la frappe.
+  &:focus-visible { box-shadow: inset 0 0 0 2px var(--app-accent); }
+
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    font-size: 12.5px;
+    // Balayer une plage ne doit pas surligner le texte au passage : le
+    // navigateur croirait à une sélection de texte et le rendu clignote.
+    // La cellule en cours de saisie retrouve la sélection plus bas.
+    user-select: none;
+  }
+
+  tbody td input { user-select: text; }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--app-panneau);
+    border-bottom: 1px solid var(--app-line);
+    border-right: 1px solid var(--app-line);
+    padding: 5px 10px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    min-width: 110px;
+    max-width: 260px;
+
+    &:hover { background: var(--app-accent-soft); }
+    &[data-actif="true"] { background: var(--app-accent-soft); }
+  }
+
+  tbody td {
+    border-bottom: 1px solid var(--app-line);
+    border-right: 1px solid var(--app-line);
+    padding: 0 10px;
+    height: 28px;
+    max-width: 260px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: cell;
+
+    span { display: block; overflow: hidden; text-overflow: ellipsis; }
+
+    &[data-num] { text-align: right; font-variant-numeric: tabular-nums; }
+
+    // La sélection se lit au fond, jamais à un contour qui décalerait la
+    // grille d'un pixel à chaque déplacement.
+    &[data-sel] { background: var(--app-accent-soft); box-shadow: inset 0 0 0 1px var(--app-accent); }
+
+    input {
+      width: 100%;
+      height: 26px;
+      border: none;
+      background: var(--app-champ);
+      color: var(--app-text);
+      font: inherit;
+      font-size: 12.5px;
+      padding: 0;
+      outline: none;
+    }
+  }
+}
+
+// Colonne des numéros de ligne : figée à gauche, elle reste lisible quand
+// on fait défiler un fichier large.
+.tblApp .tblNum {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--app-panneau);
+  border-right: 1px solid var(--app-line);
+  color: var(--app-muted);
+  font-weight: 400;
+  font-size: 11px;
+  text-align: right;
+  padding: 0 8px;
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.tblApp thead .tblNum { z-index: 3; }
+
+.tblApp .tblRepere {
+  display: inline-block;
+  min-width: 18px;
+  color: var(--app-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.tblApp .tblNomCol { font-weight: 600; }
+
+.tblApp .tblType {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 400;
+  color: var(--app-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+
+  &[data-type="nombre"] { color: var(--app-accent); }
+}
+
+// Poignée de largeur : posée sur le bord droit de l'en-tête, assez large
+// pour être attrapée sans viser au pixel.
+.tblApp .tblPoignee {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 4;
+
+  &:hover { background: var(--app-accent); opacity: 0.5; }
+}
+
+// Une cellule calculée se distingue discrètement de la donnée saisie :
+// savoir ce qui est source et ce qui est déduit évite de corriger le
+// mauvais bout.
+.tblApp tbody td[data-formule] {
+  font-style: italic;
+
+  span::after {
+    content: "ƒ";
+    float: right;
+    margin-left: 6px;
+    font-size: 9px;
+    font-style: normal;
+    color: var(--app-accent);
+    opacity: 0.7;
+  }
+}
+
+.tblApp tbody td[data-erreur] {
+  color: var(--app-danger);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.tblApp .tblResume {
+  color: var(--app-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+// ---------------------------------------------------------------------------
+// Panneau des raccourcis
+// ---------------------------------------------------------------------------
+
+.tblApp .tblRaccourcis {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 35%);
+  padding: 20px;
+}
+
+.tblApp .tblRaccourcisBoite {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--app-carte);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon-large);
+  box-shadow: var(--app-ombre);
+  padding: 16px 18px;
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+
+    b { font-size: 14px; }
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+
+  dt {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--app-accent);
+    white-space: nowrap;
+  }
+
+  dd { font-size: 12.5px; }
+}
+
+.tblApp .tblExemples {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--app-rayon);
+  background: var(--app-panneau);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--app-text);
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+// ---------------------------------------------------------------------------
+// Panneau des fréquences
+// ---------------------------------------------------------------------------
+
+.tblApp .tblFreq {
+  flex: none;
+  width: 260px;
+  border-left: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  overflow-y: auto;
+  padding: 12px;
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+
+    b { font-size: 12.5px; }
+  }
+
+  ul { list-style: none; display: grid; gap: 3px; margin-top: 8px; }
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr 54px auto;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 6px;
+    border-radius: var(--app-rayon);
+    cursor: pointer;
+    font-size: 11.5px;
+
+    &:hover { background: rgb(128 128 128 / 12%); }
+  }
+}
+
+.tblApp .tblFermer {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--app-muted);
+
+  &:hover { background: rgb(128 128 128 / 15%); }
+}
+
+.tblApp .tblFreqInfo { font-size: 11px; color: var(--app-muted); }
+
+.tblApp .tblFreqVal {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tblApp .tblFreqBarre {
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(128 128 128 / 18%);
+  overflow: hidden;
+
+  i { display: block; height: 100%; border-radius: 3px; background: var(--app-accent); }
+}
+
+.tblApp .tblFreqN {
+  font-variant-numeric: tabular-nums;
+  color: var(--app-muted);
+  min-width: 30px;
+  text-align: right;
+}
+
+// ---------------------------------------------------------------------------
+// Pied et dépôt
+// ---------------------------------------------------------------------------
+
+.tblApp .tblAide {
+  flex: none;
+  padding: 6px 12px;
+  border-top: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  font-size: 11px;
+  color: var(--app-muted);
+}
+
+.tblApp .tblDepot {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgb(from var(--app-bg) r g b / 92%);
+  border: 2px dashed var(--app-accent);
+  color: var(--app-accent);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tblApp * { transition: none !important; }
+}

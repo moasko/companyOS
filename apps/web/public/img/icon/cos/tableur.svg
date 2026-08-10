@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Tableur CSV">
+  <path d="M13 0h22a13 13 0 0 1 13 13v22a13 13 0 0 1-13 13H4a4 4 0 0 1-4-4V13A13 13 0 0 1 13 0Z" fill="#1d7a4c"/>
+  <rect x="10" y="11" width="28" height="26" rx="3" fill="#fff"/>
+  <rect x="10" y="11" width="28" height="6.5" rx="3" fill="#1d7a4c" opacity=".55"/>
+  <rect x="10" y="14.5" width="28" height="3" fill="#1d7a4c" opacity=".55"/>
+  <g stroke="#1d7a4c" stroke-width="1.4" opacity=".38">
+    <path d="M19.3 17.5V37M28.7 17.5V37"/>
+    <path d="M10 24h28M10 30.5h28"/>
+  </g>
+  <rect x="20.3" y="24.7" width="7.4" height="5.1" rx="1" fill="#1d7a4c" opacity=".22"/>
+</svg>

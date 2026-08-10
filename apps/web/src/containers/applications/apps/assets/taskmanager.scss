@@ -1,0 +1,240 @@
+.taskmanagerApp {
+  --txt_clr-rgb: 0 0 0;
+  --bg: white;
+
+  background: var(--fakeMica);
+  color: var(--dark-txt);
+
+  .windowScreen .restWindow {
+    height: 100%;
+  }
+
+  nav {
+    position: absolute;
+    left: 0;
+    width: 44px;
+    display: flex;
+    flex-direction: column;
+
+    .navLink {
+      height: 36px;
+      padding-left: 4px;
+      margin: 2px 4px;
+
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+
+      &:hover,
+      &.selected {
+        background: rgb(var(--txt_clr-rgb) / 5%);
+      }
+    }
+
+    .tabName {
+      display: none;
+    }
+
+    &.open {
+      width: 240px;
+
+      .tabName {
+        display: inline;
+      }
+    }
+
+    .marker {
+      position: absolute;
+      background: var(--clrPrm);
+      height: 16px;
+      width: 3px;
+      border-radius: 3px;
+      top: 0;
+      left: 4px;
+      transition: transform 250ms cubic-bezier(1, 0, 0, 1);
+    }
+
+    @for $i from 1 to 10 {
+      .navLink:nth-child(#{$i}).selected ~ .marker {
+        transform: translateY(((40 * ($i - 1)) + 12) + px);
+      }
+    }
+  }
+
+  main {
+    margin-left: 44px;
+    border-top-left-radius: 8px;
+    padding: 0 1rem;
+    background: var(--bg);
+    transition: all 100ms;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: scroll;
+
+    &::-webkit-scrollbar-corner {
+      background: rgba(0, 0, 0, 0);
+    }
+  }
+
+  nav.open ~ main {
+    margin-left: 240px;
+  }
+
+  table {
+    border-collapse: collapse;
+
+    th,
+    td {
+      border: 1px solid rgb(var(--txt_clr-rgb) / 10%);
+      padding: 4px 8px;
+    }
+
+    td:not(.name) {
+      background: rgb(0 0 255 / 5%);
+    }
+  }
+
+  .navMenuBtn {
+    display: flex;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 12px;
+    border-radius: 6px;
+
+    &:hover {
+      background: rgb(var(--txt_clr-rgb) / 5%);
+    }
+
+    svg {
+      transition: all 0.1s;
+    }
+    &:active svg {
+      transform: scaleX(0.67);
+    }
+  }
+}
+
+body[data-theme="dark"] .taskmanagerApp {
+  --txt_clr-rgb: 255 255 255;
+  --bg: #2c2c2c;
+}
+
+// ---- Moniteur du système (contenu refait) ----------------------------------
+
+.taskmanagerApp {
+  main {
+    padding: 16px 20px;
+  }
+
+  .tmBloc h3 {
+    margin: 0 0 12px;
+    font-size: 0.92em;
+    font-weight: 600;
+  }
+
+  .tmHint {
+    margin: 10px 0 0;
+    font-size: 0.78em;
+    line-height: 1.55;
+    opacity: 0.65;
+    max-width: 68ch;
+  }
+
+  .tmVide {
+    font-size: 0.82em;
+    opacity: 0.6;
+    padding: 10px 0;
+  }
+
+  .tmTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+
+    th {
+      text-align: left;
+      padding: 7px 8px;
+      border-bottom: 1px solid rgb(var(--txt_clr-rgb) / 0.14);
+      font-weight: 600;
+      opacity: 0.6;
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid rgb(var(--txt_clr-rgb) / 0.08);
+    }
+  }
+
+  .tmNom {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    .uicon {
+      display: flex;
+    }
+  }
+
+  .tmEtat {
+    opacity: 0.65;
+  }
+
+  .tmActions {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .tmLien {
+    margin-left: 12px;
+    font-size: 0.94em;
+    opacity: 0.8;
+
+    &:hover {
+      text-decoration: underline;
+      opacity: 1;
+    }
+  }
+
+  .tmDanger:hover {
+    color: #e53935;
+  }
+
+  .tmInfos .tmInfoLabel {
+    opacity: 0.6;
+    width: 180px;
+  }
+
+  .tmJauge {
+    margin-top: 6px;
+  }
+
+  .tmJaugeBarre {
+    height: 12px;
+    border-radius: 100px;
+    background: rgb(var(--txt_clr-rgb) / 0.1);
+    overflow: hidden;
+  }
+
+  .tmJaugeRemplie {
+    display: block;
+    height: 100%;
+    border-radius: 100px;
+    background: #2b88d8;
+    transition: width 0.4s ease;
+
+    &[data-alerte="true"] {
+      background: #e53935;
+    }
+  }
+
+  .tmJaugeLegende {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 0.76em;
+    opacity: 0.7;
+  }
+}

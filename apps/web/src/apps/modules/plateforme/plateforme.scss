@@ -1,0 +1,613 @@
+// Plateforme — voir index.jsx.
+//
+// La console de l'exploitant : quatre chiffres, une table. Sobre et
+// dense — c'est un poste de pilotage, pas une vitrine.
+
+.pltApp {
+  --pl-bg: #ffffff;
+  --pl-panel: #f7f8fa;
+  --pl-line: #e3e6eb;
+  --pl-text: #1f2733;
+  --pl-muted: #6b7684;
+  --pl-accent: #0f172a; // l'encre du pilotage
+  --pl-fort: #1a73e8;
+  --pl-danger: #c0392b;
+
+  background: var(--pl-bg);
+  color: var(--pl-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 80%;
+    height: 78%;
+    top: 9%;
+    left: 10%;
+    min-width: 900px;
+    min-height: 520px;
+  }
+
+  .pltVerrou {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    font-size: 0.84em;
+    color: var(--pl-muted);
+  }
+
+  .pltShell {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+
+  .pltTete {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+
+    h2 {
+      margin: 0;
+      font-size: 1.12em;
+    }
+  }
+
+  .pltAide {
+    margin: 3px 0 0;
+    font-size: 0.76em;
+    color: var(--pl-muted);
+    max-width: 58ch;
+  }
+
+  .pltRecherche {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid var(--pl-line);
+    border-radius: 8px;
+    color: var(--pl-muted);
+
+    input {
+      border: none;
+      background: transparent;
+      color: var(--pl-text);
+      font-family: inherit;
+      font-size: 0.78em;
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
+  .pltChiffres {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .pltChiffre {
+    padding: 14px 16px;
+    border: 1px solid var(--pl-line);
+    border-radius: 11px;
+
+    b {
+      display: block;
+      font-size: 1.4em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    span {
+      font-size: 0.68em;
+      color: var(--pl-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    &[data-fort="true"] {
+      border-color: var(--pl-fort);
+
+      b {
+        color: var(--pl-fort);
+      }
+    }
+  }
+
+}
+
+// ---------------------------------------------------------------------------
+// Ossature : navigation à gauche, contenu à droite
+// ---------------------------------------------------------------------------
+//
+// La console gagne une colonne de sections. Le réglage du stockage — celui
+// qui décide où vivent les fichiers de tous les clients — n'est plus sous
+// la table qu'on lit chaque matin : on ne tombe plus dessus par mégarde.
+
+.pltApp .pltCoquille {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.pltApp .pltNav {
+  flex: none;
+  width: 194px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--pl-line);
+  background: var(--pl-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pltApp .pltNavItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--pl-muted);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: rgb(128 128 128 / 12%);
+    color: var(--pl-text);
+  }
+
+  &[data-actif="true"] {
+    background: var(--pl-bg);
+    border: 1px solid var(--pl-line);
+    color: var(--pl-fort);
+    font-weight: 600;
+  }
+}
+
+// Le nombre d'espaces à traiter, visible depuis n'importe quelle section.
+.pltApp .pltBadge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 100px;
+  background: var(--pl-danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+  text-align: center;
+}
+
+// ---------------------------------------------------------------------------
+// Répartition du revenu
+// ---------------------------------------------------------------------------
+
+.pltApp .pltFormules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.pltApp .pltFormule {
+  display: grid;
+  gap: 7px;
+  padding: 12px 14px;
+  border: 1px solid var(--pl-line);
+  border-radius: 8px;
+}
+
+.pltApp .pltFormuleHaut,
+.pltApp .pltFormuleBas {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--pl-muted);
+
+  b {
+    color: var(--pl-text);
+    font-size: 12.5px;
+  }
+}
+
+.pltApp .pltJauge {
+  height: 6px;
+  border-radius: 4px;
+  background: rgb(128 128 128 / 16%);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: var(--pl-fort);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// À surveiller
+// ---------------------------------------------------------------------------
+//
+// Le ton se signale par une pastille, jamais par un filet latéral : le
+// cadre d'une carte reste complet, c'est la règle de maison.
+
+.pltApp .pltAlertes {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+
+  li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 13px;
+    border: 1px solid var(--pl-line);
+    border-radius: 8px;
+
+    div {
+      display: grid;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    b { font-size: 12.5px; }
+    div span { font-size: 11.5px; color: var(--pl-muted); }
+  }
+}
+
+.pltApp .pltAlertePastille {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pl-muted);
+}
+
+.pltApp .pltAlertes li[data-ton="danger"] .pltAlertePastille { background: var(--pl-danger); }
+.pltApp .pltAlertes li[data-ton="attention"] .pltAlertePastille { background: #b06000; }
+.pltApp .pltAlertes li[data-ton="info"] .pltAlertePastille { background: var(--pl-fort); }
+
+.pltApp .pltAlerteChiffre {
+  font-size: 11.5px;
+  color: var(--pl-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pltApp .pltRien {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--pl-muted);
+}
+
+.pltApp .pltLien {
+  border: none;
+  background: transparent;
+  color: var(--pl-fort);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover { text-decoration: underline; }
+}
+
+// ---------------------------------------------------------------------------
+// Filtres et table des espaces
+// ---------------------------------------------------------------------------
+
+.pltApp .pltFiltres {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.pltApp .pltFiltre {
+  padding: 5px 13px;
+  border: 1px solid var(--pl-line);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--pl-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--pl-fort);
+    color: var(--pl-fort);
+  }
+
+  &[data-actif="true"] {
+    background: var(--pl-fort);
+    border-color: var(--pl-fort);
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+.pltApp .pltTableEnveloppe {
+  overflow-x: auto;
+  border: 1px solid var(--pl-line);
+  border-radius: 9px;
+}
+
+.pltApp .pltTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0;
+    background: var(--pl-panel);
+    border-bottom: 1px solid var(--pl-line);
+    text-align: left;
+    white-space: nowrap;
+
+    // L'en-tête est un bouton : le tri doit être atteignable au clavier.
+    button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 9px 12px;
+      border: none;
+      background: transparent;
+      color: var(--pl-muted);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+
+      &:hover { color: var(--pl-fort); }
+    }
+
+    &[data-num] button { justify-content: flex-end; }
+    &[aria-sort]:not([aria-sort="none"]) button { color: var(--pl-fort); }
+  }
+
+  tbody td,
+  tbody th {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--pl-line);
+    text-align: left;
+    font-weight: 400;
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td,
+  tbody tr:last-child th { border-bottom: none; }
+
+  tbody tr:hover { background: rgb(128 128 128 / 6%); }
+
+  [data-num] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  select {
+    padding: 4px 7px;
+    border: 1px solid var(--pl-line);
+    border-radius: 6px;
+    background: var(--pl-bg);
+    color: var(--pl-text);
+    font: inherit;
+    font-size: 12px;
+    max-width: 190px;
+  }
+}
+
+// Une ligne qui demande une décision se signale par une pastille devant
+// son nom, pas par un fond coloré qui rendrait la table illisible.
+.pltApp .pltTable .pltNom {
+  display: grid;
+  gap: 1px;
+  min-width: 150px;
+
+  span { font-weight: 600; }
+  em { font-style: normal; font-size: 11px; color: var(--pl-muted); }
+}
+
+.pltApp .pltTable tr[data-alerte] .pltNom span::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--pl-muted);
+}
+
+.pltApp .pltTable tr[data-alerte="danger"] .pltNom span::before { background: var(--pl-danger); }
+.pltApp .pltTable tr[data-alerte="attention"] .pltNom span::before { background: #b06000; }
+.pltApp .pltTable tr[data-alerte="info"] .pltNom span::before { background: var(--pl-fort); }
+
+// La consommation : une jauge pour l'allure, le chiffre pour la vérité.
+.pltApp .pltUsage {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+
+  span {
+    font-size: 11px;
+    color: var(--pl-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &[data-serre="true"] i { background: #b06000; }
+  &[data-plein="true"] i { background: var(--pl-danger); }
+  &[data-plein="true"] span { color: var(--pl-danger); font-weight: 600; }
+}
+
+.pltApp .pltUsageBarre {
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(128 128 128 / 16%);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--pl-fort);
+  }
+}
+
+// Le clavier doit voir où il est.
+.pltApp button:focus-visible,
+.pltApp select:focus-visible,
+.pltApp input:focus-visible {
+  outline: 2px solid var(--pl-fort);
+  outline-offset: 2px;
+}
+
+body[data-theme="dark"] .pltApp {
+  --pl-bg: #262630;
+  --pl-panel: #1e1e26;
+  --pl-line: #35353f;
+  --pl-text: #e8e8ee;
+  --pl-muted: #9a9aa8;
+  --pl-fort: #6f8dff;
+  --pl-danger: #e2716a;
+}
+
+.pltApp .pltBloc {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: var(--plt-card, var(--app-carte, #fff));
+  border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+  border-radius: 10px;
+}
+
+.pltApp .pltBlocTete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+
+  h3 { font-size: 14px; }
+}
+
+.pltApp .pltPastilleEtat {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+  font-size: 11.5px;
+  font-weight: 600;
+
+  &::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--app-muted, #6b7684);
+  }
+
+  &[data-actif="s3"]::before { background: var(--app-ok, #188038); }
+}
+
+.pltApp .pltRepartition {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.pltApp .pltRepartCase {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+  border-radius: 8px;
+  min-width: 150px;
+
+  b { font-size: 15px; }
+}
+
+.pltApp .pltRepartNom,
+.pltApp .pltRepartTaille {
+  font-size: 11px;
+  color: var(--app-muted, #6b7684);
+}
+
+.pltApp .pltChoixStockage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.pltApp .pltOption {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  b { font-size: 12.5px; }
+  span { font-size: 11px; color: var(--app-muted, #6b7684); }
+
+  &:hover { border-color: var(--app-accent, #1a73e8); }
+
+  &[data-actif="true"] {
+    border-color: var(--app-accent, #1a73e8);
+    background: var(--app-accent-soft, #e8f0fe);
+  }
+}
+
+.pltApp .pltFormulaireS3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+
+  input,
+  select {
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+    border-radius: 6px;
+    background: var(--app-champ, #fff);
+    color: inherit;
+    font: inherit;
+    font-size: 12.5px;
+  }
+}
+
+.pltApp .pltActionsStockage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.pltApp .pltNoteEssai { margin: 0; }

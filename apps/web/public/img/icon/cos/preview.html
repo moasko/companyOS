@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>CompanyOS — jeu d'icônes</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:40px; background:#0B1220; color:#E2E8F0;
+         font:15px/1.5 ui-sans-serif,system-ui,"Segoe UI",sans-serif; }
+  h1 { font-size:24px; margin:0 0 4px; letter-spacing:-.02em; }
+  p.sub { margin:0 0 36px; color:#94A3B8; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em;
+       color:#64748B; margin:36px 0 16px; font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(118px,1fr)); gap:20px; }
+  .cell { text-align:center; }
+  .cell img { display:block; margin:0 auto 8px; width:56px; height:56px; }
+  .cell b { display:block; font-size:12px; font-weight:600; }
+  .cell span { display:block; font-size:11px; color:#64748B; margin-top:2px; }
+  .sizes { display:flex; align-items:flex-end; gap:24px; padding:20px;
+           background:#111C2E; border-radius:12px; }
+  .sizes div { text-align:center; color:#64748B; font-size:11px; }
+  .sizes img { display:block; margin-bottom:6px; }
+  .light { background:#F1F5F9; border-radius:12px; padding:20px;
+           display:flex; gap:18px; flex-wrap:wrap; }
+  .light img { width:44px; height:44px; }
+</style>
+</head>
+<body>
+<h1>CompanyOS — jeu d'icônes d'applications</h1>
+<p class="sub">Flat géométrique · tuile squircle à coin bas-gauche vif (signature de la famille) · SVG, ~500 o/icône</p>
+
+<h2>Lisibilité aux tailles réelles</h2>
+<div class="sizes">
+  <div><img src="explorateur.svg" width="16" height="16">16</div>
+  <div><img src="explorateur.svg" width="24" height="24">24</div>
+  <div><img src="explorateur.svg" width="32" height="32">32</div>
+  <div><img src="explorateur.svg" width="48" height="48">48</div>
+  <div><img src="explorateur.svg" width="72" height="72">72</div>
+</div>
+
+<h2>Sur fond clair</h2>
+<div class="light">
+  <img src="demarrer.svg"><img src="explorateur.svg"><img src="crm.svg"><img src="stock.svg">
+  <img src="facturation.svg"><img src="studio.svg"><img src="musique.svg"><img src="terminal.svg">
+</div>
+
+<h2>Socle système — ardoise</h2>
+<div class="grid">
+  <div class="cell"><img src="demarrer.svg"><b>demarrer</b><span>home</span></div>
+  <div class="cell"><img src="recherche.svg"><b>recherche</b><span>search</span></div>
+  <div class="cell"><img src="parametres.svg"><b>parametres</b><span>settings</span></div>
+  <div class="cell"><img src="taches.svg"><b>taches</b><span>taskmanager</span></div>
+  <div class="cell"><img src="explorateur.svg"><b>explorateur</b><span>explorer</span></div>
+  <div class="cell"><img src="terminal.svg"><b>terminal</b><span>terminal</span></div>
+  <div class="cell"><img src="boutique.svg"><b>boutique</b><span>store</span></div>
+  <div class="cell"><img src="corbeille.svg"><b>corbeille</b><span>bin0</span></div>
+  <div class="cell"><img src="corbeille-pleine.svg"><b>corbeille-pleine</b><span>bin1</span></div>
+</div>
+
+<h2>Documents — indigo</h2>
+<div class="grid">
+  <div class="cell"><img src="blocnotes.svg"><b>blocnotes</b><span>notepad</span></div>
+  <div class="cell"><img src="notes.svg"><b>notes</b><span>notes</span></div>
+  <div class="cell"><img src="editeur.svg"><b>editeur</b><span>winWord ⚠ manquant</span></div>
+  <div class="cell"><img src="presentation.svg"><b>presentation</b><span>powerpoint</span></div>
+  <div class="cell"><img src="pdf.svg"><b>pdf</b><span>pdf ⚠ manquant</span></div>
+  <div class="cell"><img src="pressepapiers.svg"><b>pressepapiers</b><span>clipboard ⚠ manquant</span></div>
+</div>
+
+<h2>Métier — émeraude / ambre</h2>
+<div class="grid">
+  <div class="cell"><img src="projets.svg"><b>projets</b><span>todo</span></div>
+  <div class="cell"><img src="stock.svg"><b>stock</b><span>excel</span></div>
+  <div class="cell"><img src="facturation.svg"><b>facturation</b><span>msoffice</span></div>
+  <div class="cell"><img src="crm.svg"><b>crm</b><span>people</span></div>
+  <div class="cell"><img src="rh.svg"><b>rh</b><span>yphone</span></div>
+  <div class="cell"><img src="paie.svg"><b>paie</b><span>nouveau</span></div>
+  <div class="cell"><img src="comptabilite.svg"><b>comptabilite</b><span>onenote</span></div>
+  <div class="cell"><img src="livraison.svg"><b>livraison</b><span>nouveau</span></div>
+  <div class="cell"><img src="caisse.svg"><b>caisse</b><span>nouveau</span></div>
+  <div class="cell"><img src="achats.svg"><b>achats</b><span>nouveau</span></div>
+</div>
+
+<h2>Média — magenta</h2>
+<div class="grid">
+  <div class="cell"><img src="photos.svg"><b>photos</b><span>photos</span></div>
+  <div class="cell"><img src="video.svg"><b>video</b><span>movies</span></div>
+  <div class="cell"><img src="musique.svg"><b>musique</b><span>groove</span></div>
+  <div class="cell"><img src="objet3d.svg"><b>objet3d</b><span>objet3d ⚠ manquant</span></div>
+</div>
+
+<h2>Outils — violet / sarcelle</h2>
+<div class="grid">
+  <div class="cell"><img src="studio.svg"><b>studio</b><span>code</span></div>
+  <div class="cell"><img src="calculatrice.svg"><b>calculatrice</b><span>calculator</span></div>
+  <div class="cell"><img src="qrcode.svg"><b>qrcode</b><span>nouveau</span></div>
+  <div class="cell"><img src="navigateur.svg"><b>navigateur</b><span>edge</span></div>
+</div>
+
+<h2>Connecteurs génériques — remplacent les logos de marques</h2>
+<div class="grid">
+  <div class="cell"><img src="connecteur-chat.svg"><b>connecteur-chat</b><span>discord, skype, twitter</span></div>
+  <div class="cell"><img src="connecteur-mail.svg"><b>connecteur-mail</b><span>mail, outlook</span></div>
+  <div class="cell"><img src="connecteur-drive.svg"><b>connecteur-drive</b><span>oneDrive</span></div>
+  <div class="cell"><img src="connecteur-depot.svg"><b>connecteur-depot</b><span>github</span></div>
+  <div class="cell"><img src="connecteur-visio.svg"><b>connecteur-visio</b><span>teams</span></div>
+</div>
+</body>
+</html>

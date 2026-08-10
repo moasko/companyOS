@@ -1,0 +1,119 @@
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
+import { env } from "./env.js";
+import { prisma } from "./db.js";
+import authRoutes from "./routes/auth.js";
+import appRoutes from "./routes/apps.js";
+import fileRoutes from "./routes/files.js";
+import recordRoutes from "./routes/records.js";
+import auditRoutes from "./routes/audit.js";
+import notificationRoutes from "./routes/notifications.js";
+import webRoutes from "./routes/web.js";
+import billingRoutes from "./routes/billing.js";
+import courrierRoutes from "./routes/courrier.js";
+import { demarrerRelances } from "./relances.js";
+import campagnesRoutes from "./routes/campagnes.js";
+import plateformeRoutes from "./routes/plateforme.js";
+import { demarrerCampagnes } from "./campagnes.js";
+
+const app = Fastify({
+  logger: true,
+  // Derrière le reverse-proxy de production, `request.ip` vaut sinon
+  // l'adresse du proxy : la limitation de débit compterait toutes les
+  // requêtes du monde comme venant d'une seule IP, et le journal d'audit
+  // enregistrerait la même adresse pour tout le monde. Avec ce réglage,
+  // Fastify lit `X-Forwarded-For` **lui-même**, en ne faisant confiance
+  // qu'au nombre de sauts déclaré — ce qui empêche un client de maquiller
+  // son adresse en envoyant l'en-tête à la main.
+  trustProxy: env.trustProxy,
+});
+
+// En-têtes de sécurité par défaut sur toutes les réponses de l'API.
+//
+// `contentSecurityPolicy: false` : l'API renvoie du JSON, pour lequel une
+// CSP n'a pas de sens — et les deux routes qui servent vraiment du HTML
+// (`/api/web/voir`, les pages de campagne) posent leur propre politique,
+// bien plus stricte que ce qu'un réglage global permettrait.
+//
+// `crossOriginResourcePolicy: false` : le shell vit sur un autre domaine
+// que l'API et doit pouvoir afficher les images et les vidéos servies par
+// `/api/files`. Le contrôle d'accès reste porté par le jeton, pas par
+// l'en-tête.
+await app.register(helmet, {
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false,
+});
+
+// Limitation de débit.
+//
+// Le plafond global est large : il ne sert qu'à écrêter l'abus grossier.
+// Les routes qui coûtent cher ou qui gardent un secret — connexion,
+// inscription, acceptation d'invitation, envoi de courriel, récupération
+// d'URL distante — posent le leur, bien plus bas, à leur déclaration.
+//
+// Sans cela, `bcrypt` à 12 tours n'est qu'un ralentisseur face au bourrage
+// d'identifiants, et rien n'empêche d'essayer des codes d'invitation en
+// boucle.
+await app.register(rateLimit, {
+  global: true,
+  max: 600,
+  timeWindow: "1 minute",
+  // La clé est l'IP, sauf pour une requête authentifiée : deux personnes
+  // derrière le même NAT d'entreprise ne doivent pas se gêner.
+  keyGenerator: (request) => request.user?.id || request.ip,
+  addHeaders: { "retry-after": true },
+  errorResponseBuilder: (_request, contexte) => ({
+    error: `Trop de requêtes. Réessayez dans ${Math.ceil(contexte.ttl / 1000)} secondes.`,
+  }),
+});
+
+await app.register(cors, {
+  origin: env.corsOrigin,
+  credentials: true,
+  // Sans cela, le navigateur cache les en-têtes de plage au code de la
+  // page : la lecture en flux marche, mais rien côté client ne peut lire
+  // la taille ni la position du morceau reçu.
+  exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length"],
+});
+await app.register(multipart, {
+  limits: { fileSize: env.uploadMaxOctets },
+});
+
+app.get("/health", async () => ({ status: "ok" }));
+
+await app.register(authRoutes, { prefix: "/api/auth" });
+await app.register(appRoutes, { prefix: "/api/apps" });
+await app.register(fileRoutes, { prefix: "/api/files" });
+await app.register(recordRoutes, { prefix: "/api/records" });
+await app.register(auditRoutes, { prefix: "/api/audit" });
+await app.register(notificationRoutes, { prefix: "/api/notifications" });
+await app.register(webRoutes, { prefix: "/api/web" });
+await app.register(billingRoutes, { prefix: "/api/facturation" });
+await app.register(courrierRoutes, { prefix: "/api/courrier" });
+await app.register(campagnesRoutes, { prefix: "/api/campagnes" });
+await app.register(plateformeRoutes, { prefix: "/api/plateforme" });
+
+const shutdown = async () => {
+  await app.close();
+  await prisma.$disconnect();
+  process.exit(0);
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+try {
+  await app.listen({ port: env.port, host: "0.0.0.0" });
+  // Le moteur de relances de factures — voir src/relances.js.
+  demarrerRelances();
+  // Le moteur d'envoi des campagnes — voir src/campagnes.js.
+  demarrerCampagnes();
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}
+

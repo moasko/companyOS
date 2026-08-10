@@ -1,0 +1,273 @@
+// Code — mise en page de l'éditeur.
+//
+// Reprend les variables de thème communes aux modules (--app-fond,
+// --app-panneau, --app-line…) : la fenêtre doit ressembler au reste de
+// l'OS, pas à VS Code posé dans un cadre.
+
+.codeApp {
+  .codeCorps {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    background: var(--app-fond, #f7f8f8);
+    color: var(--app-texte, #16232b);
+  }
+
+  // --- Colonne des fichiers -------------------------------------------------
+
+  .codeLateral {
+    display: flex;
+    flex-direction: column;
+    width: 232px;
+    flex: 0 0 232px;
+    min-height: 0;
+    background: var(--app-panneau, #fefefe);
+    border-right: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+  }
+
+  .codeLateralTete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--app-discret, #6d7d84);
+  }
+
+  .codeIconeBtn {
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 5px;
+
+    &:hover { background: var(--app-survol, rgb(0 0 0 / 5%)); }
+  }
+
+  .codeChemin {
+    padding: 0 12px 8px;
+    font-size: 12px;
+    color: var(--app-discret, #6d7d84);
+
+    button {
+      border: none;
+      background: transparent;
+      color: var(--app-accent, #057378);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+    }
+  }
+
+  .codeArbre {
+    list-style: none;
+    margin: 0;
+    padding: 0 6px 10px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .codeEntree {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font-size: 13px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &:hover { background: var(--app-survol, rgb(0 0 0 / 5%)); }
+
+    // Un fond, jamais une bordure latérale colorée : règle de la maison.
+    &[data-actif="true"] {
+      background: var(--app-accent-doux, #e2f2f2);
+      font-weight: 600;
+    }
+  }
+
+  // La pastille dit le langage d'un coup d'œil, sans icône à charger.
+  .codePuce {
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    flex: 0 0 7px;
+    background: #9aa7ad;
+
+    &[data-genre="dossier"] { background: #e0a45e; border-radius: 2px 2px 3px 3px; }
+    &[data-genre="javascript"] { background: #e3c343; }
+    &[data-genre="typescript"] { background: #3b86d1; }
+    &[data-genre="json"] { background: #b08a3e; }
+    &[data-genre="html"] { background: #d4703a; }
+    &[data-genre="css"], &[data-genre="scss"], &[data-genre="less"] { background: #9b6ed0; }
+    &[data-genre="markdown"] { background: #5b6b73; }
+    &[data-genre="python"] { background: #4b8bbe; }
+    &[data-genre="shell"], &[data-genre="powershell"] { background: #4c9a67; }
+    &[data-genre="yaml"], &[data-genre="ini"] { background: #7d8f96; }
+  }
+
+  .codeVide {
+    padding: 12px 10px;
+    font-size: 12px;
+    color: var(--app-discret, #6d7d84);
+  }
+
+  // --- Zone d'édition -------------------------------------------------------
+
+  .codeZone {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .codeOnglets {
+    display: flex;
+    align-items: stretch;
+    gap: 1px;
+    overflow-x: auto;
+    background: var(--app-fond, #f7f8f8);
+    border-bottom: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+    min-height: 34px;
+  }
+
+  .codeOnglet {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border-bottom: 2px solid transparent;
+
+    > button:first-child {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-size: 12.5px;
+      padding: 8px 4px 8px 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    &[data-actif="true"] {
+      background: var(--app-panneau, #fefefe);
+      border-bottom-color: var(--app-accent, #057378);
+    }
+  }
+
+  .codePastille {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--app-accent, #057378);
+  }
+
+  .codeFermer {
+    border: none;
+    background: transparent;
+    color: var(--app-discret, #6d7d84);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 8px 4px 4px;
+    border-radius: 4px;
+
+    &:hover { background: var(--app-survol, rgb(0 0 0 / 8%)); }
+  }
+
+  .codeErreur {
+    margin: 0;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    background: #fdece9;
+    color: #9a3412;
+  }
+
+  .codeEditeurEnveloppe {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .codeEditeur {
+    position: absolute;
+    inset: 0;
+  }
+
+  // L'éditeur reste monté même sans fichier (le créer coûte cher) : on le
+  // couvre plutôt que de le démonter.
+  .codeEditeurEnveloppe[data-vide="true"] .codeEditeur { visibility: hidden; }
+
+  .codeAccueil {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+    padding: 24px;
+    background: var(--app-panneau, #fefefe);
+
+    h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--app-discret, #6d7d84);
+      max-width: 380px;
+    }
+  }
+
+  .codeDiscret { opacity: 0.7; font-style: italic; }
+
+  .codeBarreEtat {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    color: var(--app-discret, #6d7d84);
+    background: var(--app-panneau, #fefefe);
+    border-top: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+  }
+
+  .codeEspace { flex: 1; }
+
+  .codeEnregistrer {
+    border: 1px solid var(--app-line, rgb(0 0 0 / 12%));
+    background: var(--app-accent, #057378);
+    color: #fff;
+    font-size: 12px;
+    padding: 3px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+
+    &:disabled {
+      background: transparent;
+      color: var(--app-discret, #6d7d84);
+      cursor: default;
+    }
+  }
+}
