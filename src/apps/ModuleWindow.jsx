@@ -1,6 +1,7 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import { ToolBar } from "../utils/general";
+import { useNomApp } from "../utils/nomsApps";
 
 /// Chrome de fenêtre commun à tous les modules CompanyOS.
 /// Un module n'a qu'à écrire son contenu :
@@ -14,6 +15,8 @@ export const ModuleWindow = ({ manifest, className = "", children }) => {
   // L'état de fenêtre est indexé par l'identifiant de l'application, pas
   // par son icône : deux apps peuvent partager la même image.
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
+  // Le titre suit la langue de l'OS ; le nom du manifeste reste l'identité.
+  const nomApp = useNomApp();
 
   // Module non installé : l'état n'existe pas, la fenêtre non plus.
   //
@@ -38,7 +41,7 @@ export const ModuleWindow = ({ manifest, className = "", children }) => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name={manifest.name}
+        name={nomApp(manifest)}
       />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="restWindow flex-grow flex flex-col">{children}</div>

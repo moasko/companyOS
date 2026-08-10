@@ -5,6 +5,8 @@
 // compléter ce tableau — l'Explorateur, le menu contextuel et les
 // visionneuses s'y réfèrent tous.
 
+import { EXTENSIONS } from "./modules/code/domaine";
+
 // `app` est l'identifiant de la fenêtre à ouvrir ; `action` est
 // l'ancienne chaîne Redux, conservée comme clé d'abonnement des
 // visionneuses.
@@ -59,6 +61,19 @@ const FAMILLES = [
     extensions: ["docx"],
   },
   {
+    genre: "classeur",
+    label: "Classeur Excel",
+    app: "classeur",
+    action: "CLASSEURAPP",
+    icone: "classeur",
+    // Les deux formats Excel. Le `.xls` de 1997 n'a rien de commun avec le
+    // `.xlsx` — c'est un conteneur binaire OLE2, lu par un analyseur
+    // dédié (voir modules/classeur/xls.js). Il s'ouvre en lecture : le
+    // classeur se réenregistre en `.xlsx`, le format vivant.
+    mime: /^application\/vnd\.openxmlformats-officedocument\.spreadsheetml|^application\/vnd\.ms-excel$/,
+    extensions: ["xlsx", "xls"],
+  },
+  {
     genre: "presentation",
     label: "Présentation PowerPoint",
     app: "presentation",
@@ -68,6 +83,34 @@ const FAMILLES = [
     // Seul le format réel de l'éditeur : un `.ppt` historique est un autre
     // format (binaire), l'ouvrir ici échouerait.
     extensions: ["pptx"],
+  },
+  {
+    genre: "tableur",
+    label: "Fichier CSV",
+    app: "tableur",
+    action: "TABLEURAPP",
+    icone: "tableur",
+    // Les serveurs annoncent le CSV de trois façons ; l'extension tranche
+    // pour le reste. `text/plain` n'est pas capté ici : un .txt quelconque
+    // n'est pas un tableau, et l'ouvrir en grille serait absurde.
+    mime: /^text\/csv$|^text\/tab-separated-values$|^application\/csv$/,
+    extensions: ["csv", "tsv"],
+  },
+  {
+    genre: "code",
+    label: "Fichier de code",
+    app: "code",
+    action: "CODEAPP",
+    icone: "code",
+    // Placée **après** le tableur : `text/csv` correspondrait aussi à
+    // `^text/`, et un CSV a une meilleure application que l'éditeur de
+    // code. L'ordre de ce tableau est la règle de priorité.
+    //
+    // `application/octet-stream` n'est pas capté : c'est le type que
+    // prennent la moitié des envois, y compris les binaires. Pour ces
+    // fichiers-là, c'est l'extension qui tranche, juste en dessous.
+    mime: /^text\/|^application\/(json|xml|javascript|x-sh|x-httpd-php|toml|yaml)$/,
+    extensions: EXTENSIONS,
   },
   {
     genre: "objet3d",

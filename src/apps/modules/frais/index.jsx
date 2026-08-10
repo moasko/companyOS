@@ -12,6 +12,9 @@
 // l'Explorateur, ouvert d'un clic depuis la note. Et chaque note
 // approuvée propose son écriture à la Comptabilité — charge de la
 // catégorie contre compte du personnel — qu'on passe là-bas d'un clic.
+//
+// L'app suit le réglage « Langue et région » : textes dans TEXTES (fr/en,
+// repli par clé), montants via useDevise — voir la partie 8 du guide.
 // ─────────────────────────────────────────────────────────────────────────
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
@@ -25,6 +28,7 @@ import { saveToCloud } from "../../cloud";
 import { ouvrirFichier } from "../../openRequest";
 import { Contenu, useChargement } from "../../chargement";
 import { Bouton, Champ, Vide } from "../../ui";
+import { useDevise, useTraduction } from "../../../utils/intl";
 import { salarieDe } from "../conges/domaine";
 import * as D from "./domaine";
 import "./frais.scss";
@@ -38,11 +42,141 @@ export const manifest = {
   Window: FraisApp,
 };
 
+const TEXTES = {
+  fr: {
+    verrou: "Connectez-vous pour vos notes de frais.",
+    vueMoi: "Mes notes",
+    vueValidation: "À valider",
+    vueRemboursement: "À rembourser",
+    salarie: "Salarié",
+    sansFicheTitre: "Aucune fiche salarié à votre nom",
+    sansFicheAide:
+      "Votre compte ({email}) n'est relié à aucune fiche RH. Demandez à un responsable d'y renseigner votre adresse email.",
+    noteIncomplete: "Note incomplète",
+    noteSoumise: "Note soumise",
+    noteSoumiseMsg: "{montant} — en attente de validation.",
+    notifResponsable: "Note de frais — {nom}",
+    categorieMontant: "{categorie} : {montant}.",
+    soumissionImpossible: "Soumission impossible",
+    recuImpossible: "Envoi du reçu impossible",
+    retirerTitre: "Retirer cette note ?",
+    retirer: "Retirer",
+    actionImpossible: "Action impossible",
+    refuserTitre: "Refuser cette note ?",
+    refuserMsg: "{nom} — {montant}.",
+    refuser: "Refuser",
+    approuver: "Approuver",
+    noteApprouvee: "Note de frais approuvée",
+    noteRefusee: "Note de frais refusée",
+    noteRemboursee: "Note de frais remboursée",
+    marquerRemboursee: "Marquer remboursée",
+    aucuneAValider: "Aucune note à valider.",
+    rienARembourser: "Rien à rembourser — tout est soldé.",
+    rembourserAide:
+      "Une note approuvée attend son remboursement : espèces, mobile money ou virement, puis marquez-la ici. L'écriture comptable est proposée dans la Comptabilité.",
+    enValidation: "en validation",
+    aRembourser: "à rembourser",
+    remboursees: "remboursées",
+    soumettreTitre: "Soumettre une dépense",
+    champDate: "Date",
+    champCategorie: "Catégorie",
+    champMontant: "Montant (F CFA)",
+    champDescription: "Description",
+    descriptionExemple: "Taxi rendez-vous client, Yopougon",
+    joindreRecu: "Joindre le reçu (photo ou PDF)",
+    soumettre: "Soumettre",
+    mesNotes: "Mes notes",
+    aucuneNote: "Aucune note pour l'instant.",
+    voirRecu: "· voir le reçu",
+    "categorie.transport": "Transport & taxi",
+    "categorie.carburant": "Carburant",
+    "categorie.repas": "Repas & réception",
+    "categorie.hebergement": "Hébergement",
+    "categorie.fournitures": "Fournitures & petit matériel",
+    "categorie.communication": "Téléphone & internet",
+    "categorie.autre": "Autre dépense",
+    "etat.soumise": "À valider",
+    "etat.approuvee": "Approuvée",
+    "etat.refusee": "Refusée",
+    "etat.remboursee": "Remboursée",
+  },
+  en: {
+    verrou: "Sign in to manage your expense reports.",
+    vueMoi: "My expenses",
+    vueValidation: "To approve",
+    vueRemboursement: "To reimburse",
+    salarie: "Employee",
+    sansFicheTitre: "No employee file in your name",
+    sansFicheAide:
+      "Your account ({email}) is not linked to any HR file. Ask a manager to add your email address to it.",
+    noteIncomplete: "Incomplete expense",
+    noteSoumise: "Expense submitted",
+    noteSoumiseMsg: "{montant} — awaiting approval.",
+    notifResponsable: "Expense report — {nom}",
+    categorieMontant: "{categorie}: {montant}.",
+    soumissionImpossible: "Could not submit",
+    recuImpossible: "Could not upload the receipt",
+    retirerTitre: "Withdraw this expense?",
+    retirer: "Withdraw",
+    actionImpossible: "Action failed",
+    refuserTitre: "Refuse this expense?",
+    refuserMsg: "{nom} — {montant}.",
+    refuser: "Refuse",
+    approuver: "Approve",
+    noteApprouvee: "Expense approved",
+    noteRefusee: "Expense refused",
+    noteRemboursee: "Expense reimbursed",
+    marquerRemboursee: "Mark as reimbursed",
+    aucuneAValider: "No expense to approve.",
+    rienARembourser: "Nothing to reimburse — all settled.",
+    rembourserAide:
+      "An approved expense awaits reimbursement: cash, mobile money or transfer, then mark it here. The journal entry is drafted in Accounting.",
+    enValidation: "awaiting approval",
+    aRembourser: "to reimburse",
+    remboursees: "reimbursed",
+    soumettreTitre: "Submit an expense",
+    champDate: "Date",
+    champCategorie: "Category",
+    champMontant: "Amount (CFA francs)",
+    champDescription: "Description",
+    descriptionExemple: "Taxi to a client meeting, Yopougon",
+    joindreRecu: "Attach the receipt (photo or PDF)",
+    soumettre: "Submit",
+    mesNotes: "My expenses",
+    aucuneNote: "No expense yet.",
+    voirRecu: "· view receipt",
+    "categorie.transport": "Transport & taxi",
+    "categorie.carburant": "Fuel",
+    "categorie.repas": "Meals & entertainment",
+    "categorie.hebergement": "Accommodation",
+    "categorie.fournitures": "Supplies & small equipment",
+    "categorie.communication": "Phone & internet",
+    "categorie.autre": "Other expense",
+    "etat.soumise": "Pending",
+    "etat.approuvee": "Approved",
+    "etat.refusee": "Refused",
+    "etat.remboursee": "Reimbursed",
+  },
+};
+
+/// Libellé d'une catégorie ou d'un état : la traduction si elle existe,
+/// sinon le libellé français du domaine — un id inconnu ne casse rien.
+const libelleCategorie = (t, id) => {
+  const traduit = t(`categorie.${id}`);
+  return traduit === `categorie.${id}` ? D.CATEGORIES[id]?.label || id : traduit;
+};
+const libelleEtat = (t, id) => {
+  const traduit = t(`etat.${id}`);
+  return traduit === `etat.${id}` ? D.ETATS[id]?.label || id : traduit;
+};
+
 function FraisApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id]);
   const session = useSelector((state) => state.session);
   const ouvert = !!wnapp && !wnapp.hide && session.status === "authenticated";
   const peutValider = ["OWNER", "ADMIN"].includes(session.user?.role);
+  const t = useTraduction(TEXTES);
+  const { montant } = useDevise();
 
   const [vue, setVue] = useState("moi");
   const [notes, setNotes] = useState([]);
@@ -77,7 +211,9 @@ function FraisApp() {
 
   const nomDe = (salarieId) => {
     const s = salaries.find((x) => x.id === salarieId);
-    return s ? `${s.data.prenom || ""} ${s.data.nom || ""}`.trim() : "Salarié";
+    return s
+      ? `${s.data.prenom || ""} ${s.data.nom || ""}`.trim()
+      : t("salarie");
   };
 
   const membreDe = (salarieId) => {
@@ -93,7 +229,7 @@ function FraisApp() {
 
   const soumettre = async () => {
     const probleme = D.problemeNote(note);
-    if (probleme) return modal.alert({ title: "Note incomplète", message: probleme });
+    if (probleme) return modal.alert({ title: t("noteIncomplete"), message: probleme });
 
     setOccupe(true);
     try {
@@ -109,21 +245,24 @@ function FraisApp() {
       setNote({ ...D.NOTE_VIDE, date: D.today() });
       await etat.rafraichir();
       notifier({
-        titre: "Note soumise",
-        message: `${D.fcfa(note.montant)} — en attente de validation.`,
-        app: "Notes de frais",
+        titre: t("noteSoumise"),
+        message: t("noteSoumiseMsg", { montant: montant(note.montant) }),
+        app: manifest.name,
         ton: "success",
       });
       for (const m of membres.filter((x) => ["OWNER", "ADMIN"].includes(x.role))) {
         envoyerA(m.id, {
           source: "frais",
-          titre: `Note de frais — ${nomDe(moi.id)}`,
-          message: `${D.CATEGORIES[note.categorie]?.label} : ${D.fcfa(note.montant)}.`,
+          titre: t("notifResponsable", { nom: nomDe(moi.id) }),
+          message: t("categorieMontant", {
+            categorie: libelleCategorie(t, note.categorie),
+            montant: montant(note.montant),
+          }),
           lien: { app: "frais" },
         });
       }
     } catch (e) {
-      modal.alert({ title: "Soumission impossible", message: e.message, tone: "error" });
+      modal.alert({ title: t("soumissionImpossible"), message: e.message, tone: "error" });
     } finally {
       setOccupe(false);
     }
@@ -147,7 +286,7 @@ function FraisApp() {
         },
       }));
     } catch (e) {
-      modal.alert({ title: "Envoi du reçu impossible", message: e.message, tone: "error" });
+      modal.alert({ title: t("recuImpossible"), message: e.message, tone: "error" });
     } finally {
       setOccupe(false);
     }
@@ -155,9 +294,9 @@ function FraisApp() {
 
   const retirer = async (fiche) => {
     const ok = await modal.confirm({
-      title: "Retirer cette note ?",
-      message: `${D.fcfa(fiche.data.montant)} — ${fiche.data.description}`,
-      confirmLabel: "Retirer",
+      title: t("retirerTitre"),
+      message: `${montant(fiche.data.montant)} — ${fiche.data.description}`,
+      confirmLabel: t("retirer"),
       danger: true,
     });
     if (!ok) return;
@@ -180,12 +319,15 @@ function FraisApp() {
         envoyerA(membre.id, {
           source: "frais",
           titre: titreNotif,
-          message: `${D.CATEGORIES[fiche.data.categorie]?.label} : ${D.fcfa(fiche.data.montant)}.`,
+          message: t("categorieMontant", {
+            categorie: libelleCategorie(t, fiche.data.categorie),
+            montant: montant(fiche.data.montant),
+          }),
           lien: { app: "frais" },
         });
       }
     } catch (e) {
-      modal.alert({ title: "Action impossible", message: e.message, tone: "error" });
+      modal.alert({ title: t("actionImpossible"), message: e.message, tone: "error" });
     } finally {
       setOccupe(false);
     }
@@ -193,12 +335,15 @@ function FraisApp() {
 
   const refuser = async (fiche) => {
     const ok = await modal.confirm({
-      title: "Refuser cette note ?",
-      message: `${nomDe(fiche.data.salarieId)} — ${D.fcfa(fiche.data.montant)}.`,
-      confirmLabel: "Refuser",
+      title: t("refuserTitre"),
+      message: t("refuserMsg", {
+        nom: nomDe(fiche.data.salarieId),
+        montant: montant(fiche.data.montant),
+      }),
+      confirmLabel: t("refuser"),
       danger: true,
     });
-    if (ok) passer(fiche, "refusee", "Note de frais refusée");
+    if (ok) passer(fiche, "refusee", t("noteRefusee"));
   };
 
   // ---- Rendu --------------------------------------------------------------
@@ -206,17 +351,17 @@ function FraisApp() {
   if (!ouvert) {
     return (
       <ModuleWindow manifest={manifest} className="frsApp">
-        <div className="frsVerrou">Connectez-vous pour vos notes de frais.</div>
+        <div className="frsVerrou">{t("verrou")}</div>
       </ModuleWindow>
     );
   }
 
   const VUES = [
-    { id: "moi", label: "Mes notes", icone: "faReceipt" },
+    { id: "moi", label: t("vueMoi"), icone: "faReceipt" },
     ...(peutValider
       ? [
-          { id: "validation", label: "À valider", icone: "faListCheck", compte: aValider.length },
-          { id: "remboursement", label: "À rembourser", icone: "faMoneyBillTransfer", compte: aRembourser.length },
+          { id: "validation", label: t("vueValidation"), icone: "faListCheck", compte: aValider.length },
+          { id: "remboursement", label: t("vueRemboursement"), icone: "faMoneyBillTransfer", compte: aRembourser.length },
         ]
       : []),
   ];
@@ -245,8 +390,8 @@ function FraisApp() {
               !moi ? (
                 <Vide
                   icone="faUserSlash"
-                  titre="Aucune fiche salarié à votre nom"
-                  aide={`Votre compte (${session.user?.email}) n'est relié à aucune fiche RH. Demandez à un responsable d'y renseigner votre adresse email.`}
+                  titre={t("sansFicheTitre")}
+                  aide={t("sansFicheAide", { email: session.user?.email })}
                 />
               ) : (
                 <MesNotes
@@ -265,14 +410,14 @@ function FraisApp() {
                 liste={aValider}
                 nomDe={nomDe}
                 occupe={occupe}
-                vide="Aucune note à valider."
+                vide={t("aucuneAValider")}
                 actions={(f) => (
                   <>
-                    <Bouton icone="faCheck" off={occupe} onClick={() => passer(f, "approuvee", "Note de frais approuvée")}>
-                      Approuver
+                    <Bouton icone="faCheck" off={occupe} onClick={() => passer(f, "approuvee", t("noteApprouvee"))}>
+                      {t("approuver")}
                     </Bouton>
                     <Bouton variante="secondaire" icone="faXmark" off={occupe} onClick={() => refuser(f)}>
-                      Refuser
+                      {t("refuser")}
                     </Bouton>
                   </>
                 )}
@@ -282,15 +427,15 @@ function FraisApp() {
                 liste={aRembourser}
                 nomDe={nomDe}
                 occupe={occupe}
-                vide="Rien à rembourser — tout est soldé."
-                aide="Une note approuvée attend son remboursement : espèces, mobile money ou virement, puis marquez-la ici. L'écriture comptable est proposée dans la Comptabilité."
+                vide={t("rienARembourser")}
+                aide={t("rembourserAide")}
                 actions={(f) => (
                   <Bouton
                     icone="faMoneyBillTransfer"
                     off={occupe}
-                    onClick={() => passer(f, "remboursee", "Note de frais remboursée")}
+                    onClick={() => passer(f, "remboursee", t("noteRemboursee"))}
                   >
-                    Marquer remboursée
+                    {t("marquerRemboursee")}
                   </Bouton>
                 )}
               />
@@ -307,6 +452,8 @@ function FraisApp() {
 // ---------------------------------------------------------------------------
 
 const MesNotes = ({ totaux, liste, note, setNote, occupe, onJoindre, onSoumettre, onRetirer }) => {
+  const t = useTraduction(TEXTES);
+  const { montant } = useDevise();
   const maj = (patch) => setNote((n) => ({ ...n, ...patch }));
   const fichierRef = useRef(null);
 
@@ -314,23 +461,23 @@ const MesNotes = ({ totaux, liste, note, setNote, occupe, onJoindre, onSoumettre
     <div className="frsMoi">
       <div className="frsTotaux">
         <div className="frsTotal" data-ton="warn">
-          <b>{D.fcfa(totaux.soumises)}</b>
-          <span>en validation</span>
+          <b>{montant(totaux.soumises)}</b>
+          <span>{t("enValidation")}</span>
         </div>
         <div className="frsTotal" data-ton="ok">
-          <b>{D.fcfa(totaux.approuvees)}</b>
-          <span>à rembourser</span>
+          <b>{montant(totaux.approuvees)}</b>
+          <span>{t("aRembourser")}</span>
         </div>
         <div className="frsTotal">
-          <b>{D.fcfa(totaux.remboursees)}</b>
-          <span>remboursées</span>
+          <b>{montant(totaux.remboursees)}</b>
+          <span>{t("remboursees")}</span>
         </div>
       </div>
 
       <div className="frsBloc">
-        <h3>Soumettre une dépense</h3>
+        <h3>{t("soumettreTitre")}</h3>
         <div className="frsFormulaire">
-          <Champ label="Date">
+          <Champ label={t("champDate")}>
             <input
               type="date"
               value={note.date}
@@ -338,16 +485,16 @@ const MesNotes = ({ totaux, liste, note, setNote, occupe, onJoindre, onSoumettre
               onChange={(e) => maj({ date: e.target.value })}
             />
           </Champ>
-          <Champ label="Catégorie">
+          <Champ label={t("champCategorie")}>
             <select value={note.categorie} onChange={(e) => maj({ categorie: e.target.value })}>
-              {Object.entries(D.CATEGORIES).map(([id, c]) => (
+              {Object.keys(D.CATEGORIES).map((id) => (
                 <option key={id} value={id}>
-                  {c.label}
+                  {libelleCategorie(t, id)}
                 </option>
               ))}
             </select>
           </Champ>
-          <Champ label="Montant (F CFA)">
+          <Champ label={t("champMontant")}>
             <input
               type="number"
               min="0"
@@ -356,10 +503,10 @@ const MesNotes = ({ totaux, liste, note, setNote, occupe, onJoindre, onSoumettre
               onChange={(e) => maj({ montant: e.target.value })}
             />
           </Champ>
-          <Champ label="Description">
+          <Champ label={t("champDescription")}>
             <input
               value={note.description}
-              placeholder="Taxi rendez-vous client, Yopougon"
+              placeholder={t("descriptionExemple")}
               onChange={(e) => maj({ description: e.target.value })}
             />
           </Champ>
@@ -394,19 +541,19 @@ const MesNotes = ({ totaux, liste, note, setNote, occupe, onJoindre, onSoumettre
               off={occupe}
               onClick={() => fichierRef.current?.click()}
             >
-              Joindre le reçu (photo ou PDF)
+              {t("joindreRecu")}
             </Bouton>
           )}
           <Bouton icone="faPaperPlane" off={occupe} onClick={onSoumettre}>
-            Soumettre
+            {t("soumettre")}
           </Bouton>
         </div>
       </div>
 
       <div className="frsBloc">
-        <h3>Mes notes</h3>
+        <h3>{t("mesNotes")}</h3>
         {!liste.length ? (
-          <p className="frsAide">Aucune note pour l'instant.</p>
+          <p className="frsAide">{t("aucuneNote")}</p>
         ) : (
           liste.map((f) => <LigneNote key={f.id} fiche={f} onRetirer={onRetirer} />)
         )}
@@ -416,34 +563,35 @@ const MesNotes = ({ totaux, liste, note, setNote, occupe, onJoindre, onSoumettre
 };
 
 const LigneNote = ({ fiche, onRetirer }) => {
+  const t = useTraduction(TEXTES);
+  const { montant } = useDevise();
   const d = fiche.data;
   const e = D.ETATS[d.etat] || {};
-  const c = D.CATEGORIES[d.categorie] || D.CATEGORIES.autre;
   return (
     <div className="frsLigne">
       <span className="frsLigneIcone">
-        <Icon fafa={c.icone} width={13} />
+        <Icon fafa={(D.CATEGORIES[d.categorie] || D.CATEGORIES.autre).icone} width={13} />
       </span>
       <div className="frsLigneCorps">
         <span className="frsLigneDesc">{d.description}</span>
         <span className="frsLigneSous">
-          {d.date} · {c.label}
+          {d.date} · {libelleCategorie(t, d.categorie)}
           {d.justificatif ? (
             <span
               className="frsLien handcr"
               onClick={() => ouvrirFichier(d.justificatif, [d.justificatif])}
             >
-              · voir le reçu
+              {t("voirRecu")}
             </span>
           ) : null}
         </span>
       </div>
-      <span className="frsLigneMontant">{D.fcfa(d.montant)}</span>
+      <span className="frsLigneMontant">{montant(d.montant)}</span>
       <span className="frsEtat" data-ton={e.ton}>
-        {e.label || d.etat}
+        {libelleEtat(t, d.etat)}
       </span>
       {d.etat === "soumise" && onRetirer ? (
-        <span className="frsRecuRetirer handcr" title="Retirer" onClick={() => onRetirer(fiche)}>
+        <span className="frsRecuRetirer handcr" title={t("retirer")} onClick={() => onRetirer(fiche)}>
           <Icon fafa="faXmark" width={11} />
         </span>
       ) : null}
@@ -456,6 +604,8 @@ const LigneNote = ({ fiche, onRetirer }) => {
 // ---------------------------------------------------------------------------
 
 const ATrancher = ({ liste, nomDe, vide, aide, actions }) => {
+  const t = useTraduction(TEXTES);
+  const { montant } = useDevise();
   if (!liste.length) {
     return <Vide icone="faListCheck" titre={vide} aide={aide} />;
   }
@@ -464,21 +614,20 @@ const ATrancher = ({ liste, nomDe, vide, aide, actions }) => {
       {aide ? <p className="frsAide">{aide}</p> : null}
       {liste.map((f) => {
         const d = f.data;
-        const c = D.CATEGORIES[d.categorie] || D.CATEGORIES.autre;
         return (
           <div key={f.id} className="frsCarte">
             <div className="frsCarteHaut">
               <span className="frsCarteNom">{nomDe(d.salarieId)}</span>
-              <span className="frsLigneMontant">{D.fcfa(d.montant)}</span>
+              <span className="frsLigneMontant">{montant(d.montant)}</span>
             </div>
             <div className="frsCarteSous">
-              {d.date} · {c.label} — « {d.description} »
+              {d.date} · {libelleCategorie(t, d.categorie)} — « {d.description} »
               {d.justificatif ? (
                 <span
                   className="frsLien handcr"
                   onClick={() => ouvrirFichier(d.justificatif, [d.justificatif])}
                 >
-                  · voir le reçu
+                  {t("voirRecu")}
                 </span>
               ) : null}
             </div>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import {
   Accueil,
   Etat,
@@ -29,6 +30,7 @@ export const manifest = {
 // ---------------------------------------------------------------------------
 
 function PhotosApp() {
+  const nomApp = useNomApp();
   const v = useVisionneuse("photos", "PHOTOS", "image");
   const [zoom, setZoom] = useState(null); // null = ajusté à la fenêtre
   const [rotation, setRotation] = useState(0);
@@ -82,7 +84,7 @@ function PhotosApp() {
   const relacher = () => (glisse.current = null);
 
   return (
-    <FenetreMedia wnapp={v.wnapp} nom="Photos" className="photosApp">
+    <FenetreMedia wnapp={v.wnapp} nom={nomApp("photos")} className="photosApp">
       {!v.courant ? (
         <Accueil
           icone="faImages"

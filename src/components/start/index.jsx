@@ -6,7 +6,8 @@ import { Icon } from "../../utils/general";
 import { GRID } from "../../reducers/deskLayout";
 import { api } from "../../api/client";
 import { ensureRootFolder } from "../../apps/cloud";
-import { ouvrirFichier } from "../../apps/openRequest";
+import { applicationManquante, ouvrirFichier } from "../../apps/openRequest";
+import { moduleById } from "../../apps/registry";
 import { ouvrirCorbeille } from "../../apps/explorerRequest";
 import { modal } from "../../apps/modalRequest";
 import { menuContextuel } from "../../apps/menuRequest";
@@ -17,11 +18,123 @@ import {
   FileThumb,
   oublierApercu,
 } from "../../containers/applications/apps/assets/FileThumb";
+import { useTraduction } from "../../utils/intl";
+import { useNomApp } from "../../utils/nomsApps";
+import { localeEffective } from "../../utils/langue";
 import "./searchpane.scss";
 import "./sidepane.scss";
 import "./startmenu.scss";
 
 export * from "./start";
+
+const TEXTES = {
+  fr: {
+    supprimerDossier: "Supprimer le dossier",
+    supprimerFichier: "Supprimer le fichier",
+    corbeilleQuestion: "Mettre « {nom} » à la corbeille ?",
+    corbeilleDetailDossier:
+      "Le dossier et tout ce qu'il contient partent avec lui. Récupérable pendant 30 jours.",
+    corbeilleDetailFichier: "Récupérable pendant 30 jours depuis la corbeille.",
+    mettreCorbeille: "Mettre à la corbeille",
+    suppressionImpossible: "Suppression impossible",
+    renommerDossier: "Renommer le dossier",
+    renommerFichier: "Renommer le fichier",
+    nouveauNom: "Nouveau nom",
+    renommer: "Renommer",
+    renommageImpossible: "Renommage impossible",
+    nouveauDossier: "Nouveau dossier",
+    nomDuDossier: "Nom du dossier",
+    creer: "Créer",
+    creationImpossible: "Création impossible",
+    affichage: "Affichage",
+    grandesIcones: "Grandes icônes",
+    icnMoyennes: "Icônes moyennes",
+    petitesIcones: "Petites icônes",
+    afficherIcones: "Afficher les icônes",
+    trierPar: "Trier par",
+    nomTri: "Nom",
+    taille: "Taille",
+    date: "Date",
+    actualiser: "Actualiser",
+    reorganiser: "Réorganiser les icônes",
+    fondSuivant: "Fond d'écran suivant",
+    personnaliser: "Personnaliser",
+    ouvrirTerminal: "Ouvrir le Terminal",
+    ouvrir: "Ouvrir",
+    viderCorbeille: "Vider la corbeille",
+    retirerBureau: "Retirer du bureau",
+    ouvrirExplorateur: "Ouvrir dans l'Explorateur",
+    ouvrirAvec: "Ouvrir avec {app}",
+    telecharger: "Télécharger",
+    voirExplorateur: "Voir dans l'Explorateur",
+    viderQuestion: "Supprimer définitivement tout ce qu'elle contient ?",
+    viderDetail: "Cette action est irréversible et libère l'espace de stockage.",
+    vider: "Vider",
+    viderImpossible: "Impossible de vider",
+    deposez: "Déposez vos fichiers sur le bureau",
+    envoi: "Envoi de « {nom} » — {n} sur {total}",
+    stockage: "Stockage",
+    nonConnecte: "Non connecté",
+    appManquante: "{app} n'est pas installée",
+    appManquanteAide:
+      "Ce fichier s'ouvre avec cette application. Installez-la depuis la Boutique, puis réessayez.",
+    typeInconnu: "Aucune application pour ce type de fichier",
+    typeInconnuAide: "Ouvrez-le depuis l'Explorateur pour le télécharger.",
+  },
+  en: {
+    supprimerDossier: "Delete folder",
+    supprimerFichier: "Delete file",
+    corbeilleQuestion: "Move “{nom}” to the recycle bin?",
+    corbeilleDetailDossier:
+      "The folder and everything inside goes with it. Recoverable for 30 days.",
+    corbeilleDetailFichier: "Recoverable for 30 days from the recycle bin.",
+    mettreCorbeille: "Move to recycle bin",
+    suppressionImpossible: "Could not delete",
+    renommerDossier: "Rename folder",
+    renommerFichier: "Rename file",
+    nouveauNom: "New name",
+    renommer: "Rename",
+    renommageImpossible: "Could not rename",
+    nouveauDossier: "New folder",
+    nomDuDossier: "Folder name",
+    creer: "Create",
+    creationImpossible: "Could not create",
+    affichage: "View",
+    grandesIcones: "Large icons",
+    icnMoyennes: "Medium icons",
+    petitesIcones: "Small icons",
+    afficherIcones: "Show icons",
+    trierPar: "Sort by",
+    nomTri: "Name",
+    taille: "Size",
+    date: "Date",
+    actualiser: "Refresh",
+    reorganiser: "Rearrange icons",
+    fondSuivant: "Next wallpaper",
+    personnaliser: "Personalize",
+    ouvrirTerminal: "Open Terminal",
+    ouvrir: "Open",
+    viderCorbeille: "Empty recycle bin",
+    retirerBureau: "Remove from desktop",
+    ouvrirExplorateur: "Open in Explorer",
+    ouvrirAvec: "Open with {app}",
+    telecharger: "Download",
+    voirExplorateur: "Show in Explorer",
+    viderQuestion: "Permanently delete everything it contains?",
+    viderDetail: "This cannot be undone and frees up storage space.",
+    vider: "Empty",
+    viderImpossible: "Could not empty",
+    deposez: "Drop your files on the desktop",
+    envoi: "Uploading “{nom}” — {n} of {total}",
+    stockage: "Storage",
+    nonConnecte: "Not signed in",
+    appManquante: "{app} is not installed",
+    appManquanteAide:
+      "This file opens with that application. Install it from the Store, then try again.",
+    typeInconnu: "No application for this file type",
+    typeInconnuAide: "Open it from the Explorer to download it.",
+  },
+};
 
 export const DesktopApp = () => {
   // Sélectionner brut, dériver dans un `useMemo` : un sélecteur qui construit
@@ -30,6 +143,8 @@ export const DesktopApp = () => {
   // called with the same parameters » — parce que cela rerend le bureau à
   // chaque action, y compris celles qui ne le concernent pas.
   const bureau = useSelector((state) => state.desktop);
+  const t = useTraduction(TEXTES);
+  const nomApp = useNomApp();
 
   const deskApps = useMemo(() => {
     const apps = [...bureau.apps];
@@ -122,21 +237,31 @@ export const DesktopApp = () => {
     if (node.type === "FOLDER") {
       return dispatch({ type: "EXPLORER", payload: "full" });
     }
-    ouvrirFichier(node, fichiers);
+    if (ouvrirFichier(node, fichiers)) return;
+
+    // L'OS sait lire ce fichier mais l'application n'est pas installée :
+    // on le dit, au lieu de laisser le double-clic sans effet.
+    const manquante = applicationManquante(node);
+    if (manquante) {
+      return modal.alert({
+        title: t("appManquante", { app: moduleById[manquante.app]?.name || manquante.label }),
+        message: t("appManquanteAide"),
+      });
+    }
+    modal.alert({ title: t("typeInconnu"), message: t("typeInconnuAide") });
   };
 
   /// Suppression d'un élément du bureau : il part à la corbeille, comme
   /// depuis l'Explorateur — récupérable pendant 30 jours.
   const supprimer = async (node) => {
     const ok = await modal.confirm({
-      title:
-        node.type === "FOLDER" ? "Supprimer le dossier" : "Supprimer le fichier",
-      message: `Mettre « ${node.name} » à la corbeille ?`,
+      title: node.type === "FOLDER" ? t("supprimerDossier") : t("supprimerFichier"),
+      message: t("corbeilleQuestion", { nom: node.name }),
       detail:
         node.type === "FOLDER"
-          ? "Le dossier et tout ce qu'il contient partent avec lui. Récupérable pendant 30 jours."
-          : "Récupérable pendant 30 jours depuis la corbeille.",
-      confirmLabel: "Mettre à la corbeille",
+          ? t("corbeilleDetailDossier")
+          : t("corbeilleDetailFichier"),
+      confirmLabel: t("mettreCorbeille"),
       danger: true,
     });
     if (!ok) return;
@@ -146,7 +271,7 @@ export const DesktopApp = () => {
       dispatch({ type: "CLOUD_TOUCH" });
     } catch (err) {
       await modal.alert({
-        title: "Suppression impossible",
+        title: t("suppressionImpossible"),
         message: err.message,
         tone: "error",
       });
@@ -156,17 +281,17 @@ export const DesktopApp = () => {
   /// Renommer un élément du bureau.
   const renommer = async (node) => {
     const nom = await modal.prompt({
-      title: node.type === "FOLDER" ? "Renommer le dossier" : "Renommer le fichier",
-      label: "Nouveau nom",
+      title: node.type === "FOLDER" ? t("renommerDossier") : t("renommerFichier"),
+      label: t("nouveauNom"),
       value: node.name,
-      confirmLabel: "Renommer",
+      confirmLabel: t("renommer"),
     });
     if (!nom || nom === node.name) return;
     try {
       await api.renameNode(node.id, nom);
       dispatch({ type: "CLOUD_TOUCH" });
     } catch (err) {
-      await modal.alert({ title: "Renommage impossible", message: err.message, tone: "error" });
+      await modal.alert({ title: t("renommageImpossible"), message: err.message, tone: "error" });
     }
   };
 
@@ -183,10 +308,10 @@ export const DesktopApp = () => {
 
   const nouveauDossier = async () => {
     const nom = await modal.prompt({
-      title: "Nouveau dossier",
-      label: "Nom du dossier",
+      title: t("nouveauDossier"),
+      label: t("nomDuDossier"),
       placeholder: "Documents",
-      confirmLabel: "Créer",
+      confirmLabel: t("creer"),
     });
     if (!nom) return;
     try {
@@ -194,7 +319,7 @@ export const DesktopApp = () => {
       await api.createFolder(nom, bureau);
       dispatch({ type: "CLOUD_TOUCH" });
     } catch (err) {
-      await modal.alert({ title: "Création impossible", message: err.message, tone: "error" });
+      await modal.alert({ title: t("creationImpossible"), message: err.message, tone: "error" });
     }
   };
 
@@ -207,43 +332,43 @@ export const DesktopApp = () => {
   const menuFond = (e) =>
     menuContextuel(e, [
       {
-        nom: "Affichage",
+        nom: t("affichage"),
         icone: "faTableCellsLarge",
         sousMenu: [
-          { nom: "Grandes icônes", action: () => Actions.changeIconSize("large"), coche: deskApps.size >= 1.5 },
-          { nom: "Icônes moyennes", action: () => Actions.changeIconSize("medium"), coche: deskApps.size > 1 && deskApps.size < 1.5 },
-          { nom: "Petites icônes", action: () => Actions.changeIconSize("small"), coche: deskApps.size <= 1 },
+          { nom: t("grandesIcones"), action: () => Actions.changeIconSize("large"), coche: deskApps.size >= 1.5 },
+          { nom: t("icnMoyennes"), action: () => Actions.changeIconSize("medium"), coche: deskApps.size > 1 && deskApps.size < 1.5 },
+          { nom: t("petitesIcones"), action: () => Actions.changeIconSize("small"), coche: deskApps.size <= 1 },
           { separateur: true },
           {
-            nom: "Afficher les icônes",
+            nom: t("afficherIcones"),
             coche: !deskApps.hide,
             action: () => Actions.deskHide(),
           },
         ],
       },
       {
-        nom: "Trier par",
+        nom: t("trierPar"),
         icone: "faArrowDownAZ",
         sousMenu: [
-          { nom: "Nom", action: () => Actions.changeSort("name"), coche: deskApps.sort === "name" },
-          { nom: "Taille", action: () => Actions.changeSort("size"), coche: deskApps.sort === "size" },
-          { nom: "Date", action: () => Actions.changeSort("date"), coche: deskApps.sort === "date" },
+          { nom: t("nomTri"), action: () => Actions.changeSort("name"), coche: deskApps.sort === "name" },
+          { nom: t("taille"), action: () => Actions.changeSort("size"), coche: deskApps.sort === "size" },
+          { nom: t("date"), action: () => Actions.changeSort("date"), coche: deskApps.sort === "date" },
         ],
       },
-      { nom: "Actualiser", icone: "faRotate", raccourci: "F5", action: chargerBureau },
+      { nom: t("actualiser"), icone: "faRotate", raccourci: "F5", action: chargerBureau },
       { separateur: true },
-      { nom: "Nouveau dossier", icone: "faFolderPlus", action: nouveauDossier },
-      { nom: "Réorganiser les icônes", icone: "faBorderAll", action: () => dispatch({ type: "DESKLAYOUT_RESET" }) },
+      { nom: t("nouveauDossier"), icone: "faFolderPlus", action: nouveauDossier },
+      { nom: t("reorganiser"), icone: "faBorderAll", action: () => dispatch({ type: "DESKLAYOUT_RESET" }) },
       { separateur: true },
-      { nom: "Fond d'écran suivant", icone: "faImage", action: () => dispatch({ type: "WALLNEXT" }) },
-      { nom: "Personnaliser", icone: "faPalette", action: () => ouvrirFenetre("settings") },
-      { nom: "Ouvrir le Terminal", icone: "faTerminal", action: () => ouvrirFenetre("terminal") },
+      { nom: t("fondSuivant"), icone: "faImage", action: () => dispatch({ type: "WALLNEXT" }) },
+      { nom: t("personnaliser"), icone: "faPalette", action: () => ouvrirFenetre("settings") },
+      { nom: t("ouvrirTerminal"), icone: "faTerminal", action: () => ouvrirFenetre("terminal") },
     ]);
 
   const menuApplication = (app, estCorbeille) => (e) =>
     menuContextuel(e, [
       {
-        nom: "Ouvrir",
+        nom: t("ouvrir"),
         icone: "faArrowUpRightFromSquare",
         action: () =>
           estCorbeille ? ouvrirCorbeille() : dispatch({ type: app.action, payload: "full" }),
@@ -252,7 +377,7 @@ export const DesktopApp = () => {
       ...(estCorbeille
         ? [
             {
-              nom: "Vider la corbeille",
+              nom: t("viderCorbeille"),
               icone: "faFireFlameSimple",
               danger: true,
               desactive: !corbeillePleine,
@@ -261,45 +386,45 @@ export const DesktopApp = () => {
           ]
         : [
             {
-              nom: "Retirer du bureau",
+              nom: t("retirerBureau"),
               icone: "faEyeSlash",
               desactive: true,
             },
           ]),
       { separateur: true },
-      { nom: "Réorganiser les icônes", icone: "faBorderAll", action: () => dispatch({ type: "DESKLAYOUT_RESET" }) },
+      { nom: t("reorganiser"), icone: "faBorderAll", action: () => dispatch({ type: "DESKLAYOUT_RESET" }) },
     ]);
 
   const menuFichier = (node) => (e) => {
     const famille = familleDe(node);
     return menuContextuel(e, [
       {
-        nom: node.type === "FOLDER" ? "Ouvrir dans l'Explorateur" : "Ouvrir",
+        nom: node.type === "FOLDER" ? t("ouvrirExplorateur") : t("ouvrir"),
         icone: node.type === "FOLDER" ? "faFolderOpen" : "faArrowUpRightFromSquare",
         action: () => ouvrir(node),
       },
       // On ne propose « Ouvrir avec » que si une application sait le lire :
       // une entrée qui échoue apprend à se méfier du menu entier.
       famille && {
-        nom: `Ouvrir avec ${famille.label}`,
+        nom: t("ouvrirAvec", { app: famille.label }),
         image: famille.icone,
         action: () => ouvrirFichier(node, fichiers),
       },
       { separateur: true },
-      { nom: "Renommer", icone: "faPen", raccourci: "F2", action: () => renommer(node) },
+      { nom: t("renommer"), icone: "faPen", raccourci: "F2", action: () => renommer(node) },
       node.type === "FILE" && {
-        nom: "Télécharger",
+        nom: t("telecharger"),
         icone: "faDownload",
         action: () => telecharger(node),
       },
       {
-        nom: "Voir dans l'Explorateur",
+        nom: t("voirExplorateur"),
         icone: "faFolderTree",
         action: () => ouvrirDossier(node.parentId),
       },
       { separateur: true },
       {
-        nom: "Mettre à la corbeille",
+        nom: t("mettreCorbeille"),
         icone: "faTrashCan",
         raccourci: "Suppr",
         danger: true,
@@ -311,10 +436,10 @@ export const DesktopApp = () => {
   /// Vider la corbeille depuis le bureau — irréversible, donc confirmé.
   const viderCorbeille = async () => {
     const ok = await modal.confirm({
-      title: "Vider la corbeille",
-      message: "Supprimer définitivement tout ce qu'elle contient ?",
-      detail: "Cette action est irréversible et libère l'espace de stockage.",
-      confirmLabel: "Vider",
+      title: t("viderCorbeille"),
+      message: t("viderQuestion"),
+      detail: t("viderDetail"),
+      confirmLabel: t("vider"),
       danger: true,
     });
     if (!ok) return;
@@ -322,7 +447,7 @@ export const DesktopApp = () => {
       await api.emptyTrash();
       dispatch({ type: "CLOUD_TOUCH" });
     } catch (err) {
-      await modal.alert({ title: "Impossible de vider", message: err.message, tone: "error" });
+      await modal.alert({ title: t("viderImpossible"), message: err.message, tone: "error" });
     }
   };
 
@@ -534,7 +659,7 @@ export const DesktopApp = () => {
                 width={Math.round(deskApps.size * 36)}
                 menu="app"
               />
-              <div className="appName">{app.name}</div>
+              <div className="appName">{nomApp(app)}</div>
             </div>
           );
         })}
@@ -575,7 +700,7 @@ export const DesktopApp = () => {
               <div className="appName">{node.name}</div>
               <div
                 className="dskSuppr"
-                title="Mettre à la corbeille"
+                title={t("mettreCorbeille")}
                 // Le clic ne doit ni sélectionner ni ouvrir la case.
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
@@ -592,13 +717,13 @@ export const DesktopApp = () => {
       {depot ? (
         <div className="dskDepot">
           <Icon fafa="faCloudArrowUp" width={24} />
-          <span>Déposez vos fichiers sur le bureau</span>
+          <span>{t("deposez")}</span>
         </div>
       ) : null}
 
       {envoi ? (
         <div className="dskEnvoi">
-          Envoi de « {envoi.nom} » — {envoi.fait + 1} sur {envoi.total}
+          {t("envoi", { nom: envoi.nom, n: envoi.fait + 1, total: envoi.total })}
         </div>
       ) : null}
     </div>
@@ -660,6 +785,7 @@ const formatBytes = (bytes) => {
 /// stockage de l'espace de travail et la session. Pas de Wi-Fi, de
 /// Bluetooth, de batterie ni de luminosité : le navigateur les gère.
 export const SidePane = () => {
+  const t = useTraduction(TEXTES);
   const sidepane = useSelector((state) => state.sidepane);
   const setting = useSelector((state) => state.setting);
   const session = useSelector((state) => state.session);
@@ -728,7 +854,7 @@ export const SidePane = () => {
         {session.status === "authenticated" ? (
           <div className="paneStorage">
             <div className="paneStorageHead">
-              <span>Stockage</span>
+              <span>{t("stockage")}</span>
               <span>
                 {formatBytes(used)} / {formatBytes(quota)}
               </span>
@@ -747,7 +873,7 @@ export const SidePane = () => {
           </div>
         ) : (
           <div className="paneAccount px-3">
-            <div className="paneTenant">Non connecté</div>
+            <div className="paneTenant">{t("nonConnecte")}</div>
           </div>
         )}
       </div>
@@ -787,7 +913,7 @@ export const CalnWid = () => {
     >
       <div className="topBar pl-4 text-sm">
         <div className="date">
-          {new Date().toLocaleDateString("fr-FR", {
+          {new Date().toLocaleDateString(localeEffective(), {
             weekday: "long",
             month: "long",
             day: "numeric",

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import {
   Accueil,
   Etat,
@@ -28,6 +29,7 @@ export const manifest = {
 // ---------------------------------------------------------------------------
 
 function MusiqueApp() {
+  const nomApp = useNomApp();
   const v = useVisionneuse("groove", "MUSIQUE", "audio", "flux");
   const audio = useRef(null);
   const canvas = useRef(null);
@@ -141,7 +143,7 @@ function MusiqueApp() {
   }, [volume, muet]);
 
   return (
-    <FenetreMedia wnapp={v.wnapp} nom="Musique" className="musiqueApp">
+    <FenetreMedia wnapp={v.wnapp} nom={nomApp("musique")} className="musiqueApp">
       {!v.courant ? (
         <Accueil
           icone="faMusic"

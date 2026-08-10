@@ -876,12 +876,8 @@ export const controle = (ecritures) => {
   return { debit, credit, ecart: debit - credit, equilibre: Math.abs(debit - credit) < 1 };
 };
 
-/// Montant en francs CFA, tel qu'on l'écrit ici : pas de décimale, un
-/// espace insécable fin comme séparateur de milliers.
-export const fcfa = (n) =>
-  `${Math.round(Number(n) || 0)
-    .toLocaleString("fr-FR")
-    .replace(/ | /g, " ")} F`;
+/// Montant lisible, dans la devise d'affichage de l'espace.
+export { montant as fcfa } from "../../../utils/monnaie";
 
 /// Le premier et le dernier jour d'un mois, au format ISO.
 export const mois = (aaaaMm) => ({

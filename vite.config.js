@@ -14,12 +14,24 @@ const config = ({ mode }) => {
           // service worker ferait télécharger une dizaine de mégaoctets à
           // tout visiteur, y compris à qui n'ouvrira jamais ces apps. Ils
           // se mettront en cache d'eux-mêmes à la première utilisation.
-          globIgnores: ["**/Editeur-*.js", "**/three.module-*.js"],
+          //
+          // Monaco (l'éditeur de VS Code, app Code) suit la même règle, et
+          // ses analyseurs de langage sont les plus gros fichiers du
+          // projet — celui de TypeScript pèse à lui seul 7 Mo.
+          globIgnores: [
+            "**/Editeur-*.js",
+            "**/three.module-*.js",
+            "**/*.worker-*.js",
+            "**/monaco-*.js",
+            "**/editor.main-*.js",
+          ],
         },
       }),
     ],
+
     base: "",
     server: {
+      allowedHosts:["shamrock-timing-sleet.ngrok-free.dev"],
       watch: {
         // `server/` est l'API et son stockage de fichiers : il vit dans le
         // même dossier mais ne fait pas partie du front. Sans cette
@@ -60,7 +72,7 @@ const config = ({ mode }) => {
               // canvg, dompurify et compagnie sont les dépendances de
               // jspdf : elles suivent le même régime que lui — chargées à
               // la première génération de PDF, pas au démarrage.
-              /node_modules[\\/](three|@docx-editor\.dev|@radix-ui|harfbuzzjs|emf-converter|docx|pdfjs-dist|pptx-react-viewer|pptx-viewer-core|pptx-viewer-mcp|framer-motion|lucide-react|react-icons|jspdf|jszip|html2canvas-pro|ai|@ai-sdk|canvg|dompurify|rgbcolor|raf|performance-now|stackblur-canvas|svg-pathdata|core-js)[\\/]/.test(
+              /node_modules[\\/](three|@docx-editor\.dev|@radix-ui|harfbuzzjs|emf-converter|docx|pdfjs-dist|pptx-react-viewer|pptx-viewer-core|pptx-viewer-mcp|framer-motion|lucide-react|react-icons|jspdf|jszip|html2canvas-pro|ai|@ai-sdk|canvg|dompurify|rgbcolor|raf|performance-now|stackblur-canvas|svg-pathdata|core-js|monaco-editor)[\\/]/.test(
                 id,
               )
             ) {

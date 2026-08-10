@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "../utils/general";
 import { subscribeModals, closeModal } from "./modalRequest";
+import { creerTraducteur } from "../utils/intl";
 import "./modal.scss";
 
 /// Boîtes de dialogue générales de CompanyOS. Rendu unique, monté au
@@ -13,12 +14,20 @@ import "./modal.scss";
 // la plus prudente.
 const DISMISS = { confirm: false, alert: true, prompt: null, custom: null };
 
-const DEFAULTS = {
-  confirm: { confirmLabel: "Confirmer", cancelLabel: "Annuler", icon: "faCircleQuestion" },
-  alert: { confirmLabel: "OK", cancelLabel: null, icon: "faCircleInfo" },
-  prompt: { confirmLabel: "Valider", cancelLabel: "Annuler", icon: "faPenToSquare" },
-  custom: { confirmLabel: null, cancelLabel: null, icon: null },
+// Les libellés par défaut suivent la langue de l'OS ; un appelant qui
+// passe confirmLabel/cancelLabel garde évidemment le sien.
+const LIBELLES = {
+  fr: { confirmer: "Confirmer", annuler: "Annuler", ok: "OK", valider: "Valider" },
+  en: { confirmer: "Confirm", annuler: "Cancel", ok: "OK", valider: "Save" },
 };
+const tLibelle = creerTraducteur(LIBELLES);
+
+const DEFAULTS = () => ({
+  confirm: { confirmLabel: tLibelle("confirmer"), cancelLabel: tLibelle("annuler"), icon: "faCircleQuestion" },
+  alert: { confirmLabel: tLibelle("ok"), cancelLabel: null, icon: "faCircleInfo" },
+  prompt: { confirmLabel: tLibelle("valider"), cancelLabel: tLibelle("annuler"), icon: "faPenToSquare" },
+  custom: { confirmLabel: null, cancelLabel: null, icon: null },
+});
 
 const TONE_ICONS = {
   success: "faCircleCheck",
@@ -28,7 +37,8 @@ const TONE_ICONS = {
 
 const ModalBox = ({ entry, top }) => {
   const kind = entry.kind || "confirm";
-  const base = DEFAULTS[kind] || DEFAULTS.confirm;
+  const defauts = DEFAULTS();
+  const base = defauts[kind] || defauts.confirm;
   const tone = entry.danger ? "error" : entry.tone || "info";
   const icon = entry.icon || TONE_ICONS[tone] || base.icon;
   const confirmLabel =

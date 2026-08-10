@@ -8,17 +8,42 @@
   position: relative;
   border-radius: 6px 6px 0 0;
 
+  // La barre d'action est **opaque**.
+  //
+  // Elle ne l'était pas : son fond venait du seul `props.bg` passé en
+  // ligne, et aucune fenêtre de l'OS n'en passait. Résultat, le titre et
+  // les boutons flottaient au-dessus du contenu, qui défilait dessous, et
+  // le bureau se voyait aux angles supérieurs.
+  //
+  // Les anciennes règles `[data-back="light|dark"]` visaient ce but mais
+  // ne se déclenchaient jamais : cet attribut est posé sur le composant
+  // `Image`, pas sur la barre.
+  //
+  // Le repli couvre les deux familles de fenêtres : un module utilise son
+  // jeton de charte, une application du socle (qui n'en déclare pas)
+  // prend la couleur neutre.
+  background: var(--app-panneau, #fefefe);
+  border-bottom: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+
   &[data-float="false"] {
     z-index: 10;
   }
 
-  &[data-back="light"] {
-    background: #fefefe;
+  // Une fenêtre qui demande une barre flottante (visionneuses plein
+  // écran) la garde transparente : là, c'est voulu.
+  &[data-float="true"] {
+    background: transparent;
+    border-bottom: none;
   }
+}
 
-  &[data-back="dark"] {
-    background: #181818;
-  }
+body[data-theme="dark"] .toolbar {
+  background: var(--app-panneau, #181818);
+  border-bottom-color: var(--app-line, rgb(255 255 255 / 10%));
+}
+
+body[data-theme="dark"] .toolbar[data-float="true"] {
+  background: transparent;
 }
 
 .topInfo {

@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { Icon, ToolBar } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import { api } from "../../../api/client";
 import { syncInstalledModules, moduleBySlug } from "../../../apps/sync";
 import { scrollElementTo } from "../../../apps/scrollTo";
@@ -26,6 +27,7 @@ const SECTIONS = [
 ];
 
 export const MicroStore = () => {
+  const nomApp = useNomApp();
   const wnapp = useSelector((state) => state.apps.store);
   const session = useSelector((state) => state.session);
 
@@ -99,7 +101,7 @@ export const MicroStore = () => {
     // enregistré une installation sans effet.
     if (!app.installed && !disponible(app)) {
       return modal.alert({
-        title: `${app.name} n'est pas encore disponible`,
+        title: `${nomApp(app)} n'est pas encore disponible`,
         message: "Ce module figure à la feuille de route mais n'est pas encore livré.",
         detail:
           "Il apparaîtra dans la Boutique, installable, dès qu'il sera prêt. Rien à faire d'ici là.",
@@ -111,7 +113,7 @@ export const MicroStore = () => {
     if (app.installed) {
       const ok = await modal.confirm({
         title: "Désinstaller l'application",
-        message: `Retirer « ${app.name} » de cet espace de travail ?`,
+        message: `Retirer « ${nomApp(app)} » de cet espace de travail ?`,
         detail:
           "Les données saisies sont conservées et reviendront si l'application est réinstallée.",
         confirmLabel: "Désinstaller",
@@ -143,9 +145,13 @@ export const MicroStore = () => {
     return catalog.filter((a) => {
       if (filter !== "Tout" && a.category !== filter) return false;
       if (!q) return true;
-      return (a.name + " " + a.description).toLowerCase().includes(q);
+      // On cherche dans le nom affiché comme dans le nom d'origine :
+      // le mot que la personne connaît doit trouver son app.
+      return (nomApp(a) + " " + a.name + " " + a.description)
+        .toLowerCase()
+        .includes(q);
     });
-  }, [catalog, filter, query]);
+  }, [catalog, filter, query, nomApp]);
 
   const installed = catalog.filter((a) => a.installed);
 
@@ -165,7 +171,7 @@ export const MicroStore = () => {
     const notes = nouveautesDepuis(app, moduleBySlug);
 
     const ok = await modal.confirm({
-      title: `Mettre à jour ${app.name}`,
+      title: `Mettre à jour ${nomApp(app)}`,
       message: `Version ${app.installedVersion || "inconnue"} → ${cible}`,
       detail: notes.length
         ? notes.map((n) => `• ${n.texte}`).join("\n")
@@ -260,7 +266,7 @@ export const MicroStore = () => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name="Boutique"
+        name={nomApp("store")}
       />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="restWindow flex-grow flex flex-col">
@@ -343,7 +349,7 @@ export const MicroStore = () => {
                             <div className="btqCardTop">
                               <Icon src={app.icon} width={34} />
                               <div className="btqCardHead">
-                                <div className="btqName">{app.name}</div>
+                                <div className="btqName">{nomApp(app)}</div>
                                 <div className="btqCat">{app.category}</div>
                               </div>
                             </div>
@@ -418,7 +424,7 @@ export const MicroStore = () => {
                           <div key={app.slug} className="btqMaj">
                             <Icon src={app.icon} width={26} />
                             <div className="btqMajInfo">
-                              <div className="btqMajNom">{app.name}</div>
+                              <div className="btqMajNom">{nomApp(app)}</div>
                               <div className="btqMajVersions">
                                 {app.installedVersion ? (
                                   <>
@@ -471,7 +477,7 @@ export const MicroStore = () => {
                         <div key={app.slug} className="btqRow">
                           <Icon src={app.icon} width={22} />
                           <div className="btqRowInfo">
-                            <div className="btqRowName">{app.name}</div>
+                            <div className="btqRowName">{nomApp(app)}</div>
                             <div className="btqRowMeta">
                               {app.category} · v
                               {app.installedVersion || versionLivree(app, moduleBySlug)}
@@ -533,7 +539,7 @@ export const MicroStore = () => {
                   {detail ? (
                     <>
                       <Icon src={detail.icon} width={48} />
-                      <div className="btqDetailName">{detail.name}</div>
+                      <div className="btqDetailName">{nomApp(detail)}</div>
                       <div className="btqDetailCat">
                         {detail.category} · v{detail.version}
                       </div>

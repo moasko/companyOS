@@ -5,7 +5,7 @@
 // transitoire, et la visionneuse est la seule à s'y intéresser.
 
 import { familleDe } from "./fileTypes";
-import { ouvrirFenetre } from "./windows";
+import { etatFenetre, ouvrirFenetre } from "./windows";
 
 const abonnes = new Map(); // action Redux → fonction de rendu
 const courant = new Map(); // action Redux → { node, voisins }
@@ -23,11 +23,23 @@ export const subscribeVisionneuse = (action, fn) => {
 /// passer à l'image suivante ou enchaîner les morceaux, sans rien
 /// redemander au serveur.
 ///
-/// Renvoie `false` si aucune application ne sait ouvrir ce fichier —
-/// à l'appelant de retomber sur le téléchargement.
+/// Renvoie `false` si le fichier ne peut pas être ouvert — à l'appelant de
+/// réagir (proposer l'installation, ou retomber sur le téléchargement).
+///
+/// Deux cas d'échec bien distincts, et c'est `applicationManquante` qui les
+/// sépare :
+///
+///   • aucun type ne correspond — personne ne sait lire ce fichier ;
+///   • le type est connu mais **son application n'est pas installée** dans
+///     cet espace de travail, donc sa fenêtre n'est pas montée.
+///
+/// Le second cas rendait `true` autrefois : on annonçait une ouverture, on
+/// demandait une fenêtre qui n'existait pas, et il ne se passait
+/// strictement rien — ni ouverture, ni téléchargement, ni message. Un clic
+/// sans effet est la pire des réponses.
 export const ouvrirFichier = (node, voisins = []) => {
   const famille = familleDe(node);
-  if (!famille) return false;
+  if (!famille || !etatFenetre(famille.app)) return false;
 
   const charge = { node, voisins, famille };
   courant.set(famille.action, charge);
@@ -35,6 +47,14 @@ export const ouvrirFichier = (node, voisins = []) => {
 
   ouvrirFenetre(famille.app);
   return true;
+};
+
+/// L'application qui saurait lire ce fichier mais qui n'est pas installée,
+/// ou `null`. Permet de proposer l'installation plutôt que de télécharger
+/// un fichier que l'OS sait pourtant ouvrir.
+export const applicationManquante = (node) => {
+  const famille = familleDe(node);
+  return famille && !etatFenetre(famille.app) ? famille : null;
 };
 
 /// Ce que la visionneuse affiche en ce moment — utile au rendu initial.

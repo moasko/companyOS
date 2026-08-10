@@ -22,6 +22,7 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { ToolBar, Icon } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import { api } from "../../../api/client";
 import { fenetre } from "../../../apps/windows";
 import { modal } from "../../../apps/modalRequest";
@@ -35,6 +36,7 @@ const ONGLETS = [
 ];
 
 export const Taskmanager = () => {
+  const nomApp = useNomApp();
   const wnapp = useSelector((state) => state.apps.taskmanager);
   const apps = useSelector((state) => state.apps);
   const session = useSelector((state) => state.session);
@@ -82,7 +84,7 @@ export const Taskmanager = () => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name="Moniteur du système"
+        name={nomApp("taskmanager")}
       />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="restWindow flex-grow flex flex-col">

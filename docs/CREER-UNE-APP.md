@@ -698,7 +698,68 @@ le jour où les règles changent.
 
 ---
 
-## 8. Pièges déjà rencontrés
+## 8. Langue et devise
+
+L'OS s'affiche en français ou en anglais, et convertit les montants à l'écran
+(FCFA, euro, dollar) selon le réglage **Paramètres → Langue et région** — par
+défaut déduit du lieu (langue du navigateur, devise selon le fuseau horaire).
+Une app n'a pas à connaître i18next ni les taux de change : tout passe par
+`src/utils/intl.js`.
+
+### Les textes
+
+Déclarez vos libellés par langue, à côté du composant, et traduisez avec
+`useTraduction` :
+
+```jsx
+import { useTraduction } from "../../../utils/intl";
+
+const TEXTES = {
+  fr: { titre: "Mes clients", compteur: "{n} fiche(s)" },
+  en: { titre: "My customers", compteur: "{n} record(s)" },
+};
+
+function MonApp() {
+  const t = useTraduction(TEXTES);
+  return <h2>{t("titre")}</h2>; // se re-rend si la langue change
+}
+```
+
+Le repli est **par clé** : une entrée absente en anglais garde sa version
+française plutôt que de disparaître, et une clé inconnue s'affiche telle
+quelle. `{nom}` s'interpole via le second argument : `t("compteur", { n: 3 })`.
+
+Hors React (un `domaine.js`, un PDF), `creerTraducteur(TEXTES)` rend le même
+`t()`, qui lit la langue au moment de l'appel.
+
+Le français d'abord : écrivez `fr` complet, ajoutez `en` au même moment si
+vous le pouvez — sinon le repli fait le pont, sans trou à l'écran.
+
+### Les montants
+
+Les données vivent en franc CFA ; la conversion n'existe qu'à l'écran, à
+l'indicatif. Ne formatez **jamais** un montant à la main (`` `${n} F` `` est un
+bug) : passez par le kit.
+
+```jsx
+import { useDevise } from "../../../utils/intl";
+
+const { montant, montantDans } = useDevise();
+montant(15000);          // « 15 000 F », « 22,87 € » ou « $25 » selon le réglage
+montantDans(120, "EUR"); // « 120 € » — la devise propre d'un document, sans conversion
+```
+
+`montant()` pour tout ce qui est stocké en FCFA — c'est le cas général.
+`montantDans()` pour un document qui porte sa propre devise (une facture en
+euros reste en euros, quel que soit le réglage d'affichage). Hors React,
+importez les mêmes fonctions depuis `src/utils/monnaie.js` — c'est ce que font
+déjà les `fcfa()` des modules existants, qui n'en sont plus que des alias.
+
+Le modèle `_template` montre les deux usages en place.
+
+---
+
+## 9. Pièges déjà rencontrés
 
 Chacun a coûté un bug réel dans ce projet.
 
@@ -767,7 +828,7 @@ qui garantit que le compteur et le journal ne peuvent pas diverger.
 
 ---
 
-## 9. Lancer et vérifier
+## 10. Lancer et vérifier
 
 ```bash
 cd server && npm run dev
@@ -791,7 +852,7 @@ Ensuite, dans le navigateur :
 
 ---
 
-## 10. Aide-mémoire
+## 11. Aide-mémoire
 
 ```
 src/apps/
@@ -843,4 +904,6 @@ src/apps/
 | Un pipeline glisser-déposer | `crm` — `CarteAffaire` |
 | Une scène 3D | `objet3d/moteur.js` |
 | Un état déduit et non saisi | `facturation/domaine.js` — `etatPaiement` |
+| Des textes en FR et EN | `utils/intl.js` — `useTraduction`, exemple dans `_template` |
+| Afficher un montant | `utils/intl.js` — `useDevise().montant`, jamais `` `${n} F` `` |
 | Une numérotation par année | `facturation/domaine.js` — `prochainNumero` |

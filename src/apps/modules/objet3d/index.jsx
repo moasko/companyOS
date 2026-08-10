@@ -11,6 +11,7 @@ import {
 } from "../_visionneuse/commun";
 import { creerScene, extensionDe } from "./moteur";
 import "./objet3d.scss";
+import { useNomApp } from "../../../utils/nomsApps";
 
 /// Visionneuse 3D du socle.
 ///
@@ -32,6 +33,7 @@ export const manifest = {
 const nf = new Intl.NumberFormat("fr-FR");
 
 function Objet3DApp() {
+  const nomApp = useNomApp();
   // Mode « flux » : un modèle 3D pèse souvent des dizaines de mégaoctets,
   // et les chargeurs de three.js prennent une URL. Inutile de le rapatrier
   // en mémoire avant de le donner au moteur.
@@ -98,7 +100,7 @@ function Objet3DApp() {
   return (
     <FenetreMedia
       wnapp={v.wnapp}
-      nom={v.courant ? sansExtension(v.courant.name) : "Visionneuse 3D"}
+      nom={v.courant ? sansExtension(v.courant.name) : nomApp("objet3d")}
       className="obj3App"
     >
       {/* Le conteneur de la scène est monté en permanence : c'est lui qui

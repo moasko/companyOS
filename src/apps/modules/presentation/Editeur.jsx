@@ -18,14 +18,15 @@ import "pptx-react-viewer/styles";
 // et lit donc celle de l'OS. Sans catalogue, toute son interface s'affiche
 // en clés brutes — « pptx.titleBar.autoSave » au lieu d'un libellé.
 //
-// Deux couches, dans cet ordre :
+// Un bundle par langue résolue (voir src/utils/langue.js) :
 //
-//   1. l'anglais complet livré par la bibliothèque, comme filet ;
-//   2. nos chaînes françaises par-dessus.
+//   - « en » : l'anglais complet livré par la bibliothèque ;
+//   - « fr » : ce même anglais comme filet, puis nos chaînes françaises
+//     par-dessus.
 //
-// Le repli est donc **par clé** : une entrée que nous n'avons pas traduite
-// prend sa version anglaise au lieu de disparaître. Voir fr.js pour ce qui
-// est couvert et pourquoi.
+// Le repli français est donc **par clé** : une entrée que nous n'avons pas
+// traduite prend sa version anglaise au lieu de disparaître. Voir fr.js
+// pour ce qui est couvert et pourquoi.
 //
 // L'enregistrement se fait ici, dans le morceau chargé à la demande : ces
 // milliers d'entrées n'ont pas à peser au démarrage de l'OS.
@@ -33,7 +34,8 @@ import "pptx-react-viewer/styles";
 // `false, true` = ne pas fusionner en profondeur, mais écraser : les clés
 // sont plates et pointées, la fusion profonde les découperait en arbre.
 i18n.addResourceBundle("en", "translation", translationsEn, false, true);
-i18n.addResourceBundle("en", "translation", traductionsFr, false, true);
+i18n.addResourceBundle("fr", "translation", translationsEn, false, true);
+i18n.addResourceBundle("fr", "translation", traductionsFr, false, true);
 
 /// Boutons masqués. `share` et `broadcast` supposent un serveur de
 /// collaboration Yjs et un canal de diffusion que CompanyOS n'a pas :

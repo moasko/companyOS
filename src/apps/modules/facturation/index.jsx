@@ -61,9 +61,10 @@ const FILTRES = [
 
 const LIGNE_VIDE = { designation: "", qte: 1, pu: 0, remise: 0, tva: 18 };
 
-const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const money = (n, devise = "XOF") =>
-  `${nf.format(Math.round((Number(n) || 0) * 100) / 100)} ${devise}`;
+// Une facture porte sa propre devise : on formate dans celle du document,
+// sans conversion — le réglage d'affichage global ne réécrit pas un
+// document commercial.
+import { montantDans as money } from "../../../utils/monnaie";
 
 const documentVide = (type = "facture") => ({
   type,

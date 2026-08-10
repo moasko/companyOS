@@ -31,6 +31,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../utils/general";
+import { creerTraducteur } from "../utils/intl";
 import "./chargement.scss";
 
 /// Message d'erreur présentable.
@@ -39,14 +40,30 @@ import "./chargement.scss";
 /// c'est de l'anglais, c'est du jargon, et cela n'indique aucune action. Le
 /// cas est fréquent en développement comme sur un réseau instable — il
 /// mérite une phrase qui dise quoi faire.
+const MESSAGES = {
+  fr: {
+    injoignable: "Le serveur est injoignable. Vérifiez votre connexion, puis réessayez.",
+    droits: "Vous n'avez pas les droits pour consulter ces données.",
+    expiree: "Votre session a expiré. Reconnectez-vous.",
+    impossible: "Chargement impossible",
+    reessayer: "Réessayer",
+  },
+  en: {
+    injoignable: "The server cannot be reached. Check your connection and try again.",
+    droits: "You do not have permission to view this data.",
+    expiree: "Your session has expired. Sign in again.",
+    impossible: "Could not load",
+    reessayer: "Try again",
+  },
+};
+const tMsg = creerTraducteur(MESSAGES);
+
 const lisible = (e) => {
   const m = e?.message || "";
-  if (/failed to fetch|networkerror|load failed/i.test(m)) {
-    return "Le serveur est injoignable. Vérifiez votre connexion, puis réessayez.";
-  }
-  if (e?.status === 403) return "Vous n'avez pas les droits pour consulter ces données.";
-  if (e?.status === 401) return "Votre session a expiré. Reconnectez-vous.";
-  return m || "Chargement impossible";
+  if (/failed to fetch|networkerror|load failed/i.test(m)) return tMsg("injoignable");
+  if (e?.status === 403) return tMsg("droits");
+  if (e?.status === 401) return tMsg("expiree");
+  return m || tMsg("impossible");
 };
 
 /// Charge les données d'une fenêtre dès qu'elle devient utilisable.
@@ -143,7 +160,7 @@ export const ErreurChargement = ({ erreur, onReessayer }) => (
     <span className="cosErrTexte">{erreur}</span>
     {onReessayer ? (
       <div className="cosErrBouton handcr" onClick={() => onReessayer()}>
-        Réessayer
+        {tMsg("reessayer")}
       </div>
     ) : null}
   </div>

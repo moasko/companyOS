@@ -783,3 +783,86 @@ body[data-theme="dark"] .stdModele {
     display: block;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Genre d'application, et essai d'adresse (apps « site web »)
+// ---------------------------------------------------------------------------
+
+.stdApp {
+  .stdGenres {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .stdGenre {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    padding: 12px 14px;
+    border: 1px solid var(--std-line, rgb(0 0 0 / 10%));
+    border-radius: 10px;
+    background: var(--std-card, #fff);
+    color: inherit;
+    cursor: pointer;
+
+    strong { font-size: 13.5px; font-weight: 600; }
+
+    span {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--std-muted, #6b7684);
+    }
+
+    &:hover { border-color: var(--std-accent, #057378); }
+
+    // Fond et contour, jamais de bordure latérale colorée.
+    &[data-active="true"] {
+      border-color: var(--std-accent, #057378);
+      background: var(--std-accent-soft, #e8f3f3);
+    }
+  }
+
+  .stdActionsLigne {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .stdEssai {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--std-card, #fff);
+    border: 1px solid var(--std-line, rgb(0 0 0 / 10%));
+
+    strong { display: block; font-size: 13px; margin-bottom: 4px; }
+
+    p {
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: var(--std-muted, #6b7684);
+    }
+
+    // La nuance passe par une pastille en tête, pas par un liseré latéral.
+    strong::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: 1px;
+      background: #9aa7ad;
+    }
+
+    &[data-etat="ok"] strong::before { background: #1d7a4c; }
+    &[data-etat="onglet"] strong::before { background: #b8791f; }
+    &[data-etat="erreur"] strong::before { background: #b23b2e; }
+  }
+}

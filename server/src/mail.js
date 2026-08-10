@@ -12,6 +12,25 @@
 
 import nodemailer from "nodemailer";
 import { env } from "./env.js";
+import { dechiffrer } from "./chiffrement.js";
+
+/// Rend le mot de passe utilisable, qu'il soit chiffré ou non.
+///
+/// Les réglages d'espace chiffrent désormais le mot de passe SMTP en base
+/// (`chiffrer()` produit « v1.… »). Deux cas restent en clair et le
+/// resteront : les mots de passe déjà enregistrés avant ce changement, et
+/// celui du relais de plateforme, qui vient d'une variable
+/// d'environnement. On déchiffre donc **si ça en a la forme**, sinon on
+/// prend la valeur telle quelle.
+///
+/// Un secret chiffré illisible — clé de chiffrement changée — vaut chaîne
+/// vide : l'authentification échouera proprement plutôt que d'envoyer le
+/// chiffré comme mot de passe au relais.
+const motDePasseClair = (pass) => {
+  if (!pass) return "";
+  if (!String(pass).startsWith("v1.")) return String(pass);
+  return dechiffrer(pass) ?? "";
+};
 
 /// Fabrique un transporteur SMTP depuis une configuration — celle de la
 /// plateforme (variables d'environnement) ou celle d'un espace de travail
@@ -24,7 +43,7 @@ export const creerTransporteur = ({ host, port, user, pass }) =>
         port: Number(port) || 587,
         // 465 = TLS implicite ; 587/25 = STARTTLS négocié.
         secure: Number(port) === 465,
-        auth: user ? { user, pass } : undefined,
+        auth: user ? { user, pass: motDePasseClair(pass) } : undefined,
       })
     : null;
 

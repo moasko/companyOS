@@ -256,9 +256,8 @@ export const recapitulatif = (bulletins = []) => {
   };
 };
 
-/// Montant lisible en francs CFA.
-export const fcfa = (n) =>
-  `${arrondi(n).toLocaleString("fr-FR").replace(/ | /g, " ")} F`;
+/// Montant lisible, dans la devise d'affichage de l'espace.
+export { montant as fcfa } from "../../../utils/monnaie";
 
 /// Le mois précédent au format AAAA-MM — le mois qu'on paie d'ordinaire.
 export const moisParDefaut = () => {

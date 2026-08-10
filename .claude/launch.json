@@ -4,8 +4,9 @@
     {
       "name": "companyos",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start", "--", "--port", "5173", "--strictPort"],
-      "port": 5173
+      "runtimeArgs": ["run", "start"],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

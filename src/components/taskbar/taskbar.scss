@@ -319,6 +319,8 @@ body[data-theme="dark"] {
   position: relative;
   margin-bottom: 6px;
   padding: 9px 11px;
+  // Le contenu laisse sa place à la pastille.
+  padding-left: 25px;
   border-radius: 8px;
   background: rgba(128, 128, 128, 0.08);
 
@@ -335,9 +337,6 @@ body[data-theme="dark"] {
     border-radius: 50%;
     background: rgba(128, 128, 128, 0.55);
   }
-
-  // Le contenu laisse sa place à la pastille.
-  padding-left: 25px;
 
   &[data-ton="success"]::before {
     background: #188038;

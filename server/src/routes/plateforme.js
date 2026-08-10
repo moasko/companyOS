@@ -20,6 +20,8 @@ import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { env } from "../env.js";
 import { FORMULES, formuleDe } from "../formules.js";
+import { chargerConfig, enregistrerConfig, testerConfig } from "../storage.js";
+import { masquer } from "../chiffrement.js";
 
 const exigerExploitant = async (request, reply) => {
   const email = request.user?.email?.toLowerCase();
@@ -97,5 +99,112 @@ export default async function plateformeRoutes(app) {
     });
 
     return serialize({ id: maj.id, plan: maj.plan, quota: maj.quota });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Stockage des fichiers
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // L'exploitant choisit où atterrissent les fichiers de tous ses clients :
+  // le disque du serveur, ou un stockage objet compatible S3.
+  //
+  // Le secret n'est **jamais** renvoyé, même à l'exploitant : l'écran en
+  // affiche les quatre derniers caractères, assez pour reconnaître la
+  // bonne clé, pas assez pour la reconstituer. Un navigateur, un cache ou
+  // un journal de proxy n'ont pas à voir passer un secret qui donne accès
+  // aux fichiers de toute la plateforme.
+
+  app.get("/stockage", async () => {
+    const config = await chargerConfig();
+    const compte = await prisma.fsNode.groupBy({
+      by: ["storage"],
+      where: { type: "FILE" },
+      _count: { _all: true },
+      _sum: { size: true },
+    }).catch(() => []);
+
+    return serialize({
+      actif: config.stockage,
+      demande: config.demande,
+      utilisable: config.utilisable,
+      secretIllisible: config.secretIllisible,
+      s3: config.s3
+        ? {
+            endpoint: config.s3.endpoint || "",
+            region: config.s3.region || "",
+            bucket: config.s3.bucket || "",
+            accessKey: config.s3.accessKey || "",
+            prefix: config.s3.prefix || "",
+            pathStyle: config.s3.pathStyle !== false,
+            secretMasque: masquer(config.s3.secretKey),
+          }
+        : null,
+      // Combien de fichiers vivent à chaque destination : c'est ce qui
+      // rassure au moment de basculer, et ce qui rappelle qu'on ne peut
+      // pas retirer une destination encore utilisée.
+      repartition: (compte || []).map((c) => ({
+        destination: c.storage || "local",
+        fichiers: c._count._all,
+        octets: c._sum.size || 0n,
+      })),
+    });
+  });
+
+  const schemaS3 = z.object({
+    endpoint: z.string().url("L'adresse doit être une URL complète, https:// compris."),
+    region: z.string().min(1).max(64),
+    bucket: z.string().min(1).max(255),
+    accessKey: z.string().min(1).max(255),
+    // Vide = « garde le secret déjà enregistré ».
+    secretKey: z.string().max(512).optional().or(z.literal("")),
+    prefix: z.string().max(255).optional().or(z.literal("")),
+    pathStyle: z.boolean().optional(),
+  });
+
+  /// Essayer une configuration sans l'enregistrer : on écrit un objet
+  /// témoin, on le relit, on le supprime. Un simple accès au bucket ne
+  /// prouverait pas le droit d'écriture — et c'est celui qui manque le
+  /// plus souvent.
+  app.post("/stockage/test", async (request, reply) => {
+    const parsed = z
+      .object({ stockage: z.enum(["local", "s3"]), s3: schemaS3.optional() })
+      .safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0].message });
+    }
+    try {
+      await testerConfig(parsed.data);
+      return { ok: true };
+    } catch (err) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+
+  app.put("/stockage", async (request, reply) => {
+    const parsed = z
+      .object({ stockage: z.enum(["local", "s3"]), s3: schemaS3.optional() })
+      .safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0].message });
+    }
+
+    // On refuse de basculer vers une destination qui ne répond pas :
+    // enregistrer une configuration fausse rendrait tout téléversement
+    // impossible, sans que personne comprenne pourquoi.
+    if (parsed.data.stockage === "s3") {
+      try {
+        await testerConfig(parsed.data);
+      } catch (err) {
+        return reply.code(400).send({
+          error: `Le stockage objet ne répond pas : ${err.message}`,
+        });
+      }
+    }
+
+    const config = await enregistrerConfig(parsed.data);
+    await journaliser(request, "plateforme.stockage", parsed.data.stockage, {
+      bucket: parsed.data.s3?.bucket,
+    });
+    return serialize({ actif: config.stockage, utilisable: config.utilisable });
   });
 }

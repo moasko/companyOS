@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useDispatch, useSelector } from "react-redux";
 import "./i18nextConf";
+import { appliquerLangue } from "./utils/langue";
 import "./index.css";
 import "./utils/scroll.scss";
 
@@ -28,6 +29,7 @@ import { ecouterLesCopies } from "./apps/clipboard";
 import { intercepterMailto } from "./apps/mailto";
 import { demarrerSyncNotifications } from "./apps/notifications";
 import { CustomApp } from "./apps/CustomApp";
+import { CustomWebApp } from "./apps/CustomWebApp";
 import {
   syncInstalledModules,
   detachAllModules,
@@ -166,6 +168,9 @@ function App() {
   // partie du socle, pas du catalogue d'un espace de travail.
   useEffect(() => {
     attachSystemModules();
+    // La langue effective (réglage épinglé ou détection du navigateur)
+    // s'applique dès le démarrage — voir src/utils/langue.js.
+    appliquerLangue();
   }, []);
 
   useEffect(() => {
@@ -240,10 +245,16 @@ function App() {
               <AppMontee key={mod.id || mod.slug || mod.icon} mod={mod} />
             ))}
             {/* Applications créées dans le Studio : pas de code, une
-                définition rendue par le moteur générique. */}
-            {customApps.map((app) => (
-              <CustomApp key={app.slug} app={app} />
-            ))}
+                définition rendue par le moteur générique. Deux genres —
+                une app de données (collections et fiches) ou une app
+                « site web » (une adresse présentée comme une app). */}
+            {customApps.map((app) =>
+              app.definition?.genre === "web" ? (
+                <CustomWebApp key={app.slug} app={app} />
+              ) : (
+                <CustomApp key={app.slug} app={app} />
+              ),
+            )}
             {Object.keys(apps)
               .filter((x) => x != "hz")
               .map((key) => apps[key])

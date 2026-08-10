@@ -8,17 +8,90 @@ import { clearToken } from "../../api/client";
 import { detachAllModules } from "../../apps/sync";
 import { reinitialiserApparence } from "../../apps/appearance";
 import { resynchroniserNotifications } from "../../apps/notifications";
+import { creerTraducteur, useLangue, useTraduction } from "../../utils/intl";
+import { useNomApp } from "../../utils/nomsApps";
+
+const TEXTES = {
+  fr: {
+    ajoutRecent: "Ajouté récemment",
+    instant: "À l'instant",
+    roleOwner: "Propriétaire",
+    roleAdmin: "Administrateur",
+    roleMember: "Membre",
+    compte: "Compte",
+    monCompte: "Mon compte",
+    espace: "Espace de travail",
+    verrouiller: "Verrouiller",
+    deconnexion: "Se déconnecter",
+    redemarrer: "Redémarrer",
+    arreter: "Arrêter",
+    epinglees: "Épinglées",
+    toutesLesApps: "Toutes les apps",
+    recommande: "Recommandé",
+    plus: "Plus",
+    retour: "Retour",
+    rechercher: "Rechercher",
+    tabTout: "Tout",
+    tabApps: "Applications",
+    tabDocuments: "Documents",
+    tabWeb: "Web",
+    tabPlus: "Plus",
+    meilleurResultat: "Meilleur résultat",
+    appsPrincipales: "Applications principales",
+    application: "Application",
+    app: "App",
+    ouvrir: "Ouvrir",
+    marcheArret: "Marche/Arrêt",
+  },
+  en: {
+    ajoutRecent: "Recently added",
+    instant: "Just now",
+    roleOwner: "Owner",
+    roleAdmin: "Administrator",
+    roleMember: "Member",
+    compte: "Account",
+    monCompte: "My account",
+    espace: "Workspace",
+    verrouiller: "Lock",
+    deconnexion: "Sign out",
+    redemarrer: "Restart",
+    arreter: "Shut down",
+    epinglees: "Pinned",
+    toutesLesApps: "All apps",
+    recommande: "Recommended",
+    plus: "More",
+    retour: "Back",
+    rechercher: "Search",
+    tabTout: "All",
+    tabApps: "Apps",
+    tabDocuments: "Documents",
+    tabWeb: "Web",
+    tabPlus: "More",
+    meilleurResultat: "Best match",
+    appsPrincipales: "Top apps",
+    application: "Application",
+    app: "App",
+    ouvrir: "Open",
+    marcheArret: "Power",
+  },
+};
+const tStatique = creerTraducteur(TEXTES);
 
 /// « Ajouté récemment », « il y a 5 min »… à partir d'un nombre de minutes.
 /// Calculé à chaque affichage : l'ancienne version écrasait le nombre par
 /// son libellé dans le store, ce qui figeait l'affichage pour la session.
 const libelleUtilisation = (minutes) => {
   if (minutes == null) return "";
-  if (minutes < 0) return "Ajouté récemment";
-  if (minutes < 10) return "À l'instant";
+  if (minutes < 0) return tStatique("ajoutRecent");
+  if (minutes < 10) return tStatique("instant");
   if (minutes < 60) return `${minutes} min`;
   return `${Math.floor(minutes / 60)} h`;
 };
+
+/// Les onglets de la recherche : des identifiants stables, pas des libellés.
+/// L'ancienne version comparait l'état (« Tout ») au texte cliqué (« All ») :
+/// trois onglets sur cinq ne s'activaient jamais.
+const TABS = ["tabTout", "tabApps", "tabDocuments", "tabWeb", "tabPlus"];
 
 export const StartMenu = () => {
   const { align } = useSelector((state) => state.taskbar);
@@ -35,6 +108,10 @@ export const StartMenu = () => {
   const menu = useSelector((state) => state.startmenu);
   const appsBrutes = useSelector((state) => state.apps);
 
+  const t = useTraduction(TEXTES);
+  const nomApp = useNomApp();
+  const langue = useLangue();
+
   const start = useMemo(() => {
     // Cases vides pour compléter la dernière rangée de six.
     const manquantes = (6 - (menu.pnApps.length % 6)) % 6;
@@ -50,30 +127,30 @@ export const StartMenu = () => {
       derniereUtilisation: libelleUtilisation(app.lastUsed),
     }));
 
+    // Le classement suit le nom **affiché** : en anglais, « Leave » se
+    // range à L, pas au C de « Congés ». La langue est donc une
+    // dépendance du calcul, au même titre que la liste des apps.
     const toutes = Object.keys(appsBrutes)
       .filter((x) => x !== "hz")
       .map((cle) => appsBrutes[cle])
-      .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+      .sort((a, b) => nomApp(a).localeCompare(nomApp(b), langue));
 
     // 27 cases : une par lettre, plus une pour tout ce qui ne commence pas
     // par une lettre.
     const parLettre = Array.from({ length: 27 }, () => []);
     for (const app of toutes) {
-      const code = (app.name || "").trim().toUpperCase().charCodeAt(0);
+      const code = nomApp(app).trim().toUpperCase().charCodeAt(0);
       parLettre[code > 64 && code < 91 ? code - 64 : 0].push(app);
     }
 
     return { ...menu, pnApps, rcApps, contApps: parLettre, allApps: toutes };
-  }, [menu, appsBrutes]);
+  }, [menu, appsBrutes, nomApp, langue]);
 
   const [query, setQuery] = useState("");
   const [match, setMatch] = useState({});
-  const [atab, setTab] = useState("Tout");
+  const [atab, setTab] = useState("tabTout");
 
   const dispatch = useDispatch();
-  const tabSw = (e) => {
-    setTab(e.target.innerText.trim());
-  };
 
   const session = useSelector((state) => state.session);
 
@@ -83,16 +160,16 @@ export const StartMenu = () => {
 
   const menuProfil = () => {
     const roles = {
-      OWNER: "Propriétaire",
-      ADMIN: "Administrateur",
-      MEMBER: "Membre",
+      OWNER: t("roleOwner"),
+      ADMIN: t("roleAdmin"),
+      MEMBER: t("roleMember"),
     };
     const connecte = session.status === "authenticated";
 
     return [
-      connecte && { titre: roles[session.user.role] || "Compte" },
+      connecte && { titre: roles[session.user.role] || t("compte") },
       {
-        nom: "Mon compte",
+        nom: t("monCompte"),
         icone: "faUser",
         desactive: !connecte,
         action: () => {
@@ -101,7 +178,7 @@ export const StartMenu = () => {
         },
       },
       {
-        nom: "Espace de travail",
+        nom: t("espace"),
         icone: "faBuilding",
         desactive: !connecte,
         action: () => {
@@ -111,7 +188,7 @@ export const StartMenu = () => {
       },
       { separateur: true },
       {
-        nom: "Verrouiller",
+        nom: t("verrouiller"),
         icone: "faLock",
         raccourci: "Win+L",
         action: () => {
@@ -120,7 +197,7 @@ export const StartMenu = () => {
         },
       },
       {
-        nom: "Se déconnecter",
+        nom: t("deconnexion"),
         icone: "faRightFromBracket",
         desactive: !connecte,
         danger: true,
@@ -143,7 +220,7 @@ export const StartMenu = () => {
 
   const menuAlimentation = () => [
     {
-      nom: "Verrouiller",
+      nom: t("verrouiller"),
       icone: "faLock",
       action: () => {
         fermerDemarrer();
@@ -152,7 +229,7 @@ export const StartMenu = () => {
     },
     { separateur: true },
     {
-      nom: "Redémarrer",
+      nom: t("redemarrer"),
       icone: "faRotateRight",
       action: () => {
         fermerDemarrer();
@@ -160,7 +237,7 @@ export const StartMenu = () => {
       },
     },
     {
-      nom: "Arrêter",
+      nom: t("arreter"),
       icone: "faPowerOff",
       danger: true,
       action: () => {
@@ -199,14 +276,20 @@ export const StartMenu = () => {
 
   useEffect(() => {
     if (query.length) {
+      const q = query.toLowerCase();
+      // On cherche dans le nom affiché **et** dans le nom d'origine : en
+      // anglais, taper « congés » doit encore trouver Leave — on garde le
+      // mot que la personne connaît, quelle que soit la langue de l'écran.
       for (var i = 0; i < start.allApps.length; i++) {
-        if (start.allApps[i].name.toLowerCase().includes(query.toLowerCase())) {
-          setMatch(start.allApps[i]);
+        const app = start.allApps[i];
+        const noms = `${nomApp(app)} ${app.name || ""}`.toLowerCase();
+        if (noms.includes(q)) {
+          setMatch(app);
           break;
         }
       }
     }
-  }, [query]);
+  }, [query, nomApp]);
 
   const userName = useSelector((state) => state.setting.person.name);
   // La photo vient de la session, pas des réglages : elle appartient au
@@ -226,13 +309,13 @@ export const StartMenu = () => {
             <div className="menuUp">
               <div className="pinnedApps">
                 <div className="stAcbar">
-                  <div className="gpname">Épinglées</div>
+                  <div className="gpname">{t("epinglees")}</div>
                   <div
                     className="gpbtn prtclk"
                     onClick={clickDispatch}
                     data-action="STARTALL"
                   >
-                    <div>Toutes les apps</div>
+                    <div>{t("toutesLesApps")}</div>
                     <Icon fafa="faChevronRight" width={8} />
                   </div>
                 </div>
@@ -250,7 +333,7 @@ export const StartMenu = () => {
                         data-payload={app.payload || "full"}
                       >
                         <Icon className="pnIcon" src={app.icon} width={32} />
-                        <div className="appName">{app.name}</div>
+                        <div className="appName">{nomApp(app)}</div>
                       </div>
                     );
                   })}
@@ -258,9 +341,9 @@ export const StartMenu = () => {
               </div>
               <div className="recApps win11Scroll">
                 <div className="stAcbar">
-                  <div className="gpname">Recommandé</div>
+                  <div className="gpname">{t("recommande")}</div>
                   <div className="gpbtn none">
-                    <div>Plus</div>
+                    <div>{t("plus")}</div>
                     <Icon fafa="faChevronRight" width={8} />
                   </div>
                 </div>
@@ -277,7 +360,7 @@ export const StartMenu = () => {
                       >
                         <Icon className="pnIcon" src={app.icon} width={32} />
                         <div className="acInfo">
-                          <div className="appName">{app.name}</div>
+                          <div className="appName">{nomApp(app)}</div>
                           <div className="timeUsed">{app.derniereUtilisation}</div>
                         </div>
                       </div>
@@ -290,14 +373,14 @@ export const StartMenu = () => {
           <div className="allCont" data-allapps={start.showAll}>
             <div className="appCont">
               <div className="stAcbar">
-                <div className="gpname">Toutes les apps</div>
+                <div className="gpname">{t("toutesLesApps")}</div>
                 <div
                   className="gpbtn prtclk"
                   onClick={clickDispatch}
                   data-action="STARTALL"
                 >
                   <Icon className="chevLeft" fafa="faChevronLeft" width={8} />
-                  <div>Retour</div>
+                  <div>{t("retour")}</div>
                 </div>
               </div>
               <div className="allApps win11Scroll" data-alpha={start.alpha}>
@@ -329,7 +412,7 @@ export const StartMenu = () => {
                         data-payload={app.payload || "full"}
                       >
                         <Icon className="pnIcon" src={app.icon} width={24} />
-                        <div className="appName">{app.name}</div>
+                        <div className="appName">{nomApp(app)}</div>
                       </div>,
                     );
                   });
@@ -382,7 +465,7 @@ export const StartMenu = () => {
                 le même produit, dont deux à maintenir pour rien. */}
             <div
               className="powerMenu handcr"
-              title="Marche/Arrêt"
+              title={t("marcheArret")}
               onClick={(e) => menuContextuel(e, menuAlimentation())}
             >
               <Icon fafa="faPowerOff" width={16} />
@@ -399,27 +482,17 @@ export const StartMenu = () => {
                 setQuery(event.target.value.trim());
               }}
               defaultValue={query}
-              placeholder="Rechercher"
+              placeholder={t("rechercher")}
               autoFocus
             />
           </div>
           <div className="flex py-4 px-1 text-xs">
             <div className="opts w-1/2 flex justify-between">
-              <div value={atab == "Tout"} onClick={tabSw}>
-                All
-              </div>
-              <div value={atab == "Applications"} onClick={tabSw}>
-                Apps
-              </div>
-              <div value={atab == "Documents"} onClick={tabSw}>
-                Documents
-              </div>
-              <div value={atab == "Web"} onClick={tabSw}>
-                Web
-              </div>
-              <div value={atab == "Plus"} onClick={tabSw}>
-                More
-              </div>
+              {TABS.map((id) => (
+                <div key={id} value={atab == id} onClick={() => setTab(id)}>
+                  {t(id)}
+                </div>
+              ))}
             </div>
           </div>
           <div className="shResult w-full flex justify-between">
@@ -428,7 +501,7 @@ export const StartMenu = () => {
               data-width={query.length != 0}
             >
               <div className="text-sm font-semibold mb-4">
-                {query.length ? "Meilleur résultat" : "Applications principales"}
+                {query.length ? t("meilleurResultat") : t("appsPrincipales")}
               </div>
               {query.length ? (
                 <div className="textResult h-16">
@@ -440,8 +513,8 @@ export const StartMenu = () => {
                   >
                     <Icon src={match.icon} width={24} />
                     <div className="matchInfo flex-col px-2">
-                      <div className="font-semibold text-xs">{match.name}</div>
-                      <div className="text-xss">Application</div>
+                      <div className="font-semibold text-xs">{nomApp(match)}</div>
+                      <div className="text-xss">{t("application")}</div>
                     </div>
                   </div>
                 </div>
@@ -458,7 +531,7 @@ export const StartMenu = () => {
                           data-payload={app.payload || "full"}
                         >
                           <Icon src={app.icon} width={30} />
-                          <div className="text-xs mt-2">{app.name}</div>
+                          <div className="text-xs mt-2">{nomApp(app)}</div>
                         </div>
                       );
                     })}
@@ -469,8 +542,8 @@ export const StartMenu = () => {
             {query.length ? (
               <div className="w-2/3 rightSide rounded">
                 <Icon className="mt-6" src={match.icon} width={64} />
-                <div className="">{match.name}</div>
-                <div className="text-xss mt-2">App</div>
+                <div className="">{nomApp(match)}</div>
+                <div className="text-xss mt-2">{t("app")}</div>
                 <div className="hline mt-8"></div>
                 <div
                   className="openlink w-4/5 flex prtclk handcr pt-3"
@@ -479,7 +552,7 @@ export const StartMenu = () => {
                   data-payload={match.payload ? match.payload : "full"}
                 >
                   <Icon className="blueicon" src="link" ui width={16} />
-                  <div className="text-xss ml-3">Ouvrir</div>
+                  <div className="text-xss ml-3">{t("ouvrir")}</div>
                 </div>
               </div>
             ) : null}

@@ -21,6 +21,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { ToolBar, Icon } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import { api } from "../../../api/client";
 import { modal } from "../../../apps/modalRequest";
 import { Auteur } from "../../../apps/Auteur";
@@ -28,6 +29,7 @@ import * as D from "../../../apps/modules/_blocnotes/domaine";
 import "./assets/notepad.scss";
 
 export const Notepad = () => {
+  const nomApp = useNomApp();
   const wnapp = useSelector((state) => state.apps.notepad);
   const session = useSelector((state) => state.session);
   const ouvert = wnapp && !wnapp.hide && session.status === "authenticated";
@@ -166,7 +168,7 @@ export const Notepad = () => {
       data-hide={wnapp.hide}
       id={wnapp.icon + "App"}
     >
-      <ToolBar app={wnapp.action} icon={wnapp.icon} size={wnapp.size} name="Bloc-notes" />
+      <ToolBar app={wnapp.action} icon={wnapp.icon} size={wnapp.size} name={nomApp("notepad")} />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="restWindow flex-grow npShell">
           {/* ---- Liste des notes ---- */}

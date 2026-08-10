@@ -1,0 +1,364 @@
+// Classeur — habillage.
+//
+// Jetons `--app-*` de la charte commune ; rien à redéclarer. Cadres de
+// cartes complets, jamais de filet coloré sur un côté.
+
+.clsApp .clsShell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.clsApp .clsVerrou {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--app-muted);
+}
+
+// ---------------------------------------------------------------------------
+// Colonne des classeurs
+// ---------------------------------------------------------------------------
+
+.clsApp .clsLateral {
+  flex: none;
+  width: 208px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clsApp .clsLateralTete { font-size: 12px; color: var(--app-muted); }
+
+.clsApp .clsListe {
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+
+  li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    border-radius: var(--app-rayon);
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--app-muted);
+
+    span:nth-of-type(1) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &:hover { background: rgb(128 128 128 / 12%); color: var(--app-text); }
+
+    &[data-actif="true"] {
+      background: var(--app-accent-soft);
+      color: var(--app-accent);
+      font-weight: 600;
+    }
+  }
+}
+
+.clsApp .clsSuppr {
+  opacity: 0;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+
+  &:hover { background: rgb(128 128 128 / 20%); color: var(--app-danger); }
+}
+
+.clsApp .clsListe li:hover .clsSuppr { opacity: 1; }
+
+// ---------------------------------------------------------------------------
+// Zone centrale
+// ---------------------------------------------------------------------------
+
+.clsApp .clsCentre {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.clsApp .clsBarre {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  flex-wrap: wrap;
+}
+
+.clsApp .clsTitre {
+  width: 190px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--app-rayon);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover { border-color: var(--app-line); }
+  &:focus { outline: none; border-color: var(--app-accent); background: var(--app-champ); }
+}
+
+.clsApp .clsSep { width: 1px; height: 18px; background: var(--app-line); margin: 0 4px; }
+.clsApp .clsEspace { flex: 1; }
+
+.clsApp .clsIcone {
+  display: inline-grid;
+  grid-auto-flow: column;
+  place-items: center;
+  gap: 5px;
+  min-width: 27px;
+  height: 27px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--app-rayon);
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { background: rgb(128 128 128 / 14%); }
+  &:disabled { opacity: 0.35; cursor: default; }
+  &[data-on="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
+}
+
+.clsApp .clsLarge { min-width: 96px; justify-content: flex-start; }
+
+// ---------------------------------------------------------------------------
+// Barre de formule
+// ---------------------------------------------------------------------------
+
+.clsApp .clsFormule {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--app-line);
+  color: var(--app-muted);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    background: var(--app-champ);
+    color: var(--app-text);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px;
+
+    &:focus { outline: none; border-color: var(--app-accent); }
+  }
+}
+
+.clsApp .clsRef {
+  min-width: 48px;
+  padding: 3px 8px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-panneau);
+  color: var(--app-text);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+// ---------------------------------------------------------------------------
+// Grille
+// ---------------------------------------------------------------------------
+
+.clsApp .clsGrille {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  outline: none;
+  background: var(--app-bg);
+
+  &:focus-visible { box-shadow: inset 0 0 0 2px var(--app-accent); }
+
+  // `user-select: none` : balayer une plage ne doit pas surligner le texte
+  // au passage, sinon le navigateur croit à une sélection de texte et le
+  // rendu clignote. La cellule en saisie retrouve la sélection juste après.
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    font-size: 12.5px;
+    user-select: none;
+  }
+
+  tbody td input { user-select: text; }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    min-width: 104px;
+    height: 24px;
+    padding: 0 8px;
+    background: var(--app-panneau);
+    border-bottom: 1px solid var(--app-line);
+    border-right: 1px solid var(--app-line);
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &[data-actif="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
+  }
+
+  tbody td {
+    height: 26px;
+    max-width: 400px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--app-line);
+    border-right: 1px solid var(--app-line);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: cell;
+
+    span { display: block; overflow: hidden; text-overflow: ellipsis; }
+
+    // La sélection se pose au fond et en anneau interne : un contour
+    // extérieur décalerait la grille d'un pixel à chaque déplacement.
+    &[data-sel] { box-shadow: inset 0 0 0 1.5px var(--app-accent); }
+
+    input {
+      width: 100%;
+      height: 24px;
+      border: none;
+      background: var(--app-champ);
+      color: var(--app-text);
+      font: inherit;
+      font-size: 12.5px;
+      padding: 0;
+      outline: none;
+    }
+  }
+}
+
+// La numérotation des lignes reste visible quand on fait défiler à droite.
+.clsApp .clsNum {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 44px;
+  padding: 0 8px;
+  background: var(--app-panneau);
+  border-right: 1px solid var(--app-line);
+  border-bottom: 1px solid var(--app-line);
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+
+  &[data-actif="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
+}
+
+.clsApp thead .clsNum { z-index: 3; }
+
+.clsApp .clsPoignee {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 4;
+
+  &:hover { background: var(--app-accent); opacity: 0.5; }
+}
+
+// Une cellule calculée se signale discrètement : savoir ce qui est saisi
+// et ce qui est déduit évite de corriger le mauvais bout.
+.clsApp tbody td[data-formule] span::after {
+  content: "ƒ";
+  float: right;
+  margin-left: 5px;
+  font-size: 9px;
+  color: var(--app-accent);
+  opacity: 0.65;
+}
+
+.clsApp tbody td[data-erreur] { color: var(--app-danger); font-weight: 600; }
+
+// ---------------------------------------------------------------------------
+// Onglets de feuilles et barre d'état
+// ---------------------------------------------------------------------------
+
+.clsApp .clsOnglets {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--app-line);
+  background: var(--app-panneau);
+  overflow-x: auto;
+}
+
+.clsApp .clsOnglet {
+  flex: none;
+  max-width: 160px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--app-rayon) var(--app-rayon) 0 0;
+  background: transparent;
+  color: var(--app-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:hover { background: rgb(128 128 128 / 12%); }
+
+  &[data-actif="true"] {
+    background: var(--app-carte);
+    border-color: var(--app-line);
+    border-bottom-color: var(--app-carte);
+    color: var(--app-accent);
+    font-weight: 600;
+  }
+}
+
+.clsApp .clsPlus { min-width: 28px; padding: 5px 8px; }
+
+.clsApp .clsEtat {
+  font-size: 11.5px;
+  color: var(--app-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+
+  b { color: var(--app-text); }
+}
+
+.clsApp .clsModifie { color: var(--app-attention); font-style: normal; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .clsApp * { transition: none !important; }
+}

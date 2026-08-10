@@ -74,8 +74,7 @@ const OPPORTUNITE_VIDE = {
   notes: "",
 };
 
-const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
-const money = (n) => `${nf.format(Math.round(Number(n) || 0))} XOF`;
+import { montant as money } from "../../../utils/monnaie";
 
 const nomDe = (c) => c?.data.entreprise || c?.data.nom || "Sans nom";
 const initiale = (c) => nomDe(c).trim().charAt(0).toUpperCase();

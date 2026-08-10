@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { api } from "../../../api/client";
+import { useTraduction, useDevise } from "../../../utils/intl";
 
 // ---------------------------------------------------------------------------
 // MODÈLE DE MODULE COMPANYOS
@@ -49,7 +50,26 @@ import { api } from "../../../api/client";
 //     jamais pour du bruit, seulement ce qu'on attend de lui.
 //
 // Voir la partie 7 de docs/CREER-UNE-APP.md.
+//
+// Langue et devise. L'OS s'affiche en français ou en anglais et convertit
+// les montants (FCFA/€/$) selon le réglage « Langue et région ». Une app
+// suit ce réglage en déclarant ses textes par langue (TEXTES ci-dessous,
+// `useTraduction`) et en formatant tout montant via `useDevise().montant`
+// — jamais de « ... F » écrit à la main. Voir la partie 8 du guide.
 // ---------------------------------------------------------------------------
+
+/// Les textes de l'app, par langue. Le repli est par clé : une entrée
+/// absente en anglais garde sa version française plutôt que de disparaître.
+const TEXTES = {
+  fr: {
+    compteur: "Contenu du module. {n} enregistrement(s).",
+    exemple: "Un montant se formate ainsi : {m}.",
+  },
+  en: {
+    compteur: "Module content. {n} record(s).",
+    exemple: "An amount is formatted like this: {m}.",
+  },
+};
 
 export const manifest = {
   // Identité de la fenêtre — le seul champ qui doit être unique dans l'OS.
@@ -68,6 +88,10 @@ function TemplateApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
   const session = useSelector((state) => state.session);
   const [items, setItems] = useState([]);
+  // `t` et `montant` suivent le réglage « Langue et région » : la fenêtre
+  // se re-rend toute seule quand l'utilisateur en change.
+  const t = useTraduction(TEXTES);
+  const { montant } = useDevise();
 
   // Charge les données à l'ouverture de la fenêtre.
   useEffect(() => {
@@ -81,7 +105,8 @@ function TemplateApp() {
   return (
     <ModuleWindow manifest={manifest} className="templateApp">
       <div style={{ padding: 20 }}>
-        <p>Contenu du module. {items.length} enregistrement(s).</p>
+        <p>{t("compteur", { n: items.length })}</p>
+        <p>{t("exemple", { m: montant(15000) })}</p>
       </div>
     </ModuleWindow>
   );

@@ -84,8 +84,9 @@ const FOURNISSEUR_VIDE = {
   ville: "",
 };
 
+import { montant as money } from "../../../utils/monnaie";
+
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const money = (n) => `${nf.format(Math.round((Number(n) || 0) * 100) / 100)} XOF`;
 const qty = (n) => nf.format(Number(n) || 0);
 const today = () => new Date().toISOString().slice(0, 10);
 

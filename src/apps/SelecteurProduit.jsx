@@ -22,8 +22,7 @@ import {
 import { arbre, chemin, branche, etat } from "./modules/stock/domaine";
 import "./selecteur.scss";
 
-const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const money = (n) => `${nf.format(Math.round((Number(n) || 0) * 100) / 100)} XOF`;
+import { montant as money } from "../utils/monnaie";
 
 /// Une branche de l'arbre des catégories, repliable.
 const Branche = ({ noeud, actif, onChoisir, profondeur = 0 }) => {

@@ -102,6 +102,14 @@ export const api = {
   plateforme: () => request("/plateforme"),
   plateformeFormule: (tenantId, plan) =>
     request(`/plateforme/espaces/${tenantId}/formule`, { method: "PUT", body: { plan } }),
+  /// Configuration du stockage, côté exploitant. Le secret part en écriture
+  /// mais ne revient jamais : la réponse n'en porte que les quatre derniers
+  /// caractères.
+  plateformeStockageLire: () => request("/plateforme/stockage"),
+  plateformeStockageTest: (config) =>
+    request("/plateforme/stockage/test", { method: "POST", body: config }),
+  plateformeStockage: (config) =>
+    request("/plateforme/stockage", { method: "PUT", body: config }),
 
   catalog: () => request("/apps/catalog"),
   installedApps: () => request("/apps/installed"),

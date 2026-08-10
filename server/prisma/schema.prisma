@@ -285,6 +285,14 @@ model FsNode {
   mimeType  String?
   /// Clé dans le stockage objet. null pour un dossier.
   storageKey String?
+  /// **Où** vivent les octets : « local », « s3 »…
+  ///
+  /// C'est ce champ qui rend le changement de destination sans danger.
+  /// L'exploitant bascule le SaaS vers S3 : les nouveaux fichiers y vont,
+  /// les anciens restent sur le disque et continuent d'être lus là-bas.
+  /// Aucune migration à mener, aucun fichier à perdre — et revenir en
+  /// arrière est tout aussi anodin.
+  storage   String   @default("local")
   /// Mise à la corbeille. null = élément vivant. Les octets restent
   /// stockés et comptés dans le quota tant que la corbeille n'est pas vidée.
   deletedAt DateTime?
@@ -308,4 +316,26 @@ model FsNode {
   @@index([tenantId, parentId])
   @@index([tenantId, trashId])
   @@map("fs_nodes")
+}
+
+/// Réglages de la plateforme elle-même, au-dessus des espaces de travail.
+///
+/// Une seule ligne, d'identifiant « global » : ce ne sont pas les réglages
+/// d'un client mais ceux de l'exploitant du SaaS. Seule la console
+/// Plateforme y touche (voir src/routes/plateforme.js).
+model PlatformConfig {
+  id String @id @default("global")
+
+  /// Destination des **nouveaux** fichiers : « local » ou « s3 ».
+  /// Les fichiers déjà écrits gardent la leur (FsNode.storage).
+  stockage String @default("local")
+
+  /// Configuration du stockage objet. La clé secrète y est **chiffrée**
+  /// (AES-256-GCM, voir src/chiffrement.js) : une copie de la base ne doit
+  /// pas donner accès aux fichiers de tous les clients.
+  s3 Json?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_config")
 }

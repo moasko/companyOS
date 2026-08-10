@@ -17,9 +17,10 @@ import { z } from "zod";
 import { prisma, serialize } from "../db.js";
 import { authenticate, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { storage } from "../storage.js";
+import { piloteLecture } from "../storage.js";
 import { env } from "../env.js";
 import { creerTransporteur, envoyerVia } from "../mail.js";
+import { chiffrer } from "../chiffrement.js";
 
 /// L'installation de l'app Courrier pour cet espace — c'est elle qui
 /// porte les réglages SMTP.
@@ -95,7 +96,11 @@ export default async function courrierRoutes(app) {
       host: parsed.data.host,
       port: parsed.data.port,
       user: parsed.data.user,
-      pass: parsed.data.pass || actuel.pass || "",
+      // Chiffré au repos, comme la clé S3 : une sauvegarde de base égarée
+      // ne doit pas livrer le relais de messagerie de chaque client. Un
+      // champ vide conserve l'existant, déjà chiffré — on ne le rechiffre
+      // pas, ce serait chiffrer un chiffré.
+      pass: parsed.data.pass ? chiffrer(parsed.data.pass) : actuel.pass || "",
       de: parsed.data.de,
     };
     const relances = parsed.data.relances
@@ -176,7 +181,10 @@ export default async function courrierRoutes(app) {
           .code(413)
           .send({ error: "Pièces jointes trop lourdes (15 Mo au total, maximum)." });
       }
-      piecesJointes.push({ filename: node.name, content: storage.read(node.storageKey) });
+      piecesJointes.push({
+        filename: node.name,
+        content: (await piloteLecture(node.storage)).read(node.storageKey),
+      });
       nomsPieces.push(node.name);
     }
 

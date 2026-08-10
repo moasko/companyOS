@@ -16,33 +16,78 @@ import { modal } from "../../apps/modalRequest";
 import { menuContextuel } from "../../apps/menuRequest";
 import { ouvrirFenetre } from "../../apps/windows";
 import { fuseauEffectif } from "../../utils/heure";
+import { localeEffective } from "../../utils/langue";
+import { useTraduction } from "../../utils/intl";
 import "./taskbar.scss";
+
+const TEXTES = {
+  fr: {
+    effacerTitre: "Effacer les notifications",
+    effacerMsg: "Toutes vos notifications seront supprimées, sur tous vos appareils.",
+    effacer: "Effacer",
+    notifications: "Notifications",
+    toutLu: "Tout marquer comme lu",
+    aucune: "Aucune notification.",
+    aligner: "Aligner les icônes",
+    aGauche: "À gauche",
+    auCentre: "Au centre",
+    gestionnaire: "Gestionnaire des tâches",
+    parametresBarre: "Paramètres de la barre des tâches",
+    afficherBureau: "Afficher le bureau",
+    quitterPleinEcran: "Quitter le plein écran",
+    pleinEcran: "Plein écran",
+    themeClair: "Passer en thème clair",
+    themeSombre: "Passer en thème sombre",
+    nonConnecte: "Non connecté",
+  },
+  en: {
+    effacerTitre: "Clear notifications",
+    effacerMsg: "All your notifications will be deleted, on all your devices.",
+    effacer: "Clear",
+    notifications: "Notifications",
+    toutLu: "Mark all as read",
+    aucune: "No notifications.",
+    aligner: "Align icons",
+    aGauche: "Left",
+    auCentre: "Center",
+    gestionnaire: "Task manager",
+    parametresBarre: "Taskbar settings",
+    afficherBureau: "Show the desktop",
+    quitterPleinEcran: "Exit full screen",
+    pleinEcran: "Full screen",
+    themeClair: "Switch to light theme",
+    themeSombre: "Switch to dark theme",
+    nonConnecte: "Not signed in",
+  },
+};
 
 /// Volet des notifications, ouvert depuis la barre des tâches.
 /// Effacer la pile n'est plus un geste local depuis que les notifications
 /// vivent sur le serveur : elle disparaît de tous les postes, sans retour
 /// possible. Un clic à côté du bouton ne doit pas suffire.
-const effacerTout = async () => {
+const effacerTout = async (t) => {
   const ok = await modal.confirm({
-    title: "Effacer les notifications",
-    message: "Toutes vos notifications seront supprimées, sur tous vos appareils.",
-    confirmLabel: "Effacer",
+    title: t("effacerTitre"),
+    message: t("effacerMsg"),
+    confirmLabel: t("effacer"),
     danger: true,
   });
   if (ok) viderNotifications();
 };
 
-const VoletNotifications = ({ liste, onFermer }) => (
+const VoletNotifications = ({ liste, onFermer }) => {
+  const t = useTraduction(TEXTES);
+  return (
   <div className="tbVolet" onClick={(e) => e.stopPropagation()}>
     <div className="tbVoletTete">
-      <span>Notifications</span>
+      <span>{t("notifications")}</span>
       {liste.length ? (
         <>
           <span className="tbVoletLien" onClick={toutMarquerLu}>
-            Tout marquer comme lu
+            {t("toutLu")}
           </span>
-          <span className="tbVoletLien" onClick={effacerTout}>
-            Effacer
+          <span className="tbVoletLien" onClick={() => effacerTout(t)}>
+            {t("effacer")}
           </span>
         </>
       ) : null}
@@ -53,7 +98,7 @@ const VoletNotifications = ({ liste, onFermer }) => (
       {!liste.length ? (
         <div className="tbVoletVide">
           <Icon fafa="faBellSlash" width={22} />
-          <span>Aucune notification.</span>
+          <span>{t("aucune")}</span>
         </div>
       ) : (
         liste.map((n) => (
@@ -92,9 +137,11 @@ const VoletNotifications = ({ liste, onFermer }) => (
       )}
     </div>
   </div>
-);
+  );
+};
 
 const Taskbar = () => {
+  const t = useTraduction(TEXTES);
   const tasks = useSelector((state) => {
     return state.taskbar;
   });
@@ -231,16 +278,16 @@ const Taskbar = () => {
           onContextMenu={(e) =>
             menuContextuel(e, [
               {
-                nom: "Aligner les icônes",
+                nom: t("aligner"),
                 icone: "faAlignCenter",
                 sousMenu: [
                   {
-                    nom: "À gauche",
+                    nom: t("aGauche"),
                     coche: tasks.align === "left",
                     action: () => dispatch({ type: "TASKLEF" }),
                   },
                   {
-                    nom: "Au centre",
+                    nom: t("auCentre"),
                     coche: tasks.align === "center",
                     action: () => dispatch({ type: "TASKCEN" }),
                   },
@@ -248,18 +295,18 @@ const Taskbar = () => {
               },
               { separateur: true },
               {
-                nom: "Gestionnaire des tâches",
+                nom: t("gestionnaire"),
                 icone: "faChartLine",
                 action: () => ouvrirFenetre("taskmanager"),
               },
               {
-                nom: "Paramètres de la barre des tâches",
+                nom: t("parametresBarre"),
                 icone: "faGear",
                 action: () => ouvrirFenetre("settings"),
               },
               { separateur: true },
               {
-                nom: "Afficher le bureau",
+                nom: t("afficherBureau"),
                 icone: "faDesktop",
                 action: () => dispatch({ type: "SHOWDSK" }),
               },
@@ -337,7 +384,7 @@ const Taskbar = () => {
           {/* Boutons système : plein écran, thème, notifications. */}
           <div
             className="tbBouton"
-            title={pleinEcran ? "Quitter le plein écran" : "Plein écran"}
+            title={pleinEcran ? t("quitterPleinEcran") : t("pleinEcran")}
             onClick={basculerPleinEcran}
           >
             <Icon fafa={pleinEcran ? "faCompress" : "faExpand"} width={12} />
@@ -345,7 +392,7 @@ const Taskbar = () => {
 
           <div
             className="tbBouton"
-            title={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
+            title={theme === "dark" ? t("themeClair") : t("themeSombre")}
             onClick={changeTheme}
           >
             <Icon fafa={theme === "dark" ? "faSun" : "faMoon"} width={12} />
@@ -355,7 +402,7 @@ const Taskbar = () => {
             <div
               className="tbBouton"
               data-actif={voletOuvert ? "true" : "false"}
-              title="Notifications"
+              title={t("notifications")}
               onClick={(e) => {
                 e.stopPropagation();
                 setVoletOuvert((v) => !v);
@@ -382,7 +429,7 @@ const Taskbar = () => {
           >
             <Icon fafa="faUser" width={11} />
             <span className="taskSessionName">
-              {session.tenant?.name || "Non connecté"}
+              {session.tenant?.name || t("nonConnecte")}
             </span>
           </div>
 
@@ -392,14 +439,14 @@ const Taskbar = () => {
             data-action="CALNTOGG"
           >
             <div>
-              {time.toLocaleTimeString("fr-FR", {
+              {time.toLocaleTimeString(localeEffective(), {
                 hour: "numeric",
                 minute: "numeric",
                 timeZone: fuseauEffectif(),
               })}
             </div>
             <div>
-              {time.toLocaleDateString("fr-FR", {
+              {time.toLocaleDateString(localeEffective(), {
                 year: "2-digit",
                 month: "2-digit",
                 day: "numeric",

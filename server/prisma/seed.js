@@ -70,6 +70,42 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "classeur",
+    name: "Classeur",
+    description:
+      "Le tableur de CompanyOS : plusieurs feuilles, cellules mises en forme, formats monnaie et pourcentage, formules avec les fonctions du métier (TVA, TTC, remise). Importe et exporte de vrais fichiers Excel (.xlsx).",
+    icon: "classeur",
+    category: "Bureautique",
+    kind: "NATIVE",
+  },
+  {
+    slug: "tableur",
+    name: "Tableur CSV",
+    description:
+      "Ouvrir, corriger et comprendre n'importe quel fichier CSV : séparateur deviné, accents abîmés réparés, navigation au clavier, table des valeurs d'une colonne, et enregistrement dans le cloud au format qu'Excel lit sans broncher.",
+    icon: "tableur",
+    category: "Outils",
+    kind: "NATIVE",
+  },
+  {
+    slug: "code",
+    name: "Code",
+    description:
+      "L'éditeur de VS Code, branché sur les fichiers de l'espace de travail : coloration syntaxique, sélection multiple, pliage, recherche et remplacement pour une quarantaine de langages. Les fichiers restent dans le cloud — un collègue ouvre les mêmes depuis sa machine, sans rien installer.",
+    icon: "code",
+    category: "Outils",
+    kind: "NATIVE",
+  },
+  {
+    slug: "analyse",
+    name: "Analyse",
+    description:
+      "Croiser les données de toutes vos applications : ventes, stock, clients, charges. Pareto, segmentation des clients, cohortes de fidélité, périodes atypiques et prévision — l'application lit aussi les apps créées au Studio.",
+    icon: "analyse",
+    category: "Outils",
+    kind: "NATIVE",
+  },
+  {
     slug: "studio",
     name: "Studio",
     description:

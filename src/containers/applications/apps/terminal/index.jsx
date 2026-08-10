@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { ToolBar } from "../../../../utils/general";
+import { useNomApp } from "../../../../utils/nomsApps";
 import { modal } from "../../../../apps/modalRequest";
 import { syncInstalledModules } from "../../../../apps/sync";
 import { menuContextuel } from "../../../../apps/menuRequest";
@@ -26,6 +27,7 @@ const ACCUEIL = [
 ];
 
 export const WnTerminal = () => {
+  const nomApp = useNomApp();
   const wnapp = useSelector((state) => state.apps.terminal);
   const session = useSelector((state) => state.session);
   const theme = useSelector((state) => state.setting.person.theme);
@@ -229,7 +231,7 @@ export const WnTerminal = () => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name="Terminal"
+        name={nomApp("terminal")}
       />
       <div
         className="windowScreen"

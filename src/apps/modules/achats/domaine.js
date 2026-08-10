@@ -251,6 +251,5 @@ export const aReapprovisionner = (articles, stocks) =>
     .filter(Boolean)
     .sort((a, b) => a.stock / a.seuil - b.stock / b.seuil);
 
-/// Montant lisible en francs CFA.
-export const fcfa = (n) =>
-  `${arrondi(n).toLocaleString("fr-FR").replace(/ | /g, " ")} F`;
+/// Montant lisible, dans la devise d'affichage de l'espace.
+export { montant as fcfa } from "../../../utils/monnaie";

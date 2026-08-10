@@ -22,7 +22,8 @@ import { Transform } from "node:stream";
 import { prisma, serialize } from "../db.js";
 import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { storage } from "../storage.js";
+import { piloteEcriture } from "../storage.js";
+import { typeNeutralise } from "../mimetype.js";
 import { randomUUID } from "node:crypto";
 import {
   ErreurWeb,
@@ -341,11 +342,12 @@ export default async function webRoutes(app) {
       parentId || null,
       nomDeFichier(finale, reponse.headers),
     );
-    const cle = storage.buildKey(request.tenantId, nom);
+    const pilote = await piloteEcriture();
+    const cle = pilote.buildKey(request.tenantId, nom);
 
     let taille;
     try {
-      taille = await storage.put(
+      taille = await pilote.put(
         cle,
         reponse.pipe(
           plafonner(
@@ -356,7 +358,7 @@ export default async function webRoutes(app) {
       );
     } catch (err) {
       reponse.destroy();
-      await storage.remove(cle);
+      await pilote.remove(cle);
       return repondreErreur(reply, err);
     }
 
@@ -370,10 +372,13 @@ export default async function webRoutes(app) {
             name: nom,
             type: "FILE",
             size: BigInt(taille),
-            mimeType:
-              String(reponse.headers["content-type"] || "").split(";")[0].trim() ||
-              "application/octet-stream",
+            // Ce type vient du serveur distant, choisi par l'utilisateur :
+            // un serveur complice répondrait « text/html » pour déposer une
+            // page exécutable dans le cloud de l'espace, visible de tous
+            // les collègues. Voir src/mimetype.js.
+            mimeType: typeNeutralise(reponse.headers["content-type"]),
             storageKey: cle,
+            storage: pilote.nom,
           },
         });
 
@@ -395,7 +400,7 @@ export default async function webRoutes(app) {
 
       return reply.code(201).send(serialize(node));
     } catch (err) {
-      await storage.remove(cle);
+      await pilote.remove(cle);
       if (err.code === "P2002") {
         // Le nom est déjà pris ici. Le client réessaiera avec un autre :
         // c'est lui qui sait comment il numérote les doublons.

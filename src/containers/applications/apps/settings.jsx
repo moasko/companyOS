@@ -26,6 +26,21 @@ import {
   fuseauEffectif,
   heureDans,
 } from "../../../utils/heure";
+import {
+  DEVISES,
+  choisirDevise,
+  deviseChoisie,
+  deviseDetectee,
+  montant,
+} from "../../../utils/monnaie";
+import {
+  LANGUES,
+  choisirLangue,
+  langueChoisie,
+  langueDetectee,
+} from "../../../utils/langue";
+import { useTraduction } from "../../../utils/intl";
+import { useNomApp } from "../../../utils/nomsApps";
 import "./assets/settings.scss";
 
 // Paramètres de CompanyOS.
@@ -47,6 +62,33 @@ const SECTIONS = [
   { id: "langue", label: "Langue et région", icon: "faLanguage" },
   { id: "apropos", label: "À propos", icon: "faCircleInfo" },
 ];
+
+/// Traductions de la navigation. Le corps des sections reste en français
+/// pour l'instant — l'extraction se fait au fil de l'eau ; le repli par
+/// clé garantit qu'aucun libellé ne disparaît.
+const TEXTES = {
+  fr: {},
+  en: {
+    "section.systeme": "System",
+    "section.apparence": "Appearance",
+    "section.bureau": "Desktop and taskbar",
+    "section.applications": "Applications",
+    "section.stockage": "Storage",
+    "section.compte": "Account",
+    "section.espace": "Workspace",
+    "section.formule": "Plan and pricing",
+    "section.journal": "Activity log",
+    "section.langue": "Language and region",
+    "section.apropos": "About",
+  },
+};
+
+/// Le libellé d'une section : traduit si la langue le couvre, sinon le
+/// français de SECTIONS.
+const libelleSection = (t, s) => {
+  const traduit = t(`section.${s.id}`);
+  return traduit === `section.${s.id}` ? s.label : traduit;
+};
 
 const VERSION = "0.1.0";
 
@@ -220,6 +262,8 @@ const Row = ({ title, desc, children }) => (
 );
 
 export const Settings = () => {
+  const t = useTraduction(TEXTES);
+  const nomApp = useNomApp();
   const wnapp = useSelector((state) => state.apps.settings);
   const theme = useSelector((state) => state.setting.person.theme);
   const wall = useSelector((state) => state.wallpaper);
@@ -256,6 +300,9 @@ export const Settings = () => {
   const [fact, setFact] = useState(null);
   // Fuseau horaire : "auto" ou un identifiant IANA, retenu sur le poste.
   const [fuseau, setFuseau] = useState(fuseauChoisi());
+  // Langue et devise d'affichage : "auto" ou un code, retenus sur le poste.
+  const [langue, setLangue] = useState(langueChoisie());
+  const [devise, setDevise] = useState(deviseChoisie());
 
   // Formulaires
   const [nomProfil, setNomProfil] = useState("");
@@ -301,9 +348,9 @@ export const Settings = () => {
 
   // ---- Formule ------------------------------------------------------------
 
-  /// Prix affiché d'une formule : « Gratuit » ou « 15 000 F / mois ».
-  const prixDe = (f) =>
-    f.prixMois ? `${f.prixMois.toLocaleString("fr-FR")} F / mois` : "Gratuit";
+  /// Prix affiché d'une formule : « Gratuit » ou « 15 000 F / mois »,
+  /// dans la devise d'affichage de l'espace.
+  const prixDe = (f) => (f.prixMois ? `${montant(f.prixMois)} / mois` : "Gratuit");
 
   /// Changement de formule — réservé au propriétaire, confirmé, et le
   /// serveur revérifie tout : rôle, stockage, effectif.
@@ -345,6 +392,18 @@ export const Settings = () => {
   const appliquerFuseau = (valeur) => {
     choisirFuseau(valeur);
     setFuseau(valeur);
+  };
+
+  // ---- Langue et devise ---------------------------------------------------
+
+  const appliquerLangueChoisie = (valeur) => {
+    choisirLangue(valeur);
+    setLangue(valeur);
+  };
+
+  const appliquerDevise = (valeur) => {
+    choisirDevise(valeur);
+    setDevise(valeur);
   };
 
   // ---- Journal ------------------------------------------------------------
@@ -556,7 +615,7 @@ export const Settings = () => {
     if (app.isCore) return;
     const ok = await modal.confirm({
       title: "Désinstaller l'application",
-      message: `Retirer « ${app.name} » de cet espace de travail ?`,
+      message: `Retirer « ${nomApp(app)} » de cet espace de travail ?`,
       detail: "Les données saisies sont conservées et reviendront si l'application est réinstallée.",
       confirmLabel: "Désinstaller",
       danger: true,
@@ -567,7 +626,7 @@ export const Settings = () => {
       await api.uninstallApp(app.slug);
       await syncInstalledModules();
       await load();
-      flash(`« ${app.name} » a été retirée`);
+      flash(`« ${nomApp(app)} » a été retirée`);
     } catch (err) {
       flash(err.message);
     } finally {
@@ -705,7 +764,7 @@ export const Settings = () => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name="Paramètres"
+        name={nomApp("settings")}
       />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="restWindow flex-grow flex flex-col">
@@ -731,7 +790,7 @@ export const Settings = () => {
                   onClick={() => goToSection(s.id)}
                 >
                   <Icon fafa={s.icon} width={13} />
-                  <span>{s.label}</span>
+                  <span>{libelleSection(t, s)}</span>
                 </div>
               ))}
             </aside>
@@ -1041,7 +1100,7 @@ export const Settings = () => {
                         <div key={a.slug} className="setAppRow">
                           <Icon src={a.icon} width={22} />
                           <div className="setAppInfo">
-                            <div className="setAppName">{a.name}</div>
+                            <div className="setAppName">{nomApp(a)}</div>
                             <div className="setAppMeta">
                               v{a.version}
                               {a.kind === "CUSTOM" ? " · créée dans le Studio" : ""}
@@ -1557,14 +1616,59 @@ export const Settings = () => {
                 <h2>Langue et région</h2>
                 <p className="setHint">Affichage du shell et des applications</p>
 
-                {/* Pas de sélecteur : seule la langue livrée est proposée.
-                    L'ancien menu promettait quatorze langues dont aucune
-                    n'existait — le choisir ne changeait rien. Un réglage qui
-                    ne règle rien est pire qu'aucun réglage. */}
+                {/* La langue pilote i18next : les surfaces traduites (le
+                    module Présentations, les chaînes extraites au fil de
+                    l'eau) suivent immédiatement ; le shell historique reste
+                    en français en attendant son extraction. */}
                 <Row
                   title="Langue d'affichage"
-                  desc="Français — la seule langue livrée pour l'instant"
-                />
+                  desc={
+                    langue === "auto"
+                      ? `Automatique — ${
+                          langueDetectee() === "fr" ? "français" : "anglais"
+                        } détecté depuis le navigateur`
+                      : "Épinglée — retenue sur ce poste"
+                  }
+                >
+                  <select
+                    className="setRole"
+                    value={langue}
+                    onChange={(e) => appliquerLangueChoisie(e.target.value)}
+                  >
+                    <option value="auto">
+                      Automatique ({langueDetectee() === "fr" ? "Français" : "English"})
+                    </option>
+                    {LANGUES.map((l) => (
+                      <option key={l.code} value={l.code}>
+                        {l.nom}
+                      </option>
+                    ))}
+                  </select>
+                </Row>
+
+                <Row
+                  title="Devise d'affichage"
+                  desc={
+                    (devise === "auto" ? deviseDetectee() : devise) === "XOF"
+                      ? "Franc CFA — la monnaie des données"
+                      : `Conversion indicative à l'écran — ${montant(15000)} pour 15 000 F. Les données restent en franc CFA.`
+                  }
+                >
+                  <select
+                    className="setRole"
+                    value={devise}
+                    onChange={(e) => appliquerDevise(e.target.value)}
+                  >
+                    <option value="auto">
+                      Automatique ({deviseDetectee()} selon le fuseau)
+                    </option>
+                    {DEVISES.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.nom} ({d.symbole})
+                      </option>
+                    ))}
+                  </select>
+                </Row>
 
                 <Row
                   title="Format de date et d'heure"

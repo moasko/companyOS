@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma, serialize } from "../db.js";
-import { authenticate } from "../auth.js";
+import { authenticate, auMoins } from "../auth.js";
 import { journaliser } from "../audit.js";
 
 /// CRUD générique des modules métier. Un module range ses données dans
@@ -130,6 +130,24 @@ export default async function recordRoutes(app) {
     });
     if (!record) {
       return reply.code(404).send({ error: "Enregistrement introuvable" });
+    }
+
+    // Chacun peut défaire sa propre saisie ; effacer celle d'un autre
+    // demande d'être administrateur.
+    //
+    // Un simple `exigerRole("ADMIN")` sur la route serait plus court, mais
+    // interdirait le geste le plus courant qui soit — retirer la fiche
+    // qu'on vient de créer par erreur — et pousserait à donner le rôle
+    // ADMIN à tout le monde, ce qui reviendrait à retirer le contrôle.
+    // La règle utile est celle-ci : la suppression est définitive (il n'y
+    // a pas de corbeille pour les fiches), donc personne n'efface le
+    // travail d'un collègue sans en avoir la responsabilité.
+    const sien = record.userId === request.user.id;
+    if (!sien && !auMoins(request.user?.role, "ADMIN")) {
+      return reply.code(403).send({
+        error:
+          "Cette fiche a été saisie par quelqu'un d'autre : seul un administrateur peut la supprimer.",
+      });
     }
 
     await prisma.record.delete({ where: { id: record.id } });

@@ -110,17 +110,52 @@ export const variablesPour = (destinataire, entreprise = "") => ({
 // clients mail respectent tous. Partagé : le serveur l'envoie, l'éditeur
 // l'affiche en aperçu — le destinataire reçoit exactement ce qu'on a vu.
 
+/// Échappe pour du **texte** HTML et pour l'intérieur d'un attribut.
+///
+/// Les guillemets en font partie, et ce n'était pas le cas : sans eux,
+/// une valeur « échappée » placée dans un attribut peut en sortir avec un
+/// simple `"`. C'est un piège classique — le texte paraît protégé, mais la
+/// protection ne vaut que pour le contexte d'origine.
 const echapperHtml = (t) =>
   String(t || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+/// Une couleur, ou la couleur par défaut. Rien d'autre.
+///
+/// `couleur` vient de `fiche.data`, c'est-à-dire d'un champ JSON libre
+/// écrit par l'API : l'écran utilise bien un `<input type="color">`, mais
+/// l'API accepte n'importe quelle chaîne. Elle est ensuite posée dans un
+/// attribut `style`, d'où on sort avec un guillemet — et le résultat est
+/// un mail à l'en-tête d'une entreprise cliente, contenant le HTML de
+/// l'attaquant. On valide donc la forme au lieu d'échapper : pour une
+/// couleur, tout ce qui n'est pas une couleur est une erreur.
+const COULEUR = /^#[0-9a-f]{3,8}$/i;
+const couleurSure = (valeur, defaut = "#e8590c") => {
+  const brute = String(valeur || "").trim();
+  return COULEUR.test(brute) ? brute : defaut;
+};
+
+/// Une URL destinée à un `href`/`src`. Seuls http(s) sont acceptés :
+/// `javascript:` et `data:` n'ont rien à faire dans un mail.
+const lienSur = (valeur) => {
+  const brute = String(valeur || "").trim();
+  if (!/^https?:\/\//i.test(brute)) return "";
+  return echapperHtml(brute);
+};
 
 export const htmlDe = (
   campagne,
-  { entreprise = "", lienCta = "", lienDesinscription = "", pixel = "" } = {},
+  { entreprise = "", lienCta: cta = "", lienDesinscription: desabo = "", pixel: tracage = "" } = {},
 ) => {
-  const couleur = campagne.couleur || "#e8590c";
+  const couleur = couleurSure(campagne.couleur);
+  // Les trois liens sont posés dans des attributs : même traitement.
+  const lienCta = lienSur(cta);
+  const lienDesinscription = lienSur(desabo);
+  const pixel = lienSur(tracage);
   const paragraphes = String(campagne.texte || "")
     .split(/\n{2,}/)
     .map(

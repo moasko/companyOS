@@ -6,27 +6,29 @@ import { initReactI18next } from "react-i18next";
 import Backend from "i18next-http-backend";
 import LanguageDetector from "i18next-browser-languagedetector";
 
-// L'interface de CompanyOS est écrite en français, directement dans les
-// composants : i18next ne traduit pas le shell. Son seul consommateur réel
-// est le module Présentations, dont le moteur appelle `useTranslation()` et
-// reçoit ses chaînes françaises par `addResourceBundle` **sur la langue
-// interne « en »** (voir src/apps/modules/presentation/Editeur.jsx). C'est
-// pourquoi « en » doit rester la langue résolue : la changer casserait ces
-// bundles. `public/locales/en/translate.json` est vide et ne sert qu'à
+// Le shell historique de CompanyOS est écrit en français, directement dans
+// les composants : i18next ne le traduit pas encore. Mais la langue résolue
+// est désormais réelle : « fr » ou « en », choisie par le réglage
+// « Langue et région » (clé locale `companyos-langue`, voir
+// src/utils/langue.js) ou détectée depuis le navigateur. Les surfaces
+// traduites — le module Présentations, qui enregistre ses bundles par
+// langue (voir src/apps/modules/presentation/Editeur.jsx), et les chaînes
+// extraites au fil de l'eau vers `locales/<lng>/translate.json` — suivent
+// ce choix. Les deux `translate.json` sont vides et n'existent que pour
 // éviter un 404 du backend.
-//
-// Le jour d'une vraie internationalisation : extraire les chaînes du shell
-// vers `locales/<lng>/translate.json`, ajouter la langue ci-dessous, et
-// enregistrer les bundles du module Présentations par langue.
-const fallbackLng = ["en"];
-const availableLanguages = ["en"];
+const fallbackLng = ["fr"];
+const availableLanguages = ["fr", "en"];
+
+// Un choix épinglé dans les réglages prime sur la détection du navigateur.
+const langueEpinglee = localStorage.getItem("companyos-langue");
 
 i18n
   .use(Backend) // load translations using http (default public/assets/locals/en/translations)
   .use(LanguageDetector) // detect user language
   .use(initReactI18next) // pass the i18n instance to react-i18next.
   .init({
-    fallbackLng, // fallback language is english.
+    lng: langueEpinglee || undefined, // undefined → détection navigateur
+    fallbackLng,
 
     backend: {
       loadPath: "locales/{{lng}}/translate.json",

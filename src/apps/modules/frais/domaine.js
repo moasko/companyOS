@@ -100,5 +100,4 @@ export const ecritureDeNote = (note, noteId, nomSalarie = "salarié") => {
   };
 };
 
-export const fcfa = (n) =>
-  `${Math.round(Number(n) || 0).toLocaleString("fr-FR")} F`;
+export { montant as fcfa } from "../../../utils/monnaie";

@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { prisma, serialize } from "../db.js";
 import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { storage } from "../storage.js";
+import { piloteEcriture, piloteLecture } from "../storage.js";
+import { typeDeFlux, typeNeutralise } from "../mimetype.js";
 
 const folderSchema = z.object({
   name: z.string().min(1).max(255),
@@ -59,7 +60,7 @@ const purgerGroupe = async (tenantId, racine, tous) => {
   });
 
   for (const n of tous) {
-    if (n.storageKey) await storage.remove(n.storageKey);
+    if (n.storageKey) await (await piloteLecture(n.storage)).remove(n.storageKey);
   }
 
   return liberes;
@@ -240,12 +241,16 @@ export default async function fileRoutes(app) {
       return reply.code(413).send({ error: "Quota de stockage atteint" });
     }
 
-    const key = storage.buildKey(request.tenantId, upload.filename);
-    const size = await storage.put(key, upload.file);
+    // La destination des nouveaux fichiers vient de la console
+    // Plateforme ; le nœud retient laquelle, pour savoir plus tard où
+    // relire ses octets.
+    const pilote = await piloteEcriture();
+    const key = pilote.buildKey(request.tenantId, upload.filename);
+    const size = await pilote.put(key, upload.file);
 
     // Le stream a pu dépasser le quota restant : on annule dans ce cas.
     if (tenant.usedBytes + BigInt(size) > tenant.quota) {
-      await storage.remove(key);
+      await pilote.remove(key);
       return reply.code(413).send({ error: "Quota de stockage dépassé" });
     }
 
@@ -259,8 +264,9 @@ export default async function fileRoutes(app) {
             name: upload.filename,
             type: "FILE",
             size: BigInt(size),
-            mimeType: upload.mimetype,
+            mimeType: typeNeutralise(upload.mimetype),
             storageKey: key,
+            storage: pilote.nom,
           },
         });
 
@@ -279,7 +285,7 @@ export default async function fileRoutes(app) {
 
       return reply.code(201).send(serialize(node));
     } catch (err) {
-      await storage.remove(key);
+      await pilote.remove(key);
       if (err.code === "P2002") {
         return reply.code(409).send({ error: "Un fichier porte déjà ce nom ici" });
       }
@@ -320,13 +326,21 @@ export default async function fileRoutes(app) {
     const total = Number(node.size);
     reply
       .header("Accept-Ranges", "bytes")
-      .header("Content-Type", node.mimeType || "application/octet-stream")
-      .header("Cache-Control", "private, max-age=3600");
+      .header("Content-Type", typeDeFlux(node.mimeType))
+      .header("Cache-Control", "private, max-age=3600")
+      // Le navigateur ne doit pas deviner un type que nous refusons de
+      // déclarer : sans « nosniff », un fichier servi en octet-stream mais
+      // commençant par « <html> » est parfois interprété comme du HTML.
+      .header("X-Content-Type-Options", "nosniff")
+      .header("Content-Disposition", `inline; filename="${encodeURIComponent(node.name)}"`)
+      // Ceinture et bretelles : si malgré tout un document s'ouvrait ici,
+      // il n'aurait ni script, ni origine, ni requête réseau.
+      .header("Content-Security-Policy", "default-src 'none'; sandbox");
 
     const plage = request.headers.range;
     if (!plage) {
       reply.header("Content-Length", total);
-      return reply.send(storage.read(node.storageKey));
+      return reply.send((await piloteLecture(node.storage)).read(node.storageKey));
     }
 
     const m = /bytes=(\d*)-(\d*)/.exec(plage);
@@ -342,7 +356,7 @@ export default async function fileRoutes(app) {
       .code(206)
       .header("Content-Range", `bytes ${debut}-${fin}/${total}`)
       .header("Content-Length", fin - debut + 1)
-      .send(storage.readRange(node.storageKey, debut, fin));
+      .send((await piloteLecture(node.storage)).readRange(node.storageKey, debut, fin));
   });
 
   app.get("/:id/download", async (request, reply) => {
@@ -353,9 +367,10 @@ export default async function fileRoutes(app) {
 
     reply
       .header("Content-Type", node.mimeType || "application/octet-stream")
+      .header("X-Content-Type-Options", "nosniff")
       .header("Content-Disposition", `attachment; filename="${encodeURIComponent(node.name)}"`);
 
-    return reply.send(storage.read(node.storageKey));
+    return reply.send((await piloteLecture(node.storage)).read(node.storageKey));
   });
 
   /// Renommer ou déplacer un élément.
@@ -449,8 +464,9 @@ export default async function fileRoutes(app) {
       return reply.code(404).send({ error: "Fichier introuvable" });
     }
 
-    const cle = storage.buildKey(request.tenantId, node.name);
-    const taille = await storage.put(cle, upload.file);
+    const pilote = await piloteEcriture();
+    const cle = pilote.buildKey(request.tenantId, node.name);
+    const taille = await pilote.put(cle, upload.file);
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: request.tenantId },
@@ -459,7 +475,7 @@ export default async function fileRoutes(app) {
     // demande que 0,1 Mo d'espace libre.
     const difference = BigInt(taille) - node.size;
     if (tenant.usedBytes + difference > tenant.quota) {
-      await storage.remove(cle);
+      await pilote.remove(cle);
       return reply.code(413).send({ error: "Quota de stockage dépassé" });
     }
 
@@ -470,7 +486,8 @@ export default async function fileRoutes(app) {
         data: {
           size: BigInt(taille),
           storageKey: cle,
-          mimeType: upload.mimetype || node.mimeType,
+          storage: pilote.nom,
+          mimeType: upload.mimetype ? typeNeutralise(upload.mimetype) : node.mimeType,
         },
       });
       await tx.tenant.update({
@@ -480,7 +497,7 @@ export default async function fileRoutes(app) {
       return fichier;
     });
 
-    await storage.remove(ancienne);
+    await (await piloteLecture(node.storage)).remove(ancienne);
     await journaliser(request, "fichier.modification", node.name, {
       octets: taille,
     });

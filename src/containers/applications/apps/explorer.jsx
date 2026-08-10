@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon, Image, ToolBar } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import { api, getToken } from "../../../api/client";
 import { FileThumb, oublierApercu } from "./assets/FileThumb";
 import { modal } from "../../../apps/modalRequest";
-import { ouvrirFichier } from "../../../apps/openRequest";
+import { applicationManquante, ouvrirFichier } from "../../../apps/openRequest";
 import { consommerDemande } from "../../../apps/explorerRequest";
 import { menuContextuel } from "../../../apps/menuRequest";
 import { familleDe } from "../../../apps/fileTypes";
+import { moduleBySlug, syncInstalledModules } from "../../../apps/sync";
+import { moduleById } from "../../../apps/registry";
+import { versionLivree } from "../../../apps/versions";
 import "./assets/fileexpo.scss";
 
 // L'Explorateur est le poste de pilotage du cloud CompanyOS : même
@@ -28,6 +32,7 @@ const formatBytes = (bytes) => {
 };
 
 export const Explorer = () => {
+  const nomApp = useNomApp();
   const dispatch = useDispatch();
   const wnapp = useSelector((state) => state.apps.explorer);
   const session = useSelector((state) => state.session);
@@ -169,9 +174,47 @@ export const Explorer = () => {
       navigate([...path, { id: node.id, name: node.name }]);
       return;
     }
-    // Aucune application déclarée pour ce type : on retombe sur le
-    // téléchargement, plutôt que de ne rien faire.
-    if (!ouvrirFichier(node, nodes)) download(node);
+    if (ouvrirFichier(node, nodes)) return;
+
+    // L'OS sait lire ce fichier, mais l'application n'est pas installée
+    // dans cet espace. Le télécharger serait absurde — on propose de
+    // l'installer, et le fichier s'ouvre dans la foulée.
+    const manquante = applicationManquante(node);
+    if (manquante) return proposerInstallation(node, manquante);
+
+    // Personne ne sait lire ce type : le téléchargement reste la sortie
+    // honnête, plutôt qu'un clic sans effet.
+    download(node);
+  };
+
+  const proposerInstallation = async (node, famille) => {
+    const mod = moduleById[famille.app];
+    const slug = mod?.slug;
+    if (!slug) return download(node);
+
+    const ok = await modal.confirm({
+      title: `Installer ${mod.name} ?`,
+      message: `« ${node.name} » s'ouvre avec ${mod.name}, qui n'est pas encore installé dans cet espace de travail.`,
+      detail: "L'installation est immédiate et réversible depuis la Boutique.",
+      confirmLabel: "Installer et ouvrir",
+    });
+    if (!ok) return;
+
+    try {
+      const catalogue = await api.catalog();
+      const entree = catalogue.find((a) => a.slug === slug);
+      await api.installApp(slug, versionLivree(entree || { slug }, moduleBySlug));
+      await syncInstalledModules();
+      // La fenêtre existe désormais : la seconde tentative aboutit.
+      if (!ouvrirFichier(node, nodes)) download(node);
+    } catch (err) {
+      modal.alert({
+        title: "Installation impossible",
+        message: err.message,
+        detail: "Seul un administrateur de l'espace peut installer une application.",
+        tone: "error",
+      });
+    }
   };
 
   const download = async (node) => {
@@ -288,6 +331,20 @@ export const Explorer = () => {
 
     setSelection([node.id]);
     setAnchor(node.id);
+
+    // Un clic simple sur un fichier l'ouvre, tout de suite, dans son
+    // application. Attendre un double-clic n'apporte rien ici : un
+    // explorateur de fichiers sert avant tout à ouvrir, et le geste doit
+    // être immédiat.
+    //
+    // Les dossiers gardent le double-clic : les sélectionner d'un clic
+    // reste nécessaire pour les renommer, les déplacer ou les supprimer
+    // depuis la barre d'outils — entrer dedans à chaque effleurement
+    // rendrait ces gestes impossibles.
+    //
+    // Les clics avec Ctrl ou Maj sont sortis plus haut : ils composent une
+    // sélection et ne doivent jamais ouvrir.
+    if (!trash && node.type === "FILE") openNode(node);
   };
 
   /// Résumé d'une sélection, pour les messages de confirmation.
@@ -544,7 +601,7 @@ export const Explorer = () => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name="Explorateur — Cloud"
+        name={`${nomApp("explorer")} — Cloud`}
       />
       <div className="windowScreen flex flex-col">
         {/* Ruban : mêmes classes, actions réelles */}
@@ -797,9 +854,11 @@ export const Explorer = () => {
                         onClick={(e) => cliquer(e, node, index)}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
-                          // En corbeille, un élément ne s'ouvre pas : il se
-                          // restaure d'abord.
-                          if (!trash) openNode(node);
+                          // Le fichier s'est déjà ouvert au premier clic :
+                          // seul le dossier attend ici son double-clic.
+                          // En corbeille, rien ne s'ouvre — on restaure
+                          // d'abord.
+                          if (!trash && node.type === "FOLDER") openNode(node);
                         }}
                         onContextMenu={menuElement(node, index)}
                       >

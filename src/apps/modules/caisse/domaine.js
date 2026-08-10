@@ -355,6 +355,5 @@ export const ecritureDuTicket = (ticket, numero) => {
   };
 };
 
-/// Montant lisible en francs CFA.
-export const fcfa = (n) =>
-  `${arrondi(n).toLocaleString("fr-FR").replace(/ | /g, " ")} F`;
+/// Montant lisible, dans la devise d'affichage de l'espace.
+export { montant as fcfa } from "../../../utils/monnaie";

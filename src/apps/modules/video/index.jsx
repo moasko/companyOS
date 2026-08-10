@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 import {
   Accueil,
   Etat,
@@ -30,6 +31,7 @@ export const manifest = {
 const VITESSES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 function VideoApp() {
+  const nomApp = useNomApp();
   const v = useVisionneuse("movies", "VIDEOAPP", "video", "flux");
   const video = useRef(null);
   const scene = useRef(null);
@@ -89,7 +91,7 @@ function VideoApp() {
   }, [volume, muet, vitesse, v.url]);
 
   return (
-    <FenetreMedia wnapp={v.wnapp} nom="Vidéo" className="videoApp">
+    <FenetreMedia wnapp={v.wnapp} nom={nomApp("video")} className="videoApp">
       {!v.courant ? (
         <Accueil
           icone="faFilm"

@@ -8,6 +8,7 @@ import {
   signToken,
   verifyPassword,
 } from "../auth.js";
+import { randomInt } from "node:crypto";
 import { journaliser, journaliserPour } from "../audit.js";
 import { formuleDe } from "../formules.js";
 import { envoyerMail, mailInvitation } from "../mail.js";
@@ -384,6 +385,18 @@ export default async function authRoutes(app) {
 
   /// Code court, lisible et dictable au téléphone. Pas de I, O, 0 ni 1 :
   /// ce sont les caractères qu'on confond en les lisant à voix haute.
+  ///
+  /// **Tiré par `randomInt`, jamais par `Math.random`.** Ce code vaut un
+  /// mot de passe : l'accepter crée un compte dans l'espace d'une
+  /// entreprise, avec le rôle que porte l'invitation — donc potentiellement
+  /// ADMIN, donc les fichiers, la comptabilité et la paie. Or le générateur
+  /// de V8 n'est pas cryptographique : son état interne se reconstitue à
+  /// partir de quelques sorties observées. Un attaquant qui crée son propre
+  /// espace et s'envoie une poignée d'invitations pourrait alors prédire
+  /// les codes émis pour les autres espaces du même serveur.
+  ///
+  /// `randomInt` tire sans biais de modulo — 32 caractères divise 2^32, mais
+  /// ne pas dépendre de cette coïncidence coûte le même nombre de lignes.
   const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const nouveauCode = () =>
     Array.from(
@@ -391,7 +404,7 @@ export default async function authRoutes(app) {
       () =>
         Array.from(
           { length: 4 },
-          () => ALPHABET[Math.floor(Math.random() * ALPHABET.length)],
+          () => ALPHABET[randomInt(ALPHABET.length)],
         ).join(""),
     ).join("-");
 
@@ -458,16 +471,33 @@ export default async function authRoutes(app) {
         where: { tenantId: request.tenantId, email, acceptedAt: null },
       });
 
-      const invitation = await prisma.invitation.create({
-        data: {
-          tenantId: request.tenantId,
-          email,
-          role: parsed.data.role,
-          code: nouveauCode(),
-          createdById: request.user.id,
-          expiresAt: new Date(Date.now() + INVITATION_JOURS * 86400000),
-        },
-      });
+      // Le code est unique en base. Une collision est très improbable
+      // (32^12), mais « très improbable » finit par arriver et rendait
+      // jusqu'ici une erreur 500 à un administrateur qui n'y est pour
+      // rien : on retire simplement une autre fois.
+      let invitation = null;
+      for (let essai = 0; essai < 5 && !invitation; essai += 1) {
+        try {
+          invitation = await prisma.invitation.create({
+            data: {
+              tenantId: request.tenantId,
+              email,
+              role: parsed.data.role,
+              code: nouveauCode(),
+              createdById: request.user.id,
+              expiresAt: new Date(Date.now() + INVITATION_JOURS * 86400000),
+            },
+          });
+        } catch (erreur) {
+          // P2002 = contrainte d'unicité. Toute autre erreur remonte.
+          if (erreur?.code !== "P2002") throw erreur;
+        }
+      }
+      if (!invitation) {
+        return reply
+          .code(503)
+          .send({ error: "Impossible de générer un code d'invitation. Réessayez." });
+      }
 
       await journaliser(request, "invitation.envoi", email, { role: parsed.data.role });
 

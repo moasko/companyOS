@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
 import { Icon, ToolBar } from "../../../utils/general";
+import { useNomApp } from "../../../utils/nomsApps";
 
 export const Calculator = () => {
+  const nomApp = useNomApp();
   const wnapp = useSelector((state) => state.apps.calculator);
   const [equa, setEqua] = useState([]);
   const [cval, setCval] = useState("0");
@@ -151,7 +153,7 @@ export const Calculator = () => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name="Calculator"
+        name={nomApp("calculator")}
       />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="flex pt-2">

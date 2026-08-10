@@ -19,6 +19,8 @@
 
 import { api, getToken } from "../api/client";
 import { ouvrirFenetre } from "./windows";
+import { creerTraducteur } from "../utils/intl";
+import { localeEffective } from "../utils/langue";
 
 const CLE = "notifications";
 const MAX = 50;
@@ -232,12 +234,18 @@ export const demarrerSyncNotifications = () => {
 export const resynchroniserNotifications = rafraichir;
 
 /// Un horodatage lisible : « à l'instant », « il y a 5 min », puis l'heure.
+const DEPUIS = {
+  fr: { instant: "à l'instant", min: "il y a {n} min", h: "il y a {n} h" },
+  en: { instant: "just now", min: "{n} min ago", h: "{n} h ago" },
+};
+const tDepuis = creerTraducteur(DEPUIS);
+
 export const depuis = (date) => {
   const s = Math.round((Date.now() - date) / 1000);
-  if (s < 45) return "à l'instant";
-  if (s < 3600) return `il y a ${Math.round(s / 60)} min`;
-  if (s < 86400) return `il y a ${Math.round(s / 3600)} h`;
-  return new Date(date).toLocaleDateString("fr-FR", {
+  if (s < 45) return tDepuis("instant");
+  if (s < 3600) return tDepuis("min", { n: Math.round(s / 60) });
+  if (s < 86400) return tDepuis("h", { n: Math.round(s / 3600) });
+  return new Date(date).toLocaleDateString(localeEffective(), {
     day: "numeric",
     month: "short",
     hour: "2-digit",

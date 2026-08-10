@@ -6,7 +6,54 @@ import { syncInstalledModules, detachAllModules } from "../../apps/sync";
 import { appliquerApparence, reinitialiserApparence } from "../../apps/appearance";
 import { resynchroniserNotifications } from "../../apps/notifications";
 import { Avatar } from "../../apps/Avatar";
+import { useTraduction } from "../../utils/intl";
+import { localeEffective } from "../../utils/langue";
 import "./back.scss";
+
+const TEXTES = {
+  fr: {
+    connexionImpossible: "Connexion impossible",
+    ouvrir: "Ouvrir mon espace",
+    changerCompte: "Changer de compte",
+    titreLogin: "Connexion à CompanyOS",
+    titreRegister: "Créer votre espace de travail",
+    titreJoin: "Rejoindre un espace de travail",
+    codeInvitation: "Code d'invitation",
+    nomEntreprise: "Nom de l'entreprise",
+    votreNom: "Votre nom",
+    email: "Adresse e-mail",
+    motDePasse: "Mot de passe",
+    motDePasseMin: "Mot de passe (8 caractères min.)",
+    seConnecter: "Se connecter",
+    creerEspace: "Créer mon espace",
+    rejoindre: "Rejoindre",
+    versInscription: "Pas encore de compte ? Créer un espace de travail",
+    versConnexion: "Déjà un compte ? Se connecter",
+    retourConnexion: "Retour à la connexion",
+    jaiUnCode: "On m'a invité — j'ai un code",
+  },
+  en: {
+    connexionImpossible: "Could not sign in",
+    ouvrir: "Open my workspace",
+    changerCompte: "Switch account",
+    titreLogin: "Sign in to CompanyOS",
+    titreRegister: "Create your workspace",
+    titreJoin: "Join a workspace",
+    codeInvitation: "Invitation code",
+    nomEntreprise: "Company name",
+    votreNom: "Your name",
+    email: "Email address",
+    motDePasse: "Password",
+    motDePasseMin: "Password (8 characters min.)",
+    seConnecter: "Sign in",
+    creerEspace: "Create my workspace",
+    rejoindre: "Join",
+    versInscription: "No account yet? Create a workspace",
+    versConnexion: "Already have an account? Sign in",
+    retourConnexion: "Back to sign-in",
+    jaiUnCode: "I was invited — I have a code",
+  },
+};
 
 export const Background = () => {
   const wall = useSelector((state) => state.wallpaper);
@@ -74,6 +121,7 @@ export const BootScreen = (props) => {
 };
 
 export const LockScreen = (props) => {
+  const t = useTraduction(TEXTES);
   const session = useSelector((state) => state.session);
   const [lock, setLock] = useState(false);
   const [unlocked, setUnLock] = useState(false);
@@ -128,7 +176,7 @@ export const LockScreen = (props) => {
       await appliquerApparence(result.tenant.id);
       proceed();
     } catch (err) {
-      setError(err.message || "Connexion impossible");
+      setError(err.message || t("connexionImpossible"));
     } finally {
       setBusy(false);
     }
@@ -165,13 +213,13 @@ export const LockScreen = (props) => {
     >
       <div className="splashScreen mt-40" data-faded={lock}>
         <div className="text-6xl font-semibold text-gray-100">
-          {new Date().toLocaleTimeString("fr-FR", {
+          {new Date().toLocaleTimeString(localeEffective(), {
             hour: "numeric",
             minute: "numeric",
           })}
         </div>
         <div className="text-lg font-medium text-gray-200">
-          {new Date().toLocaleDateString("fr-FR", {
+          {new Date().toLocaleDateString(localeEffective(), {
             weekday: "long",
             month: "long",
             day: "numeric",
@@ -200,7 +248,7 @@ export const LockScreen = (props) => {
               {session.tenant.name}
             </div>
             <div className="flex items-center mt-6 signInBtn" onClick={proceed}>
-              Ouvrir mon espace
+              {t("ouvrir")}
             </div>
             <div
               className="text-xs text-gray-400 mt-4 handcr"
@@ -212,7 +260,7 @@ export const LockScreen = (props) => {
                 resynchroniserNotifications();
               }}
             >
-              Changer de compte
+              {t("changerCompte")}
             </div>
           </>
         ) : (
@@ -220,9 +268,9 @@ export const LockScreen = (props) => {
             <div className="text-xl font-medium text-gray-200 mb-3">
               {
                 {
-                  login: "Connexion à CompanyOS",
-                  register: "Créer votre espace de travail",
-                  join: "Rejoindre un espace de travail",
+                  login: t("titreLogin"),
+                  register: t("titreRegister"),
+                  join: t("titreJoin"),
                 }[mode]
               }
             </div>
@@ -233,7 +281,7 @@ export const LockScreen = (props) => {
               <input
                 type="text"
                 className="authCode"
-                placeholder="Code d'invitation"
+                placeholder={t("codeInvitation")}
                 value={form.code}
                 onChange={changerCode}
                 onKeyDown={onKey}
@@ -245,7 +293,7 @@ export const LockScreen = (props) => {
                 {mode === "register" && (
                   <input
                     type="text"
-                    placeholder="Nom de l'entreprise"
+                    placeholder={t("nomEntreprise")}
                     value={form.company}
                     onChange={field("company")}
                     onKeyDown={onKey}
@@ -253,7 +301,7 @@ export const LockScreen = (props) => {
                 )}
                 <input
                   type="text"
-                  placeholder="Votre nom"
+                  placeholder={t("votreNom")}
                   value={form.name}
                   onChange={field("name")}
                   onKeyDown={onKey}
@@ -263,7 +311,7 @@ export const LockScreen = (props) => {
             {mode !== "join" && (
               <input
                 type="email"
-                placeholder="Adresse e-mail"
+                placeholder={t("email")}
                 value={form.email}
                 onChange={field("email")}
                 onKeyDown={onKey}
@@ -272,7 +320,7 @@ export const LockScreen = (props) => {
             )}
             <input
               type="password"
-              placeholder={mode === "login" ? "Mot de passe" : "Mot de passe (8 caractères min.)"}
+              placeholder={mode === "login" ? t("motDePasse") : t("motDePasseMin")}
               value={form.password}
               onChange={field("password")}
               onKeyDown={onKey}
@@ -281,23 +329,19 @@ export const LockScreen = (props) => {
             <div className="flex items-center mt-4 signInBtn" onClick={submit}>
               {busy
                 ? "…"
-                : { login: "Se connecter", register: "Créer mon espace", join: "Rejoindre" }[mode]}
+                : { login: t("seConnecter"), register: t("creerEspace"), join: t("rejoindre") }[mode]}
             </div>
             <div
               className="text-xs text-gray-400 mt-4 handcr"
               onClick={() => changerMode(mode === "login" ? "register" : "login")}
             >
-              {mode === "login"
-                ? "Pas encore de compte ? Créer un espace de travail"
-                : "Déjà un compte ? Se connecter"}
+              {mode === "login" ? t("versInscription") : t("versConnexion")}
             </div>
             <div
               className="text-xs text-gray-400 mt-2 handcr"
               onClick={() => changerMode(mode === "join" ? "login" : "join")}
             >
-              {mode === "join"
-                ? "Retour à la connexion"
-                : "On m'a invité — j'ai un code"}
+              {mode === "join" ? t("retourConnexion") : t("jaiUnCode")}
             </div>
           </div>
         )}

@@ -554,6 +554,8 @@ export const calculerWidget = (widget, records, collection) => {
   return { valeur: 0, format: "nombre" };
 };
 
+import { montant } from "../../../utils/monnaie";
+
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
 
 /// Affichage d'une valeur selon son type. Partagé par la liste, la fiche et
@@ -564,7 +566,7 @@ export const affiche = (champ, valeur) => {
     case "booleen":
       return valeur ? "Oui" : "Non";
     case "montant":
-      return `${nf.format(Number(valeur) || 0)} F`;
+      return montant(Number(valeur) || 0);
     case "calcul":
     case "nombre":
       return nf.format(Number(valeur) || 0);

@@ -9,6 +9,41 @@ import { journaliser } from "../audit.js";
 // Toute recherche par slug doit donc regarder les deux, jamais l'une sans
 // l'autre, et jamais celles d'un autre client.
 
+// ---------------------------------------------------------------------------
+// Secrets dans les réglages d'application
+// ---------------------------------------------------------------------------
+
+/// Champs dont la valeur est un secret, quel que soit l'endroit où elle se
+/// trouve dans l'objet.
+const CHAMPS_SECRETS = /^(pass|password|motdepasse|secret|token|jeton|apikey|accesskey|secretkey|cle|key)$/i;
+
+/// Retire les secrets d'un objet de réglages avant de le rendre au client.
+///
+/// L'app Courrier range le mot de passe SMTP dans `settings.smtp.pass`.
+/// Cette route-ci est appelée au démarrage du shell par **tout** membre,
+/// alors que la route dédiée `GET /courrier/reglages` est réservée aux
+/// ADMIN et ne renvoie qu'un booléen `motDePasseDefini`. Sans ce filtre,
+/// le soin pris là-bas était entièrement annulé ici.
+///
+/// Le tri se fait sur le **nom du champ**, pas sur le slug de l'app :
+/// une liste blanche par app se périme silencieusement à la première app
+/// qui range un jeton dans ses réglages, et le silence est précisément ce
+/// qu'il ne faut pas ici. La contrepartie assumée est qu'un champ
+/// légitimement nommé « cle » sera masqué ; c'est le bon sens du
+/// compromis.
+///
+/// On conserve la **présence** du secret (`true`/`false`) : l'écran a
+/// besoin de savoir qu'un relais est configuré, jamais avec quoi.
+const sansSecrets = (valeur) => {
+  if (Array.isArray(valeur)) return valeur.map(sansSecrets);
+  if (!valeur || typeof valeur !== "object") return valeur;
+  return Object.fromEntries(
+    Object.entries(valeur).map(([nom, v]) =>
+      CHAMPS_SECRETS.test(nom) ? [nom, v ? true : false] : [nom, sansSecrets(v)],
+    ),
+  );
+};
+
 const visibleTo = (tenantId, extra = {}) => ({
   ...extra,
   OR: [{ tenantId: null }, { tenantId }],
@@ -91,11 +126,65 @@ const widgetSchema = z.object({
     .optional(),
 });
 
-const definitionSchema = z.object({
-  collections: z.array(collectionSchema).min(1).max(8),
-  /// Le tableau de bord de l'application — jusqu'à huit pavés.
-  accueil: z.array(widgetSchema).max(8).optional(),
+/// Une application « site web » : une adresse, présentée comme une app.
+///
+/// Beaucoup d'outils que les équipes utilisent tous les jours sont déjà des
+/// sites — un tableau de bord interne, un ERP hébergé, une documentation.
+/// Leur donner une icône sur le bureau évite l'aller-retour permanent entre
+/// l'OS et un onglet de navigateur perdu au milieu de trente autres.
+///
+/// `ouverture` retient ce qui a été constaté à la création :
+///
+///   • `cadre`   — le site accepte d'être affiché dans la fenêtre ;
+///   • `fenetre` — il le refuse (`X-Frame-Options`, ou
+///                 `frame-ancestors` dans sa politique de sécurité), et
+///                 l'app ouvre alors un vrai onglet.
+///
+/// Ce refus n'est pas contournable, et ne doit pas l'être : c'est une
+/// protection que le site a posée contre le détournement de clic. On le
+/// constate au moment de créer l'app, on le dit franchement, et on propose
+/// la seule alternative honnête. C'est le cas de vscode.dev, par exemple.
+const webSchema = z.object({
+  // http(s) uniquement : `javascript:` et `data:` dans un cadre servi par
+  // nos soins reviendraient à exécuter le script de qui a créé l'app.
+  url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((v) => /^https?:\/\//i.test(v), "L'adresse doit commencer par http:// ou https://"),
+  ouverture: z.enum(["cadre", "fenetre"]).default("cadre"),
 });
+
+const definitionSchema = z
+  .object({
+    /// Le genre décide de tout le reste. Absent, c'est une app de données :
+    /// c'est ce que contiennent toutes les définitions écrites avant que ce
+    /// second genre existe, et elles doivent continuer de fonctionner.
+    genre: z.enum(["donnees", "web"]).default("donnees"),
+    collections: z.array(collectionSchema).max(8).default([]),
+    /// Le tableau de bord de l'application — jusqu'à huit pavés.
+    accueil: z.array(widgetSchema).max(8).optional(),
+    web: webSchema.optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.genre === "web") {
+      if (!d.web) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["web"],
+          message: "Une application web doit porter une adresse.",
+        });
+      }
+      return;
+    }
+    if (!d.collections.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["collections"],
+        message: "Une application de données doit avoir au moins une collection.",
+      });
+    }
+  });
 
 const appSchema = z.object({
   slug: slugSchema,
@@ -144,7 +233,7 @@ export default async function appRoutes(app) {
     return serialize(
       installations.map((i) => ({
         ...i.app,
-        settings: i.settings,
+        settings: sansSecrets(i.settings),
         installedAt: i.installedAt,
         // Ce qui est en place, à distinguer de `version` qui est ce que le
         // catalogue propose. C'est l'écart entre les deux qui fait une
@@ -165,7 +254,13 @@ export default async function appRoutes(app) {
     return serialize(apps);
   });
 
-  app.post("/", async (request, reply) => {
+  // Créer, modifier ou supprimer une application du Studio engage tout
+  // l'espace, au même titre que l'installer : la définition d'une app est
+  // le modèle de données que ses collègues remplissent, et la supprimer
+  // la retire de leur bureau par cascade. Sans ce contrôle, un membre
+  // contournait la réserve aux administrateurs posée plus bas en
+  // supprimant au lieu de désinstaller.
+  app.post("/", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
     const parsed = appSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply
@@ -196,7 +291,7 @@ export default async function appRoutes(app) {
     return reply.code(201).send(serialize(created));
   });
 
-  app.put("/:slug", async (request, reply) => {
+  app.put("/:slug", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
     const parsed = appSchema.partial({ slug: true }).safeParse(request.body);
     if (!parsed.success) {
       return reply
@@ -236,7 +331,7 @@ export default async function appRoutes(app) {
     return serialize(updated);
   });
 
-  app.delete("/:slug", async (request, reply) => {
+  app.delete("/:slug", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
     const target = await prisma.app.findFirst({
       where: { tenantId: request.tenantId, slug: request.params.slug },
     });

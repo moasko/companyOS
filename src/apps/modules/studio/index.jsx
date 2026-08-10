@@ -17,13 +17,33 @@ import "./studio.scss";
 // générique (src/apps/CustomApp.jsx) en déduit listes, formulaires et CRUD.
 // C'est ce qui la rend réellement utilisable sans recompiler quoi que ce soit.
 
+// `genres` dit dans quel genre d'application la section a un sens. Une app
+// « site web » n'a ni collection, ni tableau de bord, ni aperçu de fiche :
+// lui montrer ces écrans vides serait la faire passer pour inachevée.
 const SECTIONS = [
   { id: "mes-apps", label: "Mes applications", icon: "faLayerGroup" },
   { id: "identite", label: "Identité", icon: "faTag" },
-  { id: "donnees", label: "Données", icon: "faTable" },
-  { id: "tableau", label: "Tableau de bord", icon: "faChartPie" },
-  { id: "apercu", label: "Aperçu", icon: "faEye" },
+  { id: "adresse", label: "Adresse du site", icon: "faGlobe", genres: ["web"] },
+  { id: "donnees", label: "Données", icon: "faTable", genres: ["donnees"] },
+  { id: "tableau", label: "Tableau de bord", icon: "faChartPie", genres: ["donnees"] },
+  { id: "apercu", label: "Aperçu", icon: "faEye", genres: ["donnees"] },
   { id: "publication", label: "Publication", icon: "faRocket" },
+];
+
+/// Les deux genres d'application que le Studio sait fabriquer.
+const GENRES = [
+  {
+    id: "donnees",
+    titre: "Application de données",
+    texte:
+      "Des collections et des champs : listes, fiches, tableau de bord. Le moteur en déduit l'écran, sans écrire de code.",
+  },
+  {
+    id: "web",
+    titre: "Site web en application",
+    texte:
+      "Une adresse présentée comme une app : icône sur le bureau, entrée au menu Démarrer, fenêtre à son nom. Pour les outils que l'équipe utilise déjà dans un onglet.",
+  },
 ];
 
 // Les types viennent du domaine : ajouter un type de champ se fait à un
@@ -66,8 +86,16 @@ const APP_VIDE = () => ({
   icon: "notes",
   category: "Sur mesure",
   published: false,
-  definition: { collections: [COLLECTION_VIDE()] },
+  // Le genre est écrit dès le brouillon vide : une définition relue depuis
+  // la base peut ne pas l'avoir (elle est antérieure au second genre), et
+  // c'est `genreDe` qui comble ce cas.
+  definition: { genre: "donnees", collections: [COLLECTION_VIDE()] },
 });
+
+/// Le genre d'une définition, avec le repli qui compte : les applications
+/// créées avant l'existence des apps « site » n'ont pas ce champ, et sont
+/// toutes des applications de données.
+const genreDe = (draft) => draft?.definition?.genre || "donnees";
 
 export const manifest = {
   id: "studio",
@@ -87,6 +115,9 @@ function StudioApp() {
 
   const [section, setSection] = useState("mes-apps");
   const [apps, setApps] = useState([]);
+  // Résultat du dernier essai d'adresse, pour une app « site web ».
+  const [essai, setEssai] = useState(null);
+  const [essaiEnCours, setEssaiEnCours] = useState(false);
   // slug de l'app ouverte ; null = création
   const [editingSlug, setEditingSlug] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -179,6 +210,83 @@ function StudioApp() {
     const value = e.target.value;
     setDraft((d) => ({ ...d, [key]: value }));
   };
+
+  // --- Genre de l'application ----------------------------------------------
+
+  /// Bascule entre app de données et app « site web ».
+  ///
+  /// Les collections ne sont pas effacées en passant à « site » : quelqu'un
+  /// qui essaie l'autre genre par curiosité doit pouvoir revenir sans avoir
+  /// perdu son travail. Elles ne sont simplement plus envoyées au serveur —
+  /// voir le nettoyage à l'enregistrement.
+  const choisirGenre = (id) => {
+    setDraft((d) => ({
+      ...d,
+      definition: {
+        ...d.definition,
+        genre: id,
+        ...(id === "web" && !d.definition.web
+          ? { web: { url: "", ouverture: "cadre" } }
+          : {}),
+      },
+    }));
+    if (id === "web") goToSection("adresse");
+  };
+
+  /// Interroge réellement l'adresse et en tire le mode d'ouverture.
+  ///
+  /// C'est le serveur qui appelle le site (`POST /api/web/inspecter`) : le
+  /// navigateur ne peut pas lire les en-têtes d'un autre domaine, et c'est
+  /// justement l'en-tête qui contient la réponse. Au passage, cet appel
+  /// passe par les protections contre les adresses internes du serveur.
+  ///
+  /// On enregistre le constat plutôt que de le refaire à chaque ouverture :
+  /// interroger le site à chaque clic sur l'icône ajouterait une seconde
+  /// d'attente pour une réponse qui ne change presque jamais.
+  const essayerAdresse = async () => {
+    const url = draft?.definition?.web?.url || "";
+    setEssaiEnCours(true);
+    setEssai(null);
+    try {
+      const info = await api.web.inspecter(url);
+      const cadrable = !!info.cadrable;
+      setWeb("ouverture")(cadrable ? "cadre" : "fenetre");
+      setEssai(
+        cadrable
+          ? {
+              etat: "ok",
+              titre: info.titre || "Le site répond.",
+              texte:
+                "Il accepte d'être affiché dans un cadre : l'application le montrera directement dans sa fenêtre.",
+            }
+          : {
+              etat: "onglet",
+              titre: info.titre || "Le site répond, mais refuse le cadre.",
+              texte:
+                "C'est une protection contre le détournement de clic, et elle ne se contourne pas. " +
+                "L'application ouvrira donc un onglet du navigateur — ce qui est de toute façon " +
+                "préférable pour s'y connecter, avec la barre d'adresse et le cadenas visibles.",
+            },
+      );
+    } catch (err) {
+      setEssai({
+        etat: "erreur",
+        titre: "Adresse injoignable.",
+        texte: err?.message || "Le serveur n'a pas réussi à ouvrir cette adresse.",
+      });
+    } finally {
+      setEssaiEnCours(false);
+    }
+  };
+
+  const setWeb = (champ) => (valeur) =>
+    setDraft((d) => ({
+      ...d,
+      definition: {
+        ...d.definition,
+        web: { ...(d.definition.web || {}), [champ]: valeur },
+      },
+    }));
 
   // Le slug est l'identifiant technique : on le dérive du nom tant que
   // l'application n'existe pas, puis on le fige — le changer après coup
@@ -280,14 +388,54 @@ function StudioApp() {
 
   /// Prépare la définition pour l'API : clés dérivées des libellés quand
   /// elles sont vides, options découpées, champs sans libellé écartés.
-  const normaliser = () => D.normaliser(draft.definition);
+  ///
+  /// Pour une app « site », on n'envoie **que** l'adresse : les collections
+  /// gardées de côté dans le brouillon (pour pouvoir changer d'avis sans
+  /// rien perdre) n'ont plus de sens une fois le genre choisi, et le
+  /// serveur les refuserait comme une définition qui se contredit.
+  const normaliser = () => {
+    if (genreDe(draft) === "web") {
+      const web = draft.definition.web || {};
+      return {
+        genre: "web",
+        collections: [],
+        web: {
+          url: String(web.url || "").trim(),
+          ouverture: web.ouverture === "fenetre" ? "fenetre" : "cadre",
+        },
+      };
+    }
+    return { genre: "donnees", ...D.normaliser(draft.definition) };
+  };
+
+  /// Ce qui empêche une app « site » d'être enregistrée. Les apps de
+  /// données ont leur propre validation dans le domaine.
+  /// Les deux premières lignes reprennent volontairement `D.problemes` :
+  /// un nom et un identifiant sont exigés dans les deux genres, et un
+  /// message clair vaut mieux qu'une erreur brute renvoyée par le serveur.
+  const problemesWeb = (definition) => {
+    const out = [];
+    if (!String(draft?.name || "").trim()) out.push("Donnez un nom à l'application.");
+    if (!draft?.slug) out.push("L'identifiant technique est vide.");
+
+    const url = definition.web?.url || "";
+    if (!url) {
+      out.push("Indiquez l'adresse du site que cette application doit ouvrir.");
+    } else if (!/^https?:\/\//i.test(url)) {
+      out.push("L'adresse doit commencer par http:// ou https://.");
+    }
+    return out;
+  };
 
   const save = async ({ publish } = {}) => {
     if (busy) return;
     const definition = normaliser();
     // La validation dit *quoi* corriger et *où* : une app à trois
     // collections et vingt champs ne se relit pas à l'œil nu.
-    const soucis = D.problemes({ ...draft, definition });
+    const soucis =
+      definition.genre === "web"
+        ? problemesWeb(definition)
+        : D.problemes({ ...draft, definition });
     if (soucis.length) {
       modal.alert({
         title: "Cette application ne peut pas être enregistrée",
@@ -372,9 +520,13 @@ function StudioApp() {
     }
   };
 
+  // Une app « site » n'a pas de collections : le tableau est vide, pas absent.
   const nbChamps = draft
-    ? draft.definition.collections.reduce((n, c) => n + c.fields.length, 0)
+    ? (draft.definition.collections || []).reduce((n, c) => n + c.fields.length, 0)
     : 0;
+
+  const genre = genreDe(draft);
+  const sectionsVisibles = SECTIONS.filter((s) => !s.genres || s.genres.includes(genre));
 
   return (
     <ModuleWindow manifest={manifest} className="stdApp">
@@ -383,7 +535,7 @@ function StudioApp() {
       ) : (
         <div className="stdShell">
           <aside className="stdNav">
-            {SECTIONS.map((s) => (
+            {sectionsVisibles.map((s) => (
               <div
                 key={s.id}
                 className="stdNavItem handcr"
@@ -458,6 +610,22 @@ function StudioApp() {
                 </div>
               ) : (
                 <>
+                  <div className="stdGenres">
+                    {GENRES.map((g) => (
+                      <button
+                        type="button"
+                        key={g.id}
+                        className="stdGenre"
+                        data-active={genre === g.id}
+                        aria-pressed={genre === g.id}
+                        onClick={() => choisirGenre(g.id)}
+                      >
+                        <strong>{g.titre}</strong>
+                        <span>{g.texte}</span>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="stdGrid">
                     <label className="stdField">
                       <span className="stdLabel">Nom de l'application</span>
@@ -510,6 +678,62 @@ function StudioApp() {
                       ))}
                     </div>
                   </div>
+                </>
+              )}
+            </section>
+
+            {/* ---- Adresse (applications « site web ») ---- */}
+            <section className="stdSection" data-hidden={section !== "adresse"}>
+              <h2>
+                <span className="stdNum">3.</span> Adresse du site
+              </h2>
+              <p className="stdHint">
+                L'adresse que l'application ouvrira. Essayez-la : certains sites
+                refusent d'être affichés dans une fenêtre, et il vaut mieux le
+                savoir maintenant qu'après publication.
+              </p>
+
+              {!draft ? (
+                <div className="stdEmptyBox">Ouvrez une application, ou créez-en une.</div>
+              ) : (
+                <>
+                  <div className="stdGrid">
+                    <label className="stdField stdFull">
+                      <span className="stdLabel">Adresse (https://…)</span>
+                      <input
+                        type="url"
+                        value={draft.definition.web?.url || ""}
+                        placeholder="https://vscode.dev/"
+                        onChange={(e) => {
+                          setWeb("url")(e.target.value);
+                          setEssai(null);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="stdActionsLigne">
+                    <button
+                      type="button"
+                      className="stdBtn"
+                      disabled={essaiEnCours || !/^https?:\/\//i.test(draft.definition.web?.url || "")}
+                      onClick={essayerAdresse}
+                    >
+                      {essaiEnCours ? "Essai en cours…" : "Essayer l'adresse"}
+                    </button>
+                    <span className="stdHint">
+                      {draft.definition.web?.ouverture === "fenetre"
+                        ? "Ce site s'ouvrira dans un onglet du navigateur."
+                        : "Ce site s'affichera dans la fenêtre de l'application."}
+                    </span>
+                  </div>
+
+                  {essai && (
+                    <div className="stdEssai" data-etat={essai.etat}>
+                      <strong>{essai.titre}</strong>
+                      <p>{essai.texte}</p>
+                    </div>
+                  )}
                 </>
               )}
             </section>
