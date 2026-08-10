@@ -141,6 +141,17 @@ model Tenant {
   /// Octets réellement consommés. Tenu à jour dans la même transaction
   /// que la création / suppression de fichiers.
   usedBytes BigInt   @default(0)
+  /// Où atterrissent les fichiers de cet espace.
+  ///
+  /// « plateforme » — là où l'exploitant a décidé, c'est-à-dire le cas de
+  /// tout le monde par défaut. « s3 » — le stockage objet de l'entreprise
+  /// elle-même : son compte Amazon, son Cloudflare R2, ou le NAS de ses
+  /// bureaux sous MinIO. Une entreprise qui l'exige peut ainsi garder ses
+  /// documents chez elle sans quitter le service.
+  stockage   String  @default("plateforme")
+  /// La configuration correspondante. La clé secrète y est chiffrée, comme
+  /// celle de la plateforme — elle ne ressort jamais en clair.
+  stockageS3 Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

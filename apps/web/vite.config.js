@@ -27,6 +27,14 @@ const config = ({ mode }) => {
             "**/monaco-*.js",
             "**/editor.main-*.js",
           ],
+          // Le plafond par défaut est de 2 Mio, et le lot commun le dépasse
+          // de peu (~2,1 Mio). Or celui-là, contrairement aux moteurs
+          // ci-dessus, **doit** être préinstallé : c'est le cœur de l'OS,
+          // celui sans lequel il n'y a pas de mode hors ligne du tout.
+          //
+          // Relever le plafond ne fait pas rentrer les gros fichiers dans
+          // le cache : ils en sont écartés par leur nom, juste au-dessus.
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         },
       }),
     ],
@@ -83,7 +91,7 @@ const config = ({ mode }) => {
               // canvg, dompurify et compagnie sont les dépendances de
               // jspdf : elles suivent le même régime que lui — chargées à
               // la première génération de PDF, pas au démarrage.
-              /node_modules[\\/](three|@docx-editor\.dev|@radix-ui|harfbuzzjs|emf-converter|docx|pdfjs-dist|pptx-react-viewer|pptx-viewer-core|pptx-viewer-mcp|jspdf|jszip|html2canvas-pro|ai|@ai-sdk|canvg|dompurify|rgbcolor|raf|performance-now|stackblur-canvas|svg-pathdata|core-js|monaco-editor)[\\/]/.test(
+              /node_modules[\\/](three|@docx-editor\.dev|@radix-ui|harfbuzzjs|emf-converter|docx|pdfjs-dist|pptx-react-viewer|pptx-viewer-core|pptx-viewer-mcp|jspdf|jszip|html2canvas-pro|ai|@ai-sdk|canvg|dompurify|rgbcolor|raf|performance-now|stackblur-canvas|svg-pathdata|core-js|monaco-editor|prettier|emmet-monaco-es)[\\/]/.test(
                 id,
               )
             ) {

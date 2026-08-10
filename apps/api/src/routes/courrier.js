@@ -246,7 +246,7 @@ export default async function courrierRoutes(app) {
       }
       piecesJointes.push({
         filename: node.name,
-        content: (await piloteLecture(node.storage)).read(node.storageKey),
+        content: (await piloteLecture(node.storage, request.tenantId)).read(node.storageKey),
       });
       nomsPieces.push(node.name);
     }

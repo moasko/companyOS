@@ -158,6 +158,10 @@ export const api = {
   },
 
   usage: () => request("/files/usage"),
+  /// Tous les nœuds de l'espace, à plat — pour l'éditeur de code, qui
+  /// cherche au lieu de naviguer. Voir GET /api/files/arborescence.
+  arborescence: () => request("/files/arborescence"),
+
   listFiles: (parentId) =>
     request(`/files${parentId ? `?parentId=${encodeURIComponent(parentId)}` : ""}`),
   createFolder: (name, parentId = null) =>

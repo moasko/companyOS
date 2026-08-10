@@ -383,7 +383,7 @@ export default async function webRoutes(app) {
       parentId || null,
       nomDeFichier(finale, reponse.headers),
     );
-    const pilote = await piloteEcriture();
+    const pilote = await piloteEcriture(request.tenantId);
     const cle = pilote.buildKey(request.tenantId, nom);
 
     let taille;

@@ -5,7 +5,8 @@ import { api } from "../../../api/client";
 import { useTraduction } from "../../../utils/intl";
 import { subscribeVisionneuse } from "../../openRequest";
 import { modal } from "../../modalRequest";
-import { charger } from "./monaco";
+import { charger, THEME_CLAIR, THEME_SOMBRE } from "./monaco";
+import { formatable } from "./formatage";
 import {
   OCTETS_MAX,
   estTexteLisible,
@@ -16,6 +17,14 @@ import {
   modifie,
   ouvrir,
   statistiques,
+  indexerChemins,
+  filtrer,
+  THEMES,
+  problemeDeNom,
+  nomLibre,
+  construireArbre,
+  lignesVisibles,
+  cheminOuvert,
 } from "./domaine";
 import "./code.scss";
 
@@ -53,6 +62,36 @@ const TEXTES = {
     lignes: "{n} lignes",
     remonter: "Dossier parent",
     rafraichir: "Rafraîchir",
+    ouvrirRapide: "Ouvrir un fichier",
+    ouvrirRapidePlaceholder: "Nom du fichier… (Ctrl+P)",
+    aucunResultat: "Aucun fichier ne correspond.",
+    echecEditeur: "L'éditeur n'a pas pu se charger.",
+    nouveauFichier: "Nouveau fichier",
+    nouveauDossier: "Nouveau dossier",
+    renommer: "Renommer",
+    supprimer: "Supprimer",
+    supprimerTitre: "Mettre à la corbeille ?",
+    supprimerMsg: "« {nom} » ira à la corbeille. Vous pourrez l'en sortir pendant 30 jours.",
+    supprimerOui: "Mettre à la corbeille",
+    nomRefuse: "Ce nom ne convient pas",
+    "nom.vide": "Un nom est nécessaire.",
+    "nom.reserve": "« . » et « .. » désignent des dossiers, pas des fichiers.",
+    "nom.separateur": "Un nom ne peut pas contenir / ni \ : ce sont des séparateurs de chemin.",
+    "nom.caractere": "Ces caractères sont interdits : < > : \" | ? *",
+    "nom.long": "255 caractères au maximum.",
+    "nom.existe": "Ce nom est déjà pris dans ce dossier.",
+    echecCreation: "Création impossible.",
+    echecRenommage: "Renommage impossible.",
+    echecSuppression: "Suppression impossible.",
+    theme: "Thème",
+    "theme.auto": "Suivre l'OS",
+    "theme.vs": "Clair",
+    "theme.vs-dark": "Sombre",
+    "theme.hc-light": "Contraste élevé, clair",
+    "theme.hc-black": "Contraste élevé, sombre",
+    formatage: "Formater",
+    formatageInfo:
+      "Mettre le fichier en forme à chaque enregistrement (Prettier). Shift+Alt+F le fait à la demande.",
   },
   en: {
     fichiers: "Files",
@@ -74,6 +113,36 @@ const TEXTES = {
     lignes: "{n} lines",
     remonter: "Parent folder",
     rafraichir: "Refresh",
+    ouvrirRapide: "Open a file",
+    ouvrirRapidePlaceholder: "File name… (Ctrl+P)",
+    aucunResultat: "No file matches.",
+    echecEditeur: "The editor failed to load.",
+    nouveauFichier: "New file",
+    nouveauDossier: "New folder",
+    renommer: "Rename",
+    supprimer: "Delete",
+    supprimerTitre: "Move to trash?",
+    supprimerMsg: "“{nom}” will go to the trash. You can restore it for 30 days.",
+    supprimerOui: "Move to trash",
+    nomRefuse: "That name will not do",
+    "nom.vide": "A name is required.",
+    "nom.reserve": "“.” and “..” refer to folders, not files.",
+    "nom.separateur": "A name cannot contain / or \ : those are path separators.",
+    "nom.caractere": "These characters are not allowed: < > : \" | ? *",
+    "nom.long": "255 characters at most.",
+    "nom.existe": "That name is already taken in this folder.",
+    echecCreation: "Could not create.",
+    echecRenommage: "Could not rename.",
+    echecSuppression: "Could not delete.",
+    theme: "Theme",
+    "theme.auto": "Follow the OS",
+    "theme.vs": "Light",
+    "theme.vs-dark": "Dark",
+    "theme.hc-light": "High contrast, light",
+    "theme.hc-black": "High contrast, dark",
+    formatage: "Format",
+    formatageInfo:
+      "Format the file on every save (Prettier). Shift+Alt+F does it on demand.",
   },
 };
 
@@ -101,10 +170,37 @@ function CodeApp() {
   const [onglets, setOnglets] = useState([]);
   const [actif, setActif] = useState(null);
   const [dossier, setDossier] = useState({ id: null, nom: "" });
-  const [entrees, setEntrees] = useState([]);
   const [pret, setPret] = useState(false);
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
+  // Retenu d'une session à l'autre : c'est une préférence de personne, pas
+  // un réglage de fichier.
+  const [formatageAuto, setFormatageAuto] = useState(
+    () => localStorage.getItem("companyos-code-formatage") === "1",
+  );
+  useEffect(() => {
+    localStorage.setItem("companyos-code-formatage", formatageAuto ? "1" : "0");
+  }, [formatageAuto]);
+
+  // Ouverture rapide : l'index de tout l'espace, chargé une fois.
+  const [index, setIndex] = useState([]);
+  const [noeuds, setNoeuds] = useState([]);
+  const [deplies, setDeplies] = useState(() => new Set());
+  const [palette, setPalette] = useState(null); // null = fermée
+  const [choix, setChoix] = useState(0);
+  const champPalette = useRef(null);
+
+  // Thème de la zone d'édition. « auto » suit le mode clair/sombre de l'OS ;
+  // les autres sont ceux de VS Code, y compris les deux à contraste élevé.
+  const [themeCode, setThemeCode] = useState(
+    () => localStorage.getItem("companyos-code-theme") || "auto",
+  );
+  useEffect(() => {
+    localStorage.setItem("companyos-code-theme", themeCode);
+  }, [themeCode]);
+
+  // Menu contextuel de l'arborescence : { x, y, node }.
+  const [menu, setMenu] = useState(null);
 
   const hote = useRef(null);
   const editeur = useRef(null);
@@ -153,7 +249,15 @@ function CodeApp() {
       );
 
       setPret(true);
-    });
+    })
+      .catch((e) => {
+        // Sans ce garde, un échec de chargement de Monaco laissait une
+        // fenêtre entièrement vide et muette : la promesse était rejetée
+        // dans le vide, `pret` restait faux, et rien n'expliquait rien.
+        // Un outil qui tombe doit le dire.
+        console.error("Chargement de l'éditeur impossible :", e);
+        if (vivant) setErreur(`${t("echecEditeur")} ${e.message}`);
+      });
 
     return () => {
       vivant = false;
@@ -176,8 +280,9 @@ function CodeApp() {
   useEffect(() => {
     if (!pret || !monacoRef.current) return;
     const sombre = document.body.dataset.theme === "dark" || theme === "dark";
-    monacoRef.current.editor.setTheme(sombre ? "cos-sombre" : "cos-clair");
-  }, [pret, theme]);
+    const choisi = themeCode === "auto" ? (sombre ? THEME_SOMBRE : THEME_CLAIR) : themeCode;
+    monacoRef.current.editor.setTheme(choisi);
+  }, [pret, theme, themeCode]);
 
   // Un modèle Monaco par onglet : c'est lui qui porte l'historique
   // d'annulation et la position du curseur. Sans cela, changer d'onglet
@@ -204,20 +309,46 @@ function CodeApp() {
 
   // --- Arborescence ---------------------------------------------------------
 
-  const lireDossier = useCallback(
-    (id) => {
-      api
-        .listFiles(id)
-        .then((liste) => setEntrees(liste))
-        .catch(() => setEntrees([]));
-    },
-    [],
-  );
+  // Les entrées du dossier ciblé, dérivées de l'arborescence déjà chargée :
+  // il n'y a plus de second appel à tenir d'accord avec le premier.
+  const entrees = noeuds.filter((n) => (n.parentId || null) === (dossier.id || null));
 
+  // L'index de l'espace entier, pour l'ouverture rapide. Une seule requête,
+  // rafraîchie à chaque ouverture de la fenêtre : un fichier ajouté depuis
+  // l'Explorateur pendant qu'on code doit finir par apparaître.
   useEffect(() => {
     if (!wnapp || wnapp.hide || session.status !== "authenticated") return;
-    lireDossier(dossier.id);
-  }, [wnapp?.hide, session.status, dossier.id, lireDossier]);
+    api
+      .arborescence()
+      .then((r) => {
+        setNoeuds(r.noeuds || []);
+        setIndex(indexerChemins(r.noeuds || []));
+      })
+      .catch(() => {
+        setNoeuds([]);
+        setIndex([]);
+      });
+  }, [wnapp?.hide, session.status]);
+
+  // Ctrl+P — le raccourci est posé sur la fenêtre et non sur l'éditeur :
+  // il doit répondre même quand le curseur est dans l'arborescence.
+  useEffect(() => {
+    if (!wnapp || wnapp.hide) return undefined;
+    const surTouche = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setPalette("");
+        setChoix(0);
+      }
+    };
+    const racine = hote.current?.closest(".codeApp");
+    racine?.addEventListener("keydown", surTouche);
+    return () => racine?.removeEventListener("keydown", surTouche);
+  }, [wnapp?.hide, pret]);
+
+  useEffect(() => {
+    if (palette !== null) champPalette.current?.focus();
+  }, [palette]);
 
   // --- Ouverture ------------------------------------------------------------
 
@@ -261,6 +392,123 @@ function CodeApp() {
     [ouvrirNode],
   );
 
+  // --- Créer, renommer, supprimer -------------------------------------------
+  //
+  // Tout passe par l'API de l'Explorateur : ce sont les mêmes fichiers, vus
+  // d'une autre fenêtre. Un dossier créé ici apparaît là-bas, et
+  // réciproquement — il n'y a pas deux arborescences à tenir d'accord.
+
+  /// Recharge le dossier courant **et** l'index de l'ouverture rapide.
+  /// Oublier le second laissait Ctrl+P proposer des fichiers supprimés.
+  const rafraichirTout = useCallback(() => {
+    api
+      .arborescence()
+      .then((r) => {
+        setNoeuds(r.noeuds || []);
+        setIndex(indexerChemins(r.noeuds || []));
+      })
+      .catch(() => {});
+  }, []);
+
+  /// Demande un nom, en refusant ceux qui ne peuvent pas en être un.
+  /// La boucle est volontaire : on repose la question avec le motif du
+  /// refus plutôt que d'abandonner la création.
+  const demanderNom = useCallback(
+    async (titre, propose) => {
+      const pris = entrees.map((e) => e.name);
+      let valeur = nomLibre(propose, pris);
+      for (let essai = 0; essai < 5; essai += 1) {
+        const saisi = await modal.prompt({ title: titre, value: valeur });
+        if (saisi === null) return null;
+        const souci = problemeDeNom(saisi, pris);
+        if (!souci) return saisi.trim();
+        await modal.alert({ title: t("nomRefuse"), message: t(`nom.${souci}`), tone: "error" });
+        valeur = saisi;
+      }
+      return null;
+    },
+    [entrees, t],
+  );
+
+  const creerFichier = useCallback(async () => {
+    const nom = await demanderNom(t("nouveauFichier"), "sans-titre.js");
+    if (!nom) return;
+    setEnCours(true);
+    try {
+      // Un fichier vide, créé par le même chemin que n'importe quel envoi :
+      // il hérite ainsi du quota, du journal et de la destination de
+      // stockage de l'espace, sans code particulier.
+      const node = await api.uploadFile(new File([""], nom, { type: "text/plain" }), dossier.id);
+      rafraichirTout();
+      ouvrirNode(node);
+    } catch {
+      setErreur(t("echecCreation"));
+    } finally {
+      setEnCours(false);
+    }
+  }, [demanderNom, dossier.id, rafraichirTout, ouvrirNode, t]);
+
+  const creerDossier = useCallback(async () => {
+    const nom = await demanderNom(t("nouveauDossier"), "nouveau-dossier");
+    if (!nom) return;
+    try {
+      await api.createFolder(nom, dossier.id);
+      rafraichirTout();
+    } catch {
+      setErreur(t("echecCreation"));
+    }
+  }, [demanderNom, dossier.id, rafraichirTout, t]);
+
+  const renommer = useCallback(
+    async (node) => {
+      const autres = entrees.filter((e) => e.id !== node.id).map((e) => e.name);
+      const saisi = await modal.prompt({ title: t("renommer"), value: node.name });
+      if (saisi === null || saisi.trim() === node.name) return;
+      const souci = problemeDeNom(saisi, autres);
+      if (souci) {
+        await modal.alert({ title: t("nomRefuse"), message: t(`nom.${souci}`), tone: "error" });
+        return;
+      }
+      try {
+        await api.renameNode(node.id, saisi.trim());
+        // L'onglet ouvert porte l'ancien nom : le corriger évite
+        // d'enregistrer sous un nom qui n'existe plus.
+        setOnglets((l) =>
+          l.map((o) => (o.id === node.id ? { ...o, nom: saisi.trim(), langage: langageDe(saisi) } : o)),
+        );
+        rafraichirTout();
+      } catch {
+        setErreur(t("echecRenommage"));
+      }
+    },
+    [entrees, rafraichirTout, t],
+  );
+
+  const supprimer = useCallback(
+    async (node) => {
+      const ok = await modal.confirm({
+        title: t("supprimerTitre"),
+        message: t("supprimerMsg", { nom: node.name }),
+        confirmLabel: t("supprimerOui"),
+        danger: true,
+      });
+      if (!ok) return;
+      try {
+        await api.deleteNode(node.id);
+        // L'onglet correspondant part avec : garder ouvert un fichier
+        // supprimé mène à un enregistrement qui échoue sans qu'on comprenne.
+        modeles.current.get(node.id)?.dispose();
+        modeles.current.delete(node.id);
+        setOnglets((l) => l.filter((o) => o.id !== node.id));
+        setActif((a) => (a === node.id ? null : a));
+        rafraichirTout();
+      } catch {
+        setErreur(t("echecSuppression"));
+      }
+    },
+    [rafraichirTout, t],
+  );
+
   // --- Enregistrement -------------------------------------------------------
 
   const enregistrer = useCallback(async () => {
@@ -270,7 +518,20 @@ function CodeApp() {
     setEnCours(true);
     setErreur("");
     try {
-      const fichier = new File([onglet.contenu], onglet.nom, {
+      // Formater d'abord, enregistrer ensuite — sinon on écrit la version
+      // non formatée puis on rouvre un fichier « modifié » aussitôt.
+      //
+      // L'option est éteinte par défaut, comme dans VS Code : reformater
+      // sans prévenir un fichier qu'on venait corriger d'une ligne produit
+      // un diff de trois cents lignes, et fait perdre la confiance.
+      let contenu = onglet.contenu;
+      if (formatageAuto && editeur.current && formatable(onglet.langage)) {
+        await editeur.current.getAction("editor.action.formatDocument")?.run();
+        contenu = editeur.current.getValue();
+        setOnglets((l) => majContenu(l, onglet.id, contenu));
+      }
+
+      const fichier = new File([contenu], onglet.nom, {
         type: "text/plain;charset=utf-8",
       });
       await api.updateFileContent(onglet.id, fichier);
@@ -280,7 +541,7 @@ function CodeApp() {
     } finally {
       setEnCours(false);
     }
-  }, [t]);
+  }, [t, formatageAuto]);
 
   // L'écouteur Ctrl+S est posé une fois, à la création de l'éditeur : il
   // capturerait la première version de `enregistrer`. Cette référence lui
@@ -321,56 +582,81 @@ function CodeApp() {
         <aside className="codeLateral">
           <div className="codeLateralTete">
             <span>{t("fichiers")}</span>
-            <button
-              type="button"
-              className="codeIconeBtn"
-              onClick={() => lireDossier(dossier.id)}
-              title={t("rafraichir")}
-              aria-label={t("rafraichir")}
-            >
-              ⟳
-            </button>
-          </div>
-
-          <div className="codeChemin">
-            {dossier.id ? (
-              <button type="button" onClick={() => setDossier({ id: null, nom: "" })}>
-                ← {t("racine")}
+            <span className="codeOutils">
+              <button
+                type="button"
+                className="codeIconeBtn"
+                onClick={creerFichier}
+                title={t("nouveauFichier")}
+                aria-label={t("nouveauFichier")}
+              >
+                ＋
               </button>
-            ) : (
-              <span>{t("racine")}</span>
-            )}
+              <button
+                type="button"
+                className="codeIconeBtn"
+                onClick={creerDossier}
+                title={t("nouveauDossier")}
+                aria-label={t("nouveauDossier")}
+              >
+                ⊞
+              </button>
+              <button
+                type="button"
+                className="codeIconeBtn"
+                onClick={rafraichirTout}
+                title={t("rafraichir")}
+                aria-label={t("rafraichir")}
+              >
+                ⟳
+              </button>
+            </span>
           </div>
 
           <ul className="codeArbre">
-            {dossiers.map((d) => (
-              <li key={d.id}>
+            {lignesVisibles(construireArbre(noeuds), deplies).map((n) => (
+              <li key={n.id}>
                 <button
                   type="button"
                   className="codeEntree"
-                  onClick={() => setDossier({ id: d.id, nom: d.name })}
+                  data-actif={n.id === actif}
+                  style={{ paddingLeft: 8 + n.profondeur * 12 }}
+                  onClick={() => {
+                    if (n.type === "FOLDER") {
+                      // Le dossier cliqué devient la cible des créations :
+                      // « nouveau fichier » doit atterrir là où on regarde.
+                      setDossier({ id: n.id, nom: n.name });
+                      setDeplies((d) => {
+                        const s2 = new Set(d);
+                        if (s2.has(n.id)) s2.delete(n.id);
+                        else s2.add(n.id);
+                        return s2;
+                      });
+                    } else {
+                      ouvrirNode(n);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenu({ x: e.clientX, y: e.clientY, node: n });
+                  }}
                 >
-                  <span className="codePuce" data-genre="dossier" />
-                  {d.name}
+                  {n.type === "FOLDER" ? (
+                    <span className="codeChevron" data-ouvert={n.ouvert} aria-hidden="true">
+                      ›
+                    </span>
+                  ) : (
+                    <span className="codeChevron" aria-hidden="true" />
+                  )}
+                  <span
+                    className="codePuce"
+                    data-genre={n.type === "FOLDER" ? "dossier" : langageDe(n.name)}
+                  />
+                  {n.name}
                 </button>
               </li>
             ))}
-            {fichiers.map((f) => (
-              <li key={f.id}>
-                <button
-                  type="button"
-                  className="codeEntree"
-                  data-actif={f.id === actif}
-                  onClick={() => ouvrirNode(f)}
-                >
-                  <span className="codePuce" data-genre={langageDe(f.name)} />
-                  {f.name}
-                </button>
-              </li>
-            ))}
-            {!dossiers.length && !fichiers.length && (
-              <li className="codeVide">{t("aucunFichier")}</li>
-            )}
+            {!noeuds.length && <li className="codeVide">{t("aucunFichier")}</li>}
           </ul>
         </aside>
 
@@ -413,11 +699,124 @@ function CodeApp() {
             )}
           </div>
 
+          {menu && (
+            <div className="codeMenuFond" onClick={() => setMenu(null)} role="presentation">
+              <ul
+                className="codeMenu"
+                style={{ left: menu.x, top: menu.y }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <li>
+                  <button type="button" onClick={() => { const n = menu.node; setMenu(null); renommer(n); }}>
+                    {t("renommer")}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="codeDanger"
+                    onClick={() => { const n = menu.node; setMenu(null); supprimer(n); }}
+                  >
+                    {t("supprimer")}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
+
+          {palette !== null && (
+            <div
+              className="codePaletteFond"
+              onClick={() => setPalette(null)}
+              role="presentation"
+            >
+              <div
+                className="codePalette"
+                role="dialog"
+                aria-modal="true"
+                aria-label={t("ouvrirRapide")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  ref={champPalette}
+                  type="text"
+                  value={palette}
+                  placeholder={t("ouvrirRapidePlaceholder")}
+                  onChange={(e) => {
+                    setPalette(e.target.value);
+                    setChoix(0);
+                  }}
+                  onKeyDown={(e) => {
+                    const liste = filtrer(index, palette);
+                    if (e.key === "Escape") { setPalette(null); return; }
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setChoix((c) => Math.min(c + 1, liste.length - 1));
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setChoix((c) => Math.max(c - 1, 0));
+                    }
+                    if (e.key === "Enter" && liste[choix]) {
+                      e.preventDefault();
+                      setPalette(null);
+                      ouvrirNode({ id: liste[choix].id, name: liste[choix].nom, size: liste[choix].size });
+                    }
+                  }}
+                />
+                <ul>
+                  {filtrer(index, palette).map((e, i) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        data-choisi={i === choix}
+                        onMouseOver={() => setChoix(i)}
+                        onClick={() => {
+                          setPalette(null);
+                          ouvrirNode({ id: e.id, name: e.nom, size: e.size });
+                        }}
+                      >
+                        <span className="codePuce" data-genre={e.langage} />
+                        <b>{e.nom}</b>
+                        <small>{e.chemin}</small>
+                      </button>
+                    </li>
+                  ))}
+                  {!filtrer(index, palette).length && (
+                    <li className="codeVide">{t("aucunResultat")}</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+
           <footer className="codeBarreEtat">
             <span>{ongletActif ? ongletActif.langage : ""}</span>
             <span>{ongletActif ? t("lignes", { n: stats.lignes }) : ""}</span>
             <span>{ongletActif ? stats.finDeLigne : ""}</span>
+            {ongletActif && formatable(ongletActif.langage) && (
+              <button
+                type="button"
+                className="codeBascule"
+                data-actif={formatageAuto}
+                aria-pressed={formatageAuto}
+                onClick={() => setFormatageAuto((v) => !v)}
+                title={t("formatageInfo")}
+              >
+                {t("formatage")}
+              </button>
+            )}
             <span className="codeEspace" />
+            <label className="codeTheme">
+              <span className="codeInvisible">{t("theme")}</span>
+              <select value={themeCode} onChange={(e) => setThemeCode(e.target.value)}>
+                {THEMES.map((th) => (
+                  <option key={th.id} value={th.id}>
+                    {t(`theme.${th.id}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
             {ongletActif && (
               <button
                 type="button"

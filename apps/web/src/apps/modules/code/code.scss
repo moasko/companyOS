@@ -1,16 +1,23 @@
+@use "../../ui/theme";
+
 // Code — mise en page de l'éditeur.
 //
-// Reprend les variables de thème communes aux modules (--app-fond,
-// --app-panneau, --app-line…) : la fenêtre doit ressembler au reste de
-// l'OS, pas à VS Code posé dans un cadre.
+// Les jetons --app-* viennent de la charte commune (src/apps/ui/theme.scss),
+// posés sur .moduleWin. Ils avaient été inventés ici sous d'autres noms
+// (--app-fond, --app-texte…) : les valeurs de repli s'appliquaient donc
+// partout, et la fenêtre sortait du ton de l'OS.
 
 .codeApp {
   .codeCorps {
+    // Repère du recouvrement de l'ouverture rapide : sans cela, il
+    // remonterait jusqu'au premier ancêtre positionné, qui n'est pas
+    // forcément la fenêtre.
+    position: relative;
     display: flex;
     height: 100%;
     min-height: 0;
-    background: var(--app-fond, #f7f8f8);
-    color: var(--app-texte, #16232b);
+    background: var(--app-bg, #ffffff);
+    color: var(--app-text, #1f2733);
   }
 
   // --- Colonne des fichiers -------------------------------------------------
@@ -21,8 +28,8 @@
     width: 232px;
     flex: 0 0 232px;
     min-height: 0;
-    background: var(--app-panneau, #fefefe);
-    border-right: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+    background: var(--app-panneau, #f8f9fb);
+    border-right: 1px solid var(--app-line, #e3e6eb);
   }
 
   .codeLateralTete {
@@ -34,7 +41,7 @@
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--app-discret, #6d7d84);
+    color: var(--app-muted, #6b7684);
   }
 
   .codeIconeBtn {
@@ -47,18 +54,18 @@
     padding: 2px 4px;
     border-radius: 5px;
 
-    &:hover { background: var(--app-survol, rgb(0 0 0 / 5%)); }
+    &:hover { background: var(--app-survol, rgb(31 39 51 / 6%)); }
   }
 
   .codeChemin {
     padding: 0 12px 8px;
     font-size: 12px;
-    color: var(--app-discret, #6d7d84);
+    color: var(--app-muted, #6b7684);
 
     button {
       border: none;
       background: transparent;
-      color: var(--app-accent, #057378);
+      color: var(--app-accent, #1a73e8);
       cursor: pointer;
       font-size: 12px;
       padding: 0;
@@ -91,11 +98,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
 
-    &:hover { background: var(--app-survol, rgb(0 0 0 / 5%)); }
+    &:hover { background: var(--app-survol, rgb(31 39 51 / 6%)); }
 
     // Un fond, jamais une bordure latérale colorée : règle de la maison.
     &[data-actif="true"] {
-      background: var(--app-accent-doux, #e2f2f2);
+      background: var(--app-accent-soft, #e8f0fe);
       font-weight: 600;
     }
   }
@@ -123,7 +130,7 @@
   .codeVide {
     padding: 12px 10px;
     font-size: 12px;
-    color: var(--app-discret, #6d7d84);
+    color: var(--app-muted, #6b7684);
   }
 
   // --- Zone d'édition -------------------------------------------------------
@@ -141,8 +148,8 @@
     align-items: stretch;
     gap: 1px;
     overflow-x: auto;
-    background: var(--app-fond, #f7f8f8);
-    border-bottom: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+    background: var(--app-bg, #ffffff);
+    border-bottom: 1px solid var(--app-line, #e3e6eb);
     min-height: 34px;
   }
 
@@ -166,8 +173,8 @@
     }
 
     &[data-actif="true"] {
-      background: var(--app-panneau, #fefefe);
-      border-bottom-color: var(--app-accent, #057378);
+      background: var(--app-panneau, #f8f9fb);
+      border-bottom-color: var(--app-accent, #1a73e8);
     }
   }
 
@@ -175,20 +182,20 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--app-accent, #057378);
+    background: var(--app-accent, #1a73e8);
   }
 
   .codeFermer {
     border: none;
     background: transparent;
-    color: var(--app-discret, #6d7d84);
+    color: var(--app-muted, #6b7684);
     cursor: pointer;
     font-size: 15px;
     line-height: 1;
     padding: 2px 8px 4px 4px;
     border-radius: 4px;
 
-    &:hover { background: var(--app-survol, rgb(0 0 0 / 8%)); }
+    &:hover { background: var(--app-survol, rgb(31 39 51 / 9%)); }
   }
 
   .codeErreur {
@@ -224,7 +231,7 @@
     gap: 6px;
     text-align: center;
     padding: 24px;
-    background: var(--app-panneau, #fefefe);
+    background: var(--app-panneau, #f8f9fb);
 
     h2 {
       margin: 0;
@@ -235,7 +242,7 @@
     p {
       margin: 0;
       font-size: 13px;
-      color: var(--app-discret, #6d7d84);
+      color: var(--app-muted, #6b7684);
       max-width: 380px;
     }
   }
@@ -248,16 +255,37 @@
     gap: 16px;
     padding: 5px 12px;
     font-size: 11.5px;
-    color: var(--app-discret, #6d7d84);
-    background: var(--app-panneau, #fefefe);
-    border-top: 1px solid var(--app-line, rgb(0 0 0 / 8%));
+    color: var(--app-muted, #6b7684);
+    background: var(--app-panneau, #f8f9fb);
+    border-top: 1px solid var(--app-line, #e3e6eb);
   }
 
   .codeEspace { flex: 1; }
 
+  /* Interrupteur du formatage automatique. Éteint, il reste discret ;
+     allumé, il doit se voir — c'est un réglage qui modifie le fichier. */
+  .codeBascule {
+    border: 1px solid var(--app-line, #e3e6eb);
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+    padding: 2px 9px;
+    border-radius: 100px;
+    cursor: pointer;
+
+    &:hover { background: var(--app-survol, rgb(31 39 51 / 6%)); }
+
+    &[data-actif="true"] {
+      background: var(--app-accent-soft, #e8f0fe);
+      border-color: var(--app-accent, #1a73e8);
+      color: var(--app-accent, #1a73e8);
+      font-weight: 600;
+    }
+  }
+
   .codeEnregistrer {
-    border: 1px solid var(--app-line, rgb(0 0 0 / 12%));
-    background: var(--app-accent, #057378);
+    border: 1px solid var(--app-line, #e3e6eb);
+    background: var(--app-accent, #1a73e8);
     color: #fff;
     font-size: 12px;
     padding: 3px 12px;
@@ -266,8 +294,162 @@
 
     &:disabled {
       background: transparent;
-      color: var(--app-discret, #6d7d84);
+      color: var(--app-muted, #6b7684);
       cursor: default;
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ouverture rapide (Ctrl+P)
+//
+// Posée en haut et non au centre : c'est là que VS Code, les navigateurs et
+// les lanceurs d'applications la mettent, et l'œil l'y attend.
+// ---------------------------------------------------------------------------
+
+.codeApp {
+  .codePaletteFond {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 8px;
+    background: rgb(0 0 0 / 22%);
+  }
+
+  .codePalette {
+    width: min(560px, 92%);
+    background: var(--app-panneau, #f8f9fb);
+    border: 1px solid var(--app-line, #e3e6eb);
+    border-radius: 10px;
+    box-shadow: 0 14px 40px rgb(0 0 0 / 22%);
+    overflow: hidden;
+
+    input {
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid var(--app-line, #e3e6eb);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 13.5px;
+      padding: 10px 14px;
+      outline: none;
+    }
+
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 4px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+
+    li button {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+
+      b { font-size: 13px; font-weight: 600; flex: none; }
+
+      small {
+        font-size: 11px;
+        color: var(--app-muted, #6b7684);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      // Fond plein, jamais de bordure latérale colorée.
+      &[data-choisi="true"] { background: var(--app-accent-soft, #e8f0fe); }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Outils de l'arborescence, menu contextuel, choix du thème
+// ---------------------------------------------------------------------------
+
+.codeApp {
+  .codeOutils { display: flex; gap: 2px; }
+
+  .codeMenuFond { position: fixed; inset: 0; z-index: 30; }
+
+  .codeMenu {
+    position: fixed;
+    z-index: 31;
+    min-width: 168px;
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    background: var(--app-panneau, #f8f9fb);
+    border: 1px solid var(--app-line, #e3e6eb);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 20%);
+
+    button {
+      display: block;
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      font-size: 12.5px;
+      padding: 7px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+
+      &:hover { background: var(--app-survol, rgb(31 39 51 / 6%)); }
+    }
+
+    // Le rouge est réservé à ce qui détruit, et se voit au survol : coloré
+    // en permanence, il attire l'œil et le doigt vers la mauvaise entrée.
+    .codeDanger:hover { background: #fdece9; color: #9a3412; }
+  }
+
+  .codeTheme select {
+    border: 1px solid var(--app-line, #e3e6eb);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 100px;
+    cursor: pointer;
+  }
+
+  // Pour les lecteurs d'écran seulement : le sélecteur a besoin d'un
+  // libellé, l'écran n'a pas la place de l'afficher.
+  .codeInvisible {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+// Chevron de l'arborescence repliable.
+.codeApp {
+  .codeChevron {
+    display: inline-block;
+    width: 10px;
+    flex: none;
+    text-align: center;
+    font-size: 11px;
+    color: var(--app-muted, #6b7684);
+    transition: transform .12s;
+  }
+  .codeChevron[data-ouvert="true"] { transform: rotate(90deg); }
 }

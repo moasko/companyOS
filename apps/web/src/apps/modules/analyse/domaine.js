@@ -1059,7 +1059,7 @@ export const affinites = (paniers = [], minSupport = 0.02) => {
     for (const a of articles) compteArticle.set(a, (compteArticle.get(a) || 0) + 1);
     for (let i = 0; i < articles.length; i += 1) {
       for (let j = i + 1; j < articles.length; j += 1) {
-        const k = `${articles[i]} ${articles[j]}`;
+        const k = `${articles[i]}\u0000${articles[j]}`;
         comptePaire.set(k, (comptePaire.get(k) || 0) + 1);
       }
     }
@@ -1069,7 +1069,7 @@ export const affinites = (paniers = [], minSupport = 0.02) => {
   for (const [k, n] of comptePaire.entries()) {
     const support = n / total;
     if (support < minSupport) continue;
-    const [a, b] = k.split(" ");
+    const [a, b] = k.split("\u0000");
     const pa = compteArticle.get(a) / total;
     const pb = compteArticle.get(b) / total;
     resultat.push({

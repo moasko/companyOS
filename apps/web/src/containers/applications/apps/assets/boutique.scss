@@ -205,34 +205,50 @@
       background: var(--btq-accent-soft);
     }
 
+    // Icône à gauche, identité au milieu, état à droite — la disposition
+    // des boutiques d'applications, et celle que l'œil balaie le plus vite.
     .btqCardTop {
       display: flex;
-      align-items: center;
-      gap: 11px;
+      align-items: flex-start;
+      gap: 12px;
     }
 
     .btqCardHead {
       min-width: 0;
+      flex: 1;
     }
 
     .btqName {
-      font-size: 0.82em;
+      font-size: 0.86em;
       font-weight: 600;
-      white-space: nowrap;
+      line-height: 1.3;
+      // Deux lignes autorisées : un nom long était coupé au milieu d'un mot
+      // alors que la place existait juste en dessous.
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .btqCat {
       font-size: 0.68em;
       color: var(--btq-muted);
+      margin-top: 2px;
     }
 
+    // Exactement deux lignes, toujours : sans cette limite, les cartes
+    // avaient des hauteurs différentes et la grille se déchirait en
+    // marches d'escalier, ce qui rend la comparaison pénible.
     .btqDesc {
       font-size: 0.72em;
-      line-height: 1.45;
+      line-height: 1.5;
       color: var(--btq-muted);
       flex-grow: 1;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: calc(2 * 1.5 * 0.72em);
     }
 
     .btqCardFoot {
@@ -674,4 +690,27 @@ body[data-theme="dark"] .boutique {
     font-style: normal;
     color: var(--btq-accent);
   }
+}
+
+// Lien d'élargissement de la recherche, dans l'état vide. Un bouton, parce
+// que c'est une action ; l'apparence d'un lien, parce que c'est une
+// suggestion et non le geste principal de l'écran.
+.btqEmptyBox .btqLien {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--btq-accent, #1a73e8);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+// Ligne de résultats, au-dessus de la grille. Discrète : elle informe, elle
+// ne réclame pas l'attention. `role="status"` la fait annoncer aux lecteurs
+// d'écran quand le nombre change — sinon une recherche au clavier ne donne
+// aucun retour perceptible.
+.btqResultats {
+  margin: 0 0 12px;
+  font-size: 0.72em;
+  color: var(--btq-muted);
 }
