@@ -1,44 +1,45 @@
 # CompanyOS en production — pensé pour Dokploy.
 #
-# Trois services : la base, l'API, le shell. Dokploy lit ce fichier tel quel
-# (service « Docker Compose »), fournit les variables d'environnement depuis
-# son onglet Environment, et attache les domaines via son interface :
+# Deux services : l'API et le shell. Dokploy lit ce fichier tel quel
+# (service de type « Docker Compose »), fournit les variables depuis son
+# onglet Environment, et attache les domaines via son interface :
 #
 #   - domaine du shell → service web, port 80
 #   - domaine de l'API → service api, port 4000
 #
+# ─────────────────────────────────────────────────────────────────────────
+# LA BASE N'EST PAS ICI
+#
+# PostgreSQL est un service Dokploy à part, avec ses sauvegardes et son
+# cycle de vie propres. C'est le bon découpage : une base ne doit pas être
+# recréée parce qu'on redéploie une application, et Dokploy sait la
+# sauvegarder tout seul — ce qu'il ne ferait pas d'un conteneur déclaré
+# dans ce fichier.
+#
+# `DATABASE_URL` est donc fournie en entier depuis l'onglet Environment,
+# et pointe sur l'hôte interne de la base :
+#
+#   postgresql://postgres:MOTDEPASSE@my-dbs-companyos-zqqgcq:5432/companyos_db?schema=public
+#
+# Ce nom d'hôte n'est résoluble que parce que les deux piles partagent le
+# réseau `dokploy-network` — d'où sa déclaration en bas de fichier.
+# ─────────────────────────────────────────────────────────────────────────
+#
 # Les deux images se construisent depuis la **racine du dépôt** : c'est là
 # que vivent le package.json des workspaces et le lockfile.
 #
-# Les données vivent dans deux volumes : la base et les fichiers du cloud.
-# Sans eux, chaque redéploiement effacerait les espaces de travail.
+# Le volume `storage-data` porte les fichiers des espaces de travail. Sans
+# lui, chaque redéploiement viderait leur cloud.
 
 services:
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: companyos
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: companyos
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U companyos"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://companyos:${POSTGRES_PASSWORD}@postgres:5432/companyos?schema=public
+      # Fournie en entier depuis Dokploy — voir l'en-tête de ce fichier.
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       # Clé de chiffrement des secrets de configuration (S3, SMTP). Distincte
@@ -50,6 +51,7 @@ services:
       STORAGE_DRIVER: local
       STORAGE_LOCAL_PATH: /data/storage
       DEFAULT_TENANT_QUOTA: ${DEFAULT_TENANT_QUOTA:-5368709120}
+      UPLOAD_MAX_OCTETS: ${UPLOAD_MAX_OCTETS:-134217728}
       # Plafond d'envoi de courriels par espace et par 24 h — garde-fou
       # contre l'usage de la plateforme comme relais de spam.
       MAIL_QUOTA_JOUR: ${MAIL_QUOTA_JOUR:-500}
@@ -66,12 +68,17 @@ services:
       # La console Plateforme : les emails des exploitants du SaaS.
       PLATFORM_ADMINS: ${PLATFORM_ADMINS:-}
       # Derrière le reverse-proxy de Dokploy : sans cela, la limitation de
-      # débit compterait toutes les requêtes comme venant d'une seule IP.
+      # débit compterait toutes les requêtes comme venant d'une seule IP,
+      # et le journal d'audit enregistrerait la même adresse pour tout le
+      # monde. Jamais `true` : ce serait croire l'en-tête envoyé par le
+      # client lui-même.
       TRUST_PROXY: ${TRUST_PROXY:-1}
     volumes:
       - storage-data:/data/storage
     expose:
       - "4000"
+    networks:
+      - dokploy-network
 
   web:
     build:
@@ -80,12 +87,25 @@ services:
       args:
         # Figée dans le build du shell : le domaine public de l'API.
         VITE_API_URL: ${VITE_API_URL}
+        # Le tas de Node pendant le build. Voir apps/web/Dockerfile : sur un
+        # petit VPS, la valeur par défaut fait tuer le processus par le
+        # noyau, et Dokploy n'affiche qu'un « killed » sans explication.
+        NODE_HEAP_MO: ${NODE_HEAP_MO:-3072}
     restart: unless-stopped
     depends_on:
       - api
     expose:
       - "80"
+    networks:
+      - dokploy-network
 
 volumes:
-  postgres-data:
   storage-data:
+
+# Le réseau que Dokploy crée à son installation. Le déclarer `external`
+# plutôt que de le laisser créer un réseau propre à cette pile sert deux
+# choses : Traefik peut router vers les conteneurs, et l'API peut résoudre
+# le nom d'hôte de la base, qui vit dans un autre projet Dokploy.
+networks:
+  dokploy-network:
+    external: true
