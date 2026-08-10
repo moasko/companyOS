@@ -1,0 +1,107 @@
+// CompanyOS sur téléphone.
+//
+// ─────────────────────────────────────────────────────────────────────────
+// CE QU'UN BUREAU DEVIENT SUR 375 PIXELS
+//
+// Le shell est un bureau à fenêtres : on les déplace, on les redimensionne,
+// on en regarde deux côte à côte. Rien de tout cela n'a de sens sur un
+// téléphone — et surtout, rien de tout cela n'y est possible : une fenêtre
+// de 900 px de large sur un écran de 375 déborde, et la poignée de
+// redimensionnement est plus petite qu'un doigt.
+//
+// La règle retenue est celle de tous les systèmes mobiles : **une
+// application à la fois, plein écran**. La barre des tâches reste visible
+// en bas et devient la navigation principale — c'est déjà sa place, elle
+// n'a pas à bouger.
+//
+// POURQUOI UNE FEUILLE À PART, ET DES `!important`
+//
+// Deux raisons, et la seconde est la vraie.
+//
+// D'abord, chacun des trente modules déclare sa taille de fenêtre dans son
+// propre fichier (`[data-size="mini"]`, largeurs et hauteurs fixes) : les
+// reprendre un par un, c'est trente occasions d'en oublier un, et trente
+// fichiers à retoucher au prochain changement d'avis.
+//
+// Ensuite, une fenêtre redimensionnée à la souris porte sa taille en
+// **style en ligne** (`style={wnapp.dim}`), que le moteur de rendu place
+// au-dessus de n'importe quelle règle de feuille. Seul `!important` passe
+// devant. C'est l'un des rares endroits où il est justifié : on ne corrige
+// pas une spécificité mal pensée, on écrase délibérément une valeur posée
+// par du script pour un contexte qui n'existe plus.
+//
+// Le point de bascule est 720 px, le même que celui de la vitrine.
+// ─────────────────────────────────────────────────────────────────────────
+
+@media (max-width: 720px) {
+  // Hauteur de la barre des tâches, reprise de components/taskbar/taskbar.scss.
+  // Écrite ici en clair faute de variable partagée : à tenir d'accord si
+  // elle change là-bas.
+  $barre: 48px;
+
+  // --- Les fenêtres occupent l'écran ---------------------------------------
+  //
+  // `inset` plutôt que top/left/width/height : une seule déclaration annule
+  // d'un coup les quatre que le script a pu poser.
+  .floatTab,
+  .floatTab[data-size="mini"],
+  .floatTab[data-size="full"],
+  .floatTab[data-size="cstm"] {
+    inset: 0 0 $barre 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    min-width: 0 !important;
+    // Une fenêtre qui touche les quatre bords n'est plus une fenêtre.
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    // Animer le déplacement d'une fenêtre qui ne bouge plus ne fait que
+    // retarder son affichage.
+    transition: none !important;
+    transform: none !important;
+  }
+
+  // La barre des tâches reste atteignable : c'est le seul moyen de sortir
+  // d'une application, il n'y a pas de touche Échap sur un téléphone.
+
+  // --- Ce qui n'a plus d'objet ---------------------------------------------
+  //
+  // Les poignées de redimensionnement font quelques pixels de large :
+  // impossibles à saisir au doigt, et sans utilité puisque la fenêtre
+  // remplit déjà l'écran.
+  .resizecont {
+    display: none !important;
+  }
+
+  // L'ancrage de fenêtres côte à côte suppose deux fenêtres visibles, et
+  // s'ouvre au survol — deux choses qui n'existent pas ici.
+  .actbtns .snapbox {
+    display: none !important;
+  }
+
+  // La barre de titre devient touchable. 44 px est la hauteur en dessous de
+  // laquelle un pouce rate sa cible.
+  .toolbar {
+    min-height: 44px;
+  }
+
+  .toolbar .actbtns .uicon {
+    min-width: 46px;
+    min-height: 44px;
+  }
+
+  // --- Le menu Démarrer et les panneaux prennent la largeur ----------------
+  //
+  // Un panneau flottant calculé pour un grand écran débordait des deux
+  // côtés : la moitié de son contenu n'était pas atteignable.
+  .startMenu,
+  .quickSettings {
+    left: 4px !important;
+    right: 4px !important;
+    bottom: $barre + 4px !important;
+    width: auto !important;
+    max-width: none !important;
+    transform: none !important;
+  }
+}
