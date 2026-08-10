@@ -60,7 +60,7 @@ const purgerGroupe = async (tenantId, racine, tous) => {
   });
 
   for (const n of tous) {
-    if (n.storageKey) await (await piloteLecture(n.storage)).remove(n.storageKey);
+    if (n.storageKey) await (await piloteLecture(n.storage, tenantId)).remove(n.storageKey);
   }
 
   return liberes;
@@ -180,6 +180,38 @@ export default async function fileRoutes(app) {
 
   /// Contenu de la corbeille : uniquement ce que l'utilisateur a
   /// explicitement supprimé, pas les descendants partis avec.
+  /// Tous les nœuds vivants de l'espace, à plat.
+  ///
+  /// L'Explorateur descend dossier par dossier, ce qui est juste pour lui :
+  /// on y navigue. Un éditeur de code, non — on y cherche. « Ouvrir un
+  /// fichier par son nom » et « chercher dans tout le projet » ont besoin
+  /// de l'arborescence entière, et la reconstituer par un appel par dossier
+  /// coûterait une requête par niveau, en cascade, à chaque frappe.
+  ///
+  /// Volontairement maigre : ni contenu, ni dates, ni auteurs. De quoi
+  /// afficher un arbre et filtrer par nom, rien de plus. Quelques milliers
+  /// de fichiers tiennent ainsi dans quelques dizaines de kilo-octets.
+  ///
+  /// Plafonné : au-delà, c'est que l'espace sert de dépôt de fichiers et
+  /// non de projet, et l'ouverture rapide n'est plus le bon outil. Le
+  /// client est prévenu par `complet: false` plutôt que de recevoir une
+  /// liste tronquée en silence.
+  const ARBRE_MAX = 5000;
+
+  app.get("/arborescence", async (request) => {
+    const nodes = await prisma.fsNode.findMany({
+      where: { tenantId: request.tenantId, deletedAt: null },
+      select: { id: true, name: true, type: true, parentId: true, size: true, mimeType: true },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      take: ARBRE_MAX + 1,
+    });
+
+    return serialize({
+      complet: nodes.length <= ARBRE_MAX,
+      noeuds: nodes.slice(0, ARBRE_MAX),
+    });
+  });
+
   app.get("/trash", async (request) => {
     await purgerExpirés(request.tenantId);
 
@@ -244,7 +276,7 @@ export default async function fileRoutes(app) {
     // La destination des nouveaux fichiers vient de la console
     // Plateforme ; le nœud retient laquelle, pour savoir plus tard où
     // relire ses octets.
-    const pilote = await piloteEcriture();
+    const pilote = await piloteEcriture(request.tenantId);
     const key = pilote.buildKey(request.tenantId, upload.filename);
     const size = await pilote.put(key, upload.file);
 
@@ -340,7 +372,7 @@ export default async function fileRoutes(app) {
     const plage = request.headers.range;
     if (!plage) {
       reply.header("Content-Length", total);
-      return reply.send((await piloteLecture(node.storage)).read(node.storageKey));
+      return reply.send((await piloteLecture(node.storage, lien.tid)).read(node.storageKey));
     }
 
     const m = /bytes=(\d*)-(\d*)/.exec(plage);
@@ -356,7 +388,7 @@ export default async function fileRoutes(app) {
       .code(206)
       .header("Content-Range", `bytes ${debut}-${fin}/${total}`)
       .header("Content-Length", fin - debut + 1)
-      .send((await piloteLecture(node.storage)).readRange(node.storageKey, debut, fin));
+      .send((await piloteLecture(node.storage, lien.tid)).readRange(node.storageKey, debut, fin));
   });
 
   app.get("/:id/download", async (request, reply) => {
@@ -370,7 +402,7 @@ export default async function fileRoutes(app) {
       .header("X-Content-Type-Options", "nosniff")
       .header("Content-Disposition", `attachment; filename="${encodeURIComponent(node.name)}"`);
 
-    return reply.send((await piloteLecture(node.storage)).read(node.storageKey));
+    return reply.send((await piloteLecture(node.storage, request.tenantId)).read(node.storageKey));
   });
 
   /// Renommer ou déplacer un élément.
@@ -464,7 +496,7 @@ export default async function fileRoutes(app) {
       return reply.code(404).send({ error: "Fichier introuvable" });
     }
 
-    const pilote = await piloteEcriture();
+    const pilote = await piloteEcriture(request.tenantId);
     const cle = pilote.buildKey(request.tenantId, node.name);
     const taille = await pilote.put(cle, upload.file);
 
@@ -497,7 +529,7 @@ export default async function fileRoutes(app) {
       return fichier;
     });
 
-    await (await piloteLecture(node.storage)).remove(ancienne);
+    await (await piloteLecture(node.storage, request.tenantId)).remove(ancienne);
     await journaliser(request, "fichier.modification", node.name, {
       octets: taille,
     });

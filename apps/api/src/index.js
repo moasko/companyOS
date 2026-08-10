@@ -16,6 +16,7 @@ import billingRoutes from "./routes/billing.js";
 import courrierRoutes from "./routes/courrier.js";
 import { demarrerRelances } from "./relances.js";
 import campagnesRoutes from "./routes/campagnes.js";
+import espaceRoutes from "./routes/espace.js";
 import plateformeRoutes from "./routes/plateforme.js";
 import { demarrerCampagnes } from "./campagnes.js";
 
@@ -95,6 +96,7 @@ await app.register(webRoutes, { prefix: "/api/web" });
 await app.register(billingRoutes, { prefix: "/api/facturation" });
 await app.register(courrierRoutes, { prefix: "/api/courrier" });
 await app.register(campagnesRoutes, { prefix: "/api/campagnes" });
+await app.register(espaceRoutes, { prefix: "/api/espace" });
 await app.register(plateformeRoutes, { prefix: "/api/plateforme" });
 
 const shutdown = async () => {

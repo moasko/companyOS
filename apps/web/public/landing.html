@@ -14,6 +14,11 @@
     --nuit: #0b272b;           /* cartes d'app sombres */
     --cyan: #0aafb7;           /* accent vif du logo */
     --cyan-clair: #bfe9ec;     /* texte secondaire sur fond sombre */
+    /* Le cyan du logo tombe à 2,96:1 sur le canard des panneaux — assez
+       pour un titre de 34 px, pas pour une étiquette de 10. Celui-ci monte
+       à 4,51:1 et reste reconnaissable comme la même couleur. À réserver
+       aux petits textes ; les grands titres gardent --cyan. */
+    --cyan-lisible: #5fd4da;
     --canard: #057378;         /* accent profond du logo */
     --creme: #f0f2f1;          /* fond de page */
     --carte: #ffffff;
@@ -39,7 +44,7 @@
     display: block; font-size: .72em; font-weight: 700; letter-spacing: .14em;
     text-transform: uppercase; color: var(--canard); margin-bottom: 10px;
   }
-  .panneau .avantPropos { color: var(--cyan); }
+  .panneau .avantPropos { color: var(--cyan-lisible); }
 
   .btn {
     display: inline-block; padding: 12px 26px; border-radius: 100px;
@@ -65,9 +70,15 @@
     display: inline-flex; gap: 3px; padding: 3px; border-radius: 100px;
     border: 1px solid var(--ligne); background: #fff;
   }
+  /* La zone cliquable fait 44 px de haut, pas la pastille.
+     Le dessin reste compact — c'est `min-height` + le centrage qui donnent
+     la cible, pas du remplissage visible. Mesuré avant : 28 px, c'est-à-dire
+     sous le minimum où un pouce touche juste du premier coup. */
   .choix button {
     border: none; cursor: pointer; font: inherit; font-size: .78em; font-weight: 600;
     color: var(--sourd); background: transparent; padding: 4px 12px; border-radius: 100px;
+    min-height: 34px; min-width: 42px;
+    display: inline-flex; align-items: center; justify-content: center;
   }
   .choix button[data-actif="true"] { background: var(--lagon); color: #fff; }
 
@@ -84,12 +95,24 @@
 
   /* ---- Barre ---- */
   header.site { position: sticky; top: 0; z-index: 10; background: rgba(240,242,241,.9); backdrop-filter: blur(10px); }
-  .barre { display: flex; align-items: center; gap: 12px; padding: 16px 0; }
+  /* `padding: 16px 0` écrasait la marge latérale héritée de `.cadre` : au
+     delà de 1168 px l'inset venait du centrage, donc rien ne se voyait,
+     mais en dessous le logo touchait le bord gauche et le bouton d'appel
+     sortait à droite. Les 24 px sont donc réinscrits ici. */
+  .barre { display: flex; align-items: center; gap: 12px; padding: 16px 24px; }
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.08em; color: var(--lagon); }
   .logo img { width: 30px; height: 30px; }
   .barre nav { margin: 0 auto; display: flex; gap: 26px; font-size: .9em; color: var(--sourd); }
+  /* Les liens du menu mesuraient 17 px de haut : la hauteur du texte, pas
+     celle d'une cible. On étend la zone sans écarter les libellés. */
+  .barre nav a { display: inline-flex; align-items: center; min-height: 44px; }
   .barre nav a:hover { color: var(--lagon); }
   .barre .actions { display: flex; align-items: center; gap: 10px; }
+  /* Sans ceci, le logo et le bouton d'appel refusent de rétrécir et sortent
+     du cadre entre 720 et 900 px de large : le bouton finissait collé au
+     bord de l'écran, à moitié hors de la zone lisible. */
+  .barre .logo { flex: 0 1 auto; min-width: 0; }
+  .barre .actions { flex: 0 0 auto; }
 
   /* ---- Héros ---- */
   .scene { padding: 8px 16px 0; }
@@ -104,13 +127,6 @@
     display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px;
     align-items: center; position: relative;
   }
-  .badgeNouveau {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
-    border-radius: 100px; padding: 6px 16px; font-size: .78em; font-weight: 600;
-    color: var(--cyan-clair); margin-bottom: 22px;
-  }
-  .badgeNouveau i { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); font-style: normal; flex: none; }
   .heros h1 { font-size: clamp(2.1em, 4.6vw, 3.2em); font-weight: 700; }
   .heros h1 em { font-style: normal; color: var(--cyan); }
   .heros .argument { margin: 18px 0 0; color: var(--cyan-clair); font-size: 1.02em; max-width: 46ch; }
@@ -208,16 +224,41 @@
   .evidence p { font-size: .86em; color: var(--sourd); }
 
   /* ---- Grille d'apps ---- */
-  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 14px; }
-  .app {
-    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-    padding: 20px 16px; background: var(--carte); border-radius: 18px;
-    border: 1px solid transparent; transition: border-color .15s, transform .15s;
+  /* ---- La grille des applications ----
+     Des tuiles au nom seul, denses, les trente visibles d'un coup. C'est
+     l'étendue qui est l'argument : une carte par app avec sa description
+     n'en montrait que six par écran, et le catalogue avait l'air court.
+     Le détail de chaque métier est raconté plus bas, dans les zooms. */
+  .enTeteApps { text-align: center; max-width: 62ch; margin: 0 auto 34px; }
+  .enTeteApps h2 { margin: 0 0 12px; }
+  .enTeteApps p { margin: 0; color: var(--sourd); }
+
+  .grilleApps {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+    gap: 8px;
   }
-  .app:hover { border-color: var(--cyan); transform: translateY(-2px); }
-  .app img { width: 42px; height: 42px; }
-  .app b { font-size: .88em; }
-  .app span { font-size: .72em; color: var(--sourd); line-height: 1.4; }
+  .tuileApp {
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
+    padding: 18px 10px; background: var(--carte); border-radius: 16px;
+    border: 1px solid transparent; text-align: center;
+    transition: border-color .15s, transform .15s;
+  }
+  .tuileApp:hover { border-color: var(--cyan); transform: translateY(-2px); }
+  .tuileApp img { width: 34px; height: 34px; }
+  .tuileApp b { font-size: .78em; font-weight: 600; line-height: 1.3; }
+
+  .apresApps {
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 14px; margin: 30px 0 0;
+    font-size: .84em; color: var(--sourd);
+  }
+
+  @media (max-width: 560px) {
+    .grilleApps { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+    .tuileApp { padding: 14px 6px; }
+    .tuileApp img { width: 28px; height: 28px; }
+    .tuileApp b { font-size: .72em; }
+  }
 
   /* ---- La preuve : tout s'enchaîne ---- */
   .chaine { padding: 0 16px; }
@@ -239,7 +280,7 @@
   .maillon b .etiquette {
     display: inline-block; margin-left: 8px; padding: 1px 9px; border-radius: 100px;
     font-size: .68em; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-    background: rgba(10,175,183,.16); color: var(--cyan); vertical-align: 1px;
+    background: rgba(10,175,183,.16); color: var(--cyan-lisible); vertical-align: 1px;
   }
   .maillon small { color: var(--cyan-clair); font-size: .78em; }
   .maillon .fait {
@@ -383,15 +424,55 @@
   footer { border-top: 1px solid var(--ligne); padding: 32px 0; font-size: .8em; color: var(--sourd); }
   .pied { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
 
+  /* ---- En-tête : replié bien avant le reste de la page ----
+     Le menu centré par `margin: 0 auto` ne rétrécit pas : entre 720 et
+     ~1100 px il ne débordait pas, il passait **sous le logo**, les deux
+     textes superposés. Le repli de l'en-tête a donc son propre point de
+     rupture, plus haut que celui des sections. */
+  @media (max-width: 1000px) {
+    /* L'en-tête cesse d'être collant : replié, il fait deux lignes, et
+       les garder en haut mangeait 155 px sur un écran de 812 — un
+       cinquième de la page, en permanence. L'appel à l'action est de
+       toute façon répété dans le héros et en bas de page. */
+    header.site { position: static; }
+    .barre { flex-wrap: wrap; row-gap: 0; padding-bottom: 6px; }
+
+    /* Le menu descend sous la barre, en bandeau qui défile du doigt —
+       plutôt que `display: none`, qui privait le téléphone du sommaire
+       de la page. */
+    .barre nav {
+      order: 3; width: 100%; margin: 0 -24px; padding: 2px 24px 8px;
+      gap: 20px; overflow-x: auto; scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .barre nav::-webkit-scrollbar { display: none; }
+    .barre nav a { min-height: 38px; white-space: nowrap; }
+    /* Sans quoi le dernier lien colle au bord et on ne devine pas qu'il
+       reste quelque chose à faire défiler. */
+    .barre nav::after { content: ""; flex: 0 0 8px; }
+
+    .barre .logo { width: auto; }
+    .barre .actions { order: 2; margin-left: auto; }
+  }
+
+  /* Sous 560 px, le logo, le sélecteur et le bouton totalisent ~410 px
+     pour 327 disponibles : les actions prennent leur propre ligne. */
+  @media (max-width: 560px) {
+    .barre .logo { width: 100%; }
+    .barre .btn-ligne { display: none; }
+    .barre .actions {
+      width: 100%; margin-left: 0;
+      justify-content: space-between; gap: 10px;
+    }
+    .barre .actions .btn { flex: 0 1 auto; }
+  }
+
   @media (max-width: 860px) {
     .herosGrille { grid-template-columns: 1fr; gap: 40px; }
     .vitrines { min-height: 0; display: grid; gap: 14px; justify-items: center; }
     .appCarte { position: static; width: min(320px, 100%); }
   }
   @media (max-width: 720px) {
-    .barre nav { display: none; }
-    .barre .btn-ligne { display: none; }
-    .barre .actions { margin-left: auto; }
     .btn { padding: 11px 20px; font-size: .88em; }
     section { padding: 52px 0; }
     .heros { padding: 56px 0 60px; }
@@ -405,7 +486,6 @@
     .puce-zoom { right: 4px; bottom: -14px; }
     .deroule { padding: 4px 16px; }
     .enTete > div:first-child { max-width: none; }
-    .badgeNouveau { font-size: .7em; padding: 5px 13px; }
   }
 
   /* Qui demande moins de mouvement l'obtient. */
@@ -444,7 +524,6 @@
       <span class="anneau"></span>
       <div class="cadre herosGrille">
         <div>
-          <span class="badgeNouveau"><i></i><span data-i18n="heros.badge">Vos applications réunies, sur un seul bureau</span></span>
           <h1 data-i18n="heros.titre">Pilotez toute votre entreprise <em>depuis un seul écran</em></h1>
           <p class="argument" data-i18n="heros.argument">
             Facturation, caisse, stock, paie CNPS, comptabilité SYSCOHADA,
@@ -512,6 +591,58 @@
     </div>
   </div>
 
+  <section id="apps" style="padding-top: 0;">
+    <div class="cadre">
+      <div class="enTeteApps">
+        <span class="avantPropos" data-i18n="apps.avant">La suite</span>
+        <h2 data-i18n="apps.titre">Une application par besoin. Trente en tout.</h2>
+        <p data-i18n="apps.sous">
+          Quelque chose à gérer ? Il y a une application pour ça. Vous l'installez
+          en un clic depuis la Boutique, et elle connaît déjà les autres : le CRM
+          nourrit les campagnes, les RH alimentent la paie, tout finit en comptabilité.
+        </p>
+      </div>
+
+      <div class="grilleApps">
+        <div class="tuileApp"><img src="img/icon/cos/facturation.svg" alt="" width="34" height="34"><b data-i18n="app.facturation.n">Facturation</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/caisse.svg" alt="" width="34" height="34"><b data-i18n="app.caisse.n">Caisse</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/stock.svg" alt="" width="34" height="34"><b data-i18n="app.stock.n">Stock</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/achats.svg" alt="" width="34" height="34"><b data-i18n="app.achats.n">Achats</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/comptabilite.svg" alt="" width="34" height="34"><b data-i18n="app.compta.n">Comptabilité</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/paie.svg" alt="" width="34" height="34"><b data-i18n="app.paie.n">Paie</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/rh.svg" alt="" width="34" height="34"><b data-i18n="app.rh.n">Ressources humaines</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/conges.svg" alt="" width="34" height="34"><b data-i18n="app.conges.n">Congés</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/frais.svg" alt="" width="34" height="34"><b data-i18n="app.frais.n">Notes de frais</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/crm.svg" alt="" width="34" height="34"><b data-i18n="app.crm.n">CRM</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/courrier.svg" alt="" width="34" height="34"><b data-i18n="app.courrier.n">Courrier</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/campagnes.svg" alt="" width="34" height="34"><b data-i18n="app.campagnes.n">Campagnes</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/agenda.svg" alt="" width="34" height="34"><b data-i18n="app.agenda.n">Agenda</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/projets.svg" alt="" width="34" height="34"><b data-i18n="app.projets.n">Projets</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/signature.svg" alt="" width="34" height="34"><b data-i18n="app.signature.n">Signature</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/editeur.svg" alt="" width="34" height="34"><b data-i18n="app.docs.n">Documents</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/presentation.svg" alt="" width="34" height="34"><b data-i18n="app.presentation.n">Présentations</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/classeur.svg" alt="" width="34" height="34"><b data-i18n="app.classeur.n">Classeur</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/tableur.svg" alt="" width="34" height="34"><b data-i18n="app.tableur.n">Tableur CSV</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/analyse.svg" alt="" width="34" height="34"><b data-i18n="app.analyse.n">Analyse</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/code.svg" alt="" width="34" height="34"><b data-i18n="app.code.n">Code</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/studio.svg" alt="" width="34" height="34"><b data-i18n="app.studio.n">Studio</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/explorateur.svg" alt="" width="34" height="34"><b data-i18n="app.cloud.n">Explorateur</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/navigateur.svg" alt="" width="34" height="34"><b data-i18n="app.navigateur.n">Navigateur</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/blocnotes.svg" alt="" width="34" height="34"><b data-i18n="app.blocnotes.n">Bloc-notes</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/calculatrice.svg" alt="" width="34" height="34"><b data-i18n="app.calculatrice.n">Calculatrice</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/qrcode.svg" alt="" width="34" height="34"><b data-i18n="app.qrcode.n">Codes QR</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/boutique.svg" alt="" width="34" height="34"><b data-i18n="app.boutique.n">Boutique</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/parametres.svg" alt="" width="34" height="34"><b data-i18n="app.parametres.n">Paramètres</b></div>
+        <div class="tuileApp"><img src="img/icon/cos/terminal.svg" alt="" width="34" height="34"><b data-i18n="app.terminal.n">Terminal</b></div>
+      </div>
+
+      <p class="apresApps">
+        <a class="btn btn-ligne" href="/?connexion" data-i18n="apps.cta">Ouvrir la Boutique →</a>
+        <span data-i18n="apps.note">Aucune n'est facturée à part : elles sont toutes comprises dans l'abonnement.</span>
+      </p>
+    </div>
+  </section>
+
   <section id="bureau" class="bureau">
     <div class="cadre">
       <div class="enTete enTete-centre">
@@ -556,41 +687,6 @@
           <p data-i18n="evidence.3.p">Une vente devient une facture, qui ajuste un stock, qui nourrit
           la comptabilité. Tout est déjà relié.</p>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="apps" style="padding-top: 0;">
-    <div class="cadre">
-      <div class="enTete">
-        <div>
-          <span class="avantPropos" data-i18n="apps.avant">La suite</span>
-          <h2 data-i18n="apps.titre">Plus de vingt applications, un seul abonnement</h2>
-        </div>
-        <p data-i18n="apps.sous">
-          Chaque application connaît les autres : le CRM nourrit les campagnes,
-          les RH alimentent la paie, tout finit en comptabilité.
-        </p>
-      </div>
-      <div class="apps">
-        <div class="app"><img src="img/icon/cos/facturation.svg" alt=""><b data-i18n="app.facturation.n">Facturation</b><span data-i18n="app.facturation.d">Devis, factures, règlements, relances automatiques</span></div>
-        <div class="app"><img src="img/icon/cos/caisse.svg" alt=""><b data-i18n="app.caisse.n">Caisse</b><span data-i18n="app.caisse.d">Point de vente tactile, espèces et mobile money</span></div>
-        <div class="app"><img src="img/icon/cos/stock.svg" alt=""><b data-i18n="app.stock.n">Stock</b><span data-i18n="app.stock.d">Inventaire par mouvements, alertes de rupture</span></div>
-        <div class="app"><img src="img/icon/cos/achats.svg" alt=""><b data-i18n="app.achats.n">Achats</b><span data-i18n="app.achats.d">Commandes fournisseurs, réceptions, paiements</span></div>
-        <div class="app"><img src="img/icon/cos/comptabilite.svg" alt=""><b data-i18n="app.compta.n">Comptabilité</b><span data-i18n="app.compta.d">SYSCOHADA sans connaître un numéro de compte</span></div>
-        <div class="app"><img src="img/icon/cos/paie.svg" alt=""><b data-i18n="app.paie.n">Paie</b><span data-i18n="app.paie.d">Bulletins CNPS et ITS de Côte d'Ivoire</span></div>
-        <div class="app"><img src="img/icon/cos/rh.svg" alt=""><b data-i18n="app.rh.n">Ressources humaines</b><span data-i18n="app.rh.d">Dossiers, contrats, absences</span></div>
-        <div class="app"><img src="img/icon/cos/conges.svg" alt=""><b data-i18n="app.conges.n">Congés</b><span data-i18n="app.conges.d">Demandes, validations, soldes de jours</span></div>
-        <div class="app"><img src="img/icon/cos/frais.svg" alt=""><b data-i18n="app.frais.n">Notes de frais</b><span data-i18n="app.frais.d">Reçu photographié, validation, remboursement</span></div>
-        <div class="app"><img src="img/icon/cos/crm.svg" alt=""><b data-i18n="app.crm.n">CRM</b><span data-i18n="app.crm.d">Clients, opportunités, relances</span></div>
-        <div class="app"><img src="img/icon/cos/courrier.svg" alt=""><b data-i18n="app.courrier.n">Courrier</b><span data-i18n="app.courrier.d">Emails pro depuis votre domaine</span></div>
-        <div class="app"><img src="img/icon/cos/campagnes.svg" alt=""><b data-i18n="app.campagnes.n">Campagnes</b><span data-i18n="app.campagnes.d">Email marketing avec taux d'ouverture</span></div>
-        <div class="app"><img src="img/icon/cos/agenda.svg" alt=""><b data-i18n="app.agenda.n">Agenda</b><span data-i18n="app.agenda.d">Toutes les échéances de l'entreprise, tout seul</span></div>
-        <div class="app"><img src="img/icon/cos/signature.svg" alt=""><b data-i18n="app.signature.n">Signature</b><span data-i18n="app.signature.d">Signez vos PDF, sans imprimer</span></div>
-        <div class="app"><img src="img/icon/cos/editeur.svg" alt=""><b data-i18n="app.docs.n">Documents</b><span data-i18n="app.docs.d">Traitement de texte, vrais fichiers Word</span></div>
-        <div class="app"><img src="img/icon/cos/presentation.svg" alt=""><b data-i18n="app.presentation.n">Présentations</b><span data-i18n="app.presentation.d">Diaporamas PowerPoint dans le navigateur</span></div>
-        <div class="app"><img src="img/icon/cos/studio.svg" alt=""><b data-i18n="app.studio.n">Studio</b><span data-i18n="app.studio.d">Créez vos propres applications, sans code</span></div>
-        <div class="app"><img src="img/icon/cos/explorateur.svg" alt=""><b data-i18n="app.cloud.n">Cloud</b><span data-i18n="app.cloud.d">Les fichiers de l'entreprise, partagés et sûrs</span></div>
       </div>
     </div>
   </section>
@@ -819,6 +915,13 @@
           <p data-i18n="garde.4.p">Factures, bulletins et documents s'exportent en PDF, Word ou
           Excel à tout moment.</p>
         </div>
+        <div class="garde">
+          <i><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></i>
+          <h3 data-i18n="garde.5.t">Aucun format prisonnier</h3>
+          <p data-i18n="garde.5.p">Vos données vivent dans une base PostgreSQL ordinaire. Vous pouvez
+          faire héberger le tout chez vous — vos fichiers sur votre propre serveur de stockage,
+          voire sur le disque réseau de vos bureaux.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -956,7 +1059,6 @@
       "nav.bureau": "Le bureau", "nav.apps": "Applications", "nav.decouvrir": "Découvrir",
       "nav.tarifs": "Tarifs", "nav.faq": "Questions",
       "actions.connexion": "Se connecter", "actions.creer": "Créer mon espace",
-      "heros.badge": "Vos applications réunies, sur un seul bureau",
       "heros.titre": "Pilotez toute votre entreprise <em>depuis un seul écran</em>",
       "heros.argument": "Facturation, caisse, stock, paie CNPS, comptabilité SYSCOHADA, courrier, campagnes : des applications qui se parlent, pensées pour les entreprises ivoiriennes.",
       "heros.essayer": "Essayer gratuitement →", "heros.voirApps": "Voir les applications",
@@ -981,8 +1083,10 @@
       "evidence.2.p": "Un bureau, des icônes, un menu démarrer, une barre des tâches. Quiconque a touché un ordinateur s'y retrouve.",
       "evidence.3.t": "Rien n'est isolé. Tout se parle.",
       "evidence.3.p": "Une vente devient une facture, qui ajuste un stock, qui nourrit la comptabilité. Tout est déjà relié.",
-      "apps.avant": "La suite", "apps.titre": "Plus de vingt applications, un seul abonnement",
-      "apps.sous": "Chaque application connaît les autres : le CRM nourrit les campagnes, les RH alimentent la paie, tout finit en comptabilité.",
+      "apps.avant": "La suite", "apps.titre": "Une application par besoin. Trente en tout.",
+      "apps.sous": "Quelque chose à gérer ? Il y a une application pour ça. Vous l'installez en un clic depuis la Boutique, et elle connaît déjà les autres : le CRM nourrit les campagnes, les RH alimentent la paie, tout finit en comptabilité.",
+      "apps.cta": "Ouvrir la Boutique →",
+      "apps.note": "Aucune n'est facturée à part : elles sont toutes comprises dans l'abonnement.",
       "app.facturation.n": "Facturation", "app.facturation.d": "Devis, factures, règlements, relances automatiques",
       "app.caisse.n": "Caisse", "app.caisse.d": "Point de vente tactile, espèces et mobile money",
       "app.stock.n": "Stock", "app.stock.d": "Inventaire par mouvements, alertes de rupture",
@@ -1055,6 +1159,8 @@
       "garde.2.p": "Chaque action — qui, quoi, quand — est consignée dans un journal que personne ne peut réécrire.",
       "garde.3.t": "Rôles par utilisateur",
       "garde.3.p": "Les droits se règlent au serveur, pas à l'écran : chacun ne voit que ce que son rôle permet.",
+      "garde.5.t": "Aucun format prisonnier",
+      "garde.5.p": "Vos données vivent dans une base PostgreSQL ordinaire. Vous pouvez faire héberger le tout chez vous — vos fichiers sur votre propre serveur de stockage, voire sur le disque réseau de vos bureaux.",
       "garde.4.t": "Vos fichiers restent vôtres",
       "garde.4.p": "Factures, bulletins et documents s'exportent en PDF, Word ou Excel à tout moment.",
       "tarifs.avant": "Tarifs", "tarifs.titre": "Des tarifs sans surprise",
@@ -1092,7 +1198,6 @@
       "nav.bureau": "The desktop", "nav.apps": "Applications", "nav.decouvrir": "Discover",
       "nav.tarifs": "Pricing", "nav.faq": "FAQ",
       "actions.connexion": "Sign in", "actions.creer": "Create my workspace",
-      "heros.badge": "All your business apps, on one desktop",
       "heros.titre": "Run your whole business <em>from a single screen</em>",
       "heros.argument": "Invoicing, point of sale, inventory, CNPS payroll, SYSCOHADA accounting, mail, campaigns: applications that talk to each other, built for Ivorian businesses.",
       "heros.essayer": "Try it for free →", "heros.voirApps": "See the applications",
@@ -1117,8 +1222,10 @@
       "evidence.2.p": "A desktop, icons, a start menu, a taskbar. Anyone who has touched a computer feels at home.",
       "evidence.3.t": "Nothing is isolated. Everything talks.",
       "evidence.3.p": "A sale becomes an invoice, which adjusts the stock, which feeds the books. Everything is already connected.",
-      "apps.avant": "The suite", "apps.titre": "Twenty-plus applications, one subscription",
-      "apps.sous": "Every application knows the others: the CRM feeds the campaigns, HR feeds payroll, and everything lands in accounting.",
+      "apps.avant": "The suite", "apps.titre": "One application per need. Thirty in all.",
+      "apps.sous": "Something to manage? There is an app for it. You install it in one click from the Store, and it already knows the others: the CRM feeds the campaigns, HR feeds payroll, and everything lands in accounting.",
+      "apps.cta": "Open the Store →",
+      "apps.note": "None is billed separately: they are all included in the subscription.",
       "app.facturation.n": "Invoicing", "app.facturation.d": "Quotes, invoices, payments, automatic reminders",
       "app.caisse.n": "Point of sale", "app.caisse.d": "Touch-friendly register, cash and mobile money",
       "app.stock.n": "Inventory", "app.stock.d": "Movement-based stock, low-stock alerts",
@@ -1191,6 +1298,8 @@
       "garde.2.p": "Every action — who, what, when — is recorded in a log nobody can rewrite.",
       "garde.3.t": "Per-user roles",
       "garde.3.p": "Permissions are enforced on the server, not on the screen: everyone sees only what their role allows.",
+      "garde.5.t": "No format holds you hostage",
+      "garde.5.p": "Your data lives in an ordinary PostgreSQL database. You can have the whole thing hosted at your place — your files on your own storage server, or even on the network drive in your offices.",
       "garde.4.t": "Your files stay yours",
       "garde.4.p": "Invoices, payslips and documents export to PDF, Word or Excel at any time.",
       "tarifs.avant": "Pricing", "tarifs.titre": "Pricing without surprises",

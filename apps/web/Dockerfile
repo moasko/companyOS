@@ -27,6 +27,19 @@ COPY apps/web apps/web
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
+# La construction du shell est le moment le plus gourmand du déploiement :
+# elle empaquette Monaco, les visionneuses de documents et le moteur 3D, et
+# sort une quarantaine de mégaoctets. Sur un petit VPS, Node se voit
+# attribuer un tas trop étroit et le processus est tué par le noyau — le
+# journal de Dokploy affiche alors « killed », sans autre explication.
+#
+# Le tas est donc fixé explicitement plutôt que deviné. À baisser si la
+# machine a moins de 4 Go, à condition d'avoir du swap :
+#
+#   docker build --build-arg NODE_HEAP_MO=1536 …
+ARG NODE_HEAP_MO=3072
+ENV NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MO
+
 RUN npm run build --workspace @companyos/web
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { Icon, ToolBar } from "../../../utils/general";
+import { chercher } from "./boutique";
 import { useNomApp } from "../../../utils/nomsApps";
 import { api } from "../../../api/client";
 import { syncInstalledModules, moduleBySlug } from "../../../apps/sync";
@@ -141,17 +142,26 @@ export const MicroStore = () => {
   );
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return catalog.filter((a) => {
-      if (filter !== "Tout" && a.category !== filter) return false;
-      if (!q) return true;
-      // On cherche dans le nom affiché comme dans le nom d'origine :
-      // le mot que la personne connaît doit trouver son app.
-      return (nomApp(a) + " " + a.name + " " + a.description)
-        .toLowerCase()
-        .includes(q);
-    });
+    // Le filtre par catégorie d'abord, la recherche ensuite : chercher dans
+    // ce qu'on a déjà restreint, et non l'inverse.
+    const parCategorie =
+      filter === "Tout" ? catalog : catalog.filter((a) => a.category === filter);
+    // `chercher` ignore les accents, accepte les mots dans le désordre et
+    // classe par pertinence. Voir boutique.js — un simple `includes` ne
+    // trouvait pas « Comptabilité » quand on tapait « comptabilite ».
+    return chercher(parCategorie, query, nomApp);
   }, [catalog, filter, query, nomApp]);
+
+  // Ce que la même recherche donnerait sans le filtre de catégorie.
+  //
+  // Le piège classique d'une boutique : on cherche « paie », un filtre
+  // « Bureautique » est resté actif depuis tout à l'heure, et l'écran
+  // répond « aucun module » — laissant croire que l'application n'existe
+  // pas. Mieux vaut le dire, et proposer d'élargir.
+  const ailleurs = useMemo(
+    () => (filter === "Tout" ? [] : chercher(catalog, query, nomApp)),
+    [catalog, filter, query, nomApp],
+  );
 
   const installed = catalog.filter((a) => a.installed);
 
@@ -333,8 +343,37 @@ export const MicroStore = () => {
                   {etat.initial || etat.erreur ? (
                     <Contenu etat={etat} vide={false} squelette="grille" lignes={9} />
                   ) : visible.length === 0 ? (
-                    <div className="btqEmptyBox">Aucun module pour ce filtre.</div>
+                    <div className="btqEmptyBox">
+                      {query.trim()
+                        ? `Aucun module ne correspond à « ${query.trim()} »`
+                        : "Aucun module dans cette catégorie."}
+                      {ailleurs.length > 0 && (
+                        <>
+                          {" "}
+                          <button
+                            type="button"
+                            className="btqLien"
+                            onClick={() => setFilter("Tout")}
+                          >
+                            {ailleurs.length === 1
+                              ? "Un module correspond dans une autre catégorie."
+                              : `${ailleurs.length} modules correspondent dans d'autres catégories.`}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   ) : (
+                    <>
+                    {/* Dire ce qui est montré, et combien. Sans ce repère,
+                        on ne sait pas si la liste est le catalogue entier
+                        ou le résultat d'un filtre oublié. */}
+                    <p className="btqResultats" role="status">
+                      {query.trim()
+                        ? `${visible.length} résultat${visible.length > 1 ? "s" : ""} pour « ${query.trim()} »`
+                        : filter === "Tout"
+                          ? `${visible.length} modules au catalogue`
+                          : `${visible.length} modules · ${filter}`}
+                    </p>
                     <div className="btqGrid">
                       {visible.map((app) => {
                         const status = statusOf(app);
@@ -347,17 +386,21 @@ export const MicroStore = () => {
                             onClick={() => setSelected(app.slug)}
                           >
                             <div className="btqCardTop">
-                              <Icon src={app.icon} width={34} />
+                              <Icon src={app.icon} width={48} />
                               <div className="btqCardHead">
                                 <div className="btqName">{nomApp(app)}</div>
                                 <div className="btqCat">{app.category}</div>
                               </div>
-                            </div>
-                            <div className="btqDesc">{app.description}</div>
-                            <div className="btqCardFoot">
+                              {/* L'état va en haut à droite, là où une
+                                  boutique met le prix : c'est la première
+                                  chose qu'on cherche sur une carte, avant
+                                  même de lire la description. */}
                               <div className="btqTag" data-tone={status.tone}>
                                 {status.label}
                               </div>
+                            </div>
+                            <div className="btqDesc">{app.description}</div>
+                            <div className="btqCardFoot">
                               {app.isCore ||
                               (!disponible(app) && !app.installed) ? null : (
                                 <div
@@ -380,6 +423,7 @@ export const MicroStore = () => {
                         );
                       })}
                     </div>
+                    </>
                   )}
                 </section>
 

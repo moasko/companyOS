@@ -4,9 +4,15 @@
     {
       "name": "companyos",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
+      "runtimeArgs": ["run", "dev:web"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "companyos-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:api"],
+      "port": 4000
     }
   ]
 }

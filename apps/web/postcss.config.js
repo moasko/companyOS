@@ -22,9 +22,11 @@
 // une seule feuille du projet en contient (src/index.css).
 // ─────────────────────────────────────────────────────────────────────────
 
-const postcss = require("postcss");
-const tailwindcss = require("tailwindcss");
-const autoprefixer = require("autoprefixer");
+// Modules ES : `apps/web/package.json` declare "type": "module", donc un
+// `require` ici arrete la construction avant meme de lire une feuille.
+import postcss from "postcss";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
 
 const tailwindSiDemande = {
   postcssPlugin: "tailwind-si-demande",
@@ -43,6 +45,6 @@ const tailwindSiDemande = {
   },
 };
 
-module.exports = {
+export default {
   plugins: [tailwindSiDemande, autoprefixer],
 };

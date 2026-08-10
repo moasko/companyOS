@@ -188,17 +188,147 @@ export const enregistrerConfig = async ({ stockage, s3 }) => {
 // Choix du pilote
 // ---------------------------------------------------------------------------
 
-/// Le pilote où écrire les **nouveaux** fichiers.
-export const piloteEcriture = async () => {
+// ---------------------------------------------------------------------------
+// Le stockage propre à un espace de travail
+// ---------------------------------------------------------------------------
+//
+// Une entreprise peut exiger que ses documents restent chez elle — sur son
+// compte S3, ou sur le NAS de ses bureaux. Elle règle alors son propre
+// stockage, et ses fichiers cessent de passer par celui de l'exploitant.
+//
+// Trois destinations coexistent donc, et `FsNode.storage` dit laquelle a
+// servi pour **chaque** fichier :
+//
+//   « local »  — le disque du serveur ;
+//   « s3 »     — le stockage objet de la plateforme ;
+//   « espace » — le stockage objet de l'entreprise elle-même.
+//
+// Sans ce troisième nom, un fichier marqué « s3 » serait relu avec les
+// identifiants de la plateforme alors qu'il dort chez le client : on
+// chercherait le bon objet dans le mauvais compte.
+
+const cacheEspaces = new Map();
+
+export const invaliderCacheEspace = (tenantId) => {
+  if (tenantId) cacheEspaces.delete(tenantId);
+  else cacheEspaces.clear();
+};
+
+/// La configuration de stockage d'un espace, ou `null` s'il suit la
+/// plateforme.
+export const chargerConfigEspace = async (tenantId) => {
+  if (!tenantId) return null;
+  if (cacheEspaces.has(tenantId)) return cacheEspaces.get(tenantId);
+
+  let ligne = null;
+  try {
+    ligne = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { stockage: true, stockageS3: true },
+    });
+  } catch {
+    // Colonnes absentes : migration non appliquée. On suit la plateforme,
+    // comme avant leur existence.
+    ligne = null;
+  }
+
+  const brut = ligne?.stockageS3 || null;
+  const s3 = brut
+    ? { ...brut, secretKey: dechiffrer(brut.secretKey), pathStyle: brut.pathStyle !== false }
+    : null;
+  const utilisable = !!(s3 && s3.endpoint && s3.bucket && s3.accessKey && s3.secretKey);
+
+  const config = {
+    stockage: ligne?.stockage === "s3" && utilisable ? "s3" : "plateforme",
+    demande: ligne?.stockage || "plateforme",
+    s3,
+    utilisable,
+    secretIllisible: !!(brut?.secretKey && !s3?.secretKey),
+  };
+  cacheEspaces.set(tenantId, config);
+  return config;
+};
+
+/// Enregistre le stockage d'un espace. Même règle que pour la plateforme :
+/// un secret vide conserve celui d'avant, et il ne ressort jamais.
+export const enregistrerConfigEspace = async (tenantId, { stockage, s3 }) => {
+  const existant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { stockageS3: true },
+  });
+  const ancien = existant?.stockageS3 || {};
+
+  const nouveau = s3
+    ? {
+        ...Object.fromEntries(CHAMPS_S3.map((c) => [c, s3[c] ?? ancien[c] ?? ""])),
+        pathStyle: s3.pathStyle !== undefined ? !!s3.pathStyle : ancien.pathStyle !== false,
+        secretKey: s3.secretKey ? chiffrer(s3.secretKey) : ancien.secretKey || null,
+      }
+    : ancien;
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { stockage: stockage === "s3" ? "s3" : "plateforme", stockageS3: nouveau },
+  });
+
+  invaliderCacheEspace(tenantId);
+  return chargerConfigEspace(tenantId);
+};
+
+/// Essaie une configuration d'espace sans l'enregistrer.
+export const testerConfigEspace = async (tenantId, { stockage, s3 }) => {
+  if (stockage !== "s3") return true;
+  const existant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { stockageS3: true },
+  });
+  const secret = s3?.secretKey || dechiffrer(existant?.stockageS3?.secretKey);
+  if (!secret) throw new Error("La clé secrète est absente.");
+
+  return creerPiloteS3({
+    endpoint: s3.endpoint,
+    region: s3.region || "auto",
+    bucket: s3.bucket,
+    accessKey: s3.accessKey,
+    secretKey: secret,
+    prefix: s3.prefix || "",
+    pathStyle: s3.pathStyle !== false,
+  }).tester();
+};
+
+// ---------------------------------------------------------------------------
+// Choix du pilote
+// ---------------------------------------------------------------------------
+
+/// Le pilote où écrire les **nouveaux** fichiers de cet espace.
+///
+/// Le stockage de l'entreprise passe avant celui de la plateforme : c'est
+/// tout l'objet du réglage. Sans `tenantId`, on retombe sur la plateforme —
+/// le cas des écritures qui n'appartiennent à personne en particulier.
+export const piloteEcriture = async (tenantId) => {
+  const espace = await chargerConfigEspace(tenantId);
+  if (espace?.stockage === "s3") {
+    return { ...creerPiloteS3(espace.s3), nom: "espace" };
+  }
   const config = await chargerConfig();
   return config.stockage === "s3" ? creerPiloteS3(config.s3) : piloteLocal;
 };
 
 /// Le pilote d'un fichier **déjà écrit**, d'après ce qu'il a retenu.
 ///
-/// Un fichier posé sur S3 se relit sur S3 même si l'exploitant est revenu
-/// au disque entre-temps — c'est tout l'intérêt de retenir la destination.
-export const piloteLecture = async (nom) => {
+/// Un fichier posé sur S3 se relit sur S3 même si le réglage a changé
+/// entre-temps — c'est tout l'intérêt de retenir la destination fichier par
+/// fichier, et c'est ce qui permet de basculer sans rien migrer.
+export const piloteLecture = async (nom, tenantId) => {
+  if (nom === "espace") {
+    const espace = await chargerConfigEspace(tenantId);
+    if (!espace?.utilisable) {
+      throw new Error(
+        "Ce fichier est sur le stockage de votre entreprise, dont la configuration est absente ou illisible.",
+      );
+    }
+    return { ...creerPiloteS3(espace.s3), nom: "espace" };
+  }
   if (nom !== "s3") return piloteLocal;
   const config = await chargerConfig();
   if (!config.utilisable) {

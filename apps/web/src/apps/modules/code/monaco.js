@@ -25,6 +25,8 @@
 // fait dans le fil principal et ne coûte rien.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { brancherFormatage } from "./formatage";
+
 let promesse = null;
 
 /// Charge Monaco une seule fois et rend le module.
@@ -72,62 +74,57 @@ export const charger = () => {
     // variable devient « introuvable ». Un tapis d'erreurs fausses apprend
     // vite à ignorer les vraies. La coloration, le pliage, la sélection
     // multiple et le formatage, eux, restent entiers.
-    for (const langage of [
-      monaco.languages.typescript.typescriptDefaults,
-      monaco.languages.typescript.javascriptDefaults,
-    ]) {
-      langage.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: false });
+    // `monaco.languages.typescript` **n'existe pas** dans toutes les
+    // distributions : l'entrée classique de la 0.56 ne l'embarque pas.
+    // Écrit sans précaution, cet accès levait une exception qui rejetait
+    // tout le chargement — et l'éditeur n'était alors jamais créé, laissant
+    // une fenêtre entièrement vide. Un réglage de confort ne doit jamais
+    // pouvoir emporter l'outil qu'il agrémente.
+    const ts = monaco.languages?.typescript;
+    if (ts) {
+      for (const defauts of [ts.typescriptDefaults, ts.javascriptDefaults]) {
+        defauts?.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: false });
+      }
     }
 
     definirThemes(monaco);
+    brancherFormatage(monaco);
+
+    // Emmet : « ul>li*3 » puis Tab donne la liste complète. C'est
+    // l'abréviation qui fait gagner le plus de temps en HTML et en CSS, et
+    // son absence se remarque immédiatement quand on a l'habitude.
+    //
+    // Chargé à part et sans bloquer : si le paquet manque, l'éditeur doit
+    // continuer de fonctionner — on perd une commodité, pas l'outil.
+    import("emmet-monaco-es")
+      .then(({ emmetHTML, emmetCSS, emmetJSX }) => {
+        emmetHTML(monaco, ["html", "xml", "markdown"]);
+        emmetCSS(monaco, ["css", "scss", "less"]);
+        emmetJSX(monaco, ["javascript", "typescript"]);
+      })
+      .catch((e) => console.warn("Emmet indisponible :", e.message));
+
     return monaco;
   })();
 
   return promesse;
 };
 
-/// Deux thèmes aux couleurs de CompanyOS plutôt que ceux de VS Code.
+/// Les thèmes de VS Code, tels quels.
 ///
-/// L'éditeur occupe toute la fenêtre : un fond gris-bleu Microsoft au
-/// milieu d'un OS crème et canard se voit immédiatement. Les couleurs de
-/// syntaxe, elles, restent proches de celles de VS Code — c'est ce que
-/// l'œil d'un développeur sait lire sans réapprendre.
+/// J'avais d'abord peint l'éditeur aux couleurs de l'OS — crème et canard.
+/// C'était une erreur de jugement : on n'ouvre pas un éditeur de code en
+/// attendant la charte d'un logiciel de gestion, on l'ouvre en attendant
+/// **VS Code**. La coloration syntaxique de `vs` et `vs-dark` est celle que
+/// l'œil d'un développeur lit sans réapprendre, et elle vient avec Monaco.
+///
+/// Ce qui reste aux couleurs de la maison, c'est le pourtour : arborescence,
+/// onglets, barre d'état. La zone d'édition, elle, appartient à VS Code.
 const definirThemes = (monaco) => {
-  monaco.editor.defineTheme("cos-clair", {
-    base: "vs",
-    inherit: true,
-    rules: [
-      { token: "comment", foreground: "6d7d84", fontStyle: "italic" },
-      { token: "keyword", foreground: "057378" },
-      { token: "string", foreground: "9a5b16" },
-      { token: "number", foreground: "8a4fbd" },
-    ],
-    colors: {
-      "editor.background": "#ffffff",
-      "editorLineNumber.foreground": "#a8b4b8",
-      "editorLineNumber.activeForeground": "#057378",
-      "editor.lineHighlightBackground": "#f0f2f1",
-      "editorCursor.foreground": "#057378",
-      "editor.selectionBackground": "#c9e9eb",
-    },
-  });
-
-  monaco.editor.defineTheme("cos-sombre", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "comment", foreground: "7d8f96", fontStyle: "italic" },
-      { token: "keyword", foreground: "56c8cf" },
-      { token: "string", foreground: "e0a45e" },
-      { token: "number", foreground: "c99bf0" },
-    ],
-    colors: {
-      "editor.background": "#0d1b1e",
-      "editorLineNumber.foreground": "#4a5f65",
-      "editorLineNumber.activeForeground": "#0aafb7",
-      "editor.lineHighlightBackground": "#12262a",
-      "editorCursor.foreground": "#0aafb7",
-      "editor.selectionBackground": "#1d4a50",
-    },
-  });
+  // Rien à définir : `vs` et `vs-dark` sont fournis. La fonction est
+  // conservée pour garder un seul endroit où le thème se décide.
+  void monaco;
 };
+
+export const THEME_CLAIR = "vs";
+export const THEME_SOMBRE = "vs-dark";
