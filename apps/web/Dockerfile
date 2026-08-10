@@ -46,7 +46,24 @@ RUN npm run build --workspace @companyos/web
 
 FROM nginx:1.27-alpine
 
+# La même URL d'API que celle figée dans le bundle. Un `ARG` ne traverse
+# pas les étapes : il faut le redéclarer ici.
+ARG VITE_API_URL
+
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+
+# La politique de sécurité doit nommer l'origine de l'API, sinon le
+# navigateur refuse les appels du shell vers elle. Elle est donc injectée
+# au build, à partir de la même valeur que le bundle — les deux ne peuvent
+# pas diverger.
+#
+# Le repli sur `https:` sert au cas où l'image est construite sans
+# argument : la CSP reste alors valide, quoique plus permissive, plutôt
+# que de laisser un `__API_ORIGIN__` littéral qui casserait toute la
+# directive.
+RUN sed -i "s|__API_ORIGIN__|${VITE_API_URL:-https:}|g" /etc/nginx/conf.d/default.conf \
+    && nginx -t
+
 COPY --from=build /app/apps/web/build /usr/share/nginx/html
 
 EXPOSE 80
