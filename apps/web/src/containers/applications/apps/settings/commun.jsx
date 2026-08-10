@@ -22,7 +22,7 @@ export const formatBytes = (bytes) => {
 
 /// Rôles, tels qu'on les nomme à l'écran. Ce ne sont pas des libellés
 /// décoratifs : le serveur applique exactement cette hiérarchie — voir
-/// `exigerRole` dans server/src/auth.js.
+/// `exigerRole` dans apps/api/src/auth.js.
 ///
 ///   Propriétaire   — tout, y compris renommer l'espace et céder les clés
 ///   Administrateur — gère les membres et les applications installées

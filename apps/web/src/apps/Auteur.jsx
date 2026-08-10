@@ -7,7 +7,7 @@
 //   <Auteur record={client} />
 //
 // `record` est ce que renvoie `api.records` : le serveur y joint `auteur` et
-// `modifiePar` (voir server/src/routes/records.js).
+// `modifiePar` (voir apps/api/src/routes/records.js).
 
 import { Avatar } from "./Avatar";
 import "./auteur.scss";

@@ -30,14 +30,30 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 |---|---|---|
 | `POSTGRES_PASSWORD` | un mot de passe fort | la base |
 | `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` | signature des sessions |
-| `CORS_ORIGIN` | `https://os.mondomaine.com` | le front autorisé à appeler l'API |
-| `VITE_API_URL` | `https://api.mondomaine.com` | figée dans le build du front |
+| `ENCRYPTION_KEY` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` | chiffrement des secrets stockés (S3, SMTP) |
+| `CORS_ORIGIN` | `https://os.mondomaine.com` | le shell autorisé à appeler l'API |
+| `VITE_API_URL` | `https://api.mondomaine.com` | figée dans le build du shell |
+| `TRUST_PROXY` | `1` | un proxy devant l'API (Traefik) |
 | `JWT_EXPIRES_IN` | `7d` (défaut) | durée d'une session |
 | `DEFAULT_TENANT_QUOTA` | `5368709120` (défaut, 5 Go) | quota d'un nouvel espace |
+| `UPLOAD_MAX_OCTETS` | `134217728` (défaut, 128 Mo) | taille maximale d'un fichier importé |
+| `MAIL_QUOTA_JOUR` | `500` (défaut) | plafond d'envoi par espace et par 24 h |
 | `PLATFORM_ADMINS` | `patron@mondomaine.com` | les comptes exploitants (console Plateforme) |
 
 > `VITE_API_URL` est cuite **au build** : la changer exige un redéploiement,
 > pas seulement un redémarrage.
+
+> `ENCRYPTION_KEY` doit être **distincte** de `JWT_SECRET`. À défaut, le
+> secret JWT sert de repli — et faire tourner les sessions rendrait alors
+> illisibles tous les secrets déjà stockés (clé S3, mots de passe SMTP des
+> espaces). L'écran de configuration le signale au lieu d'échouer en
+> silence, mais autant ne pas s'y exposer.
+
+> `TRUST_PROXY` vaut `1` derrière Dokploy, jamais `true` : croire n'importe
+> quel client qui envoie `X-Forwarded-For` lui-même revient à laisser
+> maquiller les adresses du journal d'audit et contourner la limitation de
+> débit. Laissé à `0`, c'est l'inverse : toutes les requêtes comptent comme
+> venant du proxy, donc d'une seule IP.
 
 ## 4. Domaines
 

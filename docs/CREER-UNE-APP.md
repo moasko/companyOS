@@ -22,7 +22,7 @@ journal de ce qui s'y passe. Écrivez chaque module pour cette réalité —
 « qui a saisi ceci », « à qui est-ce attribué », « cette personne a-t-elle le
 droit ». La partie 7 rassemble ce qu'il faut savoir.
 
-**Les modules** (`src/apps/modules/<slug>/`) — les applications métier. Elles
+**Les modules** (`apps/web/src/apps/modules/<slug>/`) — les applications métier. Elles
 s'installent depuis la Boutique. **Un module non installé n'existe pas dans le
 shell** : ni icône sur le bureau, ni entrée au menu Démarrer, ni fenêtre montée
 dans le DOM.
@@ -31,14 +31,14 @@ Deux familles d'applications coexistent :
 
 | Famille | Où | Installable ? |
 | --- | --- | --- |
-| Socle (Explorateur, Boutique, Terminal, Bloc-notes, Calculatrice, Paramètres, Gestionnaire de tâches, Corbeille) | `src/containers/applications/apps/` | non, toujours présent |
-| Modules métier (CRM, Facturation, Stock, Générateur QR…) | `src/apps/modules/<slug>/` | oui, depuis la Boutique |
+| Socle (Explorateur, Boutique, Terminal, Bloc-notes, Calculatrice, Paramètres, Gestionnaire de tâches, Corbeille) | `apps/web/src/containers/applications/apps/` | non, toujours présent |
+| Modules métier (CRM, Facturation, Stock, Générateur QR…) | `apps/web/src/apps/modules/<slug>/` | oui, depuis la Boutique |
 
-Une troisième voie existe : le **Studio** (`src/apps/modules/studio/`) permet de
+Une troisième voie existe : le **Studio** (`apps/web/src/apps/modules/studio/`) permet de
 créer une application **sans écrire de code**, depuis le shell. Le navigateur ne
 peut pas écrire dans les sources : une app créée ainsi est donc *décrite*
 (collections + champs) et exécutée par le moteur générique
-`src/apps/CustomApp.jsx`. Elle vit dans la base, appartient à son espace de
+`apps/web/src/apps/CustomApp.jsx`. Elle vit dans la base, appartient à son espace de
 travail, et n'apparaît jamais dans la Boutique des autres clients.
 
 Prenez le Studio quand l'application se résume à saisir et consulter des
@@ -62,7 +62,7 @@ sont jamais chargés), il ne s'affichera donc jamais dans le shell.
 
 ### Étape 2 — le manifeste
 
-Dans `src/apps/modules/rh/index.jsx` :
+Dans `apps/web/src/apps/modules/rh/index.jsx` :
 
 ```js
 export const manifest = {
@@ -86,7 +86,7 @@ Vérifiez que l'icône existe : `ls public/img/icon/`.
 
 ### Étape 3 — déclarer l'app au catalogue
 
-Dans `server/prisma/seed.js`, ajoutez une entrée :
+Dans `apps/api/prisma/seed.js`, ajoutez une entrée :
 
 ```js
 {
@@ -102,7 +102,7 @@ Dans `server/prisma/seed.js`, ajoutez une entrée :
 Puis :
 
 ```bash
-cd server && node prisma/seed.js
+npm run db:seed
 ```
 
 Le seed fait un `upsert` : le relancer est sans danger.
@@ -123,7 +123,7 @@ export function RhApp() {
 }
 ```
 
-**Rien d'autre à câbler.** `src/apps/registry.js` découvre le dossier tout seul
+**Rien d'autre à câbler.** `apps/web/src/apps/registry.js` découvre le dossier tout seul
 via `import.meta.glob`. Aucun import à ajouter dans `App.jsx` ni ailleurs.
 
 ---
@@ -132,7 +132,7 @@ via `import.meta.glob`. Aucun import à ajouter dans `App.jsx` ni ailleurs.
 
 ### Choisir sa structure
 
-La charte vient du générateur QR (`src/apps/modules/qrcode/`), qui sert de
+La charte vient du générateur QR (`apps/web/src/apps/modules/qrcode/`), qui sert de
 référence visuelle. Mais **n'ajoutez pas de barre latérale ni de panneau de
 droite si le module n'en a pas besoin.**
 
@@ -334,7 +334,7 @@ Contraintes : 500 enregistrements par lecture (les plus récents d'abord), 64 Ko
 par enregistrement.
 
 Quand un module se stabilise, on peut le sortir vers de vraies tables typées
-dans `server/prisma/schema.prisma` sans changer son interface.
+dans `apps/api/prisma/schema.prisma` sans changer son interface.
 
 ### Charger au bon moment
 
@@ -443,7 +443,7 @@ journal, et un moyen de se parler. Trois choses à connaître.
 
 ### Prévenir quelqu'un
 
-Deux gestes différents, une seule porte d'entrée — `src/apps/notifications.js`.
+Deux gestes différents, une seule porte d'entrée — `apps/web/src/apps/notifications.js`.
 
 **Sur ce poste**, quand personne d'autre n'est concerné (« export terminé ») :
 
@@ -490,7 +490,7 @@ useEffect(() => {
 
 Piège : au premier lancement, le clic arrive **avant** les données. Gardez la
 demande de côté et rejouez-la au chargement — voir `lienEnAttente` dans
-`src/apps/modules/projets/index.jsx`, qui traite les deux cas.
+`apps/web/src/apps/modules/projets/index.jsx`, qui traite les deux cas.
 
 `envoyerA` n'échoue jamais bruyamment : prévenir est secondaire par rapport à
 l'action qui l'a déclenchée. N'attendez pas son résultat pour enregistrer, et
@@ -608,7 +608,7 @@ import { ouvrirFichier } from "../../openRequest";
 ouvrirFichier(node, voisins);   // .glb .gltf .obj .stl .fbx .ply .dae
 ```
 
-Rien d'autre à importer : `src/apps/fileTypes.js` associe l'extension à la
+Rien d'autre à importer : `apps/web/src/apps/fileTypes.js` associe l'extension à la
 fenêtre, et l'Explorateur comme vos modules empruntent le même chemin.
 
 ### Signer les fiches
@@ -660,7 +660,7 @@ annoncer : une pastille qui s'allume sans raison apprend à être ignorée.
 ### Le journal d'activité
 
 Les actions qui changent l'espace — membres, rôles, applications, fichiers —
-sont journalisées côté serveur (`server/src/audit.js`) et relues par les
+sont journalisées côté serveur (`apps/api/src/audit.js`) et relues par les
 administrateurs dans Paramètres → Journal d'activité.
 
 Votre interface n'a rien à appeler : c'est la route qui journalise. Si votre
@@ -671,7 +671,7 @@ await journaliser(request, "stock.transfert", article.nom, { de, vers });
 ```
 
 Le verbe suit la forme `objet.action` ; ajoutez sa traduction dans la table
-`ACTIONS` de `src/containers/applications/apps/settings.jsx`. Une action
+`ACTIONS` de `apps/web/src/containers/applications/apps/settings.jsx`. Une action
 inconnue s'affiche telle quelle — lisible, mais laid.
 
 Rien n'efface le journal, pas même le propriétaire de l'espace. N'y mettez donc
@@ -689,7 +689,7 @@ const peutGerer = ["OWNER", "ADMIN"].includes(role);
 Servez-vous-en pour **ne pas montrer** ce qui échouerait — jamais pour protéger
 quoi que ce soit. Cacher un bouton est une politesse, pas une autorisation :
 toute règle qui compte est appliquée par le serveur (`exigerRole` dans
-`server/src/auth.js`), et une requête peut très bien arriver sans passer par
+`apps/api/src/auth.js`), et une requête peut très bien arriver sans passer par
 votre écran.
 
 Corollaire pratique : en cas de doute, appelez la route et affichez l'erreur
@@ -780,7 +780,7 @@ setDraft((d) => ({ ...d, [key]: value }));
 
 Cette méthode fait défiler **tous** les ancêtres défilables, et `overflow:
 hidden` n'empêche pas le défilement par programme : le bureau entier se
-déplace. Utilisez les helpers de `src/apps/scrollTo.js`, qui ne touchent qu'au
+déplace. Utilisez les helpers de `apps/web/src/apps/scrollTo.js`, qui ne touchent qu'au
 conteneur visé.
 
 ```js
@@ -831,7 +831,7 @@ qui garantit que le compteur et le journal ne peuvent pas diverger.
 ## 10. Lancer et vérifier
 
 ```bash
-cd server && npm run dev
+npm run dev:api
 ```
 
 ```bash

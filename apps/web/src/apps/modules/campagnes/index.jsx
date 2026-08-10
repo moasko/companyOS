@@ -7,7 +7,7 @@
 // fait vraiment : choisir un public dans son CRM, écrire une fois,
 // envoyer proprement. Une campagne se prépare en brouillon, se teste sur
 // sa propre boîte, part tout de suite ou à l'heure programmée ; le
-// serveur l'égrène par petits lots (voir server/src/campagnes.js), et la
+// serveur l'égrène par petits lots (voir apps/api/src/campagnes.js), et la
 // page suit la progression jusqu'aux chiffres finaux.
 //
 // Chaque message porte son lien de désinscription. Un désinscrit est

@@ -6,7 +6,7 @@
 // propres canvas, et l'habillage reste celui de CompanyOS.
 //
 // Elle sait demander le fichier **par plages d'octets**. Combinée au point
-// de diffusion ajouté côté serveur (voir server/src/routes/files.js), la
+// de diffusion ajouté côté serveur (voir apps/api/src/routes/files.js), la
 // première page s'affiche sans attendre le téléchargement complet — ce qui
 // compte pour un contrat de deux cents pages.
 

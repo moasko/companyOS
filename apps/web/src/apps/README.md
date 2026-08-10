@@ -12,7 +12,7 @@ ni entrée au menu Démarrer, ni fenêtre montée.
 **1. Copier le modèle**
 
 ```bash
-cp -r src/apps/modules/_template src/apps/modules/facturation
+cp -r apps/web/src/apps/modules/_template apps/web/src/apps/modules/facturation
 ```
 
 **2. Adapter le manifeste** dans `index.jsx`
@@ -49,11 +49,11 @@ Presse-papiers — une visionneuse doit exister avant qu'on lui donne un
 fichier à ouvrir. Pas de slug, pas d'entrée dans `seed.js`, rien à
 installer.
 
-**3. Déclarer l'app au catalogue** dans `server/prisma/seed.js`, avec le même
+**3. Déclarer l'app au catalogue** dans `apps/api/prisma/seed.js`, avec le même
 slug, puis :
 
 ```bash
-cd server && node prisma/seed.js
+npm run db:seed
 ```
 
 **4. Écrire la fenêtre.** `ModuleWindow` fournit le chrome (barre de titre,
@@ -65,11 +65,11 @@ réduire / agrandir / fermer, déplacement, z-index) :
 </ModuleWindow>
 ```
 
-Rien d'autre à câbler : `src/apps/registry.js` découvre le dossier tout seul.
+Rien d'autre à câbler : `apps/web/src/apps/registry.js` découvre le dossier tout seul.
 
 ## Mise en page
 
-**Utilisez le kit `src/apps/ui/`.** La charte n'est plus une consigne à
+**Utilisez le kit `apps/web/src/apps/ui/`.** La charte n'est plus une consigne à
 relire, c'est du code : les jetons de thème sont posés une fois pour toutes
 sur `.moduleWin`, et les composants les utilisent. Une app ordinaire n'a
 donc *aucune* feuille de style à écrire.
@@ -102,7 +102,7 @@ couleur en dur** : le thème sombre est géré par ces variables.
 
 Les modules antérieurs (QR, CRM, Facturation, Stock, Studio, Word, Projets)
 gardent leurs jetons propres — les deux systèmes coexistent, rien n'est à
-migrer en urgence. `src/apps/modules/pressepapiers/` montre à quoi
+migrer en urgence. `apps/web/src/apps/modules/pressepapiers/` montre à quoi
 ressemble un module sur le kit : une centaine de lignes de style au lieu de
 deux cent cinquante, et pas une couleur écrite en dur.
 
@@ -178,7 +178,7 @@ exacte à ajouter) et se contente d'un avertissement en production — couper
 une app déjà installée ferait pire que le mal. Les accès déclarés sont
 montrés à l'utilisateur dans la Boutique **avant** l'installation.
 
-> À lire avant de s'y fier : `src/apps/donnees.js` explique pourquoi ce
+> À lire avant de s'y fier : `apps/web/src/apps/donnees.js` explique pourquoi ce
 > n'est **pas** une barrière de sécurité. Toutes les apps partagent le même
 > contexte JavaScript ; n'importe laquelle peut importer `api` et
 > contourner l'accesseur. C'est un contrat lisible et un garde-fou de
@@ -424,7 +424,7 @@ les données métier.
 ## Ce que fait le journal d'activité
 
 Les actions qui changent l'espace — membres, rôles, applications, fichiers —
-sont journalisées **côté serveur**, dans `server/src/audit.js`. Les
+sont journalisées **côté serveur**, dans `apps/api/src/audit.js`. Les
 administrateurs les relisent dans Paramètres → Journal d'activité.
 
 Vous n'avez rien à appeler : c'est la route qui journalise, pas l'interface.
@@ -454,7 +454,7 @@ const peutGerer = ["OWNER", "ADMIN"].includes(role);
 Servez-vous-en pour **ne pas montrer** ce qui échouera — pas pour protéger
 quoi que ce soit. Cacher un bouton est une politesse, jamais une autorisation :
 toute règle qui compte est appliquée par le serveur (`exigerRole` dans
-`server/src/auth.js`), et une requête peut arriver sans passer par votre écran.
+`apps/api/src/auth.js`), et une requête peut arriver sans passer par votre écran.
 
 Corollaire pratique : appelez la route même si vous doutez du rôle, et
 affichez l'erreur renvoyée. C'est plus juste qu'une devinette côté client.

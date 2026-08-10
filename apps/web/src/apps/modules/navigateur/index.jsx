@@ -543,7 +543,7 @@ const Lecture = ({ onglet, enCours, onRapatrier }) => (
       // site distant partagerait notre origine et pourrait lire le jeton
       // de session dans le localStorage. Pas de `allow-scripts` non plus —
       // les scripts sont déjà retirés côté serveur, ceci est la seconde
-      // barrière. Voir server/src/lecture.js.
+      // barrière. Voir apps/api/src/lecture.js.
       sandbox="allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer"
     />

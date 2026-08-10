@@ -25,7 +25,7 @@
 // Le seul cloisonnement réellement appliqué aujourd'hui l'est côté serveur :
 // isolation par espace de travail (toujours), et confinement des
 // applications du Studio à leur propre espace de noms — voir
-// server/src/routes/records.js. Celui-là tient, parce que le Studio n'exécute
+// apps/api/src/routes/records.js. Celui-là tient, parce que le Studio n'exécute
 // pas de code : c'est le moteur générique qui appelle l'API pour lui.
 // ─────────────────────────────────────────────────────────────────────────
 
