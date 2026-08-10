@@ -1,5 +1,19 @@
-// Client de l'API CompanyOS.
+// Client de l'API CompanyOS — la couche transport, et rien d'autre.
+//
+// Une fonction par route : elle prend des arguments, elle rend la réponse.
+// Pas de cache, pas d'état, pas de rechargement. Tout cela vit dans
+// `queries.js`, qui s'appuie sur ce fichier — c'est la séparation qui
+// permet d'appeler l'API depuis un endroit qui n'est pas un composant
+// React (un gestionnaire d'événement, un module de fond) sans rien casser.
+//
 // Le jeton est conservé dans localStorage et rejoué à chaque appel.
+//
+// ⚠ Le jour où l'API et le shell partageront une origine, ce choix devra
+// être revu : un jeton dans localStorage est lisible par tout script qui
+// s'exécute sur l'origine, et l'application analyse des fichiers
+// utilisateur (docx, pptx, pdf) avec des bibliothèques tierces. Un cookie
+// `HttpOnly` est la vraie réponse ; il demande une protection CSRF en
+// contrepartie.
 
 export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const TOKEN_KEY = "companyos-token";
@@ -133,7 +147,7 @@ export const api = {
   // Le web, vu par le serveur. La page ne peut faire ni l'un ni l'autre
   // elle-même : la politique d'origine lui interdit de lire un autre
   // domaine, et un cadre refusé ne lui dit pas pourquoi. Voir
-  // server/src/routes/web.js.
+  // apps/api/src/routes/web.js.
   web: {
     /// Ce qu'il y a au bout de l'adresse : page ou fichier, encadrable ou
     /// non, et pourquoi pas.

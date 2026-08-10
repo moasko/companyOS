@@ -1,0 +1,12 @@
+{
+  "printWidth": 90,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "arrowParens": "always",
+  "overrides": [
+    {
+      "files": "*.md",
+      "options": { "proseWrap": "always", "printWidth": 80 }
+    }
+  ]
+}
