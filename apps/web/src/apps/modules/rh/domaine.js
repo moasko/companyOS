@@ -44,6 +44,13 @@ export const ETATS_DEMANDE = {
   refuse: { label: "Refusé", ton: "bad" },
 };
 
+/// Le nom sous lequel une personne apparaît partout dans le module. Il est
+/// ici parce que tous les écrans l'affichent : une liste qui écrit « Nom
+/// Prénom » à côté d'une autre qui écrit « Prénom Nom » donne l'impression
+/// de deux personnes différentes.
+export const nomComplet = (s) =>
+  [s?.data?.prenom, s?.data?.nom].filter(Boolean).join(" ") || "Sans nom";
+
 /// Réglages par défaut. Modifiables dans l'application, et enregistrés avec
 /// les données de l'espace de travail.
 export const REGLAGES_DEFAUT = {

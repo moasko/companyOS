@@ -32,6 +32,15 @@ export const UNITES = [
   "paquet",
 ];
 
+/// Une quantité, écrite comme on l'écrit en français. Elle est ici plutôt
+/// que dans un écran parce que tous les écrans du module l'affichent : la
+/// même quantité doit se lire pareil dans la grille, la fiche et l'export.
+const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+export const qty = (n) => nf.format(Number(n) || 0);
+
+/// La date du jour au format des enregistrements (AAAA-MM-JJ).
+export const today = () => new Date().toISOString().slice(0, 10);
+
 /// Ordre chronologique stable.
 ///
 /// Deux mouvements saisis le même jour n'ont pas d'heure : on départage

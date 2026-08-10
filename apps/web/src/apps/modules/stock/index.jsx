@@ -6,13 +6,11 @@ import { api } from "../../../api/client";
 import { saveAs, saveToCloud } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { envoyerA } from "../../notifications";
-import { Auteur } from "../../Auteur";
 import { choisirImage, redimensionnerImage } from "../../image";
 import { invaliderReferentiel } from "../../referentiel";
-import { Contenu, useChargement } from "../../chargement";
+import { useChargement } from "../../chargement";
 import {
   SENS,
-  UNITES,
   arbre,
   branche,
   chemin,
@@ -20,8 +18,17 @@ import {
   niveaux,
   parentsPossibles,
   pmp,
+  qty,
   statistiques,
+  today,
 } from "./domaine";
+import { Analyse } from "./vues/Analyse";
+import { BarreLaterale } from "./vues/BarreLaterale";
+import { Catalogue } from "./vues/Catalogue";
+import { FicheArticle } from "./vues/FicheArticle";
+import { FormulaireFournisseur } from "./vues/FormulaireFournisseur";
+import { Fournisseurs } from "./vues/Fournisseurs";
+import { Mouvements } from "./vues/Mouvements";
 import "./stock.scss";
 
 // Gestion de stock.
@@ -37,26 +44,9 @@ import "./stock.scss";
 // modules à venir le lisent par `src/apps/referentiel.js`. Toute écriture
 // ici doit donc invalider ce référentiel, sinon les autres écrans
 // travaillent sur un catalogue périmé.
-
-const VUES = [
-  { id: "catalogue", label: "Catalogue", icone: "faBoxesStacked" },
-  { id: "mouvements", label: "Mouvements", icone: "faRightLeft" },
-  { id: "fournisseurs", label: "Fournisseurs", icone: "faTruckField" },
-  { id: "analyse", label: "Analyse", icone: "faChartColumn" },
-];
-
-const ETATS = [
-  { id: "tous", label: "Tous les états" },
-  { id: "alerte", label: "Sous le seuil" },
-  { id: "rupture", label: "Rupture" },
-];
-
-const TRIS = [
-  { id: "designation", label: "Nom (A→Z)" },
-  { id: "stock", label: "Stock croissant" },
-  { id: "valeur", label: "Valeur décroissante" },
-  { id: "recent", label: "Ajout récent" },
-];
+//
+// Ce fichier tient l'état, les écritures et l'assemblage ; chaque écran est
+// dans `vues/`, et les règles de calcul dans `domaine.js`.
 
 const ARTICLE_VIDE = {
   reference: "",
@@ -86,10 +76,6 @@ const FOURNISSEUR_VIDE = {
 
 import { montant as money } from "../../../utils/monnaie";
 
-const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const qty = (n) => nf.format(Number(n) || 0);
-const today = () => new Date().toISOString().slice(0, 10);
-
 // La vignette voyage dans l'enregistrement (limite serveur : 64 Ko de JSON).
 // À 180 px et qualité 0,7, une photo pèse 8 à 12 Ko : elle tient largement,
 // s'affiche sans requête supplémentaire, et la grille reste instantanée même
@@ -112,67 +98,6 @@ export const manifest = {
   icon: "excel",
   action: "STOCKAPP",
   Window: StockApp,
-};
-
-/// Une branche de l'arbre des catégories, dans la barre latérale.
-const BrancheCategorie = ({
-  noeud,
-  actif,
-  compte,
-  onChoisir,
-  onEditer,
-  profondeur = 0,
-}) => {
-  const [ouvert, setOuvert] = useState(profondeur < 1);
-
-  return (
-    <>
-      <div
-        className="stkCat handcr"
-        data-actif={noeud.id === actif}
-        style={{ paddingLeft: 8 + profondeur * 13 }}
-        onClick={() => onChoisir(noeud.id)}
-      >
-        <span
-          className="stkCatChevron"
-          onClick={(e) => {
-            if (!noeud.enfants.length) return;
-            e.stopPropagation();
-            setOuvert((o) => !o);
-          }}
-        >
-          {noeud.enfants.length ? (
-            <Icon fafa={ouvert ? "faChevronDown" : "faChevronRight"} width={8} />
-          ) : null}
-        </span>
-        <span className="stkCatNom">{noeud.data.nom}</span>
-        <span className="stkCatCompte">{compte(noeud.id)}</span>
-        <span
-          className="stkCatEdit"
-          title="Renommer"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEditer(noeud);
-          }}
-        >
-          <Icon fafa="faPen" width={8} />
-        </span>
-      </div>
-      {ouvert
-        ? noeud.enfants.map((enfant) => (
-            <BrancheCategorie
-              key={enfant.id}
-              noeud={enfant}
-              actif={actif}
-              compte={compte}
-              onChoisir={onChoisir}
-              onEditer={onEditer}
-              profondeur={profondeur + 1}
-            />
-          ))
-        : null}
-    </>
-  );
 };
 
 function StockApp() {
@@ -801,84 +726,19 @@ function StockApp() {
       ) : (
         <div className="stkShell">
           {/* ---------- Barre latérale ---------- */}
-          <aside className="stkNav cosScroll">
-            {VUES.map((v) => (
-              <div
-                key={v.id}
-                className="stkNavItem handcr"
-                data-actif={vue === v.id}
-                onClick={() => setVue(v.id)}
-              >
-                <Icon fafa={v.icone} width={13} />
-                <span>{v.label}</span>
-              </div>
-            ))}
-
-            {vue === "catalogue" ? (
-              <>
-                <div className="stkNavTitre">
-                  <span>Catégories</span>
-                  <span
-                    className="stkNavPlus handcr"
-                    title={
-                      catActive
-                        ? `Nouvelle sous-catégorie dans « ${catActive.data.nom} »`
-                        : "Nouvelle catégorie"
-                    }
-                    onClick={() => editerCategorie(null)}
-                  >
-                    <Icon fafa="faPlus" width={9} />
-                  </span>
-                </div>
-
-                <div
-                  className="stkCat handcr"
-                  data-actif={categorieActive === null}
-                  onClick={() => setCategorieActive(null)}
-                >
-                  <span className="stkCatChevron" />
-                  <span className="stkCatNom">Tout le catalogue</span>
-                  <span className="stkCatCompte">{articles.length}</span>
-                </div>
-
-                {racines.map((n) => (
-                  <BrancheCategorie
-                    key={n.id}
-                    noeud={n}
-                    actif={categorieActive}
-                    compte={compteCategorie}
-                    onChoisir={setCategorieActive}
-                    onEditer={editerCategorie}
-                  />
-                ))}
-
-                {articles.some((a) => !a.data.categorieId) ? (
-                  <div
-                    className="stkCat handcr"
-                    data-actif={categorieActive === "__sans__"}
-                    onClick={() => setCategorieActive("__sans__")}
-                  >
-                    <span className="stkCatChevron" />
-                    <span className="stkCatNom stkMuted">Sans catégorie</span>
-                    <span className="stkCatCompte">
-                      {articles.filter((a) => !a.data.categorieId).length}
-                    </span>
-                  </div>
-                ) : null}
-
-                {catActive ? (
-                  <div className="stkCatActions">
-                    <span className="handcr" onClick={rangerCategorie}>
-                      Ranger ailleurs
-                    </span>
-                    <span className="handcr stkDanger" onClick={supprimerCategorie}>
-                      Supprimer
-                    </span>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </aside>
+          <BarreLaterale
+            vue={vue}
+            setVue={setVue}
+            articles={articles}
+            racines={racines}
+            categorieActive={categorieActive}
+            setCategorieActive={setCategorieActive}
+            catActive={catActive}
+            compteCategorie={compteCategorie}
+            editerCategorie={editerCategorie}
+            rangerCategorie={rangerCategorie}
+            supprimerCategorie={supprimerCategorie}
+          />
 
           {/* ---------- Contenu ---------- */}
           <main className="stkMain">
@@ -916,401 +776,71 @@ function StockApp() {
             </div>
 
             {vue === "catalogue" ? (
-              <>
-                <div className="stkBarre">
-                  <div className="stkRecherche">
-                    <Icon fafa="faMagnifyingGlass" width={11} />
-                    <input
-                      type="text"
-                      placeholder="Référence, désignation, code-barres…"
-                      value={requete}
-                      onChange={(e) => setRequete(e.target.value)}
-                    />
-                    {requete ? (
-                      <Icon fafa="faXmark" width={10} onClick={() => setRequete("")} />
-                    ) : null}
-                  </div>
-
-                  <select
-                    value={filtreEtat}
-                    onChange={(e) => setFiltreEtat(e.target.value)}
-                  >
-                    {ETATS.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select value={tri} onChange={(e) => setTri(e.target.value)}>
-                    {TRIS.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <div className="stkVues">
-                    <span
-                      className="handcr"
-                      data-actif={affichage === "grille"}
-                      title="Grille"
-                      onClick={() => setAffichage("grille")}
-                    >
-                      <Icon fafa="faTableCellsLarge" width={11} />
-                    </span>
-                    <span
-                      className="handcr"
-                      data-actif={affichage === "liste"}
-                      title="Liste"
-                      onClick={() => setAffichage("liste")}
-                    >
-                      <Icon fafa="faList" width={11} />
-                    </span>
-                  </div>
-
-                  <div className="stkPrimary handcr" onClick={nouvelArticle}>
-                    <Icon fafa="faPlus" width={10} />
-                    <span>Nouveau produit</span>
-                  </div>
-                  <div className="stkBtnGhost handcr" onClick={exporterInventaire}>
-                    Export
-                  </div>
-                </div>
-
-                {/* Tant que rien n'est chargé, on montre un squelette et non
-                    « Votre catalogue est vide » : cette phrase serait fausse,
-                    et pousse à recréer des produits qui existent déjà. */}
-                {chargement.initial || chargement.erreur ? (
-                  <Contenu
-                    etat={chargement}
-                    vide={false}
-                    squelette={affichage === "grille" ? "grille" : "liste"}
-                    lignes={affichage === "grille" ? 10 : 7}
-                  />
-                ) : !visibles.length ? (
-                  <div className="stkVide">
-                    <Icon fafa="faBoxOpen" width={26} />
-                    <span>
-                      {articles.length
-                        ? "Aucun produit ne correspond à ces filtres."
-                        : "Votre catalogue est vide."}
-                    </span>
-                    {!articles.length ? (
-                      <div className="stkPrimary handcr" onClick={nouvelArticle}>
-                        Créer le premier produit
-                      </div>
-                    ) : null}
-                  </div>
-                ) : affichage === "grille" ? (
-                  <div className="stkGrille cosScroll">
-                    {visibles.map((a) => {
-                      const stock = stocks[a.id] || 0;
-                      const e = etat(stock, a.data.seuil);
-                      return (
-                        <div
-                          key={a.id}
-                          className="stkCarte handcr"
-                          data-actif={a.id === selectedId}
-                          onClick={() => ouvrirArticle(a)}
-                        >
-                          <div className="stkCarteImg">
-                            {a.data.vignette ? (
-                              <img src={a.data.vignette} alt="" />
-                            ) : (
-                              <Icon fafa="faBox" width={22} />
-                            )}
-                            <span className="stkPastille" data-ton={e.ton}>
-                              {qty(stock)}
-                            </span>
-                          </div>
-                          <div className="stkCarteNom">{a.data.designation}</div>
-                          <div className="stkCarteMeta">
-                            {[
-                              a.data.reference,
-                              categorieDe(a.data.categorieId)?.data.nom,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ") || "—"}
-                          </div>
-                          <div className="stkCartePrix">{money(a.data.prixVente)}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="stkTable cosScroll">
-                    <div className="stkTr stkTrArt stkTh">
-                      <span />
-                      <span>Produit</span>
-                      <span>Catégorie</span>
-                      <span className="stkTdNum">Stock</span>
-                      <span className="stkTdNum">Seuil</span>
-                      <span className="stkTdNum">Valeur</span>
-                      <span>État</span>
-                    </div>
-                    {visibles.map((a) => {
-                      const stock = stocks[a.id] || 0;
-                      const e = etat(stock, a.data.seuil);
-                      return (
-                        <div
-                          key={a.id}
-                          className="stkTr stkTrArt handcr"
-                          data-actif={a.id === selectedId}
-                          onClick={() => ouvrirArticle(a)}
-                        >
-                          <span className="stkTdImg">
-                            {a.data.vignette ? (
-                              <img src={a.data.vignette} alt="" />
-                            ) : (
-                              <Icon fafa="faBox" width={11} />
-                            )}
-                          </span>
-                          <span className="stkTdNom">
-                            <strong>{a.data.designation}</strong>
-                            <em>{a.data.reference}</em>
-                          </span>
-                          <span className="stkMuted">
-                            {chemin(categories, a.data.categorieId) || "—"}
-                          </span>
-                          <span className="stkTdNum">
-                            {qty(stock)} {a.data.unite}
-                          </span>
-                          <span className="stkTdNum stkMuted">{qty(a.data.seuil)}</span>
-                          <span className="stkTdNum">
-                            {money(stock * pmp(a, mouvements))}
-                          </span>
-                          <span>
-                            <span className="stkTag" data-ton={e.ton}>
-                              {e.label}
-                            </span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
+              <Catalogue
+                requete={requete}
+                setRequete={setRequete}
+                filtreEtat={filtreEtat}
+                setFiltreEtat={setFiltreEtat}
+                tri={tri}
+                setTri={setTri}
+                affichage={affichage}
+                setAffichage={setAffichage}
+                nouvelArticle={nouvelArticle}
+                exporterInventaire={exporterInventaire}
+                chargement={chargement}
+                visibles={visibles}
+                articles={articles}
+                categories={categories}
+                categorieDe={categorieDe}
+                stocks={stocks}
+                mouvements={mouvements}
+                selectedId={selectedId}
+                ouvrirArticle={ouvrirArticle}
+              />
             ) : null}
 
             {vue === "mouvements" ? (
-              !mouvements.length ? (
-                <div className="stkVide">
-                  <Icon fafa="faRightLeft" width={24} />
-                  <span>Aucun mouvement enregistré.</span>
-                </div>
-              ) : (
-                <div className="stkTable cosScroll">
-                  <div className="stkTr stkTrMvt stkTh">
-                    <span>Date</span>
-                    <span>Produit</span>
-                    <span>Type</span>
-                    <span className="stkTdNum">Quantité</span>
-                    <span>Motif</span>
-                    <span>Par</span>
-                  </div>
-                  {[...mouvements]
-                    .sort((a, b) => (a.data.date < b.data.date ? 1 : -1))
-                    .slice(0, 300)
-                    .map((m) => {
-                      const art = articles.find((a) => a.id === m.data.articleId);
-                      const s = SENS[m.data.sens] || SENS.entree;
-                      return (
-                        <div key={m.id} className="stkTr stkTrMvt">
-                          <span className="stkMuted">{m.data.date}</span>
-                          <span
-                            className="stkLien handcr"
-                            onClick={() => {
-                              if (!art) return;
-                              setVue("catalogue");
-                              ouvrirArticle(art);
-                            }}
-                          >
-                            {art?.data.designation || "produit supprimé"}
-                          </span>
-                          <span className="stkSens" data-ton={s.ton}>
-                            <Icon fafa={s.icone} width={9} />
-                            {s.label}
-                          </span>
-                          <span className="stkTdNum">{qty(m.data.quantite)}</span>
-                          <span className="stkMuted">{m.data.motif || "—"}</span>
-                          <span className="stkMuted">{m.auteur?.name || "—"}</span>
-                        </div>
-                      );
-                    })}
-                </div>
-              )
+              <Mouvements
+                mouvements={mouvements}
+                articles={articles}
+                setVue={setVue}
+                ouvrirArticle={ouvrirArticle}
+              />
             ) : null}
 
             {vue === "fournisseurs" ? (
-              <>
-                <div className="stkBarre">
-                  <div
-                    className="stkPrimary handcr"
-                    onClick={() => setFournisseurDraft({ ...FOURNISSEUR_VIDE })}
-                  >
-                    <Icon fafa="faPlus" width={10} />
-                    <span>Nouveau fournisseur</span>
-                  </div>
-                </div>
-
-                {!fournisseurs.length ? (
-                  <div className="stkVide">
-                    <Icon fafa="faTruckField" width={24} />
-                    <span>Aucun fournisseur enregistré.</span>
-                  </div>
-                ) : (
-                  <div className="stkTable cosScroll">
-                    {fournisseurs.map((f) => (
-                      <div key={f.id} className="stkTr stkTrFrn">
-                        <span
-                          className="stkTdNom handcr"
-                          onClick={() => setFournisseurDraft({ id: f.id, ...f.data })}
-                        >
-                          <strong>{f.data.nom}</strong>
-                          <em>{f.data.ville}</em>
-                        </span>
-                        <span className="stkMuted">{f.data.contact || "—"}</span>
-                        <span className="stkMuted">{f.data.telephone || "—"}</span>
-                        <span className="stkTdNum stkMuted">
-                          {articles.filter((a) => a.data.fournisseurId === f.id).length}{" "}
-                          produits
-                        </span>
-                        <span
-                          className="stkRetirer handcr"
-                          onClick={() => supprimerFournisseur(f)}
-                        >
-                          <Icon fafa="faTrash" width={10} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+              <Fournisseurs
+                fournisseurs={fournisseurs}
+                articles={articles}
+                nouveauFournisseur={() => setFournisseurDraft({ ...FOURNISSEUR_VIDE })}
+                setFournisseurDraft={setFournisseurDraft}
+                supprimerFournisseur={supprimerFournisseur}
+              />
             ) : null}
 
             {vue === "analyse" ? (
-              <div className="stkAnalyse cosScroll">
-                <div className="stkSousTitre">Valeur par catégorie</div>
-                {(() => {
-                  const parCat = racines.map((n) => {
-                    const dans = new Set(branche(categories, n.id));
-                    return {
-                      nom: n.data.nom,
-                      valeur: articles
-                        .filter((a) => dans.has(a.data.categorieId))
-                        .reduce((s, a) => s + (stocks[a.id] || 0) * pmp(a, mouvements), 0),
-                    };
-                  });
-                  const sans = articles
-                    .filter((a) => !a.data.categorieId)
-                    .reduce((s, a) => s + (stocks[a.id] || 0) * pmp(a, mouvements), 0);
-                  if (sans) parCat.push({ nom: "Sans catégorie", valeur: sans });
-
-                  if (!parCat.length)
-                    return <div className="stkEmptyBox">Aucun produit à valoriser.</div>;
-
-                  const max = Math.max(1, ...parCat.map((c) => c.valeur));
-                  return parCat
-                    .sort((a, b) => b.valeur - a.valeur)
-                    .map((c) => (
-                      <div key={c.nom} className="stkJauge">
-                        <span className="stkJaugeNom">{c.nom}</span>
-                        <span className="stkJaugeFond">
-                          <span
-                            className="stkJaugeVal"
-                            style={{ width: `${(c.valeur / max) * 100}%` }}
-                          />
-                        </span>
-                        <span className="stkJaugeChiffre">{money(c.valeur)}</span>
-                      </div>
-                    ));
-                })()}
-
-                <div className="stkSousTitre">À réapprovisionner</div>
-                {(() => {
-                  const bas = articles
-                    .filter((a) => etat(stocks[a.id], a.data.seuil).id !== "ok")
-                    .sort((a, b) => (stocks[a.id] || 0) - (stocks[b.id] || 0));
-
-                  if (!bas.length)
-                    return (
-                      <div className="stkEmptyBox">
-                        Aucun produit sous son seuil. Tout est en ordre.
-                      </div>
-                    );
-
-                  return bas.map((a) => {
-                    const e = etat(stocks[a.id], a.data.seuil);
-                    return (
-                      <div
-                        key={a.id}
-                        className="stkAlerte handcr"
-                        onClick={() => {
-                          setVue("catalogue");
-                          ouvrirArticle(a);
-                        }}
-                      >
-                        <span className="stkTag" data-ton={e.ton}>
-                          {e.label}
-                        </span>
-                        <span className="stkAlerteNom">{a.data.designation}</span>
-                        <span className="stkMuted">
-                          {qty(stocks[a.id] || 0)} / seuil {qty(a.data.seuil)}
-                        </span>
-                        <span className="stkMuted">
-                          {fournisseurDe(a.data.fournisseurId)?.data.nom ||
-                            "sans fournisseur"}
-                        </span>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
+              <Analyse
+                racines={racines}
+                categories={categories}
+                articles={articles}
+                stocks={stocks}
+                mouvements={mouvements}
+                fournisseurDe={fournisseurDe}
+                setVue={setVue}
+                ouvrirArticle={ouvrirArticle}
+              />
             ) : null}
           </main>
 
           {/* ---------- Panneau ---------- */}
           <aside className="stkPanneau cosScroll">
             {fournisseurDraft ? (
-              <>
-                <div className="stkPanTitre">
-                  {fournisseurDraft.id ? "Fournisseur" : "Nouveau fournisseur"}
-                </div>
-                {[
-                  ["nom", "Nom"],
-                  ["contact", "Contact"],
-                  ["telephone", "Téléphone"],
-                  ["email", "E-mail"],
-                  ["ville", "Ville"],
-                ].map(([cle, label]) => (
-                  <label key={cle} className="stkField">
-                    <span className="stkLabel">{label}</span>
-                    <input
-                      type="text"
-                      value={fournisseurDraft[cle] || ""}
-                      onChange={(e) =>
-                        setFournisseurDraft((d) => ({ ...d, [cle]: e.target.value }))
-                      }
-                    />
-                  </label>
-                ))}
-                <div className="stkFormActions">
-                  <div
-                    className="stkPrimary handcr"
-                    data-off={busy}
-                    onClick={enregistrerFournisseur}
-                  >
-                    Enregistrer
-                  </div>
-                  <div
-                    className="stkBtnGhost handcr"
-                    onClick={() => setFournisseurDraft(null)}
-                  >
-                    Annuler
-                  </div>
-                </div>
-              </>
+              <FormulaireFournisseur
+                fournisseurDraft={fournisseurDraft}
+                setFournisseurDraft={setFournisseurDraft}
+                busy={busy}
+                enregistrerFournisseur={enregistrerFournisseur}
+              />
             ) : !draft ? (
               <div className="stkPanVide">
                 <Icon fafa="faHandPointer" width={20} />
@@ -1320,365 +850,28 @@ function StockApp() {
                 </span>
               </div>
             ) : (
-              <>
-                <div className="stkPhoto">
-                  {draft.vignette ? (
-                    <img src={draft.vignette} alt={draft.designation} />
-                  ) : (
-                    <Icon fafa="faImage" width={26} />
-                  )}
-                </div>
-                <div className="stkPhotoActions">
-                  <span className="handcr" onClick={changerImage}>
-                    {draft.vignette ? "Changer l'image" : "Ajouter une image"}
-                  </span>
-                  {draft.vignette ? (
-                    <span className="handcr stkDanger" onClick={retirerImage}>
-                      Retirer
-                    </span>
-                  ) : null}
-                </div>
-
-                {selectedId ? (
-                  <div className="stkStockGros">
-                    <span
-                      className="stkStockVal"
-                      data-ton={etat(stocks[selectedId], draft.seuil).ton}
-                    >
-                      {qty(stocks[selectedId] || 0)}
-                    </span>
-                    <span className="stkStockUnite">{draft.unite} en stock</span>
-                  </div>
-                ) : null}
-
-                <div className="stkOnglets">
-                  {[
-                    ["fiche", "Fiche"],
-                    ["stock", "Stock"],
-                    ["historique", "Historique"],
-                  ].map(([id, label]) => (
-                    <span
-                      key={id}
-                      className="handcr"
-                      data-actif={onglet === id}
-                      onClick={() => setOnglet(id)}
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-
-                {onglet === "fiche" ? (
-                  <>
-                    <label className="stkField">
-                      <span className="stkLabel">Désignation *</span>
-                      <input
-                        type="text"
-                        value={draft.designation}
-                        onChange={champ("designation")}
-                      />
-                    </label>
-
-                    <div className="stkDeux">
-                      <label className="stkField">
-                        <span className="stkLabel">Référence</span>
-                        <input
-                          type="text"
-                          value={draft.reference}
-                          onChange={champ("reference")}
-                        />
-                      </label>
-                      <label className="stkField">
-                        <span className="stkLabel">Code-barres</span>
-                        <input
-                          type="text"
-                          value={draft.codeBarre}
-                          onChange={champ("codeBarre")}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="stkField">
-                      <span className="stkLabel">Catégorie</span>
-                      <select value={draft.categorieId} onChange={champ("categorieId")}>
-                        <option value="">Sans catégorie</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {chemin(categories, c.id)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="stkDeux">
-                      <label className="stkField">
-                        <span className="stkLabel">Marque</span>
-                        <input
-                          type="text"
-                          value={draft.marque}
-                          onChange={champ("marque")}
-                        />
-                      </label>
-                      <label className="stkField">
-                        <span className="stkLabel">Unité</span>
-                        <select value={draft.unite} onChange={champ("unite")}>
-                          {UNITES.map((u) => (
-                            <option key={u} value={u}>
-                              {u}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="stkDeux">
-                      <label className="stkField">
-                        <span className="stkLabel">Prix d'achat</span>
-                        <input
-                          type="number"
-                          value={draft.prixAchat}
-                          onChange={champ("prixAchat")}
-                        />
-                      </label>
-                      <label className="stkField">
-                        <span className="stkLabel">Prix de vente</span>
-                        <input
-                          type="number"
-                          value={draft.prixVente}
-                          onChange={champ("prixVente")}
-                        />
-                      </label>
-                    </div>
-
-                    {/* La marge se calcule, elle ne se saisit pas. L'afficher
-                        en direct évite de découvrir en fin de mois qu'un
-                        produit était vendu à perte. */}
-                    {draft.prixVente > 0 ? (
-                      <div
-                        className="stkMarge"
-                        data-negatif={draft.prixVente <= draft.prixAchat}
-                      >
-                        Marge {money(draft.prixVente - draft.prixAchat)} ·{" "}
-                        {Math.round(
-                          ((draft.prixVente - draft.prixAchat) / draft.prixVente) * 100,
-                        )}
-                        %
-                      </div>
-                    ) : null}
-
-                    <div className="stkDeux">
-                      <label className="stkField">
-                        <span className="stkLabel">Seuil d'alerte</span>
-                        <input
-                          type="number"
-                          value={draft.seuil}
-                          onChange={champ("seuil")}
-                        />
-                      </label>
-                      <label className="stkField">
-                        <span className="stkLabel">TVA %</span>
-                        <input type="number" value={draft.tva} onChange={champ("tva")} />
-                      </label>
-                    </div>
-
-                    <label className="stkField">
-                      <span className="stkLabel">Fournisseur</span>
-                      <select
-                        value={draft.fournisseurId}
-                        onChange={champ("fournisseurId")}
-                      >
-                        <option value="">Aucun</option>
-                        {fournisseurs.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.data.nom}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="stkField">
-                      <span className="stkLabel">Emplacement</span>
-                      <input
-                        type="text"
-                        placeholder="Allée B, étagère 3"
-                        value={draft.emplacement}
-                        onChange={champ("emplacement")}
-                      />
-                    </label>
-
-                    <label className="stkField">
-                      <span className="stkLabel">Description</span>
-                      <textarea
-                        rows={3}
-                        value={draft.description}
-                        onChange={champ("description")}
-                      />
-                    </label>
-
-                    {selected ? <Auteur record={selected} /> : null}
-
-                    <div className="stkFormActions">
-                      <div
-                        className="stkPrimary handcr"
-                        data-off={busy}
-                        onClick={enregistrerArticle}
-                      >
-                        <Icon fafa="faFloppyDisk" width={11} />
-                        <span>{busy ? "…" : "Enregistrer"}</span>
-                      </div>
-                      {selectedId ? (
-                        <div
-                          className="stkBtnGhost stkDanger handcr"
-                          onClick={supprimerArticle}
-                        >
-                          Supprimer
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
-
-                {onglet === "stock" ? (
-                  !selectedId ? (
-                    <div className="stkEmptyBox">
-                      Enregistrez le produit avant d'entrer des mouvements.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="stkSens3">
-                        {Object.entries(SENS).map(([id, s]) => (
-                          <span
-                            key={id}
-                            className="handcr"
-                            data-actif={mvt.sens === id}
-                            data-ton={s.ton}
-                            onClick={() => setMvt((m) => ({ ...m, sens: id }))}
-                          >
-                            <Icon fafa={s.icone} width={10} />
-                            {s.label}
-                          </span>
-                        ))}
-                      </div>
-
-                      {mvt.sens === "inventaire" ? (
-                        <div className="stkNote">
-                          L'inventaire ne s'ajoute pas au stock : il le remplace par la
-                          quantité réellement comptée.
-                        </div>
-                      ) : null}
-
-                      <div className="stkDeux">
-                        <label className="stkField">
-                          <span className="stkLabel">
-                            {mvt.sens === "inventaire" ? "Quantité comptée" : "Quantité"}
-                          </span>
-                          <input
-                            type="number"
-                            value={mvt.quantite}
-                            onChange={(e) =>
-                              setMvt((m) => ({ ...m, quantite: e.target.value }))
-                            }
-                          />
-                        </label>
-                        <label className="stkField">
-                          <span className="stkLabel">Date</span>
-                          <input
-                            type="date"
-                            value={mvt.date}
-                            onChange={(e) =>
-                              setMvt((m) => ({ ...m, date: e.target.value }))
-                            }
-                          />
-                        </label>
-                      </div>
-
-                      {mvt.sens === "entree" ? (
-                        <label className="stkField">
-                          <span className="stkLabel">Prix d'achat unitaire</span>
-                          <input
-                            type="number"
-                            placeholder={String(draft.prixAchat || 0)}
-                            value={mvt.prixUnitaire}
-                            onChange={(e) =>
-                              setMvt((m) => ({ ...m, prixUnitaire: e.target.value }))
-                            }
-                          />
-                        </label>
-                      ) : null}
-
-                      <label className="stkField">
-                        <span className="stkLabel">Motif</span>
-                        <input
-                          type="text"
-                          placeholder="Livraison, vente, casse…"
-                          value={mvt.motif}
-                          onChange={(e) =>
-                            setMvt((m) => ({ ...m, motif: e.target.value }))
-                          }
-                        />
-                      </label>
-
-                      <div className="stkFormActions">
-                        <div
-                          className="stkPrimary handcr"
-                          data-off={busy}
-                          onClick={ajouterMouvement}
-                        >
-                          Enregistrer le mouvement
-                        </div>
-                      </div>
-
-                      <div className="stkRecap">
-                        <span>Prix moyen pondéré</span>
-                        <strong>{selected ? money(pmp(selected, mouvements)) : "—"}</strong>
-                      </div>
-                      <div className="stkRecap">
-                        <span>Valeur du stock</span>
-                        <strong>
-                          {selected
-                            ? money((stocks[selectedId] || 0) * pmp(selected, mouvements))
-                            : "—"}
-                        </strong>
-                      </div>
-                    </>
-                  )
-                ) : null}
-
-                {onglet === "historique" ? (
-                  !mouvementsArticle.length ? (
-                    <div className="stkEmptyBox">Aucun mouvement pour ce produit.</div>
-                  ) : (
-                    <div className="stkHisto">
-                      {mouvementsArticle.map((m) => {
-                        const s = SENS[m.data.sens] || SENS.entree;
-                        return (
-                          <div key={m.id} className="stkHistoLigne">
-                            <span className="stkSens" data-ton={s.ton}>
-                              <Icon fafa={s.icone} width={9} />
-                            </span>
-                            <div className="stkHistoInfo">
-                              <div className="stkHistoTitre">
-                                {s.label} · {qty(m.data.quantite)} {draft.unite}
-                              </div>
-                              <div className="stkHistoMeta">
-                                {[m.data.date, m.data.motif, m.auteur?.name]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </div>
-                            </div>
-                            <span
-                              className="stkRetirer handcr"
-                              onClick={() => supprimerMouvement(m)}
-                            >
-                              <Icon fafa="faXmark" width={10} />
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
-                ) : null}
-              </>
+              <FicheArticle
+                draft={draft}
+                selected={selected}
+                selectedId={selectedId}
+                categories={categories}
+                fournisseurs={fournisseurs}
+                stocks={stocks}
+                mouvements={mouvements}
+                mouvementsArticle={mouvementsArticle}
+                onglet={onglet}
+                setOnglet={setOnglet}
+                champ={champ}
+                mvt={mvt}
+                setMvt={setMvt}
+                busy={busy}
+                changerImage={changerImage}
+                retirerImage={retirerImage}
+                enregistrerArticle={enregistrerArticle}
+                supprimerArticle={supprimerArticle}
+                ajouterMouvement={ajouterMouvement}
+                supprimerMouvement={supprimerMouvement}
+              />
             )}
           </aside>
 

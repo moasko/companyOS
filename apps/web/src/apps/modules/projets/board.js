@@ -30,6 +30,17 @@ export function idCourt() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/// Initiales d'un nom, pour les pastilles d'avatar. Au niveau module :
+/// passée en prop à des cartes mémorisées, une fonction recréée à chaque
+/// rendu annulerait la mémorisation.
+export const initiales = (nom = "") =>
+  nom
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((m) => m[0].toUpperCase())
+    .join("");
+
 // ---------------------------------------------------------------------------
 // Ordonnancement
 // ---------------------------------------------------------------------------

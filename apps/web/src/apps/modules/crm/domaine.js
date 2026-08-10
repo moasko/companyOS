@@ -43,6 +43,13 @@ export const ACTIVITES = {
   tache: { label: "Tâche", icone: "faListCheck", ton: "warn" },
 };
 
+/// Le nom sous lequel un client apparaît partout dans le module, et son
+/// initiale pour les pastilles. Ils sont ici parce que tous les écrans les
+/// affichent : la liste, le pipeline, l'agenda et la fiche doivent désigner
+/// un client de la même façon, sans quoi on croit en voir deux.
+export const nomDe = (c) => c?.data.entreprise || c?.data.nom || "Sans nom";
+export const initiale = (c) => nomDe(c).trim().charAt(0).toUpperCase();
+
 export const today = () => new Date().toISOString().slice(0, 10);
 
 export const plusJours = (jours, depuis) => {

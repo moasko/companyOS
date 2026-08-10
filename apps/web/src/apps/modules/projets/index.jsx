@@ -1,32 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
-import { Icon } from "../../../utils/general";
 import { api } from "../../../api/client";
 import { saveAs, saveToCloud } from "../../cloud";
 import { modal } from "../../modalRequest";
-import { ouvrirFichier } from "../../openRequest";
 import { accesDonnees } from "../../donnees";
 import { envoyerA } from "../../notifications";
 import {
   COLONNES_PAR_DEFAUT,
-  ETIQUETTES,
   FILTRE_VIDE,
-  avancementChecklist,
   besoinDeRenumeroter,
   cartesDe,
-  deplacerDansListe,
-  etiquetteDe,
   filtrer,
-  filtreActif,
-  formatEcheance,
   idCourt,
+  initiales,
   rangPour,
   renumeroter,
   statistiques,
-  statutEcheance,
   versCsv,
 } from "./board";
+import { BarreLaterale } from "./vues/BarreLaterale";
+import { Echeancier } from "./vues/Echeancier";
+import { EnTete } from "./vues/EnTete";
+import { Liste } from "./vues/Liste";
+import { PanneauCarte } from "./vues/PanneauCarte";
+import { Planche } from "./vues/Planche";
 import "./projets.scss";
 
 // Gestion de projet de CompanyOS — tableaux kanban.
@@ -43,6 +41,9 @@ import "./projets.scss";
 //   cartes   — { tableauId, colonneId, ordre, titre, description, echeance,
 //                assigneId, etiquettes[], checklist[], commentaires[],
 //                liens: { clientId, factureId }, pieces[] }
+//
+// Ce fichier tient l'état, les écritures et l'assemblage ; chaque écran est
+// dans `vues/`, et les règles de calcul dans `board.js`.
 
 export const manifest = {
   id: "projets",
@@ -78,150 +79,6 @@ const COULEURS_TABLEAU = [
   "#cd5a91",
   "#4bbf6b",
 ];
-
-const VUES = [
-  { id: "tableau", label: "Tableau", icone: "faTableColumns" },
-  { id: "liste", label: "Liste", icone: "faListUl" },
-  { id: "echeances", label: "Échéances", icone: "faCalendarDay" },
-];
-
-// ---- Rendu d'une carte --------------------------------------------------
-
-/// Initiales d'un nom, pour les pastilles d'avatar. Au niveau module :
-/// passée en prop à des cartes mémorisées, une fonction recréée à chaque
-/// rendu annulerait la mémorisation.
-const initiales = (nom = "") =>
-  nom
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((m) => m[0].toUpperCase())
-    .join("");
-
-/// Carte du tableau.
-///
-/// Défini au niveau du module, et surtout PAS à l'intérieur de
-/// `ProjetsApp` : un composant déclaré dans le corps d'un autre est vu
-/// comme un type neuf à chaque rendu, donc React démonte et remonte
-/// toutes les cartes. Pendant un glisser — où l'état change à chaque
-/// mouvement — le nœud tiré était détruit aussitôt et le navigateur
-/// annulait le déplacement.
-const Carte = React.memo(function Carte({
-  carte,
-  index,
-  colonneId,
-  terminee,
-  membre,
-  client,
-  glissee,
-  initiales,
-  onGlisserDebut,
-  onGlisserFin,
-  onSurvol,
-  onDepot,
-  onOuvrir,
-}) {
-  const d = carte.data;
-  const av = avancementChecklist(d.checklist);
-  const ech = statutEcheance(d.echeance, terminee);
-
-  return (
-    <div
-      className="pjCarte"
-      draggable
-      data-glissee={glissee ? "true" : "false"}
-      onDragStart={(e) => {
-        // Sans `setData`, le navigateur n'initie tout simplement pas le
-        // glisser : c'est ce qui donne l'impression que les cartes sont
-        // collées. Le contenu importe peu, sa présence est obligatoire.
-        e.dataTransfer.setData("text/plain", carte.id);
-        e.dataTransfer.effectAllowed = "move";
-        onGlisserDebut(carte, colonneId);
-      }}
-      onDragEnd={onGlisserFin}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        const r = e.currentTarget.getBoundingClientRect();
-        const apres = e.clientY > r.top + r.height / 2;
-        onSurvol(colonneId, index + (apres ? 1 : 0));
-      }}
-      onDrop={(e) => {
-        // La carte est elle-même une cible : déposer sur une carte doit
-        // insérer à côté d'elle, pas retomber sur la colonne entière.
-        e.preventDefault();
-        e.stopPropagation();
-        onDepot(colonneId, index);
-      }}
-      onClick={() => onOuvrir(carte)}
-    >
-      {(d.etiquettes || []).length ? (
-        <div className="pjEtiquettes">
-          {d.etiquettes.map((id) => {
-            const e = etiquetteDe(id);
-            return e ? (
-              <span
-                key={id}
-                className="pjEtiquette"
-                style={{ background: e.couleur }}
-                title={e.nom}
-              />
-            ) : null;
-          })}
-        </div>
-      ) : null}
-
-      <div className="pjCarteTitre">{d.titre}</div>
-
-      {client ? (
-        <div className="pjCarteClient">
-          <Icon fafa="faBuilding" width={9} />
-          {client.data.entreprise || client.data.nom}
-        </div>
-      ) : null}
-
-      <div className="pjCartePied">
-        {d.echeance ? (
-          <span className="pjEcheance" data-etat={ech}>
-            <Icon fafa="faClock" width={9} />
-            {formatEcheance(d.echeance)}
-          </span>
-        ) : null}
-        {d.description ? (
-          <span className="pjIndice" title="Cette carte a une description">
-            <Icon fafa="faAlignLeft" width={9} />
-          </span>
-        ) : null}
-        {av ? (
-          <span
-            className="pjIndice"
-            data-complet={av.complet ? "true" : "false"}
-          >
-            <Icon fafa="faSquareCheck" width={9} />
-            {av.faits}/{av.total}
-          </span>
-        ) : null}
-        {(d.commentaires || []).length ? (
-          <span className="pjIndice">
-            <Icon fafa="faComment" width={9} />
-            {d.commentaires.length}
-          </span>
-        ) : null}
-        {(d.pieces || []).length ? (
-          <span className="pjIndice">
-            <Icon fafa="faPaperclip" width={9} />
-            {d.pieces.length}
-          </span>
-        ) : null}
-        {membre ? (
-          <span className="pjAvatar" title={membre.name}>
-            {initiales(membre.name)}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
-});
 
 function ProjetsApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
@@ -720,608 +577,6 @@ function ProjetsApp() {
     }
   };
 
-  const vueTableau = (
-    <div
-      className="pjPlanche cosScroll"
-      onWheel={molettePlanche}
-      onDragOver={bordPendantGlisser}
-    >
-      {colonnes.map((col) => {
-        const dedans = cartesDe(cartesVisibles, col.id);
-        return (
-          <div
-            className="pjColonne"
-            key={col.id}
-            data-cible={cible?.colonneId === col.id ? "true" : "false"}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "move";
-              // Survol du vide d'une colonne : la carte ira à la fin.
-              if (!e.target.closest(".pjCarte")) {
-                setCible({ colonneId: col.id, position: dedans.length });
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              deposer(
-                col.id,
-                cible?.colonneId === col.id ? cible.position : dedans.length
-              );
-            }}
-          >
-            <div className="pjColonneTete">
-              <span
-                className="pjColonneTitre"
-                onClick={() => renommerColonne(col)}
-              >
-                {col.titre}
-              </span>
-              <span className="pjCompte">{dedans.length}</span>
-              <Icon
-                className="pjColonneSuppr"
-                fafa="faXmark"
-                width={10}
-                onClick={() => supprimerColonne(col)}
-              />
-            </div>
-
-            <div className="pjCartes cosScroll">
-              {dedans.map((carte, i) => (
-                <React.Fragment key={carte.id}>
-                  {cible?.colonneId === col.id && cible.position === i ? (
-                    <div className="pjFente" />
-                  ) : null}
-                  <Carte
-                    carte={carte}
-                    index={i}
-                    colonneId={col.id}
-                    terminee={col.id === stats.colonneTerminee}
-                    membre={membreDe(carte.data.assigneId)}
-                    client={clientDe(carte.data.liens?.clientId)}
-                    glissee={glisse?.carteId === carte.id}
-                    initiales={initiales}
-                    onGlisserDebut={debutGlisser}
-                    onGlisserFin={finGlisser}
-                    onSurvol={survolCible}
-                    onDepot={deposer}
-                    onOuvrir={setCarteOuverte}
-                  />
-                </React.Fragment>
-              ))}
-              {cible?.colonneId === col.id &&
-              cible.position >= dedans.length ? (
-                <div className="pjFente" />
-              ) : null}
-              {!dedans.length && cible?.colonneId !== col.id ? (
-                <div className="pjColonneVide">
-                  {filtreActif(filtre)
-                    ? "Aucune carte ne correspond"
-                    : "Rien ici"}
-                </div>
-              ) : null}
-            </div>
-
-            {composeur === col.id ? (
-              <div className="pjComposeur">
-                <textarea
-                  autoFocus
-                  rows={2}
-                  value={saisie}
-                  placeholder="Titre de la carte…"
-                  onChange={(e) => setSaisie(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      ajouterCarte(col.id);
-                    }
-                    if (e.key === "Escape") setComposeur(null);
-                  }}
-                />
-                <div className="pjComposeurActions">
-                  <button
-                    className="pjPrimaire"
-                    onClick={() => ajouterCarte(col.id)}
-                  >
-                    Ajouter
-                  </button>
-                  <Icon
-                    fafa="faXmark"
-                    width={12}
-                    onClick={() => setComposeur(null)}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div
-                className="pjAjout"
-                onClick={() => {
-                  setComposeur(col.id);
-                  setSaisie("");
-                }}
-              >
-                <Icon fafa="faPlus" width={10} /> Ajouter une carte
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      <div className="pjColonneNeuve" onClick={ajouterColonne}>
-        <Icon fafa="faPlus" width={11} /> Ajouter une colonne
-      </div>
-    </div>
-  );
-
-  const vueListe = (
-    <div className="pjListe cosScroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Carte</th>
-            <th>Colonne</th>
-            <th>Échéance</th>
-            <th>Assigné</th>
-            <th>Client</th>
-            <th>Check-list</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cartesVisibles.map((c) => {
-            const av = avancementChecklist(c.data.checklist);
-            const terminee = c.data.colonneId === stats.colonneTerminee;
-            return (
-              <tr key={c.id} onClick={() => setCarteOuverte(c)}>
-                <td className="pjListeTitre">{c.data.titre}</td>
-                <td>
-                  {colonnes.find((x) => x.id === c.data.colonneId)?.titre}
-                </td>
-                <td>
-                  {c.data.echeance ? (
-                    <span
-                      className="pjEcheance"
-                      data-etat={statutEcheance(c.data.echeance, terminee)}
-                    >
-                      {formatEcheance(c.data.echeance)}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>{membreDe(c.data.assigneId)?.name || "—"}</td>
-                <td>
-                  {clientDe(c.data.liens?.clientId)?.data.entreprise ||
-                    clientDe(c.data.liens?.clientId)?.data.nom ||
-                    "—"}
-                </td>
-                <td>{av ? `${av.faits}/${av.total}` : "—"}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {!cartesVisibles.length ? (
-        <div className="pjVide">Aucune carte à afficher.</div>
-      ) : null}
-    </div>
-  );
-
-  const vueEcheances = (
-    <div className="pjEcheancier cosScroll">
-      {["retard", "aujourdhui", "bientot", "lointain", null].map((etat) => {
-        const groupe = cartesVisibles.filter((c) => {
-          const terminee = c.data.colonneId === stats.colonneTerminee;
-          const s = statutEcheance(c.data.echeance, terminee);
-          return etat === null ? !c.data.echeance : s === etat;
-        });
-        if (!groupe.length) return null;
-        const titres = {
-          retard: "En retard",
-          aujourdhui: "Aujourd'hui",
-          bientot: "Dans les 3 jours",
-          lointain: "Plus tard",
-          null: "Sans échéance",
-        };
-        return (
-          <div className="pjGroupe" key={etat || "sans"}>
-            <div className="pjGroupeTitre" data-etat={etat}>
-              {titres[etat === null ? "null" : etat]}
-              <span className="pjCompte">{groupe.length}</span>
-            </div>
-            {groupe.map((c) => (
-              <div
-                className="pjLigne"
-                key={c.id}
-                onClick={() => setCarteOuverte(c)}
-              >
-                <span className="pjLigneTitre">{c.data.titre}</span>
-                <span className="pjLigneCol">
-                  {colonnes.find((x) => x.id === c.data.colonneId)?.titre}
-                </span>
-                {c.data.echeance ? (
-                  <span className="pjLigneDate">
-                    {formatEcheance(c.data.echeance)}
-                  </span>
-                ) : null}
-                {membreDe(c.data.assigneId) ? (
-                  <span className="pjAvatar">
-                    {initiales(membreDe(c.data.assigneId).name)}
-                  </span>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        );
-      })}
-      {!cartesVisibles.length ? (
-        <div className="pjVide">Aucune carte à afficher.</div>
-      ) : null}
-    </div>
-  );
-
-  // ---- Panneau de carte ---------------------------------------------------
-
-  const panneau = carteOuverte ? (
-    <div className="pjPanneauFond" onClick={() => setCarteOuverte(null)}>
-      <div className="pjPanneau" onClick={(e) => e.stopPropagation()}>
-        <div className="pjPanneauTete">
-          <input
-            className="pjPanneauTitre"
-            value={carteOuverte.data.titre}
-            onChange={(e) => majCarte(carteOuverte, { titre: e.target.value })}
-          />
-          <Icon
-            fafa="faXmark"
-            width={13}
-            onClick={() => setCarteOuverte(null)}
-          />
-        </div>
-
-        <div className="pjPanneauCorps cosScroll">
-          <div className="pjChamp">
-            <label>Étiquettes</label>
-            <div className="pjChoixEtiquettes">
-              {ETIQUETTES.map((e) => {
-                const actif = (carteOuverte.data.etiquettes || []).includes(
-                  e.id
-                );
-                return (
-                  <span
-                    key={e.id}
-                    className="pjPastille"
-                    data-actif={actif ? "true" : "false"}
-                    style={{ background: e.couleur }}
-                    onClick={() => {
-                      const liste = carteOuverte.data.etiquettes || [];
-                      majCarte(carteOuverte, {
-                        etiquettes: actif
-                          ? liste.filter((x) => x !== e.id)
-                          : [...liste, e.id],
-                      });
-                    }}
-                  >
-                    {e.nom}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="pjDeuxColonnes">
-            <div className="pjChamp">
-              <label>Échéance</label>
-              <input
-                type="date"
-                value={carteOuverte.data.echeance?.slice(0, 10) || ""}
-                onChange={(e) =>
-                  majCarte(carteOuverte, { echeance: e.target.value || null })
-                }
-              />
-            </div>
-            <div className="pjChamp">
-              <label>Assigné à</label>
-              <select
-                value={carteOuverte.data.assigneId || ""}
-                onChange={(e) =>
-                  majCarte(carteOuverte, { assigneId: e.target.value || null })
-                }
-              >
-                <option value="">Personne</option>
-                {membres.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="pjChamp">
-            <label>Description</label>
-            <textarea
-              rows={4}
-              value={carteOuverte.data.description || ""}
-              placeholder="Ce qu'il y a à faire, le contexte, les décisions…"
-              onChange={(e) =>
-                majCarte(carteOuverte, { description: e.target.value })
-              }
-            />
-          </div>
-
-          {/* Liens vers les autres modules — le cœur de l'intégration. */}
-          <div className="pjSection">
-            <div className="pjSectionTitre">
-              <Icon fafa="faLink" width={11} /> Rattachements
-            </div>
-            <div className="pjDeuxColonnes">
-              <div className="pjChamp">
-                <label>Client (CRM)</label>
-                <select
-                  value={carteOuverte.data.liens?.clientId || ""}
-                  onChange={(e) =>
-                    majCarte(carteOuverte, {
-                      liens: {
-                        ...carteOuverte.data.liens,
-                        clientId: e.target.value || null,
-                      },
-                    })
-                  }
-                >
-                  <option value="">Aucun</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.data.entreprise || c.data.nom}
-                    </option>
-                  ))}
-                </select>
-                {!clients.length ? (
-                  <span className="pjAide">
-                    Installez le CRM pour rattacher un client.
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="pjChamp">
-                <label>Facture</label>
-                <select
-                  value={carteOuverte.data.liens?.factureId || ""}
-                  onChange={(e) =>
-                    majCarte(carteOuverte, {
-                      liens: {
-                        ...carteOuverte.data.liens,
-                        factureId: e.target.value || null,
-                      },
-                    })
-                  }
-                >
-                  <option value="">Aucune</option>
-                  {factures.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.data.numero}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {carteOuverte.data.liens?.clientId &&
-            !carteOuverte.data.liens?.factureId ? (
-              <button className="pjSecondaire" onClick={creerFacture}>
-                <Icon fafa="faFileInvoice" width={11} /> Créer une facture pour
-                ce client
-              </button>
-            ) : null}
-            {carteOuverte.data.liens?.factureId ? (
-              <div className="pjRattache">
-                <Icon fafa="faFileInvoice" width={11} />
-                Facture{" "}
-                {factureDe(carteOuverte.data.liens.factureId)?.data.numero} —
-                gérée dans le module Facturation
-              </div>
-            ) : null}
-          </div>
-
-          {/* Pièces jointes : elles vivent dans le cloud, pas dans la carte. */}
-          <div className="pjSection">
-            <div className="pjSectionTitre">
-              <Icon fafa="faPaperclip" width={11} /> Pièces jointes
-            </div>
-            {(carteOuverte.data.pieces || []).map((p) => (
-              <div className="pjPiece" key={p.id}>
-                <Icon fafa="faFile" width={11} />
-                <span
-                  className="pjPieceNom"
-                  onClick={() => ouvrirFichier(p, carteOuverte.data.pieces)}
-                >
-                  {p.name}
-                </span>
-                <Icon
-                  fafa="faXmark"
-                  width={10}
-                  onClick={() =>
-                    majCarte(carteOuverte, {
-                      pieces: carteOuverte.data.pieces.filter(
-                        (x) => x.id !== p.id
-                      ),
-                    })
-                  }
-                />
-              </div>
-            ))}
-            <button
-              className="pjSecondaire"
-              data-off={busy}
-              onClick={() => pieceInput.current?.click()}
-            >
-              <Icon fafa="faPlus" width={10} />{" "}
-              {busy ? "Envoi…" : "Joindre un fichier"}
-            </button>
-            <input
-              ref={pieceInput}
-              type="file"
-              className="pjCache"
-              onChange={joindreFichier}
-            />
-            <span className="pjAide">
-              Les pièces jointes sont enregistrées dans le dossier « Projets »
-              du cloud et s'ouvrent dans les visionneuses de l'OS.
-            </span>
-          </div>
-
-          {/* Check-list */}
-          <div className="pjSection">
-            <div className="pjSectionTitre">
-              <Icon fafa="faSquareCheck" width={11} /> Check-list
-              {avancementChecklist(carteOuverte.data.checklist) ? (
-                <span className="pjCompte">
-                  {avancementChecklist(carteOuverte.data.checklist).faits}/
-                  {avancementChecklist(carteOuverte.data.checklist).total}
-                </span>
-              ) : null}
-            </div>
-            {/* Les tâches se réordonnent au glisser-déposer : l'ordre d'une
-                check-list porte du sens, c'est souvent la marche à suivre. */}
-            {(carteOuverte.data.checklist || []).map((item, i) => (
-              <React.Fragment key={item.id}>
-                {cibleTache === i ? <div className="pjFenteTache" /> : null}
-                <div
-                  className="pjTache"
-                  draggable
-                  data-glissee={glisseTache === item.id ? "true" : "false"}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", item.id);
-                    e.dataTransfer.effectAllowed = "move";
-                    setGlisseTache(item.id);
-                  }}
-                  onDragEnd={() => {
-                    setGlisseTache(null);
-                    setCibleTache(null);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    const r = e.currentTarget.getBoundingClientRect();
-                    setCibleTache(
-                      i + (e.clientY > r.top + r.height / 2 ? 1 : 0)
-                    );
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (glisseTache != null && cibleTache != null) {
-                      majCarte(carteOuverte, {
-                        checklist: deplacerDansListe(
-                          carteOuverte.data.checklist,
-                          glisseTache,
-                          cibleTache
-                        ),
-                      });
-                    }
-                    setGlisseTache(null);
-                    setCibleTache(null);
-                  }}
-                >
-                  <Icon className="pjPoignee" fafa="faGripVertical" width={9} />
-                  <input
-                    type="checkbox"
-                    checked={item.fait}
-                    onChange={() =>
-                      majCarte(carteOuverte, {
-                        checklist: carteOuverte.data.checklist.map((x) =>
-                          x.id === item.id ? { ...x, fait: !x.fait } : x
-                        ),
-                      })
-                    }
-                  />
-                  <span data-fait={item.fait ? "true" : "false"}>
-                    {item.texte}
-                  </span>
-                  <Icon
-                    fafa="faXmark"
-                    width={9}
-                    onClick={() =>
-                      majCarte(carteOuverte, {
-                        checklist: carteOuverte.data.checklist.filter(
-                          (x) => x.id !== item.id
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              </React.Fragment>
-            ))}
-            {cibleTache === (carteOuverte.data.checklist || []).length ? (
-              <div className="pjFenteTache" />
-            ) : null}
-            <input
-              className="pjAjoutLigne"
-              placeholder="Ajouter une tâche puis Entrée…"
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" || !e.target.value.trim()) return;
-                majCarte(carteOuverte, {
-                  checklist: [
-                    ...(carteOuverte.data.checklist || []),
-                    {
-                      id: idCourt(),
-                      texte: e.target.value.trim(),
-                      fait: false,
-                    },
-                  ],
-                });
-                e.target.value = "";
-              }}
-            />
-          </div>
-
-          {/* Commentaires */}
-          <div className="pjSection">
-            <div className="pjSectionTitre">
-              <Icon fafa="faComment" width={11} /> Commentaires
-            </div>
-            {(carteOuverte.data.commentaires || []).map((c) => (
-              <div className="pjCommentaire" key={c.id}>
-                <span className="pjAvatar">{initiales(c.auteur)}</span>
-                <div>
-                  <div className="pjCommentaireTete">
-                    <b>{c.auteur}</b>
-                    <em>{new Date(c.date).toLocaleString("fr-FR")}</em>
-                  </div>
-                  <div className="pjCommentaireTexte">{c.texte}</div>
-                </div>
-              </div>
-            ))}
-            <input
-              className="pjAjoutLigne"
-              placeholder="Écrire un commentaire puis Entrée…"
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" || !e.target.value.trim()) return;
-                majCarte(carteOuverte, {
-                  commentaires: [
-                    ...(carteOuverte.data.commentaires || []),
-                    {
-                      id: idCourt(),
-                      auteur: session.user?.name || "Moi",
-                      texte: e.target.value.trim(),
-                      date: new Date().toISOString(),
-                    },
-                  ],
-                });
-                e.target.value = "";
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="pjPanneauPied">
-          <button
-            className="pjDanger"
-            onClick={() => supprimerCarte(carteOuverte)}
-          >
-            <Icon fafa="faTrashCan" width={11} /> Supprimer la carte
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   // ---- Rendu --------------------------------------------------------------
 
   return (
@@ -1330,32 +585,14 @@ function ProjetsApp() {
         <div className="pjVide">Connectez-vous pour accéder à vos projets.</div>
       ) : (
         <div className="pjShell">
-          <div className="pjRail cosScroll">
-            <div className="pjRailTitre">Tableaux</div>
-            {tableaux.map((t) => (
-              <div
-                key={t.id}
-                className="pjRailItem"
-                data-actif={t.id === tableauId ? "true" : "false"}
-                onClick={() => {
-                  setTableauId(t.id);
-                  setFiltre(FILTRE_VIDE);
-                }}
-              >
-                <span
-                  className="pjPuce"
-                  style={{ background: t.data.couleur }}
-                />
-                <span className="pjRailNom">{t.data.nom}</span>
-                <span className="pjCompte">
-                  {cartes.filter((c) => c.data.tableauId === t.id).length}
-                </span>
-              </div>
-            ))}
-            <div className="pjRailAjout" onClick={creerTableau}>
-              <Icon fafa="faPlus" width={10} /> Nouveau tableau
-            </div>
-          </div>
+          <BarreLaterale
+            tableaux={tableaux}
+            tableauId={tableauId}
+            setTableauId={setTableauId}
+            setFiltre={setFiltre}
+            cartes={cartes}
+            creerTableau={creerTableau}
+          />
 
           <div className="pjMain">
             {!tableau ? (
@@ -1364,152 +601,96 @@ function ProjetsApp() {
               </div>
             ) : (
               <>
-                <div className="pjTete">
-                  <span
-                    className="pjPuce"
-                    style={{ background: tableau.data.couleur }}
-                  />
-                  <span
-                    className="pjNom"
-                    onClick={renommerTableau}
-                    title="Renommer"
-                  >
-                    {tableau.data.nom}
-                  </span>
-
-                  <div className="pjVues">
-                    {VUES.map((v) => (
-                      <span
-                        key={v.id}
-                        className="pjVue"
-                        data-actif={vue === v.id ? "true" : "false"}
-                        onClick={() => setVue(v.id)}
-                      >
-                        <Icon fafa={v.icone} width={11} />
-                        {v.label}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="pjSpacer" />
-
-                  <input
-                    className="pjRecherche"
-                    placeholder="Rechercher…"
-                    value={filtre.texte}
-                    onChange={(e) =>
-                      setFiltre((f) => ({ ...f, texte: e.target.value }))
-                    }
-                  />
-                  <select
-                    className="pjFiltre"
-                    value={filtre.etiquette || ""}
-                    onChange={(e) =>
-                      setFiltre((f) => ({
-                        ...f,
-                        etiquette: e.target.value || null,
-                      }))
-                    }
-                  >
-                    <option value="">Étiquette</option>
-                    {ETIQUETTES.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.nom}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="pjFiltre"
-                    value={filtre.membre || ""}
-                    onChange={(e) =>
-                      setFiltre((f) => ({
-                        ...f,
-                        membre: e.target.value || null,
-                      }))
-                    }
-                  >
-                    <option value="">Membre</option>
-                    {membres.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                  <span
-                    className="pjBascule"
-                    data-actif={filtre.retardSeulement ? "true" : "false"}
-                    onClick={() =>
-                      setFiltre((f) => ({
-                        ...f,
-                        retardSeulement: !f.retardSeulement,
-                      }))
-                    }
-                  >
-                    En retard
-                  </span>
-                  {filtreActif(filtre) ? (
-                    <span
-                      className="pjBascule"
-                      onClick={() => setFiltre(FILTRE_VIDE)}
-                    >
-                      Effacer
-                    </span>
-                  ) : null}
-
-                  {/* `Icon` ne transmet pas l'attribut `title` : l'infobulle
-                      est portée par l'enveloppe. */}
-                  <span title="Exporter en CSV vers le cloud">
-                    <Icon
-                      className="pjAction"
-                      fafa="faFileCsv"
-                      width={13}
-                      onClick={exporter}
-                    />
-                  </span>
-                  <span title="Supprimer le tableau">
-                    <Icon
-                      className="pjAction"
-                      fafa="faTrashCan"
-                      width={13}
-                      onClick={supprimerTableau}
-                    />
-                  </span>
-                </div>
-
-                <div className="pjStats">
-                  <span>
-                    <b>{stats.total}</b> carte{stats.total > 1 ? "s" : ""}
-                  </span>
-                  <span>
-                    <b>{stats.terminees}</b> terminée
-                    {stats.terminees > 1 ? "s" : ""}
-                  </span>
-                  <span data-alerte={stats.enRetard ? "true" : "false"}>
-                    <b>{stats.enRetard}</b> en retard
-                  </span>
-                  <span>
-                    <b>{stats.sansAssigne}</b> non assignée
-                    {stats.sansAssigne > 1 ? "s" : ""}
-                  </span>
-                  <div
-                    className="pjJauge"
-                    title={`${stats.avancement} % terminé`}
-                  >
-                    <div style={{ width: `${stats.avancement}%` }} />
-                  </div>
-                  <span className="pjPourcent">{stats.avancement} %</span>
-                </div>
+                <EnTete
+                  tableau={tableau}
+                  renommerTableau={renommerTableau}
+                  vue={vue}
+                  setVue={setVue}
+                  filtre={filtre}
+                  setFiltre={setFiltre}
+                  membres={membres}
+                  exporter={exporter}
+                  supprimerTableau={supprimerTableau}
+                  stats={stats}
+                />
 
                 {notice ? <div className="pjNotice">{notice}</div> : null}
 
-                {vue === "tableau" ? vueTableau : null}
-                {vue === "liste" ? vueListe : null}
-                {vue === "echeances" ? vueEcheances : null}
+                {vue === "tableau" ? (
+                  <Planche
+                    molettePlanche={molettePlanche}
+                    bordPendantGlisser={bordPendantGlisser}
+                    colonnes={colonnes}
+                    cartesVisibles={cartesVisibles}
+                    cible={cible}
+                    setCible={setCible}
+                    deposer={deposer}
+                    renommerColonne={renommerColonne}
+                    supprimerColonne={supprimerColonne}
+                    stats={stats}
+                    membreDe={membreDe}
+                    clientDe={clientDe}
+                    glisse={glisse}
+                    initiales={initiales}
+                    debutGlisser={debutGlisser}
+                    finGlisser={finGlisser}
+                    survolCible={survolCible}
+                    setCarteOuverte={setCarteOuverte}
+                    filtre={filtre}
+                    composeur={composeur}
+                    setComposeur={setComposeur}
+                    saisie={saisie}
+                    setSaisie={setSaisie}
+                    ajouterCarte={ajouterCarte}
+                    ajouterColonne={ajouterColonne}
+                  />
+                ) : null}
+                {vue === "liste" ? (
+                  <Liste
+                    cartesVisibles={cartesVisibles}
+                    colonnes={colonnes}
+                    stats={stats}
+                    membreDe={membreDe}
+                    clientDe={clientDe}
+                    setCarteOuverte={setCarteOuverte}
+                  />
+                ) : null}
+                {vue === "echeances" ? (
+                  <Echeancier
+                    cartesVisibles={cartesVisibles}
+                    colonnes={colonnes}
+                    stats={stats}
+                    membreDe={membreDe}
+                    initiales={initiales}
+                    setCarteOuverte={setCarteOuverte}
+                  />
+                ) : null}
               </>
             )}
           </div>
 
-          {panneau}
+          {carteOuverte ? (
+            <PanneauCarte
+              carteOuverte={carteOuverte}
+              setCarteOuverte={setCarteOuverte}
+              majCarte={majCarte}
+              supprimerCarte={supprimerCarte}
+              membres={membres}
+              clients={clients}
+              factures={factures}
+              factureDe={factureDe}
+              creerFacture={creerFacture}
+              busy={busy}
+              pieceInput={pieceInput}
+              joindreFichier={joindreFichier}
+              glisseTache={glisseTache}
+              setGlisseTache={setGlisseTache}
+              cibleTache={cibleTache}
+              setCibleTache={setCibleTache}
+              initiales={initiales}
+              session={session}
+            />
+          ) : null}
         </div>
       )}
     </ModuleWindow>

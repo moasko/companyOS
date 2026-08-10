@@ -6,29 +6,31 @@ import { api } from "../../../api/client";
 import { saveAs } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { envoyerA } from "../../notifications";
-import { Auteur } from "../../Auteur";
-import { Avatar } from "../../Avatar";
 import { invaliderReferentiel } from "../../referentiel";
-import { Contenu, useChargement } from "../../chargement";
+import { useChargement } from "../../chargement";
 import { totaux } from "@companyos/shared/facturation";
 import {
-  ACTIVITES,
-  ETAPES,
   ETAPES_OUVERTES,
   STATUTS,
   aFaire,
   chiffreAffaires,
   chronologie,
   clientsDormants,
-  dernierContact,
   jourssansContact,
+  nomDe,
   pipeline,
   plusJours,
   prochaineAction,
   tauxTransformation,
   today,
-  valeurPonderee,
 } from "./domaine";
+import { Agenda } from "./vues/Agenda";
+import { Analyse } from "./vues/Analyse";
+import { BarreLaterale } from "./vues/BarreLaterale";
+import { FicheClient } from "./vues/FicheClient";
+import { FormulaireAffaire } from "./vues/FormulaireAffaire";
+import { Pipeline } from "./vues/Pipeline";
+import { Portefeuille } from "./vues/Portefeuille";
 import "./crm.scss";
 
 // CRM : portefeuille, pipeline commercial et suivi de la relation.
@@ -43,13 +45,9 @@ import "./crm.scss";
 // Une tâche est une activité qui porte une échéance et qui n'est pas
 // encore faite : même chronologie, pas une entité à part. Séparer les deux
 // obligerait à regarder à deux endroits pour savoir où en est un dossier.
-
-const VUES = [
-  { id: "portefeuille", label: "Portefeuille", icone: "faUsers" },
-  { id: "pipeline", label: "Pipeline", icone: "faFilter" },
-  { id: "agenda", label: "À faire", icone: "faListCheck" },
-  { id: "analyse", label: "Analyse", icone: "faChartColumn" },
-];
+//
+// Ce fichier tient l'état, les écritures et l'assemblage ; chaque écran est
+// dans `vues/`, et les règles de calcul dans `domaine.js`.
 
 const CLIENT_VIDE = {
   nom: "",
@@ -76,9 +74,6 @@ const OPPORTUNITE_VIDE = {
 
 import { montant as money } from "../../../utils/monnaie";
 
-const nomDe = (c) => c?.data.entreprise || c?.data.nom || "Sans nom";
-const initiale = (c) => nomDe(c).trim().charAt(0).toUpperCase();
-
 export const manifest = {
   id: "crm",
   slug: "crm",
@@ -97,45 +92,6 @@ export const manifest = {
   capacites: { lit: ["facturation:factures"], ecrit: [] },
   Window: CrmApp,
 };
-
-/// Carte d'affaire du pipeline.
-///
-/// Définie **hors** du composant parent et mémorisée : déclarée à
-/// l'intérieur, React en ferait un type nouveau à chaque rendu, démonterait
-/// puis remonterait chaque carte, et détruirait le nœud en cours de
-/// glissement au premier `dragover` — le glisser-déposer serait cassé.
-const CarteAffaire = React.memo(function CarteAffaire({
-  opp,
-  client,
-  actif,
-  onOuvrir,
-  onGlisser,
-}) {
-  return (
-    <div
-      className="crmAffaire handcr"
-      data-actif={actif}
-      draggable
-      onDragStart={(e) => {
-        // Sans `setData`, le navigateur n'initie tout simplement pas le
-        // glissement — il ne suffit pas de poser `draggable`.
-        e.dataTransfer.setData("text/plain", opp.id);
-        e.dataTransfer.effectAllowed = "move";
-        onGlisser(opp.id);
-      }}
-      onClick={() => onOuvrir(opp)}
-    >
-      <div className="crmAffaireNom">{opp.data.libelle || "Sans libellé"}</div>
-      <div className="crmAffaireClient">{client ? nomDe(client) : "—"}</div>
-      <div className="crmAffairePied">
-        <span className="crmAffaireMontant">{money(opp.data.montant)}</span>
-        {opp.data.dateCloture ? (
-          <span className="crmAffaireDate">{opp.data.dateCloture}</span>
-        ) : null}
-      </div>
-    </div>
-  );
-});
 
 function CrmApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
@@ -599,55 +555,16 @@ function CrmApp() {
       ) : (
         <div className="crmShell">
           {/* ---------- Barre latérale ---------- */}
-          <aside className="crmNav cosScroll">
-            {VUES.map((v) => (
-              <div
-                key={v.id}
-                className="crmNavItem handcr"
-                data-actif={vue === v.id}
-                onClick={() => setVue(v.id)}
-              >
-                <Icon fafa={v.icone} width={13} />
-                <span>{v.label}</span>
-                {v.id === "agenda" && enRetard ? (
-                  <span className="crmPastille">{enRetard}</span>
-                ) : null}
-              </div>
-            ))}
-
-            {vue === "portefeuille" ? (
-              <>
-                <div className="crmNavTitre">Statut</div>
-                {[["tous", "Tous"], ...Object.entries(STATUTS).map(([id, s]) => [id, s.label])].map(
-                  ([id, label]) => (
-                    <div
-                      key={id}
-                      className="crmFiltre handcr"
-                      data-actif={filtreStatut === id}
-                      onClick={() => setFiltreStatut(id)}
-                    >
-                      <span>{label}</span>
-                      <span className="crmFiltreCompte">
-                        {id === "tous"
-                          ? clients.length
-                          : clients.filter((c) => c.data.statut === id).length}
-                      </span>
-                    </div>
-                  ),
-                )}
-
-                <div className="crmNavTitre">Portefeuille</div>
-                <div className="crmNavItem handcr" onClick={nouveauClient}>
-                  <Icon fafa="faUserPlus" width={12} />
-                  <span>Nouveau client</span>
-                </div>
-                <div className="crmNavItem handcr" onClick={exporterPortefeuille}>
-                  <Icon fafa="faFileCsv" width={12} />
-                  <span>Exporter</span>
-                </div>
-              </>
-            ) : null}
-          </aside>
+          <BarreLaterale
+            vue={vue}
+            setVue={setVue}
+            enRetard={enRetard}
+            clients={clients}
+            filtreStatut={filtreStatut}
+            setFiltreStatut={setFiltreStatut}
+            nouveauClient={nouveauClient}
+            exporterPortefeuille={exporterPortefeuille}
+          />
 
           {/* ---------- Contenu ---------- */}
           <main className="crmMain">
@@ -675,406 +592,66 @@ function CrmApp() {
             </div>
 
             {vue === "portefeuille" ? (
-              <>
-                <div className="crmBarre">
-                  <div className="crmRecherche">
-                    <Icon fafa="faMagnifyingGlass" width={11} />
-                    <input
-                      type="text"
-                      placeholder="Nom, entreprise, ville, téléphone…"
-                      value={requete}
-                      onChange={(e) => setRequete(e.target.value)}
-                    />
-                    {requete ? (
-                      <Icon fafa="faXmark" width={10} onClick={() => setRequete("")} />
-                    ) : null}
-                  </div>
-                  <div className="crmPrimary handcr" onClick={nouveauClient}>
-                    <Icon fafa="faPlus" width={10} />
-                    <span>Nouveau client</span>
-                  </div>
-                </div>
-
-                {etat.initial || etat.erreur ? (
-                  <Contenu etat={etat} vide={false} lignes={7} />
-                ) : !visibles.length ? (
-                  <div className="crmVide">
-                    <Icon fafa="faUsers" width={26} />
-                    <span>
-                      {clients.length
-                        ? "Aucun client ne correspond à ce filtre."
-                        : "Votre portefeuille est vide."}
-                    </span>
-                    {!clients.length ? (
-                      <div className="crmPrimary handcr" onClick={nouveauClient}>
-                        Créer la première fiche
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="crmTable cosScroll">
-                    <div className="crmTr crmTrClient crmTh">
-                      <span />
-                      <span>Client</span>
-                      <span>Ville</span>
-                      <span>Suivi par</span>
-                      <span>Dernier contact</span>
-                      <span>Prochaine action</span>
-                      <span className="crmNum">CA</span>
-                      <span>Statut</span>
-                    </div>
-                    {visibles.map((c) => {
-                      const jours = jourssansContact(c.id, activites);
-                      const prochaine = prochaineAction(c.id, activites);
-                      const s = STATUTS[c.data.statut] || STATUTS.prospect;
-                      const retard =
-                        prochaine && prochaine.data.echeance < today();
-                      return (
-                        <div
-                          key={c.id}
-                          className="crmTr crmTrClient handcr"
-                          data-actif={c.id === selectedId}
-                          onClick={() => ouvrirClient(c)}
-                        >
-                          <span className="crmInitiale">{initiale(c)}</span>
-                          <span className="crmTdNom">
-                            <strong>{nomDe(c)}</strong>
-                            <em>{c.data.entreprise ? c.data.nom : c.data.email}</em>
-                          </span>
-                          <span className="crmMuted">{c.data.ville || "—"}</span>
-                          <span className="crmResp">
-                            {membreDe(c.data.responsableId) ? (
-                              <Avatar user={membreDe(c.data.responsableId)} taille={22} />
-                            ) : (
-                              <em className="crmMuted">personne</em>
-                            )}
-                          </span>
-                          {/* « Jamais contacté » n'est pas une absence de
-                              donnée : c'est le signal le plus fort du
-                              tableau, il doit se voir comme tel. */}
-                          <span
-                            className="crmMuted"
-                            data-alerte={jours === null || jours > 60}
-                          >
-                            {jours === null ? "jamais" : `il y a ${jours} j`}
-                          </span>
-                          <span className="crmMuted" data-alerte={retard}>
-                            {prochaine
-                              ? `${prochaine.data.echeance} · ${prochaine.data.resume}`
-                              : "—"}
-                          </span>
-                          <span className="crmNum">
-                            {caParClient[c.id] ? money(caParClient[c.id]) : "—"}
-                          </span>
-                          <span>
-                            <span className="crmTag" data-ton={s.ton}>
-                              {s.label}
-                            </span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
+              <Portefeuille
+                requete={requete}
+                setRequete={setRequete}
+                nouveauClient={nouveauClient}
+                etat={etat}
+                visibles={visibles}
+                clients={clients}
+                activites={activites}
+                selectedId={selectedId}
+                ouvrirClient={ouvrirClient}
+                membreDe={membreDe}
+                caParClient={caParClient}
+              />
             ) : null}
 
             {vue === "pipeline" ? (
-              <div className="crmPipeline cosScroll">
-                {ETAPES_OUVERTES.concat(["gagnee", "perdue"]).map((id) => {
-                  const e = ETAPES[id];
-                  const liste = opportunites.filter((o) => o.data.etape === id);
-                  const montant = liste.reduce(
-                    (s, o) => s + (Number(o.data.montant) || 0),
-                    0,
-                  );
-                  return (
-                    <div
-                      key={id}
-                      className="crmColonne"
-                      onDragOver={(e2) => e2.preventDefault()}
-                      onDrop={(e2) => {
-                        e2.preventDefault();
-                        deposerAffaire(id);
-                      }}
-                    >
-                      <div className="crmColonneTete" data-ton={e.ton}>
-                        <span className="crmColonneNom">{e.label}</span>
-                        <span className="crmColonneCompte">{liste.length}</span>
-                      </div>
-                      <div className="crmColonneMontant">{money(montant)}</div>
-                      {liste.map((o) => (
-                        <CarteAffaire
-                          key={o.id}
-                          opp={o}
-                          client={clientDe(o.data.clientId)}
-                          actif={oppOuverte?.id === o.id}
-                          onOuvrir={ouvrirAffaire}
-                          onGlisser={marquerGlisse}
-                        />
-                      ))}
-                      {!liste.length ? (
-                        <div className="crmColonneVide">Déposez une affaire ici</div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
+              <Pipeline
+                opportunites={opportunites}
+                clientDe={clientDe}
+                oppOuverte={oppOuverte}
+                ouvrirAffaire={ouvrirAffaire}
+                marquerGlisse={marquerGlisse}
+                deposerAffaire={deposerAffaire}
+              />
             ) : null}
 
             {vue === "agenda" ? (
-              <div className="crmAgenda cosScroll">
-                {!taches.length ? (
-                  <div className="crmVide">
-                    <Icon fafa="faListCheck" width={24} />
-                    <span>Rien à relancer dans les quinze jours.</span>
-                  </div>
-                ) : (
-                  taches.map(({ activite: a, enRetard: tard, aujourdhui }) => {
-                    const c = clientDe(a.data.clientId);
-                    return (
-                      <div
-                        key={a.id}
-                        className="crmTache"
-                        data-retard={tard}
-                        data-aujourdhui={aujourdhui}
-                      >
-                        <span
-                          className="crmCase handcr"
-                          onClick={() => basculerTache(a)}
-                          title="Marquer comme faite"
-                        >
-                          <Icon fafa="faCheck" width={9} />
-                        </span>
-                        <div className="crmTacheInfo">
-                          <div className="crmTacheTitre">{a.data.resume}</div>
-                          <div className="crmTacheMeta">
-                            {a.data.echeance}
-                            {tard ? " · en retard" : aujourdhui ? " · aujourd'hui" : ""}
-                          </div>
-                        </div>
-                        <span
-                          className="crmLien handcr"
-                          onClick={() => {
-                            if (!c) return;
-                            setVue("portefeuille");
-                            ouvrirClient(c);
-                          }}
-                        >
-                          {c ? nomDe(c) : "client supprimé"}
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+              <Agenda
+                taches={taches}
+                clientDe={clientDe}
+                basculerTache={basculerTache}
+                setVue={setVue}
+                ouvrirClient={ouvrirClient}
+              />
             ) : null}
 
             {vue === "analyse" ? (
-              <div className="crmAnalyse cosScroll">
-                <div className="crmSousTitre">Pipeline par étape</div>
-                {!pipeTotal ? (
-                  <div className="crmEmptyBox">Aucune affaire en cours.</div>
-                ) : (
-                  etapes.map((e) => (
-                    <div key={e.id} className="crmJauge">
-                      <span className="crmJaugeNom">{e.label}</span>
-                      <span className="crmJaugeFond">
-                        <span
-                          className="crmJaugeVal"
-                          style={{
-                            width: `${(e.montant / Math.max(1, ...etapes.map((x) => x.montant))) * 100}%`,
-                          }}
-                        />
-                      </span>
-                      <span className="crmJaugeChiffre">
-                        {money(e.montant)}
-                        <em> → {money(e.pondere)}</em>
-                      </span>
-                    </div>
-                  ))
-                )}
-
-                <div className="crmSousTitre">Transformation</div>
-                {!transformation ? (
-                  <div className="crmEmptyBox">
-                    Aucune affaire close : le taux se calcule sur les affaires
-                    gagnées et perdues, pas sur celles en cours.
-                  </div>
-                ) : (
-                  <div className="crmCartes">
-                    <div className="crmCarteStat">
-                      <span className="crmCarteVal">{transformation.taux} %</span>
-                      <span className="crmCarteLbl">affaires gagnées</span>
-                    </div>
-                    <div className="crmCarteStat">
-                      <span className="crmCarteVal">
-                        {money(transformation.montantGagne)}
-                      </span>
-                      <span className="crmCarteLbl">
-                        {transformation.gagnees} gagnées · {transformation.perdues} perdues
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="crmSousTitre">Clients à rappeler</div>
-                {!dormants.length ? (
-                  <div className="crmEmptyBox">
-                    Tout le portefeuille a été contacté récemment.
-                  </div>
-                ) : (
-                  dormants.slice(0, 12).map(({ client: c, jours }) => (
-                    <div
-                      key={c.id}
-                      className="crmDormant handcr"
-                      onClick={() => {
-                        setVue("portefeuille");
-                        ouvrirClient(c);
-                      }}
-                    >
-                      <span className="crmTag" data-ton={jours === null ? "bad" : "warn"}>
-                        {jours === null ? "jamais" : `${jours} j`}
-                      </span>
-                      <span className="crmDormantNom">{nomDe(c)}</span>
-                      <span className="crmMuted">{c.data.ville || "—"}</span>
-                      <span className="crmMuted">
-                        {membreDe(c.data.responsableId)?.name || "sans responsable"}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
+              <Analyse
+                pipeTotal={pipeTotal}
+                etapes={etapes}
+                transformation={transformation}
+                dormants={dormants}
+                membreDe={membreDe}
+                setVue={setVue}
+                ouvrirClient={ouvrirClient}
+              />
             ) : null}
           </main>
 
           {/* ---------- Panneau ---------- */}
           <aside className="crmPanneau cosScroll">
             {oppOuverte ? (
-              <>
-                <div className="crmPanTitre">
-                  {oppOuverte.id ? "Affaire" : "Nouvelle affaire"}
-                </div>
-
-                <label className="crmField">
-                  <span className="crmLabel">Libellé</span>
-                  <input
-                    type="text"
-                    value={oppOuverte.libelle}
-                    onChange={(e) =>
-                      setOppOuverte((o) => ({ ...o, libelle: e.target.value }))
-                    }
-                  />
-                </label>
-
-                <label className="crmField">
-                  <span className="crmLabel">Client</span>
-                  <select
-                    value={oppOuverte.clientId}
-                    onChange={(e) =>
-                      setOppOuverte((o) => ({ ...o, clientId: e.target.value }))
-                    }
-                  >
-                    <option value="">—</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {nomDe(c)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="crmDeux">
-                  <label className="crmField">
-                    <span className="crmLabel">Montant</span>
-                    <input
-                      type="number"
-                      value={oppOuverte.montant}
-                      onChange={(e) =>
-                        setOppOuverte((o) => ({ ...o, montant: e.target.value }))
-                      }
-                    />
-                  </label>
-                  <label className="crmField">
-                    <span className="crmLabel">Clôture prévue</span>
-                    <input
-                      type="date"
-                      value={oppOuverte.dateCloture || ""}
-                      onChange={(e) =>
-                        setOppOuverte((o) => ({ ...o, dateCloture: e.target.value }))
-                      }
-                    />
-                  </label>
-                </div>
-
-                <label className="crmField">
-                  <span className="crmLabel">Étape</span>
-                  <select
-                    value={oppOuverte.etape}
-                    onChange={(e) =>
-                      setOppOuverte((o) => ({ ...o, etape: e.target.value }))
-                    }
-                  >
-                    {Object.entries(ETAPES).map(([id, e]) => (
-                      <option key={id} value={id}>
-                        {e.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="crmField">
-                  <span className="crmLabel">
-                    Probabilité % — vide : celle de l'étape (
-                    {ETAPES[oppOuverte.etape]?.probabilite} %)
-                  </span>
-                  <input
-                    type="number"
-                    placeholder={String(ETAPES[oppOuverte.etape]?.probabilite ?? "")}
-                    value={oppOuverte.probabilite ?? ""}
-                    onChange={(e) =>
-                      setOppOuverte((o) => ({ ...o, probabilite: e.target.value }))
-                    }
-                  />
-                </label>
-
-                <div className="crmRecap">
-                  <span>Valeur pondérée</span>
-                  <strong>{money(valeurPonderee({ data: oppOuverte }))}</strong>
-                </div>
-
-                <label className="crmField">
-                  <span className="crmLabel">Notes</span>
-                  <textarea
-                    rows={3}
-                    value={oppOuverte.notes || ""}
-                    onChange={(e) =>
-                      setOppOuverte((o) => ({ ...o, notes: e.target.value }))
-                    }
-                  />
-                </label>
-
-                <div className="crmFormActions">
-                  <div
-                    className="crmPrimary handcr"
-                    data-off={busy}
-                    onClick={enregistrerAffaire}
-                  >
-                    Enregistrer
-                  </div>
-                  <div className="crmBtnGhost handcr" onClick={() => setOppOuverte(null)}>
-                    Fermer
-                  </div>
-                  {oppOuverte.id ? (
-                    <div
-                      className="crmBtnGhost crmDanger handcr"
-                      onClick={() => supprimerAffaire({ id: oppOuverte.id, ...oppOuverte })}
-                    >
-                      Supprimer
-                    </div>
-                  ) : null}
-                </div>
-              </>
+              <FormulaireAffaire
+                oppOuverte={oppOuverte}
+                setOppOuverte={setOppOuverte}
+                clients={clients}
+                busy={busy}
+                enregistrerAffaire={enregistrerAffaire}
+                supprimerAffaire={supprimerAffaire}
+              />
             ) : !draft ? (
               <div className="crmPanVide">
                 <Icon fafa="faHandPointer" width={20} />
@@ -1084,360 +661,28 @@ function CrmApp() {
                 </span>
               </div>
             ) : (
-              <>
-                <div className="crmPanTete">
-                  <span className="crmGrandeInitiale">{initiale({ data: draft })}</span>
-                  <div className="crmPanInfo">
-                    <div className="crmPanNom">
-                      {draft.entreprise || draft.nom || "Nouveau client"}
-                    </div>
-                    <div className="crmPanMeta">
-                      {[draft.entreprise ? draft.nom : null, draft.ville]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
-                    </div>
-                  </div>
-                </div>
-
-                {selectedId ? (
-                  <div className="crmResume">
-                    <div>
-                      <span className="crmResumeLbl">Chiffre d'affaires</span>
-                      <strong>{money(caClient)}</strong>
-                    </div>
-                    <div>
-                      <span className="crmResumeLbl">Affaires ouvertes</span>
-                      <strong>
-                        {
-                          affairesClient.filter((o) =>
-                            ETAPES_OUVERTES.includes(o.data.etape),
-                          ).length
-                        }
-                      </strong>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="crmOnglets">
-                  {[
-                    ["fiche", "Fiche"],
-                    ["affaires", "Affaires"],
-                    ["suivi", "Suivi"],
-                  ].map(([id, label]) => (
-                    <span
-                      key={id}
-                      className="handcr"
-                      data-actif={onglet === id}
-                      onClick={() => setOnglet(id)}
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-
-                {onglet === "fiche" ? (
-                  <>
-                    <div className="crmDeux">
-                      <label className="crmField">
-                        <span className="crmLabel">Entreprise</span>
-                        <input
-                          type="text"
-                          value={draft.entreprise}
-                          onChange={champ("entreprise")}
-                        />
-                      </label>
-                      <label className="crmField">
-                        <span className="crmLabel">Contact</span>
-                        <input type="text" value={draft.nom} onChange={champ("nom")} />
-                      </label>
-                    </div>
-
-                    <div className="crmDeux">
-                      <label className="crmField">
-                        <span className="crmLabel">Téléphone</span>
-                        <input
-                          type="text"
-                          value={draft.telephone}
-                          onChange={champ("telephone")}
-                        />
-                      </label>
-                      <label className="crmField">
-                        <span className="crmLabel">E-mail</span>
-                        <input type="text" value={draft.email} onChange={champ("email")} />
-                      </label>
-                    </div>
-
-                    <div className="crmDeux">
-                      <label className="crmField">
-                        <span className="crmLabel">Ville</span>
-                        <input type="text" value={draft.ville} onChange={champ("ville")} />
-                      </label>
-                      <label className="crmField">
-                        <span className="crmLabel">Secteur</span>
-                        <input
-                          type="text"
-                          placeholder="Distribution, BTP…"
-                          value={draft.secteur}
-                          onChange={champ("secteur")}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="crmField">
-                      <span className="crmLabel">Adresse</span>
-                      <input
-                        type="text"
-                        placeholder="Cocody, rue des Jardins"
-                        value={draft.adresse}
-                        onChange={champ("adresse")}
-                      />
-                    </label>
-
-                    <div className="crmDeux">
-                      <label className="crmField">
-                        <span className="crmLabel">Statut</span>
-                        <select value={draft.statut} onChange={champ("statut")}>
-                          {Object.entries(STATUTS).map(([id, s]) => (
-                            <option key={id} value={id}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="crmField">
-                        <span className="crmLabel">Suivi par</span>
-                        <select
-                          value={draft.responsableId || ""}
-                          onChange={champ("responsableId")}
-                        >
-                          <option value="">Personne</option>
-                          {membres.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <label className="crmField">
-                      <span className="crmLabel">Notes</span>
-                      <textarea rows={3} value={draft.notes} onChange={champ("notes")} />
-                    </label>
-
-                    {selected ? <Auteur record={selected} /> : null}
-
-                    <div className="crmFormActions">
-                      <div
-                        className="crmPrimary handcr"
-                        data-off={busy}
-                        onClick={enregistrerClient}
-                      >
-                        <Icon fafa="faFloppyDisk" width={11} />
-                        <span>{busy ? "…" : "Enregistrer"}</span>
-                      </div>
-                      {selectedId ? (
-                        <div
-                          className="crmBtnGhost crmDanger handcr"
-                          onClick={supprimerClient}
-                        >
-                          Supprimer
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
-
-                {onglet === "affaires" ? (
-                  !selectedId ? (
-                    <div className="crmEmptyBox">
-                      Enregistrez la fiche avant d'ajouter des affaires.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="crmFormActions">
-                        <div className="crmPrimary handcr" onClick={nouvelleAffaire}>
-                          <Icon fafa="faPlus" width={10} />
-                          <span>Nouvelle affaire</span>
-                        </div>
-                      </div>
-
-                      {!affairesClient.length ? (
-                        <div className="crmEmptyBox">Aucune affaire pour ce client.</div>
-                      ) : (
-                        affairesClient.map((o) => {
-                          const e = ETAPES[o.data.etape] || ETAPES.contact;
-                          return (
-                            <div
-                              key={o.id}
-                              className="crmAffaireLigne handcr"
-                              onClick={() => ouvrirAffaire(o)}
-                            >
-                              <div className="crmAffaireInfo">
-                                <div className="crmAffaireTitre">{o.data.libelle}</div>
-                                <div className="crmAffaireMeta">
-                                  {money(o.data.montant)}
-                                  {o.data.dateCloture ? ` · ${o.data.dateCloture}` : ""}
-                                </div>
-                              </div>
-                              <span className="crmTag" data-ton={e.ton}>
-                                {e.label}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </>
-                  )
-                ) : null}
-
-                {onglet === "suivi" ? (
-                  !selectedId ? (
-                    <div className="crmEmptyBox">
-                      Enregistrez la fiche avant de noter un échange.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="crmTypes">
-                        {Object.entries(ACTIVITES).map(([id, a]) => (
-                          <span
-                            key={id}
-                            className="handcr"
-                            data-actif={activite.type === id}
-                            onClick={() => setActivite((v) => ({ ...v, type: id }))}
-                            title={a.label}
-                          >
-                            <Icon fafa={a.icone} width={11} />
-                          </span>
-                        ))}
-                      </div>
-
-                      <label className="crmField">
-                        <span className="crmLabel">
-                          {activite.type === "tache" ? "Quoi faire" : "Ce qui s'est dit"}
-                        </span>
-                        <input
-                          type="text"
-                          placeholder={
-                            activite.type === "tache"
-                              ? "Rappeler pour le devis"
-                              : "Relance devis, rappelle vendredi"
-                          }
-                          value={activite.resume}
-                          onChange={(e) =>
-                            setActivite((v) => ({ ...v, resume: e.target.value }))
-                          }
-                        />
-                      </label>
-
-                      <div className="crmDeux">
-                        <label className="crmField">
-                          <span className="crmLabel">Date</span>
-                          <input
-                            type="date"
-                            value={activite.date}
-                            onChange={(e) =>
-                              setActivite((v) => ({ ...v, date: e.target.value }))
-                            }
-                          />
-                        </label>
-                        {activite.type === "tache" ? (
-                          <label className="crmField">
-                            <span className="crmLabel">À faire le</span>
-                            <input
-                              type="date"
-                              value={activite.echeance || today()}
-                              onChange={(e) =>
-                                setActivite((v) => ({ ...v, echeance: e.target.value }))
-                              }
-                            />
-                          </label>
-                        ) : (
-                          <div />
-                        )}
-                      </div>
-
-                      <div className="crmFormActions">
-                        <div
-                          className="crmPrimary handcr"
-                          data-off={busy}
-                          onClick={ajouterActivite}
-                        >
-                          Ajouter au suivi
-                        </div>
-                      </div>
-
-                      {!timeline.length ? (
-                        <div className="crmEmptyBox">
-                          Aucun échange enregistré. Notez le premier appel : c'est ce qui
-                          fait la différence six mois plus tard.
-                        </div>
-                      ) : (
-                        <div className="crmTimeline">
-                          {timeline.map((ev) => {
-                            if (ev.genre === "opportunite") {
-                              const e = ETAPES[ev.record.data.etape] || ETAPES.contact;
-                              return (
-                                <div key={ev.id} className="crmEvent">
-                                  <span className="crmEventIcone" data-ton={e.ton}>
-                                    <Icon fafa="faBriefcase" width={9} />
-                                  </span>
-                                  <div className="crmEventInfo">
-                                    <div className="crmEventTitre">
-                                      {ev.record.data.libelle} ·{" "}
-                                      {money(ev.record.data.montant)}
-                                    </div>
-                                    <div className="crmEventMeta">
-                                      {e.label} · {ev.date}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            const a = ev.record;
-                            const t = ACTIVITES[a.data.type] || ACTIVITES.note;
-                            const tache = a.data.type === "tache";
-                            return (
-                              <div key={ev.id} className="crmEvent" data-fait={a.data.fait}>
-                                <span
-                                  className="crmEventIcone handcr"
-                                  data-ton={t.ton}
-                                  onClick={() => tache && basculerTache(a)}
-                                  title={tache ? "Marquer comme faite" : t.label}
-                                >
-                                  <Icon
-                                    fafa={tache && a.data.fait ? "faCheck" : t.icone}
-                                    width={9}
-                                  />
-                                </span>
-                                <div className="crmEventInfo">
-                                  <div className="crmEventTitre">{a.data.resume}</div>
-                                  <div className="crmEventMeta">
-                                    {[
-                                      t.label,
-                                      tache ? `à faire le ${a.data.echeance}` : a.data.date,
-                                      a.auteur?.name,
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" · ")}
-                                  </div>
-                                </div>
-                                <span
-                                  className="crmRetirer handcr"
-                                  onClick={() => supprimerActivite(a)}
-                                >
-                                  <Icon fafa="faXmark" width={10} />
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  )
-                ) : null}
-              </>
+              <FicheClient
+                draft={draft}
+                selected={selected}
+                selectedId={selectedId}
+                caClient={caClient}
+                affairesClient={affairesClient}
+                onglet={onglet}
+                setOnglet={setOnglet}
+                champ={champ}
+                membres={membres}
+                busy={busy}
+                enregistrerClient={enregistrerClient}
+                supprimerClient={supprimerClient}
+                nouvelleAffaire={nouvelleAffaire}
+                ouvrirAffaire={ouvrirAffaire}
+                activite={activite}
+                setActivite={setActivite}
+                ajouterActivite={ajouterActivite}
+                timeline={timeline}
+                basculerTache={basculerTache}
+                supprimerActivite={supprimerActivite}
+              />
             )}
           </aside>
 

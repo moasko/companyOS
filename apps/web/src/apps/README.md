@@ -436,8 +436,8 @@ await journaliser(request, "stock.transfert", article.nom, { de, vers });
 ```
 
 Le verbe suit la forme `objet.action`. Ajoutez sa traduction dans `ACTIONS`,
-au début de `src/containers/applications/apps/settings.jsx` — une action
-inconnue s'affiche telle quelle, ce qui est lisible mais laid.
+au début de `src/containers/applications/apps/settings/Journal.jsx` — une
+action inconnue s'affiche telle quelle, ce qui est lisible mais laid.
 
 Rien n'efface le journal, y compris le propriétaire de l'espace. N'y mettez
 donc jamais de secret : mot de passe, jeton, contenu de fichier.
