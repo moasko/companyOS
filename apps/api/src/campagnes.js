@@ -123,17 +123,24 @@ const transporteurDe = async (tenantId) => {
       })
     : null;
   const smtp = installation?.settings?.smtp;
+
+  // **Le relais de la plateforme est exclu des campagnes**, et c'est
+  // délibéré.
+  //
+  // Une invitation ou une relance part à une poignée de destinataires
+  // connus ; une campagne part à des centaines d'adresses choisies par le
+  // client. Les faire sortir par la même adresse IP, c'est confier la
+  // réputation d'envoi de tous les espaces au moins prudent d'entre eux —
+  // et cette réputation se perd en une soirée, pour tout le monde à la
+  // fois, invitations comprises.
+  //
+  // Sans relais propre, la campagne **attend** au lieu de partir : rien
+  // n'est perdu, elle repartira dès qu'un relais sera configuré. C'est déjà
+  // ce que fait l'appelant quand `transport` est nul.
   return {
-    transport: smtp?.host
-      ? creerTransporteur(smtp)
-      : creerTransporteur({
-          host: env.smtpHost,
-          port: env.smtpPort,
-          user: env.smtpUser,
-          pass: env.smtpPass,
-        }),
+    transport: smtp?.host ? creerTransporteur(smtp) : null,
     de: smtp?.de || null,
-    smtpUser: smtp?.user || env.smtpUser,
+    smtpUser: smtp?.user || null,
   };
 };
 
