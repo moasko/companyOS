@@ -15,6 +15,33 @@ const nameSchema = z
 
 const MAX_DATA_BYTES = 64 * 1024;
 
+/// Collections lues par un **moteur** du serveur, et non par un simple
+/// écran.
+///
+/// Le CRUD de ce fichier est générique et ouvert à tout membre : c'est ce
+/// qui permet à une app du Studio de ranger ses fiches sans une ligne de
+/// serveur. Mais quelques collections ne sont pas de simples données —
+/// elles sont **exécutées**. Une fiche déposée dans `campagnes/campagnes`
+/// est ramassée par `src/campagnes.js`, qui envoie réellement les messages
+/// aux adresses qu'elle contient.
+///
+/// Autrement dit, sans ce garde-fou, n'importe quel membre authentifié
+/// dispose d'un relais d'envoi de masse au nom de son entreprise — et
+/// depuis l'IP de la plateforme. Écrire ici demande donc d'être
+/// administrateur, comme installer une application.
+///
+/// La lecture reste ouverte : voir ses propres campagnes n'a jamais fait
+/// de mal.
+const COLLECTIONS_MOTEUR = new Set([
+  "campagnes/campagnes",
+  "courrier/modeles",
+  "courrier/envois",
+  "relances/relances",
+]);
+
+const exigeAdmin = (names) =>
+  COLLECTIONS_MOTEUR.has(`${names.module}/${names.collection}`);
+
 const validateParams = (params, reply) => {
   const module = nameSchema.safeParse(params.module);
   const collection = nameSchema.safeParse(params.collection);
@@ -82,6 +109,12 @@ export default async function recordRoutes(app) {
   app.post("/:module/:collection", async (request, reply) => {
     const names = validateParams(request.params, reply);
     if (!names) return;
+    if (exigeAdmin(names) && !auMoins(request.user?.role, "ADMIN")) {
+      return reply.code(403).send({
+        error:
+          "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
+      });
+    }
     const data = validateData(request.body, reply);
     if (!data) return;
 
@@ -102,6 +135,12 @@ export default async function recordRoutes(app) {
   app.put("/:module/:collection/:id", async (request, reply) => {
     const names = validateParams(request.params, reply);
     if (!names) return;
+    if (exigeAdmin(names) && !auMoins(request.user?.role, "ADMIN")) {
+      return reply.code(403).send({
+        error:
+          "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
+      });
+    }
     const data = validateData(request.body, reply);
     if (!data) return;
 
@@ -122,6 +161,12 @@ export default async function recordRoutes(app) {
   app.delete("/:module/:collection/:id", async (request, reply) => {
     const names = validateParams(request.params, reply);
     if (!names) return;
+    if (exigeAdmin(names) && !auMoins(request.user?.role, "ADMIN")) {
+      return reply.code(403).send({
+        error:
+          "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
+      });
+    }
 
     // On relit avant d'effacer : une fois la ligne partie, il ne reste
     // aucun moyen de dire au journal *ce qui* a disparu.
