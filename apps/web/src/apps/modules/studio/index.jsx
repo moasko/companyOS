@@ -21,13 +21,44 @@ import "./studio.scss";
 // « site web » n'a ni collection, ni tableau de bord, ni aperçu de fiche :
 // lui montrer ces écrans vides serait la faire passer pour inachevée.
 const SECTIONS = [
-  { id: "mes-apps", label: "Mes applications", icon: "faLayerGroup" },
-  { id: "identite", label: "Identité", icon: "faTag" },
-  { id: "adresse", label: "Adresse du site", icon: "faGlobe", genres: ["web"] },
-  { id: "donnees", label: "Données", icon: "faTable", genres: ["donnees"] },
-  { id: "tableau", label: "Tableau de bord", icon: "faChartPie", genres: ["donnees"] },
-  { id: "apercu", label: "Aperçu", icon: "faEye", genres: ["donnees"] },
-  { id: "publication", label: "Publication", icon: "faRocket" },
+  { id: "mes-apps", label: "Mes applications", icon: "faLayerGroup", phase: "Espace" },
+  { id: "identite", label: "Identité", icon: "faTag", phase: "Construire" },
+  {
+    id: "adresse",
+    label: "Adresse du site",
+    icon: "faGlobe",
+    genres: ["web"],
+    phase: "Construire",
+  },
+  {
+    id: "donnees",
+    label: "Données",
+    icon: "faTable",
+    genres: ["donnees"],
+    phase: "Construire",
+  },
+  {
+    id: "automatisations",
+    label: "Automatisations",
+    icon: "faBolt",
+    genres: ["donnees"],
+    phase: "Construire",
+  },
+  {
+    id: "tableau",
+    label: "Interface",
+    icon: "faObjectGroup",
+    genres: ["donnees"],
+    phase: "Expérience",
+  },
+  {
+    id: "apercu",
+    label: "Aperçu",
+    icon: "faEye",
+    genres: ["donnees"],
+    phase: "Expérience",
+  },
+  { id: "publication", label: "Publication", icon: "faRocket", phase: "Livrer" },
 ];
 
 /// Les deux genres d'application que le Studio sait fabriquer.
@@ -234,6 +265,23 @@ function StudioApp() {
     goToSection("identite");
   };
 
+  const dupliquerApp = (app) => {
+    const nom = `${app.name} — copie`;
+    setEditingSlug(null);
+    setDraft({
+      ...APP_VIDE(),
+      name: nom,
+      slug: slugify(nom),
+      description: app.description || "",
+      icon: app.icon,
+      category: app.category,
+      published: false,
+      definition: JSON.parse(JSON.stringify(app.definition || APP_VIDE().definition)),
+    });
+    goToSection("identite");
+    flash("Copie créée — donnez-lui un nom avant de la publier");
+  };
+
   // Mise à jour fonctionnelle : plusieurs champs peuvent changer avant le
   // rendu suivant, partir de `draft` capturé écraserait les précédents.
   const setField = (key) => (e) => {
@@ -385,25 +433,12 @@ function StudioApp() {
       },
     }));
 
-  // ---- Pavés du tableau de bord ----
-  const widgets = () => draft.definition.accueil || [];
-  const setWidgets = (liste) =>
+  const pages = () => draft.definition.pages || [];
+  const setPages = (liste) =>
     setDraft((d) => ({
       ...d,
-      definition: { ...d.definition, accueil: liste },
+      definition: { ...d.definition, pages: liste },
     }));
-  const addWidget = () =>
-    setWidgets([
-      ...widgets(),
-      {
-        type: "compteur",
-        collection: draft.definition.collections[0]?.key || "",
-        titre: "",
-      },
-    ]);
-  const setWidget = (i, patch) =>
-    setWidgets(widgets().map((w, j) => (j === i ? { ...w, ...patch } : w)));
-  const removeWidget = (i) => setWidgets(widgets().filter((_, j) => j !== i));
 
   const addChamp = (ci) =>
     setDraft((d) => ({
@@ -428,6 +463,25 @@ function StudioApp() {
         ),
       },
     }));
+
+  // ---- Logique no-code ---------------------------------------------------
+  const automatisations = () => draft.definition.automatisations || [];
+  const setAutomatisations = (liste) =>
+    setDraft((d) => ({
+      ...d,
+      definition: { ...d.definition, automatisations: liste },
+    }));
+  const addAutomatisation = () =>
+    setAutomatisations([
+      ...automatisations(),
+      D.AUTOMATISATION_VIDE(draft.definition.collections[0]?.key || ""),
+    ]);
+  const setAutomatisation = (index, patch) =>
+    setAutomatisations(
+      automatisations().map((regle, i) => (i === index ? { ...regle, ...patch } : regle)),
+    );
+  const removeAutomatisation = (index) =>
+    setAutomatisations(automatisations().filter((_, i) => i !== index));
 
   /// Prépare la définition pour l'API : clés dérivées des libellés quand
   /// elles sont vides, options découpées, champs sans libellé écartés.
@@ -587,6 +641,36 @@ function StudioApp() {
       ].filter(Boolean).length
     : 0;
 
+  const etatSection = (id) => {
+    if (!draft || id === "mes-apps") return "";
+    if (id === "identite") return draft.name.trim() && draft.slug ? "ok" : "todo";
+    if (id === "adresse") {
+      return /^https?:\/\//i.test(definitionCourante.web?.url || "") ? "ok" : "todo";
+    }
+    if (id === "donnees") return nbChamps > 0 ? "ok" : "todo";
+    if (id === "automatisations") return automatisations().length ? "ok" : "optionnel";
+    if (id === "tableau")
+      return (draft.definition.pages || []).length ||
+        (draft.definition.accueil || []).length
+        ? "ok"
+        : "optionnel";
+    if (id === "apercu") return "optionnel";
+    if (id === "publication") return problemesCourants.length ? "alerte" : "ok";
+    return "";
+  };
+
+  const indexSection = sectionsVisibles.findIndex((s) => s.id === section);
+  const sectionPrecedente = sectionsVisibles[indexSection - 1];
+  const sectionSuivante = sectionsVisibles[indexSection + 1];
+  const appsPubliees = apps.filter((app) => app.published).length;
+  const reglesActives = apps.reduce(
+    (total, app) =>
+      total +
+      (app.definition?.automatisations || []).filter((regle) => regle.active !== false)
+        .length,
+    0,
+  );
+
   return (
     <ModuleWindow manifest={manifest} className="stdApp">
       {session.status !== "authenticated" ? (
@@ -594,19 +678,47 @@ function StudioApp() {
       ) : (
         <div className="stdShell">
           <aside className="stdNav" aria-label="Étapes de création">
-            {sectionsVisibles.map((s) => (
-              <button
-                type="button"
-                key={s.id}
-                className="stdNavItem"
-                data-active={section === s.id}
-                aria-current={section === s.id ? "step" : undefined}
-                onClick={() => goToSection(s.id)}
-              >
-                <Icon fafa={s.icon} width={13} />
-                <span>{s.label}</span>
-              </button>
-            ))}
+            <div className="stdNavBrand">
+              <span className="stdNavLogo">
+                <Icon fafa="faWandMagicSparkles" width={15} />
+              </span>
+              <span>
+                <strong>Studio</strong>
+                <small>Créateur no-code</small>
+              </span>
+            </div>
+            <div className="stdNavSteps">
+              {sectionsVisibles.map((s, index) => (
+                <React.Fragment key={s.id}>
+                  {index === 0 || sectionsVisibles[index - 1].phase !== s.phase ? (
+                    <div className="stdNavPhase">{s.phase}</div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="stdNavItem"
+                    data-active={section === s.id}
+                    data-state={etatSection(s.id)}
+                    aria-current={section === s.id ? "step" : undefined}
+                    onClick={() => goToSection(s.id)}
+                  >
+                    <Icon fafa={s.icon} width={13} />
+                    <span>{s.label}</span>
+                    {etatSection(s.id) === "ok" ? (
+                      <Icon className="stdNavEtat" fafa="faCircleCheck" width={10} />
+                    ) : etatSection(s.id) === "alerte" ? (
+                      <span className="stdNavAlerte">{problemesCourants.length}</span>
+                    ) : null}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="stdNavFooter">
+              <Icon fafa="faCircleCheck" width={12} />
+              <span>
+                Moteur sécurisé
+                <small>Schéma v{D.SCHEMA_VERSION}</small>
+              </span>
+            </div>
           </aside>
 
           <div className="stdMain cosScroll" ref={mainRef}>
@@ -645,11 +757,37 @@ function StudioApp() {
             ) : null}
             {/* ---- Mes applications ---- */}
             <section className="stdSection" data-hidden={section !== "mes-apps"}>
+              <div className="stdStudioHero">
+                <div className="stdStudioHeroCopy">
+                  <span className="stdEyebrow">COMPANYOS APP STUDIO</span>
+                  <h1>Transformez vos processus en applications.</h1>
+                  <p>
+                    Données, interfaces et automatisations réunies dans un seul espace
+                    no-code.
+                  </p>
+                  <button type="button" className="stdHeroCta" onClick={openNew}>
+                    <Icon fafa="faPlus" width={11} />
+                    Créer une application
+                  </button>
+                </div>
+                <div className="stdStudioStats" aria-label="Résumé du Studio">
+                  <div>
+                    <strong>{apps.length}</strong>
+                    <span>Applications</span>
+                  </div>
+                  <div>
+                    <strong>{appsPubliees}</strong>
+                    <span>En production</span>
+                  </div>
+                  <div>
+                    <strong>{reglesActives}</strong>
+                    <span>Règles actives</span>
+                  </div>
+                </div>
+              </div>
               <div className="stdSectionHead">
                 <div>
-                  <h2>
-                    <span className="stdNum">1.</span> Mes applications
-                  </h2>
+                  <h2>Vos applications</h2>
                   <p className="stdHint">
                     Applications créées par {session.tenant?.name}
                   </p>
@@ -667,12 +805,16 @@ function StudioApp() {
               ) : (
                 <div className="stdList">
                   {apps.map((a) => (
-                    <button
-                      type="button"
+                    <div
                       key={a.slug}
                       className="stdRow"
                       data-active={a.slug === editingSlug}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => openApp(a)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") openApp(a);
+                      }}
                     >
                       <Icon src={a.icon} width={24} />
                       <div className="stdRowInfo">
@@ -686,7 +828,25 @@ function StudioApp() {
                       <div className="stdTag" data-tone={a.published ? "ok" : "idle"}>
                         {a.published ? "Publiée" : "Brouillon"}
                       </div>
-                    </button>
+                      <span
+                        className="stdRowDupliquer"
+                        role="button"
+                        tabIndex={0}
+                        title="Dupliquer cette application"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          dupliquerApp(a);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.stopPropagation();
+                            dupliquerApp(a);
+                          }
+                        }}
+                      >
+                        <Icon fafa="faCopy" width={11} />
+                      </span>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1066,22 +1226,40 @@ function StudioApp() {
               )}
             </section>
 
+            {/* ---- Automatisations no-code ---- */}
+            <section className="stdSection" data-hidden={section !== "automatisations"}>
+              <div className="stdSectionHead">
+                <div>
+                  <h2>
+                    <span className="stdNum">4.</span> Automatisations
+                  </h2>
+                  <p className="stdHint">
+                    Déclencheur → conditions → actions. La logique s'exécute lorsque vos
+                    collègues enregistrent une fiche, sans script ni formule cachée.
+                  </p>
+                </div>
+                <button type="button" className="stdBtnGhost" onClick={addAutomatisation}>
+                  <Icon fafa="faBolt" width={10} />
+                  Nouvelle règle
+                </button>
+              </div>
+              {draft ? (
+                <AutomatisationsBuilder
+                  regles={automatisations()}
+                  collections={D.normaliser(draft.definition).collections}
+                  onSet={setAutomatisation}
+                  onRemove={removeAutomatisation}
+                />
+              ) : null}
+            </section>
+
             {/* ---- Tableau de bord ---- */}
             <section className="stdSection" data-hidden={section !== "tableau"}>
-              <h2>
-                <span className="stdNum">4.</span> Tableau de bord
-              </h2>
-              <p className="stdHint">
-                Des indicateurs affichés à l'ouverture de l'application. Sans eux, il faut
-                parcourir toutes les fiches pour savoir « combien ». Facultatif.
-              </p>
               {draft ? (
-                <TableauBuilder
-                  widgets={widgets()}
+                <InterfaceBuilder
+                  pages={pages()}
                   collections={D.normaliser(draft.definition).collections}
-                  onAdd={addWidget}
-                  onSet={setWidget}
-                  onRemove={removeWidget}
+                  onChange={setPages}
                 />
               ) : null}
             </section>
@@ -1153,7 +1331,15 @@ function StudioApp() {
                     {problemesCourants.length ? (
                       <ul>
                         {problemesCourants.map((probleme) => (
-                          <li key={probleme}>{probleme}</li>
+                          <li key={probleme}>
+                            <button
+                              type="button"
+                              onClick={() => goToSection(D.sectionPourProbleme(probleme))}
+                            >
+                              <span>{probleme}</span>
+                              <Icon fafa="faArrowRight" width={9} />
+                            </button>
+                          </li>
                         ))}
                       </ul>
                     ) : (
@@ -1203,11 +1389,334 @@ function StudioApp() {
               )}
             </section>
 
+            {draft && section !== "mes-apps" ? (
+              <nav className="stdParcours" aria-label="Navigation dans la création">
+                <button
+                  type="button"
+                  className="stdBtnGhost"
+                  disabled={!sectionPrecedente || sectionPrecedente.id === "mes-apps"}
+                  onClick={() => sectionPrecedente && goToSection(sectionPrecedente.id)}
+                >
+                  <Icon fafa="faArrowLeft" width={10} />
+                  Précédent
+                </button>
+                <span>
+                  Étape {indexSection} sur {sectionsVisibles.length - 1}
+                </span>
+                {sectionSuivante ? (
+                  <button
+                    type="button"
+                    className="stdPrimary"
+                    onClick={() => goToSection(sectionSuivante.id)}
+                  >
+                    Continuer
+                    <Icon fafa="faArrowRight" width={10} />
+                  </button>
+                ) : null}
+              </nav>
+            ) : null}
+
             {notice ? <div className="stdNotice">{notice}</div> : null}
           </div>
         </div>
       )}
     </ModuleWindow>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Automatisations
+// ---------------------------------------------------------------------------
+
+const OPERATEURS = [
+  ["egal", "est égal à"],
+  ["different", "est différent de"],
+  ["contient", "contient"],
+  ["vide", "est vide"],
+  ["non-vide", "n'est pas vide"],
+  ["superieur", "est supérieur à"],
+];
+
+function AutomatisationsBuilder({ regles, collections, onSet, onRemove }) {
+  if (!regles.length) {
+    return (
+      <div className="stdEmptyBox">
+        Aucune automatisation. Exemple : « quand une opportunité est créée et que son
+        montant dépasse 1 000 000, définir la priorité sur Haute ».
+      </div>
+    );
+  }
+
+  return (
+    <div className="stdRegles">
+      {regles.map((regle, index) => {
+        const collection =
+          collections.find((candidate) => candidate.key === regle.collection) ||
+          collections[0];
+        const champs = (collection?.fields || []).filter(
+          (champ) => champ.type !== "calcul",
+        );
+        const setListe = (cle, liste) => onSet(index, { [cle]: liste });
+        return (
+          <article
+            className="stdRegle"
+            key={regle.id || index}
+            data-active={regle.active}
+          >
+            <header>
+              <label className="stdSwitchRegle">
+                <input
+                  type="checkbox"
+                  checked={regle.active !== false}
+                  onChange={(event) => onSet(index, { active: event.target.checked })}
+                />
+                <span>{regle.active !== false ? "Active" : "Inactive"}</span>
+              </label>
+              <input
+                className="stdRegleNom"
+                value={regle.nom}
+                onChange={(event) => onSet(index, { nom: event.target.value })}
+                aria-label="Nom de la règle"
+              />
+              <button type="button" className="stdDel" onClick={() => onRemove(index)}>
+                <Icon fafa="faTrashCan" width={10} />
+              </button>
+            </header>
+
+            <div className="stdReglePhrase">
+              <b>Quand</b>
+              <select
+                value={regle.declencheur}
+                onChange={(event) => onSet(index, { declencheur: event.target.value })}
+              >
+                <option value="creation">une fiche est créée</option>
+                <option value="modification">une fiche est modifiée</option>
+                <option value="toujours">une fiche est enregistrée</option>
+              </select>
+              <b>dans</b>
+              <select
+                value={regle.collection}
+                onChange={(event) =>
+                  onSet(index, {
+                    collection: event.target.value,
+                    conditions: [],
+                    actions: [],
+                  })
+                }
+              >
+                {collections.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="stdRegleBloc">
+              <div className="stdRegleTitre">
+                <span>SI</span> Toutes les conditions
+              </div>
+              {(regle.conditions || []).map((condition, ci) => (
+                <div className="stdRegleLigne" key={ci}>
+                  <select
+                    value={condition.champ}
+                    onChange={(event) =>
+                      setListe(
+                        "conditions",
+                        regle.conditions.map((item, i) =>
+                          i === ci ? { ...item, champ: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">Choisir un champ</option>
+                    {champs.map((champ) => (
+                      <option key={champ.key} value={champ.key}>
+                        {champ.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={condition.operateur}
+                    onChange={(event) =>
+                      setListe(
+                        "conditions",
+                        regle.conditions.map((item, i) =>
+                          i === ci ? { ...item, operateur: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  >
+                    {OPERATEURS.map(([valeur, label]) => (
+                      <option key={valeur} value={valeur}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  {!["vide", "non-vide"].includes(condition.operateur) ? (
+                    <input
+                      value={condition.valeur ?? ""}
+                      placeholder="Valeur"
+                      onChange={(event) =>
+                        setListe(
+                          "conditions",
+                          regle.conditions.map((item, i) =>
+                            i === ci ? { ...item, valeur: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                  ) : (
+                    <span />
+                  )}
+                  <button
+                    type="button"
+                    className="stdDel"
+                    onClick={() =>
+                      setListe(
+                        "conditions",
+                        regle.conditions.filter((_, i) => i !== ci),
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="stdLien"
+                onClick={() =>
+                  setListe("conditions", [
+                    ...(regle.conditions || []),
+                    { champ: champs[0]?.key || "", operateur: "egal", valeur: "" },
+                  ])
+                }
+              >
+                + Ajouter une condition
+              </button>
+            </div>
+
+            <div className="stdRegleBloc">
+              <div className="stdRegleTitre">
+                <span>ALORS</span> Actions à exécuter
+              </div>
+              {(regle.actions || []).map((action, ai) => (
+                <div className="stdRegleLigne stdRegleAction" key={ai}>
+                  <select
+                    value={action.type}
+                    onChange={(event) =>
+                      setListe(
+                        "actions",
+                        regle.actions.map((item, i) =>
+                          i === ai
+                            ? event.target.value === "notifier"
+                              ? { type: "notifier", titre: "Information", message: "" }
+                              : {
+                                  type: "definir",
+                                  champ: champs[0]?.key || "",
+                                  valeur: "",
+                                }
+                            : item,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="definir">Définir un champ</option>
+                    <option value="notifier">Envoyer une notification</option>
+                  </select>
+                  {action.type === "notifier" ? (
+                    <>
+                      <input
+                        value={action.titre || ""}
+                        placeholder="Titre de la notification"
+                        onChange={(event) =>
+                          setListe(
+                            "actions",
+                            regle.actions.map((item, i) =>
+                              i === ai ? { ...item, titre: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                      <input
+                        value={action.message || ""}
+                        placeholder="Message"
+                        onChange={(event) =>
+                          setListe(
+                            "actions",
+                            regle.actions.map((item, i) =>
+                              i === ai ? { ...item, message: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <select
+                        value={action.champ}
+                        onChange={(event) =>
+                          setListe(
+                            "actions",
+                            regle.actions.map((item, i) =>
+                              i === ai ? { ...item, champ: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      >
+                        <option value="">Choisir un champ</option>
+                        {champs.map((champ) => (
+                          <option key={champ.key} value={champ.key}>
+                            {champ.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={action.valeur ?? ""}
+                        placeholder="Nouvelle valeur"
+                        onChange={(event) =>
+                          setListe(
+                            "actions",
+                            regle.actions.map((item, i) =>
+                              i === ai ? { ...item, valeur: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="stdDel"
+                    onClick={() =>
+                      setListe(
+                        "actions",
+                        regle.actions.filter((_, i) => i !== ai),
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="stdLien"
+                onClick={() =>
+                  setListe("actions", [
+                    ...(regle.actions || []),
+                    { type: "definir", champ: champs[0]?.key || "", valeur: "" },
+                  ])
+                }
+              >
+                + Ajouter une action
+              </button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1369,80 +1878,1081 @@ function Apercu({ definition }) {
 }
 
 // ---------------------------------------------------------------------------
-// Constructeur du tableau de bord
+// Builder visuel de l'interface
 // ---------------------------------------------------------------------------
 
-/// Compose les pavés du tableau de bord. Chaque pavé dit : quel indicateur,
-/// sur quelle collection, sur quel champ. Les choix se restreignent à ce
-/// qui a du sens — une somme ne se propose que sur un montant ou un nombre.
-function TableauBuilder({ widgets, collections, onAdd, onSet, onRemove }) {
+const BLOCS_INTERFACE = {
+  titre: { label: "Titre", icon: "faHeading" },
+  texte: { label: "Texte", icon: "faAlignLeft" },
+  bouton: { label: "Bouton", icon: "faArrowPointer" },
+  compteur: { label: "Indicateur", icon: "faChartSimple" },
+  tableau: { label: "Tableau", icon: "faTable" },
+  formulaire: { label: "Formulaire", icon: "faRectangleList" },
+  conteneur: { label: "Conteneur", icon: "faBorderAll" },
+  section: { label: "Section", icon: "faColumns" },
+  image: { label: "Image", icon: "faImage" },
+  carte: { label: "Carte", icon: "faIdCard" },
+  liste: { label: "Liste", icon: "faList" },
+  graphique: { label: "Graphique", icon: "faChartColumn" },
+  badge: { label: "Badge", icon: "faCertificate" },
+  separateur: { label: "Séparateur", icon: "faMinus" },
+};
+
+const GROUPES_BLOCS = [
+  { id: "structure", label: "Structure", types: ["section", "conteneur", "separateur"] },
+  {
+    id: "contenu",
+    label: "Contenu",
+    types: ["titre", "texte", "image", "badge", "bouton"],
+  },
+  {
+    id: "donnees",
+    label: "Données",
+    types: ["compteur", "carte", "liste", "tableau", "graphique", "formulaire"],
+  },
+];
+
+const MODELES_SECTIONS = [
+  {
+    id: "hero",
+    label: "En-tête",
+    icon: "faFlag",
+    enfants: [
+      ["titre", "Titre de la page"],
+      ["texte", "Présentez cet espace à vos utilisateurs."],
+      ["bouton", "Commencer"],
+    ],
+  },
+  {
+    id: "kpis",
+    label: "Indicateurs",
+    icon: "faChartSimple",
+    enfants: [
+      ["titre", "Vue d’ensemble"],
+      ["compteur", "Total"],
+      ["compteur", "En cours"],
+      ["compteur", "Terminés"],
+    ],
+    grille: true,
+  },
+  {
+    id: "donnees",
+    label: "Données",
+    icon: "faTable",
+    enfants: [
+      ["titre", "Dernières données"],
+      ["tableau", "Enregistrements"],
+    ],
+  },
+];
+
+const idInterface = (prefixe) =>
+  `${prefixe}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+function nouveauBloc(type, collections) {
+  return {
+    id: idInterface("bloc"),
+    type,
+    label: BLOCS_INTERFACE[type]?.label || "Composant",
+    collection: [
+      "compteur",
+      "tableau",
+      "formulaire",
+      "liste",
+      "graphique",
+      "carte",
+    ].includes(type)
+      ? collections[0]?.key || ""
+      : "",
+    ...(type === "image"
+      ? { source: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200" }
+      : {}),
+    style: {
+      largeur: [
+        "titre",
+        "tableau",
+        "liste",
+        "graphique",
+        "separateur",
+        "section",
+        "conteneur",
+      ].includes(type)
+        ? "100"
+        : "50",
+      padding: 16,
+      alignement: "gauche",
+      fond: "surface",
+      direction: ["section", "conteneur"].includes(type) ? "ligne" : undefined,
+      colonnes: ["section", "conteneur"].includes(type) ? 2 : undefined,
+      gap: ["section", "conteneur"].includes(type) ? 12 : undefined,
+    },
+  };
+}
+
+function InterfaceBuilder({ pages, collections, onChange }) {
+  const pagesCourantes = pages.length
+    ? pages
+    : [
+        {
+          id: "accueil",
+          nom: "Accueil",
+          composants: [
+            { ...nouveauBloc("titre", collections), label: "Tableau de bord" },
+            { ...nouveauBloc("compteur", collections), label: "Total" },
+            { ...nouveauBloc("tableau", collections), label: "Dernières données" },
+          ],
+        },
+      ];
+  const [pageId, setPageId] = useState(pagesCourantes[0]?.id || "accueil");
+  const [selectionId, setSelectionId] = useState(
+    pagesCourantes[0]?.composants?.[0]?.id || "",
+  );
+  const [mode, setMode] = useState("desktop");
+  const [apercuActif, setApercuActif] = useState(false);
+  const [rechercheBlocs, setRechercheBlocs] = useState("");
+  const historique = React.useRef([]);
+  const futur = React.useRef([]);
+  const [, rafraichirHistorique] = useState(0);
+  const page = pagesCourantes.find((item) => item.id === pageId) || pagesCourantes[0];
+  const composants = page?.composants || [];
+  const selection = composants.find((item) => item.id === selectionId);
+  const styleEdition = selection
+    ? {
+        ...selection.style,
+        ...(mode !== "desktop" ? selection.responsive?.[mode] || {} : {}),
+      }
+    : {};
+
+  const commit = (prochainesPages) => {
+    historique.current = [...historique.current.slice(-49), pagesCourantes];
+    futur.current = [];
+    onChange(prochainesPages);
+    rafraichirHistorique((version) => version + 1);
+  };
+  const annuler = () => {
+    const precedent = historique.current.pop();
+    if (!precedent) return;
+    futur.current.push(pagesCourantes);
+    onChange(precedent);
+    rafraichirHistorique((version) => version + 1);
+  };
+  const retablir = () => {
+    const suivant = futur.current.pop();
+    if (!suivant) return;
+    historique.current.push(pagesCourantes);
+    onChange(suivant);
+    rafraichirHistorique((version) => version + 1);
+  };
+  const setComposants = (liste) =>
+    commit(
+      pagesCourantes.map((item) =>
+        item.id === page.id ? { ...item, composants: liste } : item,
+      ),
+    );
+  const ajouterPage = () => {
+    const id = idInterface("page");
+    commit([
+      ...pagesCourantes,
+      { id, nom: `Page ${pagesCourantes.length + 1}`, composants: [] },
+    ]);
+    setPageId(id);
+    setSelectionId("");
+  };
+  const modifierPage = (patch) =>
+    commit(
+      pagesCourantes.map((item) => (item.id === page.id ? { ...item, ...patch } : item)),
+    );
+  const dupliquerPage = () => {
+    const id = idInterface("page");
+    const nouveauxIds = Object.fromEntries(
+      composants.map((item) => [item.id, idInterface("bloc")]),
+    );
+    const copie = {
+      ...page,
+      id,
+      nom: `${page.nom} — copie`,
+      composants: composants.map((item) => ({
+        ...item,
+        id: nouveauxIds[item.id],
+        ...(item.parentId ? { parentId: nouveauxIds[item.parentId] } : {}),
+      })),
+    };
+    commit([...pagesCourantes, copie]);
+    setPageId(id);
+    setSelectionId(copie.composants[0]?.id || "");
+  };
+  const supprimerPage = () => {
+    if (pagesCourantes.length <= 1) return;
+    const restantes = pagesCourantes.filter((item) => item.id !== page.id);
+    commit(restantes);
+    setPageId(restantes[0].id);
+    setSelectionId(restantes[0].composants?.[0]?.id || "");
+  };
+  const ajouterBloc = (type, parentCible) => {
+    const parentId =
+      parentCible === null
+        ? ""
+        : parentCible ||
+          (["section", "conteneur"].includes(selection?.type)
+            ? selection.id
+            : selection?.parentId || "");
+    const bloc = {
+      ...nouveauBloc(type, collections),
+      ...(parentId ? { parentId } : {}),
+    };
+    setComposants([...composants, bloc]);
+    setSelectionId(bloc.id);
+  };
+  const ajouterModeleSection = (modele) => {
+    const section = {
+      ...nouveauBloc("section", collections),
+      label: modele.label,
+      style: {
+        ...nouveauBloc("section", collections).style,
+        direction: modele.grille ? "grille" : "colonne",
+        colonnes: modele.grille ? 3 : 2,
+      },
+    };
+    const enfants = modele.enfants.map(([type, label]) => ({
+      ...nouveauBloc(type, collections),
+      label,
+      parentId: section.id,
+      ...(type === "titre"
+        ? { style: { ...nouveauBloc(type, collections).style, largeur: "100" } }
+        : {}),
+    }));
+    setComposants([...composants, section, ...enfants]);
+    setSelectionId(section.id);
+  };
+  const modifierBloc = (patch) =>
+    setComposants(
+      composants.map((item) => (item.id === selectionId ? { ...item, ...patch } : item)),
+    );
+  const modifierStyle = (patch) => {
+    if (mode === "desktop") {
+      modifierBloc({ style: { ...selection.style, ...patch } });
+      return;
+    }
+    modifierBloc({
+      responsive: {
+        ...selection.responsive,
+        [mode]: { ...selection.responsive?.[mode], ...patch },
+      },
+    });
+  };
+  const supprimerBloc = () => {
+    setComposants(
+      composants
+        .filter((item) => item.id !== selectionId)
+        .map((item) =>
+          item.parentId === selectionId
+            ? { ...item, parentId: selection?.parentId }
+            : item,
+        ),
+    );
+    setSelectionId("");
+  };
+  const dupliquerBloc = () => {
+    if (!selection) return;
+    const index = composants.findIndex((item) => item.id === selectionId);
+    const copie = {
+      ...selection,
+      id: idInterface("bloc"),
+      label: `${selection.label} — copie`,
+    };
+    const liste = [...composants];
+    liste.splice(index + 1, 0, copie);
+    setComposants(liste);
+    setSelectionId(copie.id);
+  };
+  const changerOrdre = (direction) => {
+    const index = composants.findIndex((item) => item.id === selectionId);
+    const cible = index + direction;
+    if (index < 0 || cible < 0 || cible >= composants.length) return;
+    const liste = [...composants];
+    [liste[index], liste[cible]] = [liste[cible], liste[index]];
+    setComposants(liste);
+  };
+  const deplacerBloc = (sourceId, cibleId) => {
+    if (!sourceId || sourceId === cibleId) return;
+    const source = composants.find((item) => item.id === sourceId);
+    if (!source) return;
+    const sansSource = composants.filter((item) => item.id !== sourceId);
+    const cible = sansSource.findIndex((item) => item.id === cibleId);
+    sansSource.splice(cible < 0 ? sansSource.length : cible, 0, source);
+    setComposants(sansSource);
+  };
+  const imbriquerBloc = (sourceId, parentId) => {
+    if (!sourceId || sourceId === parentId) return;
+    const parent = composants.find((item) => item.id === parentId);
+    if (!parent || !["section", "conteneur"].includes(parent.type)) return;
+    let courant = parent;
+    while (courant?.parentId) {
+      if (courant.parentId === sourceId) return;
+      courant = composants.find((item) => item.id === courant.parentId);
+    }
+    setComposants(
+      composants.map((item) => (item.id === sourceId ? { ...item, parentId } : item)),
+    );
+  };
+  const sortirBloc = (sourceId) => {
+    if (!sourceId) return;
+    setComposants(
+      composants.map((item) =>
+        item.id === sourceId ? { ...item, parentId: undefined } : item,
+      ),
+    );
+  };
+  const profondeurBloc = (bloc) => {
+    let profondeur = 0;
+    let courant = bloc;
+    while (courant?.parentId && profondeur < 8) {
+      profondeur += 1;
+      courant = composants.find((item) => item.id === courant.parentId);
+    }
+    return profondeur;
+  };
+  const rechercheNormalisee = rechercheBlocs.trim().toLocaleLowerCase("fr");
+  const cheminSelection = [];
+  let elementChemin = selection;
+  while (elementChemin && cheminSelection.length < 8) {
+    cheminSelection.unshift(elementChemin);
+    elementChemin = composants.find((item) => item.id === elementChemin.parentId);
+  }
+
   return (
-    <div className="stdWidgetsEditeur">
-      {widgets.length === 0 ? (
-        <div className="stdEmptyBox">
-          Aucun pavé. Ajoutez-en un pour donner une vue d'ensemble à l'application.
+    <div className="stdBuilder">
+      <header className="stdBuilderTop">
+        <div>
+          <span className="stdBuilderCrumb">INTERFACE</span>
+          <strong>{page?.nom || "Nouvelle page"}</strong>
         </div>
-      ) : (
-        widgets.map((w, i) => {
-          const coll = collections.find((c) => c.key === w.collection);
-          const def = D.WIDGETS[w.type];
-          const champsPossibles = (coll?.fields || []).filter(
-            (f) => !def?.typeChamp || def.typeChamp.includes(f.type),
-          );
-          return (
-            <div key={i} className="stdWidgetRow">
-              <input
-                type="text"
-                className="stdWidgetTitre"
-                value={w.titre || ""}
-                placeholder={def?.label || "Titre"}
-                onChange={(e) => onSet(i, { titre: e.target.value })}
-              />
-              <select
-                value={w.type}
-                onChange={(e) => onSet(i, { type: e.target.value, champ: "" })}
+        <div className="stdBuilderToolbar">
+          <div className="stdBuilderHistory">
+            <button
+              type="button"
+              disabled={!historique.current.length}
+              onClick={annuler}
+              title="Annuler"
+            >
+              <Icon fafa="faRotateLeft" width={11} />
+            </button>
+            <button
+              type="button"
+              disabled={!futur.current.length}
+              onClick={retablir}
+              title="Rétablir"
+            >
+              <Icon fafa="faRotateRight" width={11} />
+            </button>
+          </div>
+          <div className="stdBuilderModes" aria-label="Taille de l'aperçu">
+            {[
+              ["desktop", "faDesktop"],
+              ["tablet", "faTabletScreenButton"],
+              ["mobile", "faMobileScreenButton"],
+            ].map(([id, icon]) => (
+              <button
+                type="button"
+                key={id}
+                data-active={mode === id}
+                onClick={() => setMode(id)}
+                title={id}
               >
-                {Object.entries(D.WIDGETS).map(([id, t]) => (
-                  <option key={id} value={id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={w.collection}
-                onChange={(e) => onSet(i, { collection: e.target.value, champ: "" })}
+                <Icon fafa={icon} width={12} />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="stdBuilderTopActions">
+          <button
+            type="button"
+            className="stdBtnGhost"
+            onClick={() => ajouterBloc("section", null)}
+            data-preview-hidden={apercuActif}
+          >
+            <Icon fafa="faColumns" width={10} /> Nouvelle section
+          </button>
+          <button
+            type="button"
+            className="stdBtnGhost"
+            data-active={apercuActif}
+            onClick={() => {
+              setApercuActif((actif) => !actif);
+              setSelectionId("");
+            }}
+          >
+            <Icon fafa={apercuActif ? "faPen" : "faPlay"} width={10} />
+            {apercuActif ? "Modifier" : "Aperçu"}
+          </button>
+        </div>
+      </header>
+
+      <div className="stdBuilderBody" data-preview={apercuActif}>
+        <aside className="stdBuilderLeft">
+          <div className="stdBuilderPanelHead">
+            <strong>Pages</strong>
+            <button type="button" onClick={ajouterPage} title="Ajouter une page">
+              +
+            </button>
+          </div>
+          <div className="stdBuilderPages">
+            {pagesCourantes.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                data-active={item.id === page?.id}
+                onClick={() => {
+                  setPageId(item.id);
+                  setSelectionId(item.composants?.[0]?.id || "");
+                }}
               >
-                {collections.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
+                <Icon fafa="faFile" width={11} />
+                <span>{item.nom}</span>
+                <small>{item.composants?.length || 0}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="stdBuilderPanelHead stdBuilderComponentsHead">
+            <strong>Composants</strong>
+          </div>
+          <label className="stdBuilderSearch">
+            <Icon fafa="faMagnifyingGlass" width={10} />
+            <input
+              value={rechercheBlocs}
+              placeholder="Rechercher…"
+              onChange={(event) => setRechercheBlocs(event.target.value)}
+            />
+            {rechercheBlocs ? (
+              <button type="button" onClick={() => setRechercheBlocs("")}>
+                ×
+              </button>
+            ) : null}
+          </label>
+          {!rechercheNormalisee ? (
+            <div className="stdSectionTemplates">
+              <span>Sections prêtes</span>
+              <div>
+                {MODELES_SECTIONS.map((modele) => (
+                  <button
+                    type="button"
+                    key={modele.id}
+                    onClick={() => ajouterModeleSection(modele)}
+                  >
+                    <Icon fafa={modele.icon} width={11} />
+                    <span>{modele.label}</span>
+                  </button>
                 ))}
-              </select>
-              {def?.besoinChamp ? (
-                <select
-                  value={w.champ || ""}
-                  onChange={(e) => onSet(i, { champ: e.target.value })}
-                >
-                  <option value="">— quel champ ? —</option>
-                  {champsPossibles.map((f) => (
-                    <option key={f.key} value={f.key}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className="stdWidgetVide" />
-              )}
-              <div className="stdDel handcr" onClick={() => onRemove(i)}>
-                ✕
               </div>
             </div>
-          );
-        })
-      )}
-      <div className="stdBtnGhost handcr" onClick={onAdd}>
-        Ajouter un pavé
+          ) : null}
+          <div className="stdBuilderLibraryGroups">
+            {GROUPES_BLOCS.map((groupe) => {
+              const types = groupe.types.filter((type) =>
+                BLOCS_INTERFACE[type].label
+                  .toLocaleLowerCase("fr")
+                  .includes(rechercheNormalisee),
+              );
+              if (!types.length) return null;
+              return (
+                <div className="stdBuilderLibraryGroup" key={groupe.id}>
+                  <span>{groupe.label}</span>
+                  <div className="stdBuilderLibrary">
+                    {types.map((type) => {
+                      const bloc = BLOCS_INTERFACE[type];
+                      return (
+                        <button
+                          type="button"
+                          key={type}
+                          draggable
+                          onDragStart={(event) =>
+                            event.dataTransfer.setData("studio/type", type)
+                          }
+                          onClick={() => ajouterBloc(type)}
+                          title={`Ajouter ${bloc.label}`}
+                        >
+                          <Icon fafa={bloc.icon} width={13} />
+                          <span>{bloc.label}</span>
+                          <small>+</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="stdBuilderPanelHead stdBuilderLayersHead">
+            <strong>Calques</strong>
+            <small>{composants.length}</small>
+          </div>
+          <div className="stdBuilderLayers">
+            {composants.map((bloc, index) => (
+              <button
+                type="button"
+                key={bloc.id}
+                data-active={bloc.id === selectionId}
+                data-nested={Boolean(bloc.parentId)}
+                style={{ "--layer-depth": profondeurBloc(bloc) }}
+                onClick={() => setSelectionId(bloc.id)}
+              >
+                <Icon fafa={BLOCS_INTERFACE[bloc.type]?.icon} width={10} />
+                <span>{bloc.label || BLOCS_INTERFACE[bloc.type]?.label}</span>
+                <small>{index + 1}</small>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <main className="stdBuilderStage">
+          <div
+            className="stdBuilderCanvas"
+            data-mode={mode}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              if (apercuActif) return;
+              event.preventDefault();
+              const type = event.dataTransfer.getData("studio/type");
+              if (type) ajouterBloc(type, null);
+              else sortirBloc(event.dataTransfer.getData("studio/bloc"));
+            }}
+          >
+            <div className="stdCanvasBar">
+              <span className="stdCanvasBreadcrumb">
+                <b>{page?.nom}</b>
+                {cheminSelection.map((item) => (
+                  <React.Fragment key={item.id}>
+                    <em>/</em>
+                    <small>{item.label || BLOCS_INTERFACE[item.type]?.label}</small>
+                  </React.Fragment>
+                ))}
+              </span>
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className="stdCanvasGrid">
+              {composants.length ? (
+                composants
+                  .filter((bloc) => !bloc.parentId)
+                  .map((bloc) => (
+                    <BuilderBloc
+                      key={bloc.id}
+                      bloc={bloc}
+                      collection={collections.find((c) => c.key === bloc.collection)}
+                      selected={bloc.id === selectionId}
+                      onSelect={(id = bloc.id) => setSelectionId(id)}
+                      onMove={deplacerBloc}
+                      onNest={imbriquerBloc}
+                      onAdd={ajouterBloc}
+                      composants={composants}
+                      collections={collections}
+                      selectedId={selectionId}
+                      mode={mode}
+                      preview={apercuActif}
+                    />
+                  ))
+              ) : (
+                <div className="stdCanvasEmpty">
+                  <Icon fafa="faShapes" width={24} />
+                  <strong>Déposez votre premier composant</strong>
+                  <span>Cliquez ou glissez un élément depuis la bibliothèque.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+
+        <aside className="stdBuilderInspector">
+          {selection ? (
+            <>
+              <div className="stdInspectorTitle">
+                <Icon fafa={BLOCS_INTERFACE[selection.type]?.icon} width={13} />
+                <div>
+                  <strong>{BLOCS_INTERFACE[selection.type]?.label}</strong>
+                  <small>{selection.id}</small>
+                </div>
+              </div>
+              <label>
+                <span>Libellé</span>
+                <input
+                  value={selection.label || ""}
+                  onChange={(e) => modifierBloc({ label: e.target.value })}
+                />
+              </label>
+              {[
+                "compteur",
+                "tableau",
+                "formulaire",
+                "liste",
+                "graphique",
+                "carte",
+              ].includes(selection.type) ? (
+                <label>
+                  <span>Source de données</span>
+                  <select
+                    value={selection.collection || ""}
+                    onChange={(e) => modifierBloc({ collection: e.target.value })}
+                  >
+                    <option value="">Aucune</option>
+                    {collections.map((coll) => (
+                      <option key={coll.key} value={coll.key}>
+                        {coll.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {selection.type === "image" ? (
+                <label>
+                  <span>Adresse de l’image</span>
+                  <input
+                    type="url"
+                    value={selection.source || ""}
+                    placeholder="https://…"
+                    onChange={(e) => modifierBloc({ source: e.target.value })}
+                  />
+                </label>
+              ) : null}
+              {!["section", "conteneur"].includes(selection.type) ? (
+                <label>
+                  <span>Section parente</span>
+                  <select
+                    value={selection.parentId || ""}
+                    onChange={(e) =>
+                      modifierBloc({ parentId: e.target.value || undefined })
+                    }
+                  >
+                    <option value="">Racine de la page</option>
+                    {composants
+                      .filter((item) => ["section", "conteneur"].includes(item.type))
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.label}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              ) : null}
+              <div className="stdInspectorGroup">
+                <strong>
+                  Disposition{" "}
+                  <span className="stdBreakpointBadge">
+                    {mode === "desktop"
+                      ? "Bureau"
+                      : mode === "tablet"
+                        ? "Tablette"
+                        : "Mobile"}
+                  </span>
+                </strong>
+                <label>
+                  <span>Largeur</span>
+                  <select
+                    value={styleEdition.largeur || "50"}
+                    onChange={(e) => modifierStyle({ largeur: e.target.value })}
+                  >
+                    <option value="25">25 %</option>
+                    <option value="50">50 %</option>
+                    <option value="75">75 %</option>
+                    <option value="100">100 %</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Alignement</span>
+                  <select
+                    value={styleEdition.alignement || "gauche"}
+                    onChange={(e) => modifierStyle({ alignement: e.target.value })}
+                  >
+                    <option value="gauche">Gauche</option>
+                    <option value="centre">Centre</option>
+                    <option value="droite">Droite</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Marge intérieure</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="64"
+                    value={styleEdition.padding ?? 16}
+                    onChange={(e) => modifierStyle({ padding: Number(e.target.value) })}
+                  />
+                </label>
+                {["section", "conteneur"].includes(selection.type) ? (
+                  <>
+                    <label>
+                      <span>Disposition des enfants</span>
+                      <select
+                        value={styleEdition.direction || "ligne"}
+                        onChange={(e) => modifierStyle({ direction: e.target.value })}
+                      >
+                        <option value="ligne">Ligne flexible</option>
+                        <option value="colonne">Colonne</option>
+                        <option value="grille">Grille</option>
+                      </select>
+                    </label>
+                    {styleEdition.direction === "grille" ? (
+                      <label>
+                        <span>Colonnes</span>
+                        <select
+                          value={styleEdition.colonnes || 2}
+                          onChange={(e) =>
+                            modifierStyle({ colonnes: Number(e.target.value) })
+                          }
+                        >
+                          <option value="2">2 colonnes</option>
+                          <option value="3">3 colonnes</option>
+                          <option value="4">4 colonnes</option>
+                        </select>
+                      </label>
+                    ) : null}
+                    <label>
+                      <span>Espacement</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="48"
+                        value={styleEdition.gap ?? 12}
+                        onChange={(e) => modifierStyle({ gap: Number(e.target.value) })}
+                      />
+                    </label>
+                  </>
+                ) : null}
+              </div>
+              <div className="stdInspectorGroup">
+                <strong>Apparence</strong>
+                <label>
+                  <span>Fond</span>
+                  <select
+                    value={styleEdition.fond || "surface"}
+                    onChange={(e) => modifierStyle({ fond: e.target.value })}
+                  >
+                    <option value="surface">Surface</option>
+                    <option value="transparent">Transparent</option>
+                    <option value="accent">Accent</option>
+                    <option value="subtil">Subtil</option>
+                  </select>
+                </label>
+              </div>
+              {mode !== "desktop" ? (
+                <label className="stdResponsiveVisibility">
+                  <input
+                    type="checkbox"
+                    checked={!styleEdition.masque}
+                    onChange={(e) => modifierStyle({ masque: !e.target.checked })}
+                  />
+                  <span>Visible sur {mode === "tablet" ? "tablette" : "mobile"}</span>
+                </label>
+              ) : null}
+              {selection.type === "bouton" ? (
+                <div className="stdInspectorGroup">
+                  <strong>Action au clic</strong>
+                  <label>
+                    <span>Action</span>
+                    <select
+                      value={selection.action?.type || "aucune"}
+                      onChange={(e) =>
+                        modifierBloc({ action: { type: e.target.value, cible: "" } })
+                      }
+                    >
+                      <option value="aucune">Aucune</option>
+                      <option value="page">Ouvrir une page</option>
+                      <option value="collection">Ouvrir une collection</option>
+                    </select>
+                  </label>
+                  {selection.action?.type === "page" ? (
+                    <label>
+                      <span>Page cible</span>
+                      <select
+                        value={selection.action?.cible || ""}
+                        onChange={(e) =>
+                          modifierBloc({
+                            action: { ...selection.action, cible: e.target.value },
+                          })
+                        }
+                      >
+                        <option value="">Choisir…</option>
+                        {pagesCourantes.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.nom}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {selection.action?.type === "collection" ? (
+                    <label>
+                      <span>Collection cible</span>
+                      <select
+                        value={selection.action?.cible || ""}
+                        onChange={(e) =>
+                          modifierBloc({
+                            action: { ...selection.action, cible: e.target.value },
+                          })
+                        }
+                      >
+                        <option value="">Choisir…</option>
+                        {collections.map((item) => (
+                          <option key={item.key} value={item.key}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="stdInspectorActions">
+                <button type="button" onClick={() => changerOrdre(-1)} title="Monter">
+                  <Icon fafa="faArrowUp" width={10} />
+                </button>
+                <button type="button" onClick={() => changerOrdre(1)} title="Descendre">
+                  <Icon fafa="faArrowDown" width={10} />
+                </button>
+                <button type="button" onClick={dupliquerBloc} title="Dupliquer">
+                  <Icon fafa="faCopy" width={10} /> Dupliquer
+                </button>
+              </div>
+              <button
+                type="button"
+                className="stdInspectorDelete"
+                onClick={supprimerBloc}
+              >
+                Supprimer le composant
+              </button>
+            </>
+          ) : (
+            <div className="stdPageInspector">
+              <div className="stdInspectorTitle">
+                <Icon fafa="faFile" width={13} />
+                <div>
+                  <strong>Page</strong>
+                  <small>{page.id}</small>
+                </div>
+              </div>
+              <label>
+                <span>Nom de la page</span>
+                <input
+                  value={page.nom || ""}
+                  onChange={(e) => modifierPage({ nom: e.target.value })}
+                />
+              </label>
+              <div className="stdInspectorGroup">
+                <strong>Gestion</strong>
+                <div className="stdPageActions">
+                  <button type="button" onClick={dupliquerPage}>
+                    <Icon fafa="faCopy" width={10} /> Dupliquer
+                  </button>
+                  <button
+                    type="button"
+                    data-danger
+                    disabled={pagesCourantes.length <= 1}
+                    onClick={supprimerPage}
+                  >
+                    <Icon fafa="faTrash" width={10} /> Supprimer
+                  </button>
+                </div>
+              </div>
+              <div className="stdInspectorEmpty stdInspectorEmptyCompact">
+                <Icon fafa="faArrowPointer" width={18} />
+                <strong>Sélectionnez un composant</strong>
+                <span>Ou modifiez les réglages de cette page.</span>
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
+    </div>
+  );
+}
+
+function BuilderBloc({
+  bloc,
+  collection,
+  selected,
+  selectedId,
+  onSelect,
+  onMove,
+  onNest,
+  onAdd,
+  composants,
+  collections,
+  mode,
+}) {
+  const estSection = ["section", "conteneur"].includes(bloc.type);
+  const enfants = composants.filter((item) => item.parentId === bloc.id);
+  const styleEffectif = {
+    ...bloc.style,
+    ...(mode !== "desktop" ? bloc.responsive?.[mode] || {} : {}),
+  };
+  return (
+    <div
+      className="stdCanvasBloc"
+      data-type={bloc.type}
+      data-selected={selected}
+      data-background={bloc.style?.fond || "surface"}
+      data-breakpoint-hidden={Boolean(styleEffectif.masque)}
+      draggable
+      style={{
+        "--bloc-width": `${styleEffectif.largeur || 50}%`,
+        "--bloc-padding": `${styleEffectif.padding ?? 16}px`,
+        textAlign:
+          styleEffectif.alignement === "centre"
+            ? "center"
+            : styleEffectif.alignement === "droite"
+              ? "right"
+              : "left",
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}
+      onDragStart={(event) => event.dataTransfer.setData("studio/bloc", bloc.id)}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        const type = event.dataTransfer.getData("studio/type");
+        if (type && estSection) {
+          onAdd(type, bloc.id);
+          return;
+        }
+        const sourceId = event.dataTransfer.getData("studio/bloc");
+        if (estSection) onNest(sourceId, bloc.id);
+        else onMove(sourceId, bloc.id);
+      }}
+    >
+      {selected ? (
+        <span className="stdCanvasSelection">{BLOCS_INTERFACE[bloc.type]?.label}</span>
+      ) : null}
+      {bloc.type === "titre" ? <h3>{bloc.label}</h3> : null}
+      {bloc.type === "texte" ? <p>{bloc.label || "Votre texte commence ici."}</p> : null}
+      {bloc.type === "bouton" ? (
+        <button type="button">{bloc.label || "Continuer"}</button>
+      ) : null}
+      {bloc.type === "compteur" ? (
+        <div className="stdMockMetric">
+          <span>{bloc.label}</span>
+          <strong>128</strong>
+          <small>+12 % ce mois</small>
+        </div>
+      ) : null}
+      {bloc.type === "tableau" ? (
+        <div className="stdMockTable">
+          <strong>{bloc.label}</strong>
+          <span>
+            {collection?.fields
+              ?.slice(0, 3)
+              .map((f) => f.label)
+              .join("  ·  ") || "Nom  ·  Statut  ·  Date"}
+          </span>
+          <i />
+          <i />
+          <i />
+        </div>
+      ) : null}
+      {bloc.type === "formulaire" ? (
+        <div className="stdMockForm">
+          <strong>{bloc.label}</strong>
+          <span />
+          <span />
+          <button type="button">Enregistrer</button>
+        </div>
+      ) : null}
+      {bloc.type === "conteneur" ? (
+        <div className="stdMockContainer">
+          <Icon fafa="faPlus" width={12} />
+          <span>{bloc.label}</span>
+        </div>
+      ) : null}
+      {bloc.type === "section" ? (
+        <div className="stdMockSectionLabel">
+          <Icon fafa="faColumns" width={11} />
+          <span>{bloc.label}</span>
+          <small>
+            {enfants.length} composant{enfants.length > 1 ? "s" : ""}
+          </small>
+        </div>
+      ) : null}
+      {bloc.type === "image" ? (
+        <div className="stdMockImage" style={{ backgroundImage: `url(${bloc.source})` }}>
+          <span>{bloc.label}</span>
+        </div>
+      ) : null}
+      {bloc.type === "carte" ? (
+        <div className="stdMockCard">
+          <i />
+          <div>
+            <strong>{bloc.label}</strong>
+            <span>{collection?.label || "Collection"}</span>
+          </div>
+          <Icon fafa="faChevronRight" width={9} />
+        </div>
+      ) : null}
+      {bloc.type === "liste" ? (
+        <div className="stdMockList">
+          <strong>{bloc.label}</strong>
+          {[1, 2, 3].map((item) => (
+            <span key={item}>
+              <i />
+              <b>Élément {item}</b>
+              <small>À l’instant</small>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {bloc.type === "graphique" ? (
+        <div className="stdMockChart">
+          <strong>{bloc.label}</strong>
+          <div>
+            {[42, 68, 54, 88, 73, 96].map((value, index) => (
+              <i key={index} style={{ height: `${value}%` }} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {bloc.type === "badge" ? (
+        <span className="stdMockBadge">{bloc.label || "Nouveau"}</span>
+      ) : null}
+      {bloc.type === "separateur" ? (
+        <div className="stdMockSeparator">
+          <span>{bloc.label}</span>
+        </div>
+      ) : null}
+      {estSection ? (
+        <div
+          className="stdNestedZone"
+          data-direction={styleEffectif.direction || "ligne"}
+          style={{
+            "--nested-gap": `${styleEffectif.gap ?? 12}px`,
+            "--nested-columns": styleEffectif.colonnes || 2,
+          }}
+        >
+          {enfants.length ? (
+            enfants.map((enfant) => (
+              <BuilderBloc
+                key={enfant.id}
+                bloc={enfant}
+                collection={collections.find((item) => item.key === enfant.collection)}
+                selected={enfant.id === selectedId}
+                selectedId={selectedId}
+                onSelect={() => onSelect(enfant.id)}
+                onMove={onMove}
+                onNest={onNest}
+                onAdd={onAdd}
+                composants={composants}
+                collections={collections}
+                mode={mode}
+              />
+            ))
+          ) : (
+            <span className="stdNestedEmpty">
+              Déposez des composants dans cette section
+            </span>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

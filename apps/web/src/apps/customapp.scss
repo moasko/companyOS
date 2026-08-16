@@ -513,6 +513,68 @@ body[data-theme="dark"] .cstApp {
   }
 }
 
+// Interfaces composées dans le builder visuel du Studio.
+.cstApp {
+  .cstPageGrid {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .cstPageBloc {
+    box-sizing: border-box;
+    width: calc(var(--cst-bloc-width, 50%) - 6px);
+    min-height: 64px;
+    padding: var(--cst-padding, 16px);
+    border: 1px solid var(--cst-line);
+    border-radius: 10px;
+    background: var(--cst-card);
+
+    &[data-background="transparent"] { border-color: transparent; background: transparent; }
+    &[data-background="subtil"] { background: var(--cst-panel); }
+    &[data-background="accent"] { border-color: var(--cst-accent); background: var(--cst-accent); color: #fff; }
+
+    h2 { margin: 0; }
+    > p { margin: 0; color: var(--cst-muted); font-size: 0.78em; line-height: 1.6; }
+    > button { padding: 8px 14px; border: 0; border-radius: 7px; background: var(--cst-accent); color: #fff; font: 0.74em inherit; }
+  }
+
+  .cstPageMetric { display: flex; flex-direction: column; span { color: var(--cst-muted); font-size: 0.7em; } strong { margin: 6px 0 2px; font-size: 1.65em; } small { color: var(--cst-muted); font-size: 0.62em; } }
+  .cstPageTable { display: flex; flex-direction: column; gap: 6px; > strong { margin-bottom: 4px; font-size: 0.76em; } }
+  .cstPageTableHead, .cstPageTableRow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 7px 8px; font-size: 0.64em; span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+  .cstPageTableHead { border-radius: 6px; background: var(--cst-panel); color: var(--cst-muted); font-weight: 650; }
+  .cstPageTableRow { border-bottom: 1px solid var(--cst-line); }
+  .cstPageForm { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; > strong { grid-column: 1 / -1; font-size: 0.76em; } label { display: flex; gap: 4px; flex-direction: column; color: var(--cst-muted); font-size: 0.62em; } input, select { min-width: 0; padding: 7px; border: 1px solid var(--cst-line); border-radius: 6px; background: var(--cst-field); color: var(--cst-text); } input[type="checkbox"] { width: auto; align-self: flex-start; accent-color: var(--cst-accent); } }
+  .cstPageFormActions { display: flex; grid-column: 1 / -1; align-items: center; justify-content: flex-end; gap: 10px; small { color: var(--cst-muted); font-size: 0.62em; } button { padding: 8px 13px; border: 0; border-radius: 7px; background: var(--cst-accent); color: #fff; font: 0.68em inherit; cursor: pointer; } }
+  .cstPageContainer { display: grid; min-height: 58px; place-items: center; border: 1px dashed var(--cst-line); border-radius: 7px; color: var(--cst-muted); font-size: 0.68em; }
+  .cstPageImage { display: block; width: 100%; max-height: 320px; object-fit: cover; border-radius: 8px; }
+  .cstPageCard { display: flex; gap: 5px; flex-direction: column; span, small { color: var(--cst-muted); font-size: 0.65em; } strong { margin: 4px 0; font-size: 1em; } }
+  .cstPageList { display: flex; gap: 5px; flex-direction: column; > strong { margin-bottom: 5px; font-size: 0.76em; } > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; background: var(--cst-panel); font-size: 0.66em; } i { width: 20px; height: 20px; border-radius: 50%; background: var(--cst-accent-soft); } small { color: var(--cst-muted); } }
+  .cstPageChart { > strong { font-size: 0.76em; } > div { display: flex; height: 150px; align-items: flex-end; gap: 9px; margin: 12px 0 6px; padding: 0 9px 7px; border-bottom: 1px solid var(--cst-line); } i { min-width: 14px; flex: 1; border-radius: 5px 5px 1px 1px; background: linear-gradient(180deg, var(--cst-accent), color-mix(in srgb, var(--cst-accent) 55%, #8ec5ff)); } small { color: var(--cst-muted); font-size: 0.62em; } }
+  .cstPageBadge { display: inline-flex; padding: 5px 10px; border-radius: 999px; background: var(--cst-accent-soft); color: var(--cst-accent); font-size: 0.68em; font-weight: 650; }
+  .cstPageSeparator { display: flex; align-items: center; gap: 10px; color: var(--cst-muted); font-size: 0.64em; &::before, &::after { height: 1px; flex: 1; background: var(--cst-line); content: ""; } }
+  .cstPageSectionTitle { display: block; margin-bottom: 9px; font-size: 0.78em; }
+  .cstNestedZone { display: flex; align-items: stretch; gap: var(--cst-nested-gap); flex-wrap: wrap; &[data-direction="colonne"] { flex-direction: column; } &[data-direction="grille"] { display: grid; grid-template-columns: repeat(var(--cst-nested-columns), minmax(0, 1fr)); } }
+  .cstPageBlocNested { width: auto; min-width: 0; flex: 1 1 220px; > button { padding: 8px 14px; border: 0; border-radius: 7px; background: var(--cst-accent); color: #fff; } }
+
+  @media (max-width: 900px) {
+    .cstPageBloc {
+      width: calc(var(--cst-tablet-width, 100%) - 6px);
+      padding: var(--cst-tablet-padding, var(--cst-padding, 16px));
+      &[data-hide-tablet="true"] { display: none; }
+    }
+  }
+
+  @media (max-width: 600px) {
+    .cstPageBloc {
+      width: var(--cst-mobile-width, 100%);
+      padding: var(--cst-mobile-padding, var(--cst-padding, 16px));
+      &[data-hide-mobile="true"] { display: none; }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Applications « site web » du Studio
 //

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma, serialize } from "../db.js";
 import { authenticate, auMoins } from "../auth.js";
 import { journaliser } from "../audit.js";
+import { executerAutomatisations } from "../automatisations.js";
 
 /// CRUD générique des modules métier. Un module range ses données dans
 /// des collections nommées : /api/records/crm/clients, etc.
@@ -115,8 +116,17 @@ export default async function recordRoutes(app) {
           "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
       });
     }
-    const data = validateData(request.body, reply);
+    let data = validateData(request.body, reply);
     if (!data) return;
+
+    const execution = await executerAutomatisations({
+      tenantId: request.tenantId,
+      userId: request.user.id,
+      ...names,
+      declencheur: "creation",
+      valeurs: data,
+    });
+    data = execution.valeurs;
 
     const record = await prisma.record.create({
       data: {
@@ -127,9 +137,20 @@ export default async function recordRoutes(app) {
       },
     });
 
+    if (execution.declenchees.length) {
+      await journaliser(request, "nocode.automatisation", execution.app, {
+        collection: names.collection,
+        declencheur: "creation",
+        regles: execution.declenchees,
+        recordId: record.id,
+      });
+    }
+    const avecAuteur = (await auteurs(request.tenantId, [record]))[0];
     return reply
       .code(201)
-      .send(serialize((await auteurs(request.tenantId, [record]))[0]));
+      .send(
+        serialize({ ...avecAuteur, automatisationsExecutees: execution.declenchees }),
+      );
   });
 
   app.put("/:module/:collection/:id", async (request, reply) => {
@@ -141,8 +162,17 @@ export default async function recordRoutes(app) {
           "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
       });
     }
-    const data = validateData(request.body, reply);
+    let data = validateData(request.body, reply);
     if (!data) return;
+
+    const execution = await executerAutomatisations({
+      tenantId: request.tenantId,
+      userId: request.user.id,
+      ...names,
+      declencheur: "modification",
+      valeurs: data,
+    });
+    data = execution.valeurs;
 
     // updateMany + filtre tenant : impossible de toucher la ligne d'un autre client.
     const { count } = await prisma.record.updateMany({
@@ -155,7 +185,19 @@ export default async function recordRoutes(app) {
     }
 
     const record = await prisma.record.findUnique({ where: { id: request.params.id } });
-    return serialize((await auteurs(request.tenantId, [record]))[0]);
+    if (execution.declenchees.length) {
+      await journaliser(request, "nocode.automatisation", execution.app, {
+        collection: names.collection,
+        declencheur: "modification",
+        regles: execution.declenchees,
+        recordId: record.id,
+      });
+    }
+    const avecAuteur = (await auteurs(request.tenantId, [record]))[0];
+    return serialize({
+      ...avecAuteur,
+      automatisationsExecutees: execution.declenchees,
+    });
   });
 
   app.delete("/:module/:collection/:id", async (request, reply) => {

@@ -47,8 +47,15 @@ export const CustomApp = ({ app }) => {
   // La définition peut porter un tableau de bord : s'il existe, c'est le
   // premier écran — une app sans vue d'ensemble oblige à tout parcourir.
   const accueil = app.definition?.accueil || [];
-  const [vue, setVue] = useState(accueil.length ? "__accueil" : collections[0]?.key || "");
-  const collKey = vue === "__accueil" ? collections[0]?.key || "" : vue;
+  const pages = app.definition?.pages || [];
+  const [vue, setVue] = useState(
+    pages.length
+      ? `__page:${pages[0].id}`
+      : accueil.length
+        ? "__accueil"
+        : collections[0]?.key || "",
+  );
+  const collKey = vue.startsWith("__") ? collections[0]?.key || "" : vue;
   const [records, setRecords] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -58,8 +65,7 @@ export const CustomApp = ({ app }) => {
 
   const mainRef = React.useRef(null);
 
-  const collection =
-    collections.find((c) => c.key === collKey) || collections[0] || null;
+  const collection = collections.find((c) => c.key === collKey) || collections[0] || null;
 
   const flash = (msg) => {
     setNotice(msg);
@@ -74,13 +80,21 @@ export const CustomApp = ({ app }) => {
   const [donneesAccueil, setDonneesAccueil] = useState({});
 
   useEffect(() => {
-    if (!accueil.length) return;
+    if (!accueil.length && !pages.length) return;
     if (!wnapp || wnapp.hide || session.status !== "authenticated") return;
-    const cibles = [...new Set(accueil.map((w) => w.collection))];
-    Promise.all(
-      cibles.map((c) => api.records.list(app.slug, c).catch(() => [])),
-    ).then((listes) =>
-      setDonneesAccueil(Object.fromEntries(cibles.map((c, i) => [c, listes[i]]))),
+    const cibles = [
+      ...new Set(
+        [
+          ...accueil.map((w) => w.collection),
+          ...pages.flatMap((page) =>
+            (page.composants || []).map((composant) => composant.collection),
+          ),
+        ].filter(Boolean),
+      ),
+    ];
+    Promise.all(cibles.map((c) => api.records.list(app.slug, c).catch(() => []))).then(
+      (listes) =>
+        setDonneesAccueil(Object.fromEntries(cibles.map((c, i) => [c, listes[i]]))),
     );
   }, [wnapp?.hide, session.status, vue]);
 
@@ -175,12 +189,29 @@ export const CustomApp = ({ app }) => {
     setBusy(true);
     try {
       if (selectedId) {
-        await api.records.update(app.slug, collection.key, selectedId, draft);
-        flash("Enregistrement mis à jour");
+        const updated = await api.records.update(
+          app.slug,
+          collection.key,
+          selectedId,
+          draft,
+        );
+        const executees = updated.automatisationsExecutees || [];
+        setDraft(updated.data);
+        flash(
+          executees.length
+            ? `Mis à jour · ${executees.length} automatisation${executees.length > 1 ? "s" : ""} exécutée${executees.length > 1 ? "s" : ""}`
+            : "Enregistrement mis à jour",
+        );
       } else {
         const created = await api.records.create(app.slug, collection.key, draft);
+        const executees = created.automatisationsExecutees || [];
         setSelectedId(created.id);
-        flash("Enregistrement créé");
+        setDraft(created.data);
+        flash(
+          executees.length
+            ? `Créé · ${executees.length} automatisation${executees.length > 1 ? "s" : ""} exécutée${executees.length > 1 ? "s" : ""}`
+            : "Enregistrement créé",
+        );
       }
       await load();
     } catch (err) {
@@ -275,8 +306,19 @@ export const CustomApp = ({ app }) => {
           {/* Barre latérale dès qu'il y a un tableau de bord ou plusieurs
               collections. Une app à une seule collection sans dashboard n'a
               rien à y mettre. */}
-          {collections.length > 1 || accueil.length ? (
+          {collections.length > 1 || accueil.length || pages.length ? (
             <aside className="cstNav">
+              {pages.map((page) => (
+                <div
+                  key={page.id}
+                  className="cstNavItem handcr"
+                  data-active={vue === `__page:${page.id}`}
+                  onClick={() => setVue(`__page:${page.id}`)}
+                >
+                  <Icon fafa="faFile" width={13} />
+                  <span>{page.nom}</span>
+                </div>
+              ))}
               {accueil.length ? (
                 <div
                   className="cstNavItem handcr"
@@ -302,181 +344,197 @@ export const CustomApp = ({ app }) => {
           ) : null}
 
           <div className="cstMain cosScroll" ref={mainRef}>
-            {vue === "__accueil" ? (
+            {vue.startsWith("__page:") ? (
+              <PageComposee
+                page={pages.find((page) => `__page:${page.id}` === vue)}
+                collections={collections}
+                donnees={donneesAccueil}
+                onNavigate={setVue}
+                appSlug={app.slug}
+              />
+            ) : vue === "__accueil" ? (
               <TableauDeBord
                 accueil={accueil}
                 collections={collections}
                 donnees={donneesAccueil}
               />
             ) : (
-            <>
-            <section className="cstSection">
-              <div className="cstSectionHead">
-                <div>
+              <>
+                <section className="cstSection">
+                  <div className="cstSectionHead">
+                    <div>
+                      <h2>
+                        <span className="cstNum">1.</span> {collection.label}
+                      </h2>
+                      <p className="cstHint">
+                        {records.length} enregistrement{records.length > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="cstHeadBtns">
+                      <div className="cstBtnGhost handcr" onClick={openNew}>
+                        Nouveau
+                      </div>
+                      <div
+                        className="cstBtnGhost handcr"
+                        data-off={!records.length || busy}
+                        onClick={exportCsv}
+                      >
+                        Export CSV
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="cstField">
+                    <input
+                      type="text"
+                      placeholder="Rechercher…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                  </div>
+
+                  {visible.length === 0 ? (
+                    <div className="cstEmptyBox">
+                      {records.length === 0
+                        ? "Aucun enregistrement. Créez le premier avec « Nouveau »."
+                        : "Aucun résultat."}
+                    </div>
+                  ) : (
+                    <VueCollection
+                      collection={collection}
+                      colonnes={colonnes}
+                      records={visible}
+                      selectedId={selectedId}
+                      rendu={rendu}
+                      onOuvrir={openRecord}
+                    />
+                  )}
+                </section>
+
+                <section className="cstSection">
                   <h2>
-                    <span className="cstNum">1.</span> {collection.label}
+                    <span className="cstNum">2.</span> Fiche
                   </h2>
                   <p className="cstHint">
-                    {records.length} enregistrement{records.length > 1 ? "s" : ""}
+                    {draft
+                      ? "Renseignez les champs, puis enregistrez"
+                      : "Sélectionnez une ligne, ou créez un enregistrement"}
                   </p>
-                </div>
-                <div className="cstHeadBtns">
-                  <div className="cstBtnGhost handcr" onClick={openNew}>
-                    Nouveau
-                  </div>
-                  <div
-                    className="cstBtnGhost handcr"
-                    data-off={!records.length || busy}
-                    onClick={exportCsv}
-                  >
-                    Export CSV
-                  </div>
-                </div>
-              </div>
 
-              <div className="cstField">
-                <input
-                  type="text"
-                  placeholder="Rechercher…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-
-              {visible.length === 0 ? (
-                <div className="cstEmptyBox">
-                  {records.length === 0
-                    ? "Aucun enregistrement. Créez le premier avec « Nouveau »."
-                    : "Aucun résultat."}
-                </div>
-              ) : (
-                <VueCollection
-                  collection={collection}
-                  colonnes={colonnes}
-                  records={visible}
-                  selectedId={selectedId}
-                  rendu={rendu}
-                  onOuvrir={openRecord}
-                />
-              )}
-            </section>
-
-            <section className="cstSection">
-              <h2>
-                <span className="cstNum">2.</span> Fiche
-              </h2>
-              <p className="cstHint">
-                {draft
-                  ? "Renseignez les champs, puis enregistrez"
-                  : "Sélectionnez une ligne, ou créez un enregistrement"}
-              </p>
-
-              {!draft ? (
-                <div className="cstEmptyBox">Aucune fiche ouverte.</div>
-              ) : (
-                <>
-                  <div className="cstGrid">
-                    {collection.fields.map((champ, index) => {
-                      const valeurs = valeursCompletes(collection, draft);
-                      // Un titre de section quand elle change : c'est ce qui
-                      // découpe une fiche à vingt champs en blocs lisibles.
-                      const sectionPrec = collection.fields[index - 1]?.section || "";
-                      const enTete =
-                        (champ.section || "") && (champ.section || "") !== sectionPrec ? (
-                          <div key={`s-${index}`} className="cstFicheSection">
-                            {champ.section}
-                          </div>
-                        ) : null;
-                      return (
-                      <React.Fragment key={champ.key}>
-                      {enTete}
-                      <label
-                        className="cstField"
-                        data-large={champ.type === "zone" || champ.largeur === "plein"}
-                      >
-                        <span className="cstLabel">
-                          {champ.label}
-                          {champ.required ? " *" : ""}
-                        </span>
-                        {champ.type === "zone" ? (
-                          <textarea
-                            rows={3}
-                            value={draft[champ.key] ?? ""}
-                            onChange={setField(champ)}
-                          />
-                        ) : champ.type === "choix" ? (
-                          <select value={draft[champ.key] ?? ""} onChange={setField(champ)}>
-                            <option value="">—</option>
-                            {(champ.options || []).map((o) => (
-                              <option key={o} value={o}>
-                                {o}
-                              </option>
-                            ))}
-                          </select>
-                        ) : champ.type === "booleen" ? (
-                          <label className="cstCheck handcr">
-                            <input
-                              type="checkbox"
-                              checked={!!draft[champ.key]}
-                              onChange={setField(champ)}
-                            />
-                            <span>Oui</span>
-                          </label>
-                        ) : champ.type === "relation" ? (
-                          <select value={draft[champ.key] ?? ""} onChange={setField(champ)}>
-                            <option value="">—</option>
-                            {(liees[champ.cible] || []).map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {libelleFiche(
-                                  collections.find((c) => c.key === champ.cible),
-                                  r,
+                  {!draft ? (
+                    <div className="cstEmptyBox">Aucune fiche ouverte.</div>
+                  ) : (
+                    <>
+                      <div className="cstGrid">
+                        {collection.fields.map((champ, index) => {
+                          const valeurs = valeursCompletes(collection, draft);
+                          // Un titre de section quand elle change : c'est ce qui
+                          // découpe une fiche à vingt champs en blocs lisibles.
+                          const sectionPrec = collection.fields[index - 1]?.section || "";
+                          const enTete =
+                            (champ.section || "") &&
+                            (champ.section || "") !== sectionPrec ? (
+                              <div key={`s-${index}`} className="cstFicheSection">
+                                {champ.section}
+                              </div>
+                            ) : null;
+                          return (
+                            <React.Fragment key={champ.key}>
+                              {enTete}
+                              <label
+                                className="cstField"
+                                data-large={
+                                  champ.type === "zone" || champ.largeur === "plein"
+                                }
+                              >
+                                <span className="cstLabel">
+                                  {champ.label}
+                                  {champ.required ? " *" : ""}
+                                </span>
+                                {champ.type === "zone" ? (
+                                  <textarea
+                                    rows={3}
+                                    value={draft[champ.key] ?? ""}
+                                    onChange={setField(champ)}
+                                  />
+                                ) : champ.type === "choix" ? (
+                                  <select
+                                    value={draft[champ.key] ?? ""}
+                                    onChange={setField(champ)}
+                                  >
+                                    <option value="">—</option>
+                                    {(champ.options || []).map((o) => (
+                                      <option key={o} value={o}>
+                                        {o}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : champ.type === "booleen" ? (
+                                  <label className="cstCheck handcr">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!draft[champ.key]}
+                                      onChange={setField(champ)}
+                                    />
+                                    <span>Oui</span>
+                                  </label>
+                                ) : champ.type === "relation" ? (
+                                  <select
+                                    value={draft[champ.key] ?? ""}
+                                    onChange={setField(champ)}
+                                  >
+                                    <option value="">—</option>
+                                    {(liees[champ.cible] || []).map((r) => (
+                                      <option key={r.id} value={r.id}>
+                                        {libelleFiche(
+                                          collections.find((c) => c.key === champ.cible),
+                                          r,
+                                        )}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : champ.type === "calcul" ? (
+                                  // Un calcul se lit, il ne se saisit pas. Il reste
+                                  // visible dans la fiche parce que c'est souvent le
+                                  // chiffre qui intéresse — le total à facturer.
+                                  <output className="cstCalcul">
+                                    {affiche(champ, valeurs[champ.key])}
+                                  </output>
+                                ) : (
+                                  <input
+                                    type={TYPES[champ.type]?.saisie || "text"}
+                                    value={draft[champ.key] ?? ""}
+                                    onChange={setField(champ)}
+                                  />
                                 )}
-                              </option>
-                            ))}
-                          </select>
-                        ) : champ.type === "calcul" ? (
-                          // Un calcul se lit, il ne se saisit pas. Il reste
-                          // visible dans la fiche parce que c'est souvent le
-                          // chiffre qui intéresse — le total à facturer.
-                          <output className="cstCalcul">
-                            {affiche(champ, valeurs[champ.key])}
-                          </output>
-                        ) : (
-                          <input
-                            type={TYPES[champ.type]?.saisie || "text"}
-                            value={draft[champ.key] ?? ""}
-                            onChange={setField(champ)}
-                          />
-                        )}
-                      </label>
-                      </React.Fragment>
-                      );
-                    })}
-                  </div>
+                              </label>
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
 
-                  {/* Toute app du Studio hérite de la signature : ce sont
+                      {/* Toute app du Studio hérite de la signature : ce sont
                       des fiches partagées, « qui a saisi ça » s'y pose
                       exactement comme ailleurs. */}
-                  {selectedId ? (
-                    <Auteur record={records.find((r) => r.id === selectedId)} />
-                  ) : null}
+                      {selectedId ? (
+                        <Auteur record={records.find((r) => r.id === selectedId)} />
+                      ) : null}
 
-                  <div className="cstFormActions">
-                    <div className="cstPrimary handcr" data-off={busy} onClick={save}>
-                      <Icon fafa="faFloppyDisk" width={11} />
-                      <span>{busy ? "…" : "Enregistrer"}</span>
-                    </div>
-                    {selectedId ? (
-                      <div className="cstBtnGhost cstDanger handcr" onClick={remove}>
-                        Supprimer
+                      <div className="cstFormActions">
+                        <div className="cstPrimary handcr" data-off={busy} onClick={save}>
+                          <Icon fafa="faFloppyDisk" width={11} />
+                          <span>{busy ? "…" : "Enregistrer"}</span>
+                        </div>
+                        {selectedId ? (
+                          <div className="cstBtnGhost cstDanger handcr" onClick={remove}>
+                            Supprimer
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </div>
-                </>
-              )}
-            </section>
-
-            </>
+                    </>
+                  )}
+                </section>
+              </>
             )}
             {notice ? <div className="cstNotice">{notice}</div> : null}
           </div>
@@ -509,9 +567,8 @@ function VueCollection({ collection, colonnes, records, selectedId, rendu, onOuv
   }
 
   if (mode === "cartes") {
-    const champsCarte = (collection.vue?.carte?.length
-      ? collection.vue.carte
-      : colonnes.map((c) => c.key)
+    const champsCarte = (
+      collection.vue?.carte?.length ? collection.vue.carte : colonnes.map((c) => c.key)
     )
       .map((k) => collection.fields.find((f) => f.key === k))
       .filter(Boolean);
@@ -602,7 +659,10 @@ function VueKanban({ collection, champKey, records, selectedId, rendu, onOuvrir 
                   onClick={() => onOuvrir(r)}
                 >
                   {titres.map((f, i) => (
-                    <div key={f.key} className={i === 0 ? "cstKCarteTitre" : "cstKCarteSous"}>
+                    <div
+                      key={f.key}
+                      className={i === 0 ? "cstKCarteTitre" : "cstKCarteSous"}
+                    >
                       {rendu(f, valeurs)}
                     </div>
                   ))}
@@ -613,6 +673,372 @@ function VueKanban({ collection, champKey, records, selectedId, rendu, onOuvrir 
         );
       })}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pages composées dans le Studio
+// ---------------------------------------------------------------------------
+
+function PageComposee({ page, collections, donnees, onNavigate, appSlug }) {
+  if (!page) return null;
+  return (
+    <section className="cstSection cstPageComposee">
+      <div className="cstPageGrid">
+        {(page.composants || [])
+          .filter((bloc) => !bloc.parentId)
+          .map((bloc) => {
+            const collection = collections.find((item) => item.key === bloc.collection);
+            const records = donnees[bloc.collection] || [];
+            return (
+              <div
+                key={bloc.id}
+                className="cstPageBloc"
+                data-background={bloc.style?.fond || "surface"}
+                data-hide-tablet={Boolean(bloc.responsive?.tablet?.masque)}
+                data-hide-mobile={Boolean(bloc.responsive?.mobile?.masque)}
+                style={{
+                  "--cst-bloc-width": `${bloc.style?.largeur || 50}%`,
+                  "--cst-tablet-width": `${bloc.responsive?.tablet?.largeur || bloc.style?.largeur || 50}%`,
+                  "--cst-mobile-width": `${bloc.responsive?.mobile?.largeur || bloc.responsive?.tablet?.largeur || bloc.style?.largeur || 50}%`,
+                  "--cst-padding": `${bloc.style?.padding ?? 16}px`,
+                  "--cst-tablet-padding": `${bloc.responsive?.tablet?.padding ?? bloc.style?.padding ?? 16}px`,
+                  "--cst-mobile-padding": `${bloc.responsive?.mobile?.padding ?? bloc.responsive?.tablet?.padding ?? bloc.style?.padding ?? 16}px`,
+                  textAlign:
+                    bloc.style?.alignement === "centre"
+                      ? "center"
+                      : bloc.style?.alignement === "droite"
+                        ? "right"
+                        : "left",
+                }}
+              >
+                {bloc.type === "titre" ? <h2>{bloc.label}</h2> : null}
+                {bloc.type === "texte" ? <p>{bloc.label}</p> : null}
+                {bloc.type === "bouton" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bloc.action?.type === "page" && bloc.action.cible) {
+                        onNavigate(`__page:${bloc.action.cible}`);
+                      }
+                      if (bloc.action?.type === "collection" && bloc.action.cible) {
+                        onNavigate(bloc.action.cible);
+                      }
+                    }}
+                  >
+                    {bloc.label}
+                  </button>
+                ) : null}
+                {bloc.type === "compteur" ? (
+                  <div className="cstPageMetric">
+                    <span>{bloc.label}</span>
+                    <strong>
+                      {new Intl.NumberFormat("fr-FR").format(records.length)}
+                    </strong>
+                    <small>{collection?.label || "Données"}</small>
+                  </div>
+                ) : null}
+                {bloc.type === "tableau" ? (
+                  <div className="cstPageTable">
+                    <strong>{bloc.label}</strong>
+                    <div className="cstPageTableHead">
+                      {(collection?.fields || []).slice(0, 4).map((field) => (
+                        <span key={field.key}>{field.label}</span>
+                      ))}
+                    </div>
+                    {records.slice(0, 5).map((record) => (
+                      <div key={record.id} className="cstPageTableRow">
+                        {(collection?.fields || []).slice(0, 4).map((field) => (
+                          <span key={field.key}>
+                            {affiche(field, record.values?.[field.key])}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {bloc.type === "formulaire" ? (
+                  <FormulaireCompose
+                    appSlug={appSlug}
+                    collection={collection}
+                    titre={bloc.label}
+                  />
+                ) : null}
+                {bloc.type === "conteneur" ? (
+                  <div className="cstPageContainer">{bloc.label}</div>
+                ) : null}
+                {bloc.type === "section" ? (
+                  <strong className="cstPageSectionTitle">{bloc.label}</strong>
+                ) : null}
+                {bloc.type === "image" ? (
+                  bloc.source ? (
+                    <img
+                      className="cstPageImage"
+                      src={bloc.source}
+                      alt={bloc.label || ""}
+                    />
+                  ) : (
+                    <div className="cstPageContainer">Image non configurée</div>
+                  )
+                ) : null}
+                {bloc.type === "carte" ? (
+                  <div className="cstPageCard">
+                    <span>{bloc.label}</span>
+                    <strong>
+                      {records[0]
+                        ? affiche(
+                            collection?.fields?.[0] || { type: "texte" },
+                            records[0].values?.[collection?.fields?.[0]?.key],
+                          )
+                        : "Aucune donnée"}
+                    </strong>
+                    <small>{collection?.label || "Collection"}</small>
+                  </div>
+                ) : null}
+                {bloc.type === "liste" ? (
+                  <div className="cstPageList">
+                    <strong>{bloc.label}</strong>
+                    {records.slice(0, 6).map((record) => (
+                      <div key={record.id}>
+                        <i />
+                        <span>
+                          {affiche(
+                            collection?.fields?.[0] || { type: "texte" },
+                            record.values?.[collection?.fields?.[0]?.key],
+                          )}
+                        </span>
+                        <small>{collection?.label}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {bloc.type === "graphique" ? (
+                  <div className="cstPageChart">
+                    <strong>{bloc.label}</strong>
+                    <div>
+                      {(records.length ? records.slice(0, 8) : [1, 2, 3, 4, 5]).map(
+                        (record, index) => (
+                          <i
+                            key={record.id || index}
+                            style={{
+                              height: `${28 + ((index * 19 + records.length * 7) % 68)}%`,
+                            }}
+                          />
+                        ),
+                      )}
+                    </div>
+                    <small>
+                      {records.length} élément{records.length > 1 ? "s" : ""}
+                    </small>
+                  </div>
+                ) : null}
+                {bloc.type === "badge" ? (
+                  <span className="cstPageBadge">{bloc.label || "Nouveau"}</span>
+                ) : null}
+                {bloc.type === "separateur" ? (
+                  <div className="cstPageSeparator">
+                    <span>{bloc.label}</span>
+                  </div>
+                ) : null}
+                {["section", "conteneur"].includes(bloc.type) ? (
+                  <div
+                    className="cstNestedZone"
+                    data-direction={bloc.style?.direction || "ligne"}
+                    style={{
+                      "--cst-nested-gap": `${bloc.style?.gap ?? 12}px`,
+                      "--cst-nested-columns": bloc.style?.colonnes || 2,
+                    }}
+                  >
+                    {(page.composants || [])
+                      .filter((enfant) => enfant.parentId === bloc.id)
+                      .map((enfant) => (
+                        <BlocImbrique
+                          key={enfant.id}
+                          bloc={enfant}
+                          page={page}
+                          collections={collections}
+                          donnees={donnees}
+                          onNavigate={onNavigate}
+                          appSlug={appSlug}
+                        />
+                      ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+      </div>
+    </section>
+  );
+}
+
+function BlocImbrique({ bloc, page, collections, donnees, onNavigate, appSlug }) {
+  const collection = collections.find((item) => item.key === bloc.collection);
+  const records = donnees[bloc.collection] || [];
+  const enfants = (page.composants || []).filter((item) => item.parentId === bloc.id);
+  const estSection = ["section", "conteneur"].includes(bloc.type);
+  return (
+    <div
+      className="cstPageBloc cstPageBlocNested"
+      data-background={bloc.style?.fond || "surface"}
+      data-hide-tablet={Boolean(bloc.responsive?.tablet?.masque)}
+      data-hide-mobile={Boolean(bloc.responsive?.mobile?.masque)}
+      style={{
+        "--cst-bloc-width": `${bloc.style?.largeur || 50}%`,
+        "--cst-tablet-width": `${bloc.responsive?.tablet?.largeur || bloc.style?.largeur || 50}%`,
+        "--cst-mobile-width": `${bloc.responsive?.mobile?.largeur || bloc.responsive?.tablet?.largeur || bloc.style?.largeur || 50}%`,
+        "--cst-padding": `${bloc.style?.padding ?? 16}px`,
+        "--cst-tablet-padding": `${bloc.responsive?.tablet?.padding ?? bloc.style?.padding ?? 16}px`,
+        "--cst-mobile-padding": `${bloc.responsive?.mobile?.padding ?? bloc.responsive?.tablet?.padding ?? bloc.style?.padding ?? 16}px`,
+      }}
+    >
+      {bloc.type === "titre" ? <h2>{bloc.label}</h2> : null}
+      {bloc.type === "texte" ? <p>{bloc.label}</p> : null}
+      {bloc.type === "badge" ? <span className="cstPageBadge">{bloc.label}</span> : null}
+      {bloc.type === "image" && bloc.source ? (
+        <img className="cstPageImage" src={bloc.source} alt={bloc.label || ""} />
+      ) : null}
+      {bloc.type === "compteur" ? (
+        <div className="cstPageMetric">
+          <span>{bloc.label}</span>
+          <strong>{records.length}</strong>
+          <small>{collection?.label}</small>
+        </div>
+      ) : null}
+      {bloc.type === "bouton" ? (
+        <button
+          type="button"
+          onClick={() =>
+            bloc.action?.cible &&
+            onNavigate(
+              bloc.action.type === "page"
+                ? `__page:${bloc.action.cible}`
+                : bloc.action.cible,
+            )
+          }
+        >
+          {bloc.label}
+        </button>
+      ) : null}
+      {bloc.type === "separateur" ? (
+        <div className="cstPageSeparator">
+          <span>{bloc.label}</span>
+        </div>
+      ) : null}
+      {estSection ? (
+        <>
+          <strong className="cstPageSectionTitle">{bloc.label}</strong>
+          <div
+            className="cstNestedZone"
+            data-direction={bloc.style?.direction || "ligne"}
+            style={{
+              "--cst-nested-gap": `${bloc.style?.gap ?? 12}px`,
+              "--cst-nested-columns": bloc.style?.colonnes || 2,
+            }}
+          >
+            {enfants.map((enfant) => (
+              <BlocImbrique
+                key={enfant.id}
+                bloc={enfant}
+                page={page}
+                collections={collections}
+                donnees={donnees}
+                onNavigate={onNavigate}
+                appSlug={appSlug}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+      {bloc.type === "formulaire" ? (
+        <FormulaireCompose appSlug={appSlug} collection={collection} titre={bloc.label} />
+      ) : null}
+      {["carte", "liste", "graphique", "tableau"].includes(bloc.type) ? (
+        <div className="cstPageContainer">
+          {bloc.label} · {records.length} élément{records.length > 1 ? "s" : ""}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FormulaireCompose({ appSlug, collection, titre }) {
+  const champs = (collection?.fields || []).filter((field) => field.type !== "calcul");
+  const [valeurs, setValeurs] = useState(() =>
+    Object.fromEntries(champs.map((field) => [field.key, valeurVide(field)])),
+  );
+  const [etat, setEtat] = useState("");
+  const envoyer = async (event) => {
+    event.preventDefault();
+    if (!appSlug || !collection) return;
+    setEtat("Enregistrement…");
+    try {
+      await api.records.create(appSlug, collection.key, valeurs);
+      setValeurs(
+        Object.fromEntries(champs.map((field) => [field.key, valeurVide(field)])),
+      );
+      setEtat("Enregistré");
+    } catch (error) {
+      setEtat(error.message || "Échec de l’enregistrement");
+    }
+  };
+  if (!collection)
+    return <div className="cstPageContainer">Choisissez une collection.</div>;
+  return (
+    <form className="cstPageForm" onSubmit={envoyer}>
+      <strong>{titre}</strong>
+      {champs.slice(0, 8).map((field) => (
+        <label key={field.key}>
+          <span>{field.label}</span>
+          {field.type === "choix" ? (
+            <select
+              value={valeurs[field.key] ?? ""}
+              required={field.required}
+              onChange={(event) =>
+                setValeurs((courantes) => ({
+                  ...courantes,
+                  [field.key]: event.target.value,
+                }))
+              }
+            >
+              <option value="">Choisir…</option>
+              {(field.options || []).map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          ) : field.type === "booleen" ? (
+            <input
+              type="checkbox"
+              checked={Boolean(valeurs[field.key])}
+              onChange={(event) =>
+                setValeurs((courantes) => ({
+                  ...courantes,
+                  [field.key]: event.target.checked,
+                }))
+              }
+            />
+          ) : (
+            <input
+              type={TYPES[field.type]?.saisie || "text"}
+              value={valeurs[field.key] ?? ""}
+              required={field.required}
+              onChange={(event) =>
+                setValeurs((courantes) => ({
+                  ...courantes,
+                  [field.key]: event.target.value,
+                }))
+              }
+            />
+          )}
+        </label>
+      ))}
+      <div className="cstPageFormActions">
+        <small>{etat}</small>
+        <button type="submit">Enregistrer</button>
+      </div>
+    </form>
   );
 }
 

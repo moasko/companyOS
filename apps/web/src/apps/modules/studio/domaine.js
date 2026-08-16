@@ -51,7 +51,65 @@ export const TYPES = {
 /// Version du contrat déclaratif compris par ce shell. Elle voyage avec la
 /// définition afin qu'une future évolution puisse migrer les anciennes apps
 /// explicitement au lieu d'en deviner la forme au rendu.
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+export const AUTOMATISATION_VIDE = (collection = "") => ({
+  id: `regle-${Date.now()}`,
+  nom: "Nouvelle règle",
+  active: true,
+  collection,
+  declencheur: "creation",
+  conditions: [],
+  actions: [],
+});
+
+const conditionValide = (condition, valeurs) => {
+  const valeur = valeurs?.[condition.champ];
+  const attendu = condition.valeur ?? "";
+  if (condition.operateur === "non-vide") return valeur !== "" && valeur != null;
+  if (condition.operateur === "vide") return valeur === "" || valeur == null;
+  if (condition.operateur === "different")
+    return String(valeur ?? "") !== String(attendu);
+  if (condition.operateur === "contient") {
+    return String(valeur ?? "")
+      .toLowerCase()
+      .includes(String(attendu).toLowerCase());
+  }
+  if (condition.operateur === "superieur") return Number(valeur) > Number(attendu);
+  return String(valeur ?? "") === String(attendu);
+};
+
+/// Exécute les règles déclaratives d'une app, sans `eval` et sans code fourni
+/// par l'utilisateur. Une règle ne peut modifier que la fiche courante.
+export const appliquerAutomatisations = (
+  definition,
+  collection,
+  declencheur,
+  valeurs,
+) => {
+  const resultat = { ...valeurs };
+  const declenchees = [];
+  const notifications = [];
+  for (const regle of definition?.automatisations || []) {
+    if (
+      regle.active === false ||
+      regle.collection !== collection ||
+      ![declencheur, "toujours"].includes(regle.declencheur) ||
+      !(regle.conditions || []).every((condition) => conditionValide(condition, resultat))
+    ) {
+      continue;
+    }
+    for (const action of regle.actions || []) {
+      if (action.type === "definir" && action.champ)
+        resultat[action.champ] = action.valeur;
+      if (action.type === "notifier" && action.titre) {
+        notifications.push({ titre: action.titre, message: action.message || "" });
+      }
+    }
+    declenchees.push(regle.nom || "Règle sans nom");
+  }
+  return { valeurs: resultat, declenchees, notifications };
+};
 
 /// Ce qu'un champ neuf contient.
 export const CHAMP_VIDE = () => ({
@@ -397,12 +455,171 @@ export const normaliser = (definition) => {
     }
     return true;
   });
+  const normaliserStyleResponsive = (style = {}) => ({
+    ...(style.largeur && ["25", "50", "75", "100"].includes(String(style.largeur))
+      ? { largeur: String(style.largeur) }
+      : {}),
+    ...(style.padding !== undefined
+      ? { padding: Math.max(0, Math.min(64, Number(style.padding) || 0)) }
+      : {}),
+    ...(style.alignement && ["gauche", "centre", "droite"].includes(style.alignement)
+      ? { alignement: style.alignement }
+      : {}),
+    ...(style.direction && ["ligne", "colonne", "grille"].includes(style.direction)
+      ? { direction: style.direction }
+      : {}),
+    ...(style.colonnes && [2, 3, 4].includes(Number(style.colonnes))
+      ? { colonnes: Number(style.colonnes) }
+      : {}),
+    ...(style.gap !== undefined
+      ? { gap: Math.max(0, Math.min(48, Number(style.gap) || 0)) }
+      : {}),
+    ...(style.fond && ["surface", "transparent", "accent", "subtil"].includes(style.fond)
+      ? { fond: style.fond }
+      : {}),
+    ...(style.masque !== undefined ? { masque: Boolean(style.masque) } : {}),
+  });
+  const typesComposants = new Set([
+    "titre",
+    "texte",
+    "bouton",
+    "compteur",
+    "tableau",
+    "formulaire",
+    "conteneur",
+    "section",
+    "image",
+    "carte",
+    "liste",
+    "graphique",
+    "badge",
+    "separateur",
+  ]);
+  const pages = (definition?.pages || []).slice(0, 20).map((page, index) => ({
+    id: slugify(page.id || page.nom) || `page-${index + 1}`,
+    nom: String(page.nom || `Page ${index + 1}`)
+      .trim()
+      .slice(0, 80),
+    composants: (page.composants || [])
+      .filter((composant) => typesComposants.has(composant.type))
+      .slice(0, 80)
+      .map((composant, composantIndex) => ({
+        id: String(composant.id || `bloc-${composantIndex + 1}`).slice(0, 80),
+        type: composant.type,
+        label: String(composant.label || "").slice(0, 160),
+        ...(composant.parentId &&
+        (page.composants || [])
+          .slice(0, composantIndex)
+          .some(
+            (parent) =>
+              String(parent.id) === String(composant.parentId) &&
+              ["section", "conteneur"].includes(parent.type),
+          )
+          ? { parentId: String(composant.parentId).slice(0, 80) }
+          : {}),
+        ...(composant.type === "image" && /^https?:\/\//i.test(composant.source || "")
+          ? { source: String(composant.source).slice(0, 1000) }
+          : {}),
+        ...(composant.collection && clesColl.has(slugify(composant.collection))
+          ? { collection: slugify(composant.collection) }
+          : {}),
+        ...(composant.type === "bouton" &&
+        ["page", "collection"].includes(composant.action?.type) &&
+        composant.action?.cible
+          ? {
+              action: {
+                type: composant.action.type,
+                cible: slugify(composant.action.cible),
+              },
+            }
+          : {}),
+        style: {
+          largeur: ["25", "50", "75", "100"].includes(String(composant.style?.largeur))
+            ? String(composant.style.largeur)
+            : "50",
+          padding: Math.max(0, Math.min(64, Number(composant.style?.padding) || 0)),
+          alignement: ["gauche", "centre", "droite"].includes(composant.style?.alignement)
+            ? composant.style.alignement
+            : "gauche",
+          fond: ["surface", "transparent", "accent", "subtil"].includes(
+            composant.style?.fond,
+          )
+            ? composant.style.fond
+            : "surface",
+          ...(["section", "conteneur"].includes(composant.type)
+            ? {
+                direction: ["ligne", "colonne", "grille"].includes(
+                  composant.style?.direction,
+                )
+                  ? composant.style.direction
+                  : "ligne",
+                colonnes: [2, 3, 4].includes(Number(composant.style?.colonnes))
+                  ? Number(composant.style.colonnes)
+                  : 2,
+                gap: Math.max(0, Math.min(48, Number(composant.style?.gap) || 0)),
+              }
+            : {}),
+        },
+        ...(composant.responsive
+          ? {
+              responsive: {
+                tablet: normaliserStyleResponsive(composant.responsive.tablet),
+                mobile: normaliserStyleResponsive(composant.responsive.mobile),
+              },
+            }
+          : {}),
+      })),
+  }));
+  const automatisations = (definition?.automatisations || []).map((regle, index) => ({
+    id: String(regle.id || `regle-${index + 1}`).slice(0, 60),
+    nom: String(regle.nom || `Règle ${index + 1}`)
+      .trim()
+      .slice(0, 80),
+    active: regle.active !== false,
+    collection: slugify(regle.collection),
+    declencheur: ["creation", "modification", "toujours"].includes(regle.declencheur)
+      ? regle.declencheur
+      : "creation",
+    conditions: (regle.conditions || []).slice(0, 6).map((condition) => ({
+      champ: slugify(condition.champ),
+      operateur: [
+        "egal",
+        "different",
+        "contient",
+        "vide",
+        "non-vide",
+        "superieur",
+      ].includes(condition.operateur)
+        ? condition.operateur
+        : "egal",
+      valeur: condition.valeur ?? "",
+    })),
+    actions: (regle.actions || []).slice(0, 6).map((action) =>
+      action.type === "notifier"
+        ? {
+            type: "notifier",
+            titre: String(action.titre || "Notification")
+              .trim()
+              .slice(0, 100),
+            message: String(action.message || "")
+              .trim()
+              .slice(0, 500),
+          }
+        : {
+            type: "definir",
+            champ: slugify(action.champ),
+            valeur: action.valeur ?? "",
+          },
+    ),
+  }));
 
   return {
     schemaVersion: SCHEMA_VERSION,
     genre: "donnees",
     collections,
     ...(accueil.length ? { accueil } : {}),
+    ...(pages.length ? { pages } : {}),
+    ...(automatisations.length ? { automatisations } : {}),
   };
 };
 
@@ -467,7 +684,33 @@ export const problemes = (app) => {
       }
     }
   }
+  for (const regle of app?.definition?.automatisations || []) {
+    const collection = collections.find((c) => c.key === regle.collection);
+    if (!collection) {
+      out.push(`La règle « ${regle.nom} » vise une collection qui n'existe pas.`);
+      continue;
+    }
+    const cles = new Set(collection.fields.map((f) => f.key));
+    if (!(regle.actions || []).length)
+      out.push(`La règle « ${regle.nom} » n'a aucune action.`);
+    if (
+      [
+        ...(regle.conditions || []),
+        ...(regle.actions || []).filter((action) => action.type === "definir"),
+      ].some((x) => !cles.has(x.champ))
+    ) {
+      out.push(`La règle « ${regle.nom} » utilise un champ qui n'existe pas.`);
+    }
+  }
   return out;
+};
+
+/// Écran vers lequel guider l'utilisateur lorsqu'une validation échoue.
+export const sectionPourProbleme = (probleme = "") => {
+  if (/nom|identifiant technique/i.test(probleme)) return "identite";
+  if (/adresse|http/i.test(probleme)) return "adresse";
+  if (/règle|automatisation/i.test(probleme)) return "automatisations";
+  return "donnees";
 };
 
 /// Le libellé d'une fiche liée : son premier champ texte renseigné.

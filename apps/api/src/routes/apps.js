@@ -125,6 +125,47 @@ const widgetSchema = z.object({
   filtre: z.object({ champ: z.string().max(40), valeur: z.string().max(80) }).optional(),
 });
 
+const automatisationSchema = z.object({
+  id: z.string().min(1).max(60),
+  nom: z.string().min(1).max(80),
+  active: z.boolean().default(true),
+  collection: z.string().min(1).max(40),
+  declencheur: z.enum(["creation", "modification", "toujours"]),
+  conditions: z
+    .array(
+      z.object({
+        champ: z.string().min(1).max(40),
+        operateur: z.enum([
+          "egal",
+          "different",
+          "contient",
+          "vide",
+          "non-vide",
+          "superieur",
+        ]),
+        valeur: z.union([z.string(), z.number(), z.boolean()]).optional(),
+      }),
+    )
+    .max(6),
+  actions: z
+    .array(
+      z.discriminatedUnion("type", [
+        z.object({
+          type: z.literal("definir"),
+          champ: z.string().min(1).max(40),
+          valeur: z.union([z.string(), z.number(), z.boolean()]),
+        }),
+        z.object({
+          type: z.literal("notifier"),
+          titre: z.string().min(1).max(100),
+          message: z.string().max(500).optional(),
+        }),
+      ]),
+    )
+    .min(1)
+    .max(6),
+});
+
 /// Une application « site web » : une adresse, présentée comme une app.
 ///
 /// Beaucoup d'outils que les équipes utilisent tous les jours sont déjà des
@@ -161,7 +202,7 @@ const definitionSchema = z
   .object({
     /// Version explicite du contrat déclaratif. Les définitions historiques
     /// n'en ont pas et sont donc interprétées comme la première version.
-    schemaVersion: z.number().int().min(1).max(1).default(1),
+    schemaVersion: z.number().int().min(1).max(2).default(1),
     /// Le genre décide de tout le reste. Absent, c'est une app de données :
     /// c'est ce que contiennent toutes les définitions écrites avant que ce
     /// second genre existe, et elles doivent continuer de fonctionner.
@@ -169,6 +210,7 @@ const definitionSchema = z
     collections: z.array(collectionSchema).max(8).default([]),
     /// Le tableau de bord de l'application — jusqu'à huit pavés.
     accueil: z.array(widgetSchema).max(8).optional(),
+    automatisations: z.array(automatisationSchema).max(12).optional(),
     web: webSchema.optional(),
   })
   .superRefine((d, ctx) => {
@@ -283,6 +325,23 @@ const definitionSchema = z
           code: z.ZodIssueCode.custom,
           path: ["accueil", wi],
           message: "Ce widget référence une collection ou un champ inexistant.",
+        });
+      }
+    }
+
+    for (const [ri, regle] of (d.automatisations || []).entries()) {
+      const collection = d.collections.find((c) => c.key === regle.collection);
+      const cles = new Set((collection?.fields || []).map((f) => f.key));
+      if (
+        !collection ||
+        [...regle.conditions, ...regle.actions.filter((a) => a.type === "definir")].some(
+          (element) => !cles.has(element.champ),
+        )
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["automatisations", ri],
+          message: "Une automatisation référence une collection ou un champ inexistant.",
         });
       }
     }
