@@ -157,6 +157,10 @@ export const manifest = {
   id: "studio",
   slug: "studio",
   name: "Studio",
+  // Sur localhost, le builder doit rester testable même lorsque le
+  // catalogue distant est indisponible. En production il demeure un module
+  // installable depuis la Boutique.
+  systeme: import.meta.env.DEV,
   // L'icône est un fichier, pas une clé : le générateur QR utilise aussi
   // « code », et c'est sans conséquence depuis que l'identité d'une
   // application est son `id`.
@@ -216,11 +220,16 @@ function StudioApp() {
       render: ({ close }) => (
         <div className="stdModeles">
           {D.MODELES.map((m) => (
-            <div key={m.id} className="stdModele handcr" onClick={() => close(m.id)}>
+            <button
+              type="button"
+              key={m.id}
+              className="stdModele handcr"
+              onClick={() => close(m.id)}
+            >
               <Icon src={m.icone} width={30} />
               <b>{m.nom}</b>
               <span>{m.aide}</span>
-            </div>
+            </button>
           ))}
         </div>
       ),
@@ -2010,6 +2019,9 @@ function InterfaceBuilder({ pages, collections, onChange }) {
   const [mode, setMode] = useState("desktop");
   const [apercuActif, setApercuActif] = useState(false);
   const [rechercheBlocs, setRechercheBlocs] = useState("");
+  const [zoom, setZoom] = useState(100);
+  const [panneauGauche, setPanneauGauche] = useState(true);
+  const [inspecteurVisible, setInspecteurVisible] = useState(true);
   const historique = React.useRef([]);
   const futur = React.useRef([]);
   const [, rafraichirHistorique] = useState(0);
@@ -2263,8 +2275,45 @@ function InterfaceBuilder({ pages, collections, onChange }) {
               </button>
             ))}
           </div>
+          <div className="stdBuilderZoom" aria-label="Zoom du canvas">
+            <button
+              type="button"
+              onClick={() => setZoom((valeur) => Math.max(50, valeur - 10))}
+              title="Réduire le zoom"
+            >
+              −
+            </button>
+            <button type="button" onClick={() => setZoom(100)} title="Zoom à 100 %">
+              {zoom}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom((valeur) => Math.min(140, valeur + 10))}
+              title="Augmenter le zoom"
+            >
+              +
+            </button>
+          </div>
         </div>
         <div className="stdBuilderTopActions">
+          <button
+            type="button"
+            className="stdBuilderPanelToggle"
+            data-active={panneauGauche}
+            onClick={() => setPanneauGauche((visible) => !visible)}
+            title={panneauGauche ? "Masquer la bibliothèque" : "Afficher la bibliothèque"}
+          >
+            <Icon fafa="faTableColumns" width={11} />
+          </button>
+          <button
+            type="button"
+            className="stdBuilderPanelToggle"
+            data-active={inspecteurVisible}
+            onClick={() => setInspecteurVisible((visible) => !visible)}
+            title={inspecteurVisible ? "Masquer l’inspecteur" : "Afficher l’inspecteur"}
+          >
+            <Icon fafa="faSliders" width={11} />
+          </button>
           <button
             type="button"
             className="stdBtnGhost"
@@ -2288,7 +2337,12 @@ function InterfaceBuilder({ pages, collections, onChange }) {
         </div>
       </header>
 
-      <div className="stdBuilderBody" data-preview={apercuActif}>
+      <div
+        className="stdBuilderBody"
+        data-preview={apercuActif}
+        data-left-open={panneauGauche}
+        data-inspector-open={inspecteurVisible}
+      >
         <aside className="stdBuilderLeft">
           <div className="stdBuilderPanelHead">
             <strong>Pages</strong>
@@ -2314,6 +2368,7 @@ function InterfaceBuilder({ pages, collections, onChange }) {
             ))}
           </div>
 
+          <div className="stdBuilderPalette">
           <div className="stdBuilderPanelHead stdBuilderComponentsHead">
             <strong>Composants</strong>
           </div>
@@ -2383,6 +2438,8 @@ function InterfaceBuilder({ pages, collections, onChange }) {
               );
             })}
           </div>
+          </div>
+          <div className="stdBuilderLayersPane">
           <div className="stdBuilderPanelHead stdBuilderLayersHead">
             <strong>Calques</strong>
             <small>{composants.length}</small>
@@ -2403,9 +2460,17 @@ function InterfaceBuilder({ pages, collections, onChange }) {
               </button>
             ))}
           </div>
+          </div>
         </aside>
 
         <main className="stdBuilderStage">
+          <div
+            className="stdBuilderZoomSurface"
+            style={{
+              width: `${10000 / zoom}%`,
+              transform: `scale(${zoom / 100})`,
+            }}
+          >
           <div
             className="stdBuilderCanvas"
             data-mode={mode}
@@ -2461,6 +2526,7 @@ function InterfaceBuilder({ pages, collections, onChange }) {
                 </div>
               )}
             </div>
+          </div>
           </div>
         </main>
 
@@ -2779,6 +2845,7 @@ function BuilderBloc({
   composants,
   collections,
   mode,
+  preview,
 }) {
   const estSection = ["section", "conteneur"].includes(bloc.type);
   const enfants = composants.filter((item) => item.parentId === bloc.id);
@@ -2790,10 +2857,11 @@ function BuilderBloc({
     <div
       className="stdCanvasBloc"
       data-type={bloc.type}
-      data-selected={selected}
+      data-selected={!preview && selected}
+      data-preview={preview}
       data-background={bloc.style?.fond || "surface"}
       data-breakpoint-hidden={Boolean(styleEffectif.masque)}
-      draggable
+      draggable={!preview}
       style={{
         "--bloc-width": `${styleEffectif.largeur || 50}%`,
         "--bloc-padding": `${styleEffectif.padding ?? 16}px`,
@@ -2805,12 +2873,14 @@ function BuilderBloc({
               : "left",
       }}
       onClick={(event) => {
+        if (preview) return;
         event.stopPropagation();
         onSelect();
       }}
       onDragStart={(event) => event.dataTransfer.setData("studio/bloc", bloc.id)}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => !preview && event.preventDefault()}
       onDrop={(event) => {
+        if (preview) return;
         event.stopPropagation();
         event.preventDefault();
         const type = event.dataTransfer.getData("studio/type");
@@ -2823,7 +2893,7 @@ function BuilderBloc({
         else onMove(sourceId, bloc.id);
       }}
     >
-      {selected ? (
+      {!preview && selected ? (
         <span className="stdCanvasSelection">{BLOCS_INTERFACE[bloc.type]?.label}</span>
       ) : null}
       {bloc.type === "titre" ? <h3>{bloc.label}</h3> : null}
@@ -2944,6 +3014,7 @@ function BuilderBloc({
                 composants={composants}
                 collections={collections}
                 mode={mode}
+                preview={preview}
               />
             ))
           ) : (

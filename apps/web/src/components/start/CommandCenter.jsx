@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { ouvrirDossier } from "../../apps/explorerRequest";
 import { ouvrirFichier } from "../../apps/openRequest";
-import { ouvrirFenetre } from "../../apps/windows";
+import { etatFenetre, ouvrirFenetre } from "../../apps/windows";
 import { Icon } from "../../utils/general";
 import { classerResultats } from "./recherche";
 
@@ -21,7 +21,10 @@ const COMMANDES = [
     aide: "Ouvrir le Studio",
     mots: "nouveau nocode données métier studio",
     icone: "studio",
-    executer: () => ouvrirFenetre("studio"),
+    // Un raccourci de création ne doit jamais sembler cassé : si le Studio
+    // n'est pas encore installé dans cet espace, on conduit l'utilisateur
+    // vers la Boutique où il peut l'ajouter.
+    executer: () => ouvrirFenetre(etatFenetre("studio") ? "studio" : "store"),
   },
   {
     id: "nouveau-document",
