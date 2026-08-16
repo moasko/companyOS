@@ -29,13 +29,14 @@ const taskReducer = (state = defState, action) => {
         ...state,
         align: "left",
       };
-    case "TASKTOG":
+    case "TASKTOG": {
       const alignment = state.align == "left" ? "center" : "left";
       localStorage.setItem("taskbar-align", alignment);
       return {
         ...state,
         align: alignment,
       };
+    }
     case "TASKPSHOW":
       return {
         ...state,

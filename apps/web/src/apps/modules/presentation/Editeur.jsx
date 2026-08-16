@@ -7,7 +7,7 @@
 // Vite en fait un morceau qui ne se télécharge qu'à la première ouverture
 // d'une présentation.
 
-import React, { forwardRef } from "react";
+import React, { Component, forwardRef } from "react";
 import { PowerPointViewer } from "pptx-react-viewer";
 import { translationsEn } from "pptx-react-viewer/i18n";
 import i18n from "../../../i18nextConf";
@@ -46,6 +46,42 @@ i18n.addResourceBundle("fr", "translation", traductionsFr, false, true);
 /// transitions, animations, mode présentation, export — fonctionne.
 const MASQUES = ["share", "broadcast", "record"];
 
+class ProtectionEditeur extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { erreur: null };
+  }
+
+  static getDerivedStateFromError(erreur) {
+    return { erreur };
+  }
+
+  componentDidCatch(erreur) {
+    console.error("Le moteur PowerPoint n'a pas pu afficher la présentation", erreur);
+  }
+
+  render() {
+    if (this.state.erreur) {
+      return (
+        <div className="pptMoteurErreur" role="alert">
+          <IconeErreur />
+          <b>La présentation ne peut pas être affichée</b>
+          <span>
+            Le fichier est peut-être endommagé ou contient un élément non pris en charge.
+            Vos données dans le cloud n'ont pas été modifiées.
+          </span>
+          <button type="button" onClick={() => this.setState({ erreur: null })}>
+            Réessayer l'affichage
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const IconeErreur = () => <span className="pptMoteurErreurIcone">!</span>;
+
 const Editeur = forwardRef(function Editeur(
   { octets, nom, sombre, auteur, surOuverture, surModification },
   ref,
@@ -55,24 +91,30 @@ const Editeur = forwardRef(function Editeur(
     // le moteur habille tout son intérieur avec des classes utilitaires
     // générées, sur lesquelles on ne peut rien parier.
     <div className="pptMoteur">
-      <PowerPointViewer
-        ref={ref}
-        content={octets}
-        fileName={nom}
-        // Lecture *et* création : c'est la même surface, l'édition n'est
-        // qu'un interrupteur. Sans elle, l'app ne serait qu'une visionneuse.
-        canEdit
-        authorName={auteur}
-        defaultLocale="fr"
-        defaultThemeKey={sombre ? "vermilionDark" : "vermilionLight"}
-        hiddenActions={MASQUES}
-        // Fichier → Ouvrir passe par le cloud de l'espace, jamais par le
-        // disque de la machine. Il n'y a pas de crochet équivalent pour
-        // « Enregistrer » : c'est la barre de CompanyOS qui s'en charge, en
-        // lisant les octets par `ref.getContent()` — voir index.jsx.
-        onOpenFile={surOuverture}
-        onDirtyChange={surModification}
-      />
+      <ProtectionEditeur>
+        <PowerPointViewer
+          ref={ref}
+          className="pptMoteurSurface"
+          content={octets}
+          fileName={nom}
+          // Lecture *et* création : c'est la même surface, l'édition n'est
+          // qu'un interrupteur. Sans elle, l'app ne serait qu'une visionneuse.
+          canEdit
+          authorName={auteur}
+          defaultLocale="fr"
+          defaultThemeKey={sombre ? "vermilionDark" : "vermilionLight"}
+          hiddenActions={MASQUES}
+          // CompanyOS possède déjà son autosauvegarde cloud. Désactiver la
+          // récupération locale évite deux états concurrents du même fichier.
+          autosave={false}
+          // Fichier → Ouvrir passe par le cloud de l'espace, jamais par le
+          // disque de la machine. Il n'y a pas de crochet équivalent pour
+          // « Enregistrer » : c'est la barre de CompanyOS qui s'en charge, en
+          // lisant les octets par `ref.getContent()` — voir index.jsx.
+          onOpenFile={surOuverture}
+          onDirtyChange={surModification}
+        />
+      </ProtectionEditeur>
     </div>
   );
 });

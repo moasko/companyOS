@@ -48,6 +48,11 @@ export const TYPES = {
   calcul: { label: "Calcul automatique", saisie: "aucune", aligne: true, calcule: true },
 };
 
+/// Version du contrat déclaratif compris par ce shell. Elle voyage avec la
+/// définition afin qu'une future évolution puisse migrer les anciennes apps
+/// explicitement au lieu d'en deviner la forme au rendu.
+export const SCHEMA_VERSION = 1;
+
 /// Ce qu'un champ neuf contient.
 export const CHAMP_VIDE = () => ({
   key: "",
@@ -120,7 +125,12 @@ export const MODELES = [
           icon: "faTruckFast",
           fields: [
             { key: "reference", label: "Référence", type: "texte", required: true },
-            { key: "destinataire", label: "Destinataire", type: "relation", cible: "destinataires" },
+            {
+              key: "destinataire",
+              label: "Destinataire",
+              type: "relation",
+              cible: "destinataires",
+            },
             { key: "date", label: "Date prévue", type: "date" },
             {
               key: "etat",
@@ -163,7 +173,12 @@ export const MODELES = [
             { key: "date", label: "Date", type: "date" },
             { key: "heures", label: "Heures passées", type: "nombre" },
             { key: "taux", label: "Taux horaire", type: "montant" },
-            { key: "total", label: "À facturer", type: "calcul", formule: "heures * taux" },
+            {
+              key: "total",
+              label: "À facturer",
+              type: "calcul",
+              formule: "heures * taux",
+            },
             {
               key: "etat",
               label: "État",
@@ -200,7 +215,13 @@ export const MODELES = [
           label: "Cotisations",
           icon: "faHandHoldingDollar",
           fields: [
-            { key: "adherent", label: "Adhérent", type: "relation", cible: "adherents", required: true },
+            {
+              key: "adherent",
+              label: "Adhérent",
+              type: "relation",
+              cible: "adherents",
+              required: true,
+            },
             { key: "date", label: "Date du versement", type: "date" },
             { key: "montant", label: "Montant", type: "montant" },
             {
@@ -332,6 +353,19 @@ export const normaliser = (definition) => {
     key: slugify(c.key || c.label) || `collection-${ci + 1}`,
     label: (c.label || "").trim() || `Collection ${ci + 1}`,
     icon: c.icon || "faTable",
+    ...(c.vue
+      ? {
+          vue: {
+            mode: ["liste", "cartes", "kanban"].includes(c.vue.mode)
+              ? c.vue.mode
+              : "liste",
+            ...(c.vue.groupePar ? { groupePar: slugify(c.vue.groupePar) } : {}),
+            ...(Array.isArray(c.vue.carte)
+              ? { carte: c.vue.carte.map(slugify).filter(Boolean).slice(0, 6) }
+              : {}),
+          },
+        }
+      : {}),
     fields: (c.fields || [])
       .filter((f) => (f.label || "").trim())
       .map((f, fi) => ({
@@ -339,6 +373,10 @@ export const normaliser = (definition) => {
         label: f.label.trim(),
         type: TYPES[f.type] ? f.type : "texte",
         required: !!f.required,
+        ...(f.largeur === "plein" ? { largeur: "plein" } : { largeur: "demi" }),
+        ...(String(f.section || "").trim()
+          ? { section: String(f.section).trim().slice(0, 60) }
+          : {}),
         ...(f.type === "choix"
           ? { options: (f.options || []).map((o) => String(o).trim()).filter(Boolean) }
           : {}),
@@ -360,7 +398,12 @@ export const normaliser = (definition) => {
     return true;
   });
 
-  return accueil.length ? { collections, accueil } : { collections };
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    genre: "donnees",
+    collections,
+    ...(accueil.length ? { accueil } : {}),
+  };
 };
 
 /// Ce qui empêche de publier, en clair. Liste vide = bon à publier.
@@ -410,14 +453,14 @@ export const problemes = (app) => {
         if (!f.formule) {
           out.push(`« ${f.label} » est un calcul sans formule.`);
         } else {
-          const inconnues = referencesDe(f.formule).filter(
-            (r) => !cles.includes(r),
-          );
+          const inconnues = referencesDe(f.formule).filter((r) => !cles.includes(r));
           if (inconnues.length) {
             out.push(
               `La formule de « ${f.label} » utilise ${inconnues.map((x) => `« ${x} »`).join(", ")}, qui n'existe pas dans cette collection.`,
             );
-          } else if (evaluer(f.formule, Object.fromEntries(cles.map((k) => [k, 1]))) === null) {
+          } else if (
+            evaluer(f.formule, Object.fromEntries(cles.map((k) => [k, 1]))) === null
+          ) {
             out.push(`La formule de « ${f.label} » n'est pas valide.`);
           }
         }
@@ -503,8 +546,16 @@ export const parSection = (fields = []) => {
 
 export const WIDGETS = {
   compteur: { label: "Nombre de fiches", besoinChamp: false },
-  somme: { label: "Total d'un montant", besoinChamp: true, typeChamp: ["montant", "nombre", "calcul"] },
-  repartition: { label: "Répartition par choix", besoinChamp: true, typeChamp: ["choix", "booleen"] },
+  somme: {
+    label: "Total d'un montant",
+    besoinChamp: true,
+    typeChamp: ["montant", "nombre", "calcul"],
+  },
+  repartition: {
+    label: "Répartition par choix",
+    besoinChamp: true,
+    typeChamp: ["choix", "booleen"],
+  },
 };
 
 /// Calcule la valeur d'un pavé à partir des fiches d'une collection.
@@ -554,7 +605,7 @@ export const calculerWidget = (widget, records, collection) => {
   return { valeur: 0, format: "nombre" };
 };
 
-import { montant } from "../../../utils/monnaie";
+import { montant } from "../../../utils/monnaie.js";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
 

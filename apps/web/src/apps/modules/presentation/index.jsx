@@ -26,13 +26,7 @@
 // tout fichier produit par une app atterrit dans le cloud.
 // ─────────────────────────────────────────────────────────────────────────
 
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import store from "../../../reducers";
 import { ModuleWindow } from "../../ModuleWindow";
@@ -43,7 +37,7 @@ import { modal } from "../../modalRequest";
 import { notifier } from "../../notifications";
 import { subscribeVisionneuse } from "../../openRequest";
 import { Contenu, useChargement } from "../../chargement";
-import { MIME_PPTX, diaporamaVierge } from "./gabarit";
+import { MIME_PPTX, MODELES_PRESENTATION, diaporamaVierge } from "./gabarit";
 import "./presentation.scss";
 
 export const manifest = {
@@ -152,8 +146,47 @@ function PresentationApp() {
   /// Diaporama neuf — voir gabarit.js pour ce qu'il contient et pourquoi.
   const nouveau = async () => {
     if (!(await confirmerAbandon())) return;
+    const choix = await modal.open({
+      title: "Créer une présentation",
+      render: ({ close }) => (
+        <div className="pptModeles">
+          <div className="pptModelesIntro">
+            <b>Commencez avec une histoire, pas une page blanche.</b>
+            <span>
+              Chaque modèle contient une structure narrative, des notes du présentateur et
+              des données faciles à remplacer.
+            </span>
+          </div>
+          <div className="pptModelesGrille">
+            {MODELES_PRESENTATION.map((modele) => (
+              <button
+                type="button"
+                className="pptModele"
+                key={modele.id}
+                style={{ "--ppt-modele-accent": modele.accent }}
+                onClick={() => close(modele.id)}
+              >
+                <span className={`pptModeleApercu pptModeleApercu--${modele.id}`}>
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="pptModeleTexte">
+                  <b>{modele.nom}</b>
+                  <span>{modele.description}</span>
+                  <small>
+                    {modele.slides} diapositive{modele.slides > 1 ? "s" : ""}
+                  </small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ),
+    });
+    if (!choix) return;
     try {
-      monter(await diaporamaVierge(), null);
+      monter(await diaporamaVierge(choix), null);
     } catch (e) {
       modal.alert({ title: "Création impossible", message: e.message, tone: "error" });
     }
@@ -347,8 +380,8 @@ function PresentationApp() {
                 lignes={6}
                 rendreVide={() => (
                   <div className="pptVoletVide">
-                    Aucune présentation. Créez-en une — elle vivra dans le
-                    dossier {DOSSIER} du cloud, visible de toute l'équipe.
+                    Aucune présentation. Créez-en une — elle vivra dans le dossier{" "}
+                    {DOSSIER} du cloud, visible de toute l'équipe.
                   </div>
                 )}
               >
@@ -395,7 +428,10 @@ function PresentationApp() {
                     Enregistrer — la bibliothèque n'en propose pas qui
                     écrive ailleurs que sur la machine. */}
                 <div className="pptBarreDoc">
-                  <Icon fafa="faRectangleList" width={13} />
+                  <span className="pptBarreMarque">
+                    <Icon fafa="faRectangleList" width={13} />
+                    <b>SLIDES</b>
+                  </span>
                   <input
                     className="pptTitreDoc"
                     value={titre}
@@ -420,6 +456,9 @@ function PresentationApp() {
                           : fichier
                             ? "Enregistré dans le cloud"
                             : "Jamais enregistrée"}
+                  </span>
+                  <span className="pptCompatibilite" title="Format PowerPoint natif">
+                    PPTX
                   </span>
                   <div
                     className="pptEnregistrer handcr"
@@ -454,17 +493,22 @@ function PresentationApp() {
             ) : (
               <div className="pptAccueil">
                 <Icon className="pptAccueilIcone" src="presentation" width={56} />
-                <div className="pptAccueilTitre">Présentations</div>
+                <div className="pptAccueilSurTitre">COMPANYOS</div>
+                <div className="pptAccueilTitre">Slides</div>
                 <p>
-                  De vrais diaporamas PowerPoint (.pptx), rangés dans le cloud
-                  de l'entreprise. Créez, modifiez, projetez en plein écran
-                  avec transitions et notes du présentateur — ce qui est
-                  enregistré ici se rouvre dans PowerPoint, et inversement.
+                  Des présentations convaincantes, compatibles PowerPoint et rangées dans
+                  le cloud de l'entreprise. Partez d'une structure professionnelle,
+                  adaptez-la et présentez-la en plein écran.
                 </p>
+                <div className="pptAccueilAtouts">
+                  <span>Modèles professionnels</span>
+                  <span>Transitions et animations</span>
+                  <span>Notes du présentateur</span>
+                </div>
                 <div className="pptAccueilActions">
                   <div className="pptAccueilBtn handcr" onClick={nouveau}>
                     <Icon fafa="faFileCirclePlus" width={13} />
-                    Nouvelle présentation
+                    Créer une présentation
                   </div>
                 </div>
               </div>

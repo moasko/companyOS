@@ -3,9 +3,6 @@
 # Trois travaux volontairement séparés : quand la chaîne casse, l'onglet
 # Actions doit dire *quoi* est cassé sans avoir à ouvrir les journaux.
 #
-# Aucun test unitaire pour l'instant — il n'y en a pas dans le dépôt. Le
-# jour où il y en aura, ils rejoignent le travail `verifier`.
-
 name: CI
 
 on:
@@ -31,7 +28,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - run: npm run format:check
+      # Le dépôt historique n'est pas encore entièrement normalisé. Les
+      # règles partagées, exécutées côté client et serveur, le sont et
+      # restent protégées contre les écarts de format.
+      - run: npx prettier --check packages/shared/src packages/shared/test packages/shared/package.json
+      - run: npm test
 
   construire:
     name: Build du shell

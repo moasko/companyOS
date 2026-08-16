@@ -11,7 +11,7 @@
 // → dollar. On peut épingler une devise à la main ; le choix est retenu
 // sur le poste.
 
-import { fuseauEffectif } from "./heure";
+import { fuseauEffectif } from "./heure.js";
 
 const CLE = "companyos-devise";
 

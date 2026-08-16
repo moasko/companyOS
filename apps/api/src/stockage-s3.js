@@ -142,7 +142,7 @@ export const creerPiloteS3 = (config) => ({
   buildKey(tenantId, filename) {
     // Le nom d'origine est conservé en fin de clé : retrouver un objet
     // depuis la console du fournisseur reste possible.
-    const propre = String(filename).replace(/[^\w.\-]+/g, "_").slice(-120);
+    const propre = String(filename).replace(/[^\w.-]+/g, "_").slice(-120);
     return `${config.prefix || ""}${tenantId}/${randomUUID()}-${propre}`;
   },
 

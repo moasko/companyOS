@@ -101,7 +101,9 @@ function App() {
     var actionType = "";
     try {
       actionType = event.target.dataset.action || "";
-    } catch (err) {}
+    } catch {
+      // Une préférence locale corrompue ne doit pas empêcher le démarrage.
+    }
 
     var actionType0 = getComputedStyle(event.target).getPropertyValue(
       "--prefix",

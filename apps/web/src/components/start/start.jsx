@@ -10,6 +10,7 @@ import { reinitialiserApparence } from "../../apps/appearance";
 import { resynchroniserNotifications } from "../../apps/notifications";
 import { creerTraducteur, useLangue, useTraduction } from "../../utils/intl";
 import { useNomApp } from "../../utils/nomsApps";
+import { CommandCenter } from "./CommandCenter";
 
 const TEXTES = {
   fr: {
@@ -88,11 +89,6 @@ const libelleUtilisation = (minutes) => {
   return `${Math.floor(minutes / 60)} h`;
 };
 
-/// Les onglets de la recherche : des identifiants stables, pas des libellés.
-/// L'ancienne version comparait l'état (« Tout ») au texte cliqué (« All ») :
-/// trois onglets sur cinq ne s'activaient jamais.
-const TABS = ["tabTout", "tabApps", "tabDocuments", "tabWeb", "tabPlus"];
-
 export const StartMenu = () => {
   const { align } = useSelector((state) => state.taskbar);
   // Ce sélecteur écrivait dans le store à chaque rendu, de trois façons :
@@ -146,11 +142,8 @@ export const StartMenu = () => {
     return { ...menu, pnApps, rcApps, contApps: parLettre, allApps: toutes };
   }, [menu, appsBrutes, nomApp, langue]);
 
-  const [query, setQuery] = useState("");
-  const [match, setMatch] = useState({});
-  const [atab, setTab] = useState("tabTout");
-
   const dispatch = useDispatch();
+  const [centreCle, setCentreCle] = useState(0);
 
   const session = useSelector((state) => state.session);
 
@@ -268,28 +261,29 @@ export const StartMenu = () => {
       if (target) {
         target.parentNode.scrollTop = target.offsetTop;
       } else {
-        var target = document.getElementById("charA");
-        target.parentNode.scrollTop = 0;
+        const premiereLettre = document.getElementById("charA");
+        if (premiereLettre) premiereLettre.parentNode.scrollTop = 0;
       }
     }
   };
 
+  // Ctrl/⌘ + K devient le geste universel pour atteindre n'importe quelle
+  // ressource de l'espace de travail. Il fonctionne même quand le bouton de
+  // recherche est masqué dans les réglages de la barre des tâches.
   useEffect(() => {
-    if (query.length) {
-      const q = query.toLowerCase();
-      // On cherche dans le nom affiché **et** dans le nom d'origine : en
-      // anglais, taper « congés » doit encore trouver Leave — on garde le
-      // mot que la personne connaît, quelle que soit la langue de l'écran.
-      for (var i = 0; i < start.allApps.length; i++) {
-        const app = start.allApps[i];
-        const noms = `${nomApp(app)} ${app.name || ""}`.toLowerCase();
-        if (noms.includes(q)) {
-          setMatch(app);
-          break;
-        }
+    const clavier = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        dispatch({ type: "STARTSRC_OPEN" });
       }
-    }
-  }, [query, nomApp]);
+    };
+    window.addEventListener("keydown", clavier);
+    return () => window.removeEventListener("keydown", clavier);
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!start.hide && !start.menu) setCentreCle((cle) => cle + 1);
+  }, [start.hide, start.menu]);
 
   const userName = useSelector((state) => state.setting.person.name);
   // La photo vient de la session, pas des réglages : elle appartient au
@@ -429,14 +423,10 @@ export const StartMenu = () => {
                     return (
                       <div
                         key={i}
-                        className={
-                          ldx.length == 0 ? "dullApp allApp" : "allApp prtclk"
-                        }
+                        className={ldx.length == 0 ? "dullApp allApp" : "allApp prtclk"}
                         data-action="STARTALPHA"
                         onClick={ldx.length == 0 ? null : clickDispatch}
-                        data-payload={
-                          i == 0 ? "#" : String.fromCharCode(i + 64)
-                        }
+                        data-payload={i == 0 ? "#" : String.fromCharCode(i + 64)}
                       >
                         <div className="ltName">
                           {i == 0 ? "#" : String.fromCharCode(i + 64)}
@@ -473,91 +463,14 @@ export const StartMenu = () => {
           </div>
         </>
       ) : (
-        <div className="searchMenu">
-          <div className="searchBar">
-            <Icon className="searchIcon" src="search" width={16} />
-            <input
-              type="text"
-              onChange={(event) => {
-                setQuery(event.target.value.trim());
-              }}
-              defaultValue={query}
-              placeholder={t("rechercher")}
-              autoFocus
-            />
-          </div>
-          <div className="flex py-4 px-1 text-xs">
-            <div className="opts w-1/2 flex justify-between">
-              {TABS.map((id) => (
-                <div key={id} value={atab == id} onClick={() => setTab(id)}>
-                  {t(id)}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="shResult w-full flex justify-between">
-            <div
-              className="leftSide flex-col px-1"
-              data-width={query.length != 0}
-            >
-              <div className="text-sm font-semibold mb-4">
-                {query.length ? t("meilleurResultat") : t("appsPrincipales")}
-              </div>
-              {query.length ? (
-                <div className="textResult h-16">
-                  <div
-                    className="smatch flex my-2 p-3 rounded handcr prtclk"
-                    onClick={clickDispatch}
-                    data-action={match.action}
-                    data-payload={match.payload || "full"}
-                  >
-                    <Icon src={match.icon} width={24} />
-                    <div className="matchInfo flex-col px-2">
-                      <div className="font-semibold text-xs">{nomApp(match)}</div>
-                      <div className="text-xss">{t("application")}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="topApps flex w-full justify-between">
-                    {start.rcApps.slice(1, 7).map((app, i) => {
-                      return (
-                        <div
-                          key={i}
-                          className="topApp pt-6 py-4 ltShad prtclk"
-                          onClick={clickDispatch}
-                          data-action={app.action}
-                          data-payload={app.payload || "full"}
-                        >
-                          <Icon src={app.icon} width={30} />
-                          <div className="text-xs mt-2">{nomApp(app)}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-            {query.length ? (
-              <div className="w-2/3 rightSide rounded">
-                <Icon className="mt-6" src={match.icon} width={64} />
-                <div className="">{nomApp(match)}</div>
-                <div className="text-xss mt-2">{t("app")}</div>
-                <div className="hline mt-8"></div>
-                <div
-                  className="openlink w-4/5 flex prtclk handcr pt-3"
-                  onClick={clickDispatch}
-                  data-action={match.action}
-                  data-payload={match.payload ? match.payload : "full"}
-                >
-                  <Icon className="blueicon" src="link" ui width={16} />
-                  <div className="text-xss ml-3">{t("ouvrir")}</div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
+        !start.hide && (
+          <CommandCenter
+            key={centreCle}
+            apps={start.allApps}
+            nomApp={nomApp}
+            fermer={() => dispatch({ type: "STARTHID" })}
+          />
+        )
       )}
     </div>
   );

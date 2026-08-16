@@ -31,13 +31,7 @@ export const STATUTS = {
   annule: { label: "Annulé", ton: "off" },
 };
 
-export const MOYENS = [
-  "Espèces",
-  "Mobile Money",
-  "Virement",
-  "Chèque",
-  "Carte bancaire",
-];
+export const MOYENS = ["Espèces", "Mobile Money", "Virement", "Chèque", "Carte bancaire"];
 
 export const DEVISES = ["XOF", "EUR", "USD"];
 
@@ -124,7 +118,8 @@ export const etatPaiement = (doc, reglements = [], maintenant = today()) => {
   const d = doc.data || doc;
   if (d.type === "devis") return { id: "sansObjet", label: "—", ton: "idle" };
   if (d.statut === "annule") return { id: "annule", label: "Annulé", ton: "off" };
-  if (d.statut === "brouillon") return { id: "brouillon", label: "Brouillon", ton: "idle" };
+  if (d.statut === "brouillon")
+    return { id: "brouillon", label: "Brouillon", ton: "idle" };
 
   const du = totaux(d).ttc;
   const paye = encaisse(doc.id, reglements);
@@ -247,7 +242,8 @@ export const balanceAgee = (documents, reglements, maintenant = today()) => {
     if (!["impayee", "partielle", "retard"].includes(e.id)) continue;
 
     const retard = joursDeRetard(doc, maintenant);
-    const tranche = tranches.find((t) => retard <= t.max) || tranches[tranches.length - 1];
+    const tranche =
+      tranches.find((t) => retard <= t.max) || tranches[tranches.length - 1];
     tranche.montant += e.reste;
   }
 

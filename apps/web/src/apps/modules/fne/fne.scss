@@ -1,0 +1,149 @@
+@use "../../ui/theme";
+
+// FNE — mise en page.
+//
+// Les jetons --app-* viennent de la charte commune (src/apps/ui/theme.scss),
+// posés sur .moduleWin.
+
+.fneApp {
+  .fneCorps {
+    height: 100%;
+    overflow-y: auto;
+    padding: 26px 30px 32px;
+    background: var(--app-bg, #ffffff);
+    color: var(--app-text, #1f2733);
+  }
+
+  .fneTete {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+
+    h2 { margin: 0 0 3px; font-size: 1.02em; font-weight: 600; }
+    p  { margin: 0; font-size: .82em; color: var(--app-muted, #6b7684); }
+  }
+
+  .fneActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .fnePrincipal,
+  .fneSecondaire {
+    font: inherit;
+    font-size: .84em;
+    padding: 9px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    // 40 px de haut : l'action principale d'une app se vise sans réfléchir.
+    min-height: 40px;
+  }
+
+  .fnePrincipal {
+    border: none;
+    background: var(--app-accent, #1a73e8);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .fneSecondaire {
+    border: 1px solid var(--app-line, #e3e6eb);
+    background: transparent;
+    color: inherit;
+  }
+
+  // L'adresse est montrée en toutes lettres, et c'est le point : c'est en la
+  // lisant qu'on vérifie qu'on va bien chez la DGI.
+  .fneAdresse {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0 0 22px;
+
+    span {
+      font-size: .64em;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--app-muted, #6b7684);
+    }
+
+    code { font-size: .8em; word-break: break-all; }
+  }
+
+  .fneNote {
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border: 1px solid var(--app-line, #e3e6eb);
+    border-radius: 10px;
+    background: var(--app-panneau, #f8f9fb);
+
+    h3 { margin: 0 0 6px; font-size: .82em; font-weight: 600; }
+
+    p, li {
+      margin: 0 0 6px;
+      font-size: .78em;
+      line-height: 1.6;
+      color: var(--app-muted, #6b7684);
+    }
+
+    ul { margin: 0; padding-left: 18px; }
+    p:last-child, li:last-child { margin-bottom: 0; }
+  }
+
+  .fneVerif code { color: var(--app-text, #1f2733); word-break: break-all; }
+}
+
+// Le portail encadré, quand il l'accepte.
+.fneApp {
+  .fneCadre {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  // L'adresse en permanence sous les yeux : c'est ce qui rend le cadre
+  // acceptable pour un portail où l'on saisit des identifiants fiscaux.
+  .fneBarre {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: var(--app-panneau, #f8f9fb);
+    border-bottom: 1px solid var(--app-line, #e3e6eb);
+
+    code {
+      flex: 1;
+      min-width: 0;
+      font-size: .72em;
+      color: var(--app-muted, #6b7684);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    button {
+      border: 1px solid var(--app-line, #e3e6eb);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: .72em;
+      padding: 4px 12px;
+      border-radius: 100px;
+      cursor: pointer;
+      white-space: nowrap;
+      min-height: 30px;
+    }
+  }
+
+  iframe {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: none;
+    background: #fff;
+  }
+}

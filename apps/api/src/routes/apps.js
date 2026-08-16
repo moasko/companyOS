@@ -15,7 +15,8 @@ import { journaliser } from "../audit.js";
 
 /// Champs dont la valeur est un secret, quel que soit l'endroit où elle se
 /// trouve dans l'objet.
-const CHAMPS_SECRETS = /^(pass|password|motdepasse|secret|token|jeton|apikey|accesskey|secretkey|cle|key)$/i;
+const CHAMPS_SECRETS =
+  /^(pass|password|motdepasse|secret|token|jeton|apikey|accesskey|secretkey|cle|key)$/i;
 
 /// Retire les secrets d'un objet de réglages avant de le rendre au client.
 ///
@@ -121,9 +122,7 @@ const widgetSchema = z.object({
   titre: z.string().max(60).optional(),
   collection: z.string().max(40),
   champ: z.string().max(40).optional(),
-  filtre: z
-    .object({ champ: z.string().max(40), valeur: z.string().max(80) })
-    .optional(),
+  filtre: z.object({ champ: z.string().max(40), valeur: z.string().max(80) }).optional(),
 });
 
 /// Une application « site web » : une adresse, présentée comme une app.
@@ -151,12 +150,18 @@ const webSchema = z.object({
     .string()
     .trim()
     .max(2000)
-    .refine((v) => /^https?:\/\//i.test(v), "L'adresse doit commencer par http:// ou https://"),
+    .refine(
+      (v) => /^https?:\/\//i.test(v),
+      "L'adresse doit commencer par http:// ou https://",
+    ),
   ouverture: z.enum(["cadre", "fenetre"]).default("cadre"),
 });
 
 const definitionSchema = z
   .object({
+    /// Version explicite du contrat déclaratif. Les définitions historiques
+    /// n'en ont pas et sont donc interprétées comme la première version.
+    schemaVersion: z.number().int().min(1).max(1).default(1),
     /// Le genre décide de tout le reste. Absent, c'est une app de données :
     /// c'est ce que contiennent toutes les définitions écrites avant que ce
     /// second genre existe, et elles doivent continuer de fonctionner.
@@ -175,6 +180,13 @@ const definitionSchema = z
           message: "Une application web doit porter une adresse.",
         });
       }
+      if (d.collections.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["collections"],
+          message: "Une application web ne doit pas contenir de collections actives.",
+        });
+      }
       return;
     }
     if (!d.collections.length) {
@@ -183,6 +195,96 @@ const definitionSchema = z
         path: ["collections"],
         message: "Une application de données doit avoir au moins une collection.",
       });
+    }
+
+    const clesCollections = d.collections.map((collection) => collection.key);
+    if (new Set(clesCollections).size !== clesCollections.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["collections"],
+        message: "Chaque collection doit avoir un identifiant unique.",
+      });
+    }
+
+    d.collections.forEach((collection, ci) => {
+      if (!collection.fields.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["collections", ci, "fields"],
+          message: "Une collection doit contenir au moins un champ.",
+        });
+      }
+      const clesChamps = collection.fields.map((champ) => champ.key);
+      if (new Set(clesChamps).size !== clesChamps.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["collections", ci, "fields"],
+          message: "Chaque champ doit avoir un identifiant unique dans sa collection.",
+        });
+      }
+      collection.fields.forEach((champ, fi) => {
+        if (champ.type === "choix" && !champ.options?.length) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["collections", ci, "fields", fi, "options"],
+            message: "Une liste de choix doit contenir au moins une option.",
+          });
+        }
+        if (
+          champ.type === "relation" &&
+          (!champ.cible ||
+            !clesCollections.includes(champ.cible) ||
+            champ.cible === collection.key)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["collections", ci, "fields", fi, "cible"],
+            message: "La relation doit viser une autre collection existante.",
+          });
+        }
+        if (champ.type === "calcul") {
+          const references = String(champ.formule || "").match(/[a-zA-Z_][\w-]*/g) || [];
+          if (
+            !champ.formule ||
+            references.some((reference) => !clesChamps.includes(reference))
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["collections", ci, "fields", fi, "formule"],
+              message:
+                "La formule doit utiliser uniquement les champs de cette collection.",
+            });
+          }
+        }
+      });
+      if (
+        collection.vue?.mode === "kanban" &&
+        !collection.fields.some(
+          (champ) => champ.key === collection.vue.groupePar && champ.type === "choix",
+        )
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["collections", ci, "vue", "groupePar"],
+          message: "Un kanban doit être groupé par un champ de type liste de choix.",
+        });
+      }
+    });
+
+    for (const [wi, widget] of (d.accueil || []).entries()) {
+      const collection = d.collections.find(
+        (candidate) => candidate.key === widget.collection,
+      );
+      if (
+        !collection ||
+        (widget.champ && !collection.fields.some((champ) => champ.key === widget.champ))
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["accueil", wi],
+          message: "Ce widget référence une collection ou un champ inexistant.",
+        });
+      }
     }
   });
 
@@ -352,39 +454,45 @@ export default async function appRoutes(app) {
 
   // Installer ou retirer une application engage tout l'espace de travail,
   // pas seulement celui qui clique : réservé aux administrateurs.
-  app.post("/:slug/install", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
-    const target = await findVisibleApp(request.tenantId, request.params.slug);
-    if (!target) {
-      return reply.code(404).send({ error: "Application introuvable" });
-    }
+  app.post(
+    "/:slug/install",
+    { preHandler: exigerRole("ADMIN") },
+    async (request, reply) => {
+      const target = await findVisibleApp(request.tenantId, request.params.slug);
+      if (!target) {
+        return reply.code(404).send({ error: "Application introuvable" });
+      }
 
-    // La version est celle que le shell dit installer. C'est lui qui porte
-    // le code, donc lui seul sait ce qu'il vient de mettre en place ; le
-    // serveur, qui ne fait que l'enregistrer, retombe sur celle du
-    // catalogue quand rien ne lui est transmis.
-    const version = String(request.body?.version || target.version || "").slice(0, 20);
+      // La version est celle que le shell dit installer. C'est lui qui porte
+      // le code, donc lui seul sait ce qu'il vient de mettre en place ; le
+      // serveur, qui ne fait que l'enregistrer, retombe sur celle du
+      // catalogue quand rien ne lui est transmis.
+      const version = String(request.body?.version || target.version || "").slice(0, 20);
 
-    const installation = await prisma.installation.upsert({
-      where: { tenantId_appId: { tenantId: request.tenantId, appId: target.id } },
-      update: { version },
-      create: {
-        tenantId: request.tenantId,
-        userId: request.user.id,
-        appId: target.id,
+      const installation = await prisma.installation.upsert({
+        where: { tenantId_appId: { tenantId: request.tenantId, appId: target.id } },
+        update: { version },
+        create: {
+          tenantId: request.tenantId,
+          userId: request.user.id,
+          appId: target.id,
+          version,
+        },
+        include: { app: true },
+      });
+
+      await journaliser(request, "app.installation", target.name, {
+        slug: target.slug,
         version,
-      },
-      include: { app: true },
-    });
+      });
 
-    await journaliser(request, "app.installation", target.name, {
-      slug: target.slug,
-      version,
-    });
-
-    return reply
-      .code(201)
-      .send(serialize({ ...installation.app, installed: true, installedVersion: version }));
-  });
+      return reply
+        .code(201)
+        .send(
+          serialize({ ...installation.app, installed: true, installedVersion: version }),
+        );
+    },
+  );
 
   /// Enregistre une mise à jour appliquée.
   ///
@@ -392,62 +500,72 @@ export default async function appRoutes(app) {
   /// distinguer « a installé » de « a mis à jour », et une mise à jour n'a
   /// de sens que sur une application déjà en place — l'exiger évite qu'un
   /// appel de travers installe silencieusement autre chose.
-  app.put("/:slug/install", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
-    const target = await findVisibleApp(request.tenantId, request.params.slug);
-    if (!target) {
-      return reply.code(404).send({ error: "Application introuvable" });
-    }
+  app.put(
+    "/:slug/install",
+    { preHandler: exigerRole("ADMIN") },
+    async (request, reply) => {
+      const target = await findVisibleApp(request.tenantId, request.params.slug);
+      if (!target) {
+        return reply.code(404).send({ error: "Application introuvable" });
+      }
 
-    const existante = await prisma.installation.findFirst({
-      where: { tenantId: request.tenantId, appId: target.id },
-    });
-    if (!existante) {
-      return reply.code(409).send({ error: "Cette application n'est pas installée." });
-    }
-
-    const version = String(request.body?.version || target.version || "").slice(0, 20);
-    const avant = existante.version || null;
-
-    const installation = await prisma.installation.update({
-      where: { id: existante.id },
-      data: { version },
-      include: { app: true },
-    });
-
-    // Pas de trace quand il n'y a pas d'« avant » : ce n'est pas une mise à
-    // jour, c'est l'enregistrement d'une version de référence pour une
-    // installation antérieure au suivi. Treize lignes de bookkeeping
-    // noieraient les vrais événements du journal.
-    if (avant) {
-      await journaliser(request, "app.miseajour", target.name, {
-        slug: target.slug,
-        avant,
-        apres: version,
+      const existante = await prisma.installation.findFirst({
+        where: { tenantId: request.tenantId, appId: target.id },
       });
-    }
+      if (!existante) {
+        return reply.code(409).send({ error: "Cette application n'est pas installée." });
+      }
 
-    return reply.send(
-      serialize({ ...installation.app, installed: true, installedVersion: version }),
-    );
-  });
+      const version = String(request.body?.version || target.version || "").slice(0, 20);
+      const avant = existante.version || null;
 
-  app.delete("/:slug/install", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
-    const target = await findVisibleApp(request.tenantId, request.params.slug);
-    if (!target) {
-      return reply.code(404).send({ error: "Application introuvable" });
-    }
-    if (target.isCore) {
-      return reply
-        .code(409)
-        .send({ error: "Une application du socle ne peut pas être désinstallée" });
-    }
+      const installation = await prisma.installation.update({
+        where: { id: existante.id },
+        data: { version },
+        include: { app: true },
+      });
 
-    await prisma.installation.deleteMany({
-      where: { tenantId: request.tenantId, appId: target.id },
-    });
+      // Pas de trace quand il n'y a pas d'« avant » : ce n'est pas une mise à
+      // jour, c'est l'enregistrement d'une version de référence pour une
+      // installation antérieure au suivi. Treize lignes de bookkeeping
+      // noieraient les vrais événements du journal.
+      if (avant) {
+        await journaliser(request, "app.miseajour", target.name, {
+          slug: target.slug,
+          avant,
+          apres: version,
+        });
+      }
 
-    await journaliser(request, "app.desinstallation", target.name, { slug: target.slug });
+      return reply.send(
+        serialize({ ...installation.app, installed: true, installedVersion: version }),
+      );
+    },
+  );
 
-    return reply.code(204).send();
-  });
+  app.delete(
+    "/:slug/install",
+    { preHandler: exigerRole("ADMIN") },
+    async (request, reply) => {
+      const target = await findVisibleApp(request.tenantId, request.params.slug);
+      if (!target) {
+        return reply.code(404).send({ error: "Application introuvable" });
+      }
+      if (target.isCore) {
+        return reply
+          .code(409)
+          .send({ error: "Une application du socle ne peut pas être désinstallée" });
+      }
+
+      await prisma.installation.deleteMany({
+        where: { tenantId: request.tenantId, appId: target.id },
+      });
+
+      await journaliser(request, "app.desinstallation", target.name, {
+        slug: target.slug,
+      });
+
+      return reply.code(204).send();
+    },
+  );
 }

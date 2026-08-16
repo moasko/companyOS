@@ -28,7 +28,7 @@ const defState = {
   wps: wps,
   src: walls[wps],
   locked: !(locked == "false"),
-  booted: false || import.meta.env.MODE == "development",
+  booted: import.meta.env.MODE === "development",
   act: "",
   dir: 0,
 };

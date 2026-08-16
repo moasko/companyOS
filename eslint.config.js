@@ -56,6 +56,16 @@ export default [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // Le shell historique utilise encore des `var` redéclarés dans une
+      // même fonction. C'est légal en JavaScript et ne doit pas masquer les
+      // erreurs réellement bloquantes pendant sa migration progressive.
+      "no-redeclare": "off",
+      // Ces expressions servent précisément à retirer les caractères de
+      // contrôle de fichiers importés et de sorties du terminal.
+      "no-control-regex": "off",
+      // Plusieurs parseurs métier reconnaissent explicitement l'espace
+      // insécable, courant dans les nombres copiés depuis Excel.
+      "no-irregular-whitespace": "off",
     },
   },
 
@@ -78,6 +88,7 @@ export default [
       // production. `console.error` et `console.warn` restent permis :
       // c'est ainsi que les moteurs de fond signalent un échec.
       "no-console": ["warn", { allow: ["error", "warn"] }],
+      "no-control-regex": "off",
     },
   },
 

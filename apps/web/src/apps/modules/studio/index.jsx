@@ -62,15 +62,36 @@ const TYPES_CHAMP = Object.entries(D.TYPES).map(([id, t]) => ({ id, label: t.lab
 // liste de noms, le résolveur fait le reste.
 const ICONES = [
   // métier
-  "projets", "crm", "rh", "facturation", "stock", "comptabilite", "livraison",
+  "projets",
+  "crm",
+  "rh",
+  "facturation",
+  "stock",
+  "comptabilite",
+  "livraison",
   // documents
-  "notes", "blocnotes", "editeur", "presentation", "pdf", "pressepapiers",
+  "notes",
+  "blocnotes",
+  "editeur",
+  "presentation",
+  "pdf",
+  "pressepapiers",
   // outils
-  "qrcode", "calculatrice", "studio", "navigateur", "taches",
+  "qrcode",
+  "calculatrice",
+  "studio",
+  "navigateur",
+  "taches",
   // média
-  "photos", "video", "musique", "objet3d",
+  "photos",
+  "video",
+  "musique",
+  "objet3d",
   // échanges
-  "connecteur-mail", "connecteur-chat", "connecteur-drive", "connecteur-visio",
+  "connecteur-mail",
+  "connecteur-chat",
+  "connecteur-drive",
+  "connecteur-visio",
 ];
 
 const CATEGORIES = ["Sur mesure", "Gestion", "Bureautique", "Outils", "Suivi"];
@@ -89,7 +110,11 @@ const APP_VIDE = () => ({
   // Le genre est écrit dès le brouillon vide : une définition relue depuis
   // la base peut ne pas l'avoir (elle est antérieure au second genre), et
   // c'est `genreDe` qui comble ce cas.
-  definition: { genre: "donnees", collections: [COLLECTION_VIDE()] },
+  definition: {
+    schemaVersion: D.SCHEMA_VERSION,
+    genre: "donnees",
+    collections: [COLLECTION_VIDE()],
+  },
 });
 
 /// Le genre d'une définition, avec le repli qui compte : les applications
@@ -199,7 +224,12 @@ function StudioApp() {
       icon: app.icon,
       category: app.category,
       published: app.published,
-      definition: app.definition || { collections: [COLLECTION_VIDE()] },
+      definition: {
+        schemaVersion: D.SCHEMA_VERSION,
+        genre: "donnees",
+        collections: [COLLECTION_VIDE()],
+        ...(app.definition || {}),
+      },
     });
     goToSection("identite");
   };
@@ -304,6 +334,7 @@ function StudioApp() {
     setDraft((d) => ({
       ...d,
       definition: {
+        ...d.definition,
         collections: d.definition.collections.map((c, i) =>
           i === index ? { ...c, ...patch } : c,
         ),
@@ -314,9 +345,14 @@ function StudioApp() {
     setDraft((d) => ({
       ...d,
       definition: {
+        ...d.definition,
         collections: [
           ...d.definition.collections,
-          { ...COLLECTION_VIDE(), key: `collection-${d.definition.collections.length + 1}`, label: "Nouvelle collection" },
+          {
+            ...COLLECTION_VIDE(),
+            key: `collection-${d.definition.collections.length + 1}`,
+            label: "Nouvelle collection",
+          },
         ],
       },
     }));
@@ -325,6 +361,7 @@ function StudioApp() {
     setDraft((d) => ({
       ...d,
       definition: {
+        ...d.definition,
         collections:
           d.definition.collections.length > 1
             ? d.definition.collections.filter((_, i) => i !== index)
@@ -336,9 +373,13 @@ function StudioApp() {
     setDraft((d) => ({
       ...d,
       definition: {
+        ...d.definition,
         collections: d.definition.collections.map((c, i) =>
           i === ci
-            ? { ...c, fields: c.fields.map((f, j) => (j === fi ? { ...f, ...patch } : f)) }
+            ? {
+                ...c,
+                fields: c.fields.map((f, j) => (j === fi ? { ...f, ...patch } : f)),
+              }
             : c,
         ),
       },
@@ -368,6 +409,7 @@ function StudioApp() {
     setDraft((d) => ({
       ...d,
       definition: {
+        ...d.definition,
         collections: d.definition.collections.map((c, i) =>
           i === ci ? { ...c, fields: [...c.fields, CHAMP_VIDE()] } : c,
         ),
@@ -378,6 +420,7 @@ function StudioApp() {
     setDraft((d) => ({
       ...d,
       definition: {
+        ...d.definition,
         collections: d.definition.collections.map((c, i) =>
           i === ci && c.fields.length > 1
             ? { ...c, fields: c.fields.filter((_, j) => j !== fi) }
@@ -397,6 +440,7 @@ function StudioApp() {
     if (genreDe(draft) === "web") {
       const web = draft.definition.web || {};
       return {
+        schemaVersion: D.SCHEMA_VERSION,
         genre: "web",
         collections: [],
         web: {
@@ -527,6 +571,21 @@ function StudioApp() {
 
   const genre = genreDe(draft);
   const sectionsVisibles = SECTIONS.filter((s) => !s.genres || s.genres.includes(genre));
+  const definitionCourante = draft ? normaliser() : null;
+  const problemesCourants = draft
+    ? definitionCourante.genre === "web"
+      ? problemesWeb(definitionCourante)
+      : D.problemes({ ...draft, definition: definitionCourante })
+    : [];
+  const etapesConfigurees = draft
+    ? [
+        Boolean(draft.name.trim() && draft.slug),
+        genre === "web"
+          ? Boolean(definitionCourante.web?.url)
+          : Boolean(definitionCourante.collections.length && nbChamps),
+        problemesCourants.length === 0,
+      ].filter(Boolean).length
+    : 0;
 
   return (
     <ModuleWindow manifest={manifest} className="stdApp">
@@ -534,21 +593,56 @@ function StudioApp() {
         <div className="stdLocked">Connectez-vous pour utiliser le Studio.</div>
       ) : (
         <div className="stdShell">
-          <aside className="stdNav">
+          <aside className="stdNav" aria-label="Étapes de création">
             {sectionsVisibles.map((s) => (
-              <div
+              <button
+                type="button"
                 key={s.id}
-                className="stdNavItem handcr"
+                className="stdNavItem"
                 data-active={section === s.id}
+                aria-current={section === s.id ? "step" : undefined}
                 onClick={() => goToSection(s.id)}
               >
                 <Icon fafa={s.icon} width={13} />
                 <span>{s.label}</span>
-              </div>
+              </button>
             ))}
           </aside>
 
           <div className="stdMain cosScroll" ref={mainRef}>
+            {draft ? (
+              <header className="stdContext">
+                <div className="stdContextApp">
+                  <Icon src={draft.icon} width={30} />
+                  <div>
+                    <strong>{draft.name || "Application sans nom"}</strong>
+                    <span>
+                      {editingSlug ? "Modification" : "Nouvelle application"} · Schéma v
+                      {draft.definition.schemaVersion || 1}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  className="stdProgress"
+                  aria-label={`${etapesConfigurees} étapes sur 3 prêtes`}
+                >
+                  <span>{etapesConfigurees}/3 prêtes</span>
+                  <div>
+                    {[1, 2, 3].map((numero) => (
+                      <i key={numero} data-done={numero <= etapesConfigurees} />
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="stdBtnGhost"
+                  onClick={() => save()}
+                  disabled={busy}
+                >
+                  {busy ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </header>
+            ) : null}
             {/* ---- Mes applications ---- */}
             <section className="stdSection" data-hidden={section !== "mes-apps"}>
               <div className="stdSectionHead">
@@ -560,22 +654,23 @@ function StudioApp() {
                     Applications créées par {session.tenant?.name}
                   </p>
                 </div>
-                <div className="stdBtnGhost handcr" onClick={openNew}>
+                <button type="button" className="stdBtnGhost" onClick={openNew}>
                   Nouvelle application
-                </div>
+                </button>
               </div>
 
               {apps.length === 0 ? (
                 <div className="stdEmptyBox">
-                  Aucune application pour l'instant. « Nouvelle application » vous
-                  guide en trois étapes : identité, données, publication.
+                  Aucune application pour l'instant. « Nouvelle application » vous guide
+                  en trois étapes : identité, données, publication.
                 </div>
               ) : (
                 <div className="stdList">
                   {apps.map((a) => (
-                    <div
+                    <button
+                      type="button"
                       key={a.slug}
-                      className="stdRow handcr"
+                      className="stdRow"
                       data-active={a.slug === editingSlug}
                       onClick={() => openApp(a)}
                     >
@@ -583,15 +678,15 @@ function StudioApp() {
                       <div className="stdRowInfo">
                         <div className="stdRowName">{a.name}</div>
                         <div className="stdRowMeta">
-                          {a.category} ·{" "}
-                          {(a.definition?.collections || []).length} collection
+                          {a.category} · {(a.definition?.collections || []).length}{" "}
+                          collection
                           {(a.definition?.collections || []).length > 1 ? "s" : ""}
                         </div>
                       </div>
                       <div className="stdTag" data-tone={a.published ? "ok" : "idle"}>
                         {a.published ? "Publiée" : "Brouillon"}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -667,14 +762,17 @@ function StudioApp() {
                     <span className="stdLabel">Icône</span>
                     <div className="stdIcons">
                       {ICONES.map((ic) => (
-                        <div
+                        <button
+                          type="button"
                           key={ic}
-                          className="stdIcon handcr"
+                          className="stdIcon"
+                          aria-label={`Choisir l'icône ${ic}`}
+                          aria-pressed={draft.icon === ic}
                           data-active={draft.icon === ic}
                           onClick={() => setDraft((d) => ({ ...d, icon: ic }))}
                         >
                           <Icon src={ic} width={26} />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -688,13 +786,15 @@ function StudioApp() {
                 <span className="stdNum">3.</span> Adresse du site
               </h2>
               <p className="stdHint">
-                L'adresse que l'application ouvrira. Essayez-la : certains sites
-                refusent d'être affichés dans une fenêtre, et il vaut mieux le
-                savoir maintenant qu'après publication.
+                L'adresse que l'application ouvrira. Essayez-la : certains sites refusent
+                d'être affichés dans une fenêtre, et il vaut mieux le savoir maintenant
+                qu'après publication.
               </p>
 
               {!draft ? (
-                <div className="stdEmptyBox">Ouvrez une application, ou créez-en une.</div>
+                <div className="stdEmptyBox">
+                  Ouvrez une application, ou créez-en une.
+                </div>
               ) : (
                 <>
                   <div className="stdGrid">
@@ -716,7 +816,10 @@ function StudioApp() {
                     <button
                       type="button"
                       className="stdBtn"
-                      disabled={essaiEnCours || !/^https?:\/\//i.test(draft.definition.web?.url || "")}
+                      disabled={
+                        essaiEnCours ||
+                        !/^https?:\/\//i.test(draft.definition.web?.url || "")
+                      }
                       onClick={essayerAdresse}
                     >
                       {essaiEnCours ? "Essai en cours…" : "Essayer l'adresse"}
@@ -746,14 +849,14 @@ function StudioApp() {
                     <span className="stdNum">3.</span> Données
                   </h2>
                   <p className="stdHint">
-                    Une collection devient un onglet ; ses champs deviennent le
-                    formulaire et les colonnes de la liste
+                    Une collection devient un onglet ; ses champs deviennent le formulaire
+                    et les colonnes de la liste
                   </p>
                 </div>
                 {draft ? (
-                  <div className="stdBtnGhost handcr" onClick={addCollection}>
+                  <button type="button" className="stdBtnGhost" onClick={addCollection}>
                     Ajouter une collection
-                  </div>
+                  </button>
                 ) : null}
               </div>
 
@@ -793,7 +896,8 @@ function StudioApp() {
                         onChange={(e) => {
                           const mode = e.target.value;
                           setCollection(ci, {
-                            vue: mode === "liste" ? undefined : { ...(c.vue || {}), mode },
+                            vue:
+                              mode === "liste" ? undefined : { ...(c.vue || {}), mode },
                           });
                         }}
                       >
@@ -826,8 +930,8 @@ function StudioApp() {
                       {c.vue?.mode === "kanban" &&
                       !c.fields.some((f) => f.type === "choix") ? (
                         <em className="stdVueAstuce">
-                          Ajoutez d'abord un champ « Liste de choix » : ses
-                          valeurs feront les colonnes.
+                          Ajoutez d'abord un champ « Liste de choix » : ses valeurs feront
+                          les colonnes.
                         </em>
                       ) : null}
                     </div>
@@ -879,13 +983,18 @@ function StudioApp() {
                             // qui se désigne lui-même n'a pas de sens ici.
                             <select
                               value={f.cible || ""}
-                              onChange={(e) => setChamp(ci, fi, { cible: e.target.value })}
+                              onChange={(e) =>
+                                setChamp(ci, fi, { cible: e.target.value })
+                              }
                             >
                               <option value="">— vers quelle liste ? —</option>
                               {draft.definition.collections
                                 .filter((autre, i) => i !== ci)
                                 .map((autre) => (
-                                  <option key={autre.key} value={D.slugify(autre.key || autre.label)}>
+                                  <option
+                                    key={autre.key}
+                                    value={D.slugify(autre.key || autre.label)}
+                                  >
                                     {autre.label}
                                   </option>
                                 ))}
@@ -895,7 +1004,9 @@ function StudioApp() {
                               type="text"
                               value={f.formule || ""}
                               placeholder="Ex. heures * taux"
-                              onChange={(e) => setChamp(ci, fi, { formule: e.target.value })}
+                              onChange={(e) =>
+                                setChamp(ci, fi, { formule: e.target.value })
+                              }
                             />
                           ) : (
                             <label className="stdCheck handcr">
@@ -922,7 +1033,9 @@ function StudioApp() {
                           <div className="stdChampMEP">
                             <select
                               value={f.largeur || "demi"}
-                              onChange={(e) => setChamp(ci, fi, { largeur: e.target.value })}
+                              onChange={(e) =>
+                                setChamp(ci, fi, { largeur: e.target.value })
+                              }
                               title="Largeur du champ dans la fiche"
                             >
                               <option value="demi">Demi-largeur</option>
@@ -932,16 +1045,22 @@ function StudioApp() {
                               type="text"
                               value={f.section || ""}
                               placeholder="Section (ex. Coordonnées)"
-                              onChange={(e) => setChamp(ci, fi, { section: e.target.value })}
+                              onChange={(e) =>
+                                setChamp(ci, fi, { section: e.target.value })
+                              }
                             />
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    <div className="stdBtnGhost handcr" onClick={() => addChamp(ci)}>
+                    <button
+                      type="button"
+                      className="stdBtnGhost"
+                      onClick={() => addChamp(ci)}
+                    >
                       Ajouter un champ
-                    </div>
+                    </button>
                   </div>
                 ))
               )}
@@ -953,9 +1072,8 @@ function StudioApp() {
                 <span className="stdNum">4.</span> Tableau de bord
               </h2>
               <p className="stdHint">
-                Des indicateurs affichés à l'ouverture de l'application. Sans
-                eux, il faut parcourir toutes les fiches pour savoir « combien ».
-                Facultatif.
+                Des indicateurs affichés à l'ouverture de l'application. Sans eux, il faut
+                parcourir toutes les fiches pour savoir « combien ». Facultatif.
               </p>
               {draft ? (
                 <TableauBuilder
@@ -985,8 +1103,8 @@ function StudioApp() {
                 <span className="stdNum">6.</span> Publication
               </h2>
               <p className="stdHint">
-                Publier place l'application dans la Boutique de votre espace de
-                travail — elle n'est jamais visible par les autres clients
+                Publier place l'application dans la Boutique de votre espace de travail —
+                elle n'est jamais visible par les autres clients
               </p>
 
               {!draft ? (
@@ -1000,14 +1118,11 @@ function StudioApp() {
                       <div className="stdRecapMeta">
                         {draft.category} · {draft.definition.collections.length}{" "}
                         collection
-                        {draft.definition.collections.length > 1 ? "s" : ""} ·{" "}
-                        {nbChamps} champ{nbChamps > 1 ? "s" : ""}
+                        {draft.definition.collections.length > 1 ? "s" : ""} · {nbChamps}{" "}
+                        champ{nbChamps > 1 ? "s" : ""}
                       </div>
                     </div>
-                    <div
-                      className="stdTag"
-                      data-tone={draft.published ? "ok" : "idle"}
-                    >
+                    <div className="stdTag" data-tone={draft.published ? "ok" : "idle"}>
                       {editingSlug
                         ? draft.published
                           ? "Publiée"
@@ -1016,22 +1131,54 @@ function StudioApp() {
                     </div>
                   </div>
 
+                  <div
+                    className="stdValidation"
+                    data-ready={problemesCourants.length === 0}
+                  >
+                    <div className="stdValidationTitre">
+                      <Icon
+                        fafa={
+                          problemesCourants.length
+                            ? "faTriangleExclamation"
+                            : "faCircleCheck"
+                        }
+                        width={13}
+                      />
+                      <strong>
+                        {problemesCourants.length
+                          ? `${problemesCourants.length} point${problemesCourants.length > 1 ? "s" : ""} à corriger`
+                          : "Application prête à publier"}
+                      </strong>
+                    </div>
+                    {problemesCourants.length ? (
+                      <ul>
+                        {problemesCourants.map((probleme) => (
+                          <li key={probleme}>{probleme}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>Le nom, les données et les références ont été vérifiés.</p>
+                    )}
+                  </div>
+
                   <div className="stdActions">
-                    <div
+                    <button
+                      type="button"
                       className="stdPrimary handcr"
-                      data-off={busy}
+                      disabled={busy || problemesCourants.length > 0}
                       onClick={() => save({ publish: true })}
                     >
                       <Icon fafa="faRocket" width={11} />
                       <span>{busy ? "…" : "Publier dans la Boutique"}</span>
-                    </div>
-                    <div
+                    </button>
+                    <button
+                      type="button"
                       className="stdBtnGhost handcr"
-                      data-off={busy}
+                      disabled={busy}
                       onClick={() => save()}
                     >
                       Enregistrer le brouillon
-                    </div>
+                    </button>
                     {editingSlug && draft.published ? (
                       <div
                         className="stdBtnGhost handcr"
@@ -1149,8 +1296,8 @@ function Apercu({ definition }) {
             </div>
           </div>
           <p className="stdHint">
-            Les trois premiers champs font les colonnes. Réordonnez-les dans
-            l'onglet Données pour changer ce que la liste montre.
+            Les trois premiers champs font les colonnes. Réordonnez-les dans l'onglet
+            Données pour changer ce que la liste montre.
           </p>
         </div>
 
@@ -1168,7 +1315,11 @@ function Apercu({ definition }) {
                   {champ.required ? " *" : ""}
                 </span>
                 {champ.type === "zone" ? (
-                  <textarea rows={2} value={fiche[champ.key] ?? ""} onChange={majChamp(champ)} />
+                  <textarea
+                    rows={2}
+                    value={fiche[champ.key] ?? ""}
+                    onChange={majChamp(champ)}
+                  />
                 ) : champ.type === "choix" ? (
                   <select value={fiche[champ.key] ?? ""} onChange={majChamp(champ)}>
                     <option value="">—</option>
@@ -1208,8 +1359,8 @@ function Apercu({ definition }) {
             ))}
           </div>
           <p className="stdHint">
-            Saisissez ici pour éprouver vos calculs : ils se recalculent
-            comme dans l'application réelle. Rien n'est enregistré.
+            Saisissez ici pour éprouver vos calculs : ils se recalculent comme dans
+            l'application réelle. Rien n'est enregistré.
           </p>
         </div>
       </div>
@@ -1229,8 +1380,7 @@ function TableauBuilder({ widgets, collections, onAdd, onSet, onRemove }) {
     <div className="stdWidgetsEditeur">
       {widgets.length === 0 ? (
         <div className="stdEmptyBox">
-          Aucun pavé. Ajoutez-en un pour donner une vue d'ensemble à
-          l'application.
+          Aucun pavé. Ajoutez-en un pour donner une vue d'ensemble à l'application.
         </div>
       ) : (
         widgets.map((w, i) => {
@@ -1248,7 +1398,10 @@ function TableauBuilder({ widgets, collections, onAdd, onSet, onRemove }) {
                 placeholder={def?.label || "Titre"}
                 onChange={(e) => onSet(i, { titre: e.target.value })}
               />
-              <select value={w.type} onChange={(e) => onSet(i, { type: e.target.value, champ: "" })}>
+              <select
+                value={w.type}
+                onChange={(e) => onSet(i, { type: e.target.value, champ: "" })}
+              >
                 {Object.entries(D.WIDGETS).map(([id, t]) => (
                   <option key={id} value={id}>
                     {t.label}
@@ -1266,7 +1419,10 @@ function TableauBuilder({ widgets, collections, onAdd, onSet, onRemove }) {
                 ))}
               </select>
               {def?.besoinChamp ? (
-                <select value={w.champ || ""} onChange={(e) => onSet(i, { champ: e.target.value })}>
+                <select
+                  value={w.champ || ""}
+                  onChange={(e) => onSet(i, { champ: e.target.value })}
+                >
                   <option value="">— quel champ ? —</option>
                   {champsPossibles.map((f) => (
                     <option key={f.key} value={f.key}>

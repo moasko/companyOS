@@ -24,6 +24,8 @@ import "./selecteur.scss";
 
 import { montant as money } from "../utils/monnaie";
 
+const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+
 /// Une branche de l'arbre des catégories, repliable.
 const Branche = ({ noeud, actif, onChoisir, profondeur = 0 }) => {
   const [ouvert, setOuvert] = useState(profondeur === 0);

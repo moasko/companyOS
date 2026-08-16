@@ -88,6 +88,15 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "fne",
+    name: "FNE",
+    description:
+      "Le portail de la facture normalisée électronique de la DGI, à portée d'icône. L'app ouvre le site officiel dans un onglet — barre d'adresse et cadenas visibles — parce qu'on y saisit les identifiants fiscaux de l'entreprise.",
+    icon: "fne",
+    category: "Gestion",
+    kind: "NATIVE",
+  },
+  {
     slug: "code",
     name: "Code",
     description:

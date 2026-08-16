@@ -207,6 +207,7 @@
     display: flex;
     align-items: center;
     gap: 9px;
+    min-height: 48px;
     padding: 7px 14px;
     border-bottom: 1px solid var(--ppt-line);
     background: var(--ppt-bg);
@@ -216,6 +217,30 @@
       color: var(--ppt-accent);
       flex-shrink: 0;
     }
+  }
+
+  .pptBarreMarque {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-right: 11px;
+    border-right: 1px solid var(--ppt-line);
+
+    b {
+      color: var(--ppt-accent);
+      font-size: 0.62em;
+      letter-spacing: 0.12em;
+    }
+  }
+
+  .pptCompatibilite {
+    padding: 3px 7px;
+    border: 1px solid var(--ppt-line);
+    border-radius: 999px;
+    color: var(--ppt-muted);
+    font-size: 0.58em;
+    font-weight: 750;
+    letter-spacing: 0.06em;
   }
 
   .pptTitreDoc {
@@ -288,27 +313,72 @@
   // Il apporte son ruban, ses miniatures et sa zone de diapositive ; on ne
   // lui demande que de remplir la place restante.
   .pptMoteur {
+    position: relative;
+    width: 100%;
+    height: 100%;
     flex-grow: 1;
     min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
 
     > div {
       flex-grow: 1;
+      width: 100%;
+      height: 100%;
       min-height: 0;
     }
+  }
 
-    // Sa barre de titre fait double emploi avec celle de CompanyOS : même
-    // nom de fichier, plus un réglage d'enregistrement automatique qui
-    // parle d'un chemin sur la machine — notion sans objet ici, où le
-    // document vit dans le cloud. Le bouton « Present » qu'elle portait se
-    // retrouve tel quel dans l'onglet « Slide Show », donc rien ne se perd.
-    //
-    // Le sélecteur est structurel faute de mieux : à l'intérieur, tout est
-    // habillé de classes utilitaires générées.
-    > div > div > div:first-child {
-      display: none;
+  // Ne jamais masquer les enfants internes du moteur par leur position :
+  // leur structure évolue entre versions et cela avait fini par cacher la
+  // scène entière. La classe publique et une taille explicite forment le
+  // contrat stable de l'intégration.
+  .pptMoteurSurface {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .pptMoteurErreur {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 32px;
+    text-align: center;
+    color: var(--ppt-text);
+
+    > span:not(.pptMoteurErreurIcone) {
+      max-width: 54ch;
+      color: var(--ppt-muted);
+      font-size: 0.76em;
+      line-height: 1.55;
     }
+
+    button {
+      margin-top: 5px;
+      padding: 7px 13px;
+      border: 0;
+      border-radius: 7px;
+      background: var(--ppt-accent);
+      color: #fff;
+      font: 600 0.72em inherit;
+      cursor: pointer;
+    }
+  }
+
+  .pptMoteurErreurIcone {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--ppt-accent-soft);
+    color: var(--ppt-accent);
+    font-weight: 800;
   }
 
   .pptPatiente,
@@ -336,9 +406,34 @@
   }
 
   .pptAccueilTitre {
-    font-size: 1.25em;
-    font-weight: 600;
+    font-size: 1.9em;
+    font-weight: 750;
+    letter-spacing: -0.035em;
     color: var(--ppt-text);
+  }
+
+  .pptAccueilSurTitre {
+    margin-bottom: -10px;
+    color: var(--ppt-accent);
+    font-size: 0.65em;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+  }
+
+  .pptAccueilAtouts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 5px;
+
+    span {
+      padding: 5px 9px;
+      border: 1px solid var(--ppt-line);
+      border-radius: 999px;
+      color: var(--ppt-muted);
+      font-size: 0.68em;
+    }
   }
 
   .pptAccueilActions {
@@ -359,6 +454,144 @@
     &:hover {
       background: color-mix(in srgb, var(--ppt-accent) 88%, #000);
     }
+  }
+}
+
+// La galerie vit dans le portail global des modales, hors de `.pptApp`.
+.pptModeles {
+  width: min(780px, 78vw);
+  padding: 4px;
+}
+
+.pptModelesIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 20px;
+
+  b {
+    font-size: 0.95em;
+  }
+
+  span {
+    max-width: 66ch;
+    color: var(--ui-muted, #64748b);
+    font-size: 0.78em;
+    line-height: 1.5;
+  }
+}
+
+.pptModelesGrille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.pptModele {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 15px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, currentColor 2%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: 150ms ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--ppt-modele-accent, #2563eb);
+    box-shadow: 0 9px 24px
+      color-mix(in srgb, var(--ppt-modele-accent, #2563eb) 14%, transparent);
+    outline: none;
+    transform: translateY(-2px);
+  }
+}
+
+.pptModeleApercu {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #f8fafc;
+  box-shadow: 0 3px 12px #0f172a24;
+
+  &::before {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 28px;
+    height: 5px;
+    border-radius: 4px;
+    background: var(--ppt-modele-accent);
+    content: "";
+  }
+
+  i {
+    position: absolute;
+    left: 12px;
+    width: 68px;
+    height: 5px;
+    border-radius: 4px;
+    background: #cbd5e1;
+
+    &:nth-child(1) {
+      top: 30px;
+      width: 88px;
+      height: 9px;
+      background: #334155;
+    }
+    &:nth-child(2) {
+      top: 46px;
+    }
+    &:nth-child(3) {
+      top: 57px;
+      width: 46px;
+    }
+  }
+
+  &--pitch {
+    background: #171426;
+  }
+  &--rapport {
+    background: #f1f5f4;
+  }
+  &--projet {
+    background: #fff5eb;
+  }
+}
+
+.pptModeleTexte {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+
+  b {
+    font-size: 0.82em;
+  }
+  span {
+    color: var(--ui-muted, #64748b);
+    font-size: 0.71em;
+    line-height: 1.4;
+  }
+  small {
+    color: var(--ppt-modele-accent, #2563eb);
+    font-size: 0.65em;
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 760px) {
+  .pptModeles {
+    width: min(520px, 78vw);
+  }
+  .pptModelesGrille {
+    grid-template-columns: 1fr;
   }
 }
 

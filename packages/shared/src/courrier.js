@@ -41,7 +41,9 @@ export const pretAEnvoyer = ({ a, sujet, texte }) => {
 
 /// Extrait d'un corps de message pour la liste des envois.
 export const extraitDe = (texte, longueur = 90) => {
-  const plat = String(texte || "").replace(/\s+/g, " ").trim();
+  const plat = String(texte || "")
+    .replace(/\s+/g, " ")
+    .trim();
   return plat.length <= longueur ? plat : `${plat.slice(0, longueur - 1)}…`;
 };
 
@@ -99,7 +101,9 @@ export const contactsDe = ({ clients = [], salaries = [] } = {}) => {
   const vus = new Set();
   const out = [];
   const ajouter = (email, nom, source) => {
-    const cle = String(email || "").trim().toLowerCase();
+    const cle = String(email || "")
+      .trim()
+      .toLowerCase();
     if (!cle || !adresseValide(cle) || vus.has(cle)) return;
     vus.add(cle);
     out.push({ email: cle, nom: nom || cle, source });
@@ -108,7 +112,11 @@ export const contactsDe = ({ clients = [], salaries = [] } = {}) => {
     ajouter(c.data?.email, c.data?.entreprise || c.data?.nom, "Client");
   }
   for (const s of salaries) {
-    ajouter(s.data?.email, `${s.data?.prenom || ""} ${s.data?.nom || ""}`.trim(), "Équipe");
+    ajouter(
+      s.data?.email,
+      `${s.data?.prenom || ""} ${s.data?.nom || ""}`.trim(),
+      "Équipe",
+    );
   }
   return out;
 };
@@ -126,7 +134,11 @@ export const tokenCourant = (champ) => {
 export const suggererContacts = (contacts, champ, limite = 6) => {
   const token = tokenCourant(champ).toLowerCase();
   if (token.length < 2) return [];
-  const deja = new Set(adressesDe(champ).slice(0, -1).map((a) => a.toLowerCase()));
+  const deja = new Set(
+    adressesDe(champ)
+      .slice(0, -1)
+      .map((a) => a.toLowerCase()),
+  );
   return contacts
     .filter(
       (c) =>
@@ -149,9 +161,7 @@ export const initialesDe = (adresse) => {
   const locale = String(adresse || "").split("@")[0];
   const morceaux = locale.split(/[._-]+/).filter(Boolean);
   const lettres =
-    morceaux.length >= 2
-      ? morceaux[0][0] + morceaux[1][0]
-      : locale.slice(0, 2);
+    morceaux.length >= 2 ? morceaux[0][0] + morceaux[1][0] : locale.slice(0, 2);
   return (lettres || "?").toUpperCase();
 };
 
@@ -167,7 +177,9 @@ export const teinteDe = (adresse) => {
 export const dateEnvoi = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) +
+  return (
+    d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) +
     ", " +
-    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+  );
 };

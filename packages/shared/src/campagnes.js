@@ -65,9 +65,15 @@ export const audienceDe = (clients = [], filtres = {}) => {
     const d = c.data || {};
     if (!adresseValide(d.email)) return false;
     if (d.emailDesinscrit) return false;
-    if (filtres.statut && filtres.statut !== "tous" && d.statut !== filtres.statut) return false;
-    if (filtres.ville && (d.ville || "").toLowerCase() !== filtres.ville.toLowerCase()) return false;
-    if (filtres.secteur && (d.secteur || "").toLowerCase() !== filtres.secteur.toLowerCase()) return false;
+    if (filtres.statut && filtres.statut !== "tous" && d.statut !== filtres.statut)
+      return false;
+    if (filtres.ville && (d.ville || "").toLowerCase() !== filtres.ville.toLowerCase())
+      return false;
+    if (
+      filtres.secteur &&
+      (d.secteur || "").toLowerCase() !== filtres.secteur.toLowerCase()
+    )
+      return false;
     const cle = d.email.trim().toLowerCase();
     if (vues.has(cle)) return false;
     vues.add(cle);
@@ -149,7 +155,12 @@ const lienSur = (valeur) => {
 
 export const htmlDe = (
   campagne,
-  { entreprise = "", lienCta: cta = "", lienDesinscription: desabo = "", pixel: tracage = "" } = {},
+  {
+    entreprise = "",
+    lienCta: cta = "",
+    lienDesinscription: desabo = "",
+    pixel: tracage = "",
+  } = {},
 ) => {
   const couleur = couleurSure(campagne.couleur);
   // Les trois liens sont posés dans des attributs : même traitement.
@@ -223,7 +234,7 @@ export const resumeDe = (destinataires = []) => {
 export const prete = (campagne) =>
   Boolean(
     String(campagne.nom || "").trim() &&
-      String(campagne.sujet || "").trim() &&
-      String(campagne.texte || "").trim() &&
-      (campagne.destinataires || []).length,
+    String(campagne.sujet || "").trim() &&
+    String(campagne.texte || "").trim() &&
+    (campagne.destinataires || []).length,
   );

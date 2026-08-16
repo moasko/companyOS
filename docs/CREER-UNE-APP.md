@@ -8,11 +8,11 @@ Guide complet et autonome. Il suppose seulement que vous savez lire du React.
 
 CompanyOS a trois couches.
 
-**Le shell** (`src/`) — le bureau, les fenêtres, la barre des tâches, le menu
+**Le shell** (`apps/web/src/`) — le bureau, les fenêtres, la barre des tâches, le menu
 Démarrer. Le shell est dérivé de win11React : React 18 + Vite + Redux (sans Toolkit)
 + SCSS. Pas de TypeScript.
 
-**L'API** (`server/`) — Fastify + Prisma + PostgreSQL. Elle porte les comptes,
+**L'API** (`apps/api/`) — Fastify + Prisma + PostgreSQL. Elle porte les comptes,
 les espaces de travail (tenants), le quota, le catalogue d'applications, les
 fichiers et les **données des modules**.
 

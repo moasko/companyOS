@@ -8,7 +8,7 @@ catalogue d'applications installables et arborescence de fichiers.
 ## Démarrer
 
 ```bash
-cd server
+cd apps/api
 cp .env.example .env    # puis renseigner DATABASE_URL et JWT_SECRET
 npm install
 npx prisma migrate deploy

@@ -50,6 +50,7 @@ export const ICONES_COS = new Set([
   "tableur",
   "classeur",
   "code",
+  "fne",
   // média
   "photos",
   "video",

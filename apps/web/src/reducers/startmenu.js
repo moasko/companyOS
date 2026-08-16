@@ -52,6 +52,13 @@ const menuReducer = (state = defState, action) => {
         hide: !(state.hide || state.menu),
         menu: false,
       };
+    case "STARTSRC_OPEN":
+      return {
+        ...state,
+        hide: false,
+        menu: false,
+        showAll: false,
+      };
     case "STARTPWC":
       return {
         ...state,

@@ -260,9 +260,9 @@ export const Calculator = () => {
             )}
             <div className="histCont cosScroll">
               <div className="hct h-max flex-grow">
-                {hist.map((his) => {
+                {hist.map((his, index) => {
                   return (
-                    <div className="flex flex-col items-end mb-6 text-gray-500">
+                    <div key={index} className="flex flex-col items-end mb-6 text-gray-500">
                       {his[0]} {his[1]} {his[2]} {his[3]}
                       <div className="text-2xl text-gray-600">{his[4]}</div>
                     </div>

@@ -63,13 +63,7 @@ export const pause = (props) => {
 
 export const search = (props) => {
   return (
-    <svg
-      height={24}
-      width={24}
-      viewBox="0 0 512 512"
-      aria-hidden="true"
-      {...props}
-    >
+    <svg height={24} width={24} viewBox="0 0 512 512" aria-hidden="true" {...props}>
       <path
         d="M349.714 347.937l93.714 109.969-16.254 13.969-93.969-109.969q-48.508 36.825-109.207 36.825-36.826 0-70.476-14.349t-57.905-38.603-38.603-57.905-14.349-70.476 14.349-70.476 38.603-57.905 57.905-38.603 70.476-14.349 70.476 14.349 57.905 38.603 38.603 57.905 14.349 70.476q0 37.841-14.73 71.619t-40.889 58.921zM224 377.397q43.428 0 80.254-21.461t58.286-58.286 21.461-80.254-21.461-80.254-58.286-58.285T224 57.397t-80.254 21.46-58.285 58.285-21.46 80.254 21.46 80.254 58.285 58.286T224 377.397z"
         fill="currentColor"
@@ -80,13 +74,7 @@ export const search = (props) => {
 
 export const camera = (props) => {
   return (
-    <svg
-      height={24}
-      width={24}
-      viewBox="0 0 32 32"
-      xmlSpace="preserve"
-      {...props}
-    >
+    <svg height={24} width={24} viewBox="0 0 32 32" xmlSpace="preserve" {...props}>
       <g clipRule="evenodd" fill="#222" fillRule="evenodd">
         <path d="M16 10.001a8 8 0 00-8 8 8 8 0 1016 0 8 8 0 00-8-8zm4.555 11.905a5.998 5.998 0 01-8.459.65 5.997 5.997 0 01-.65-8.459 6 6 0 019.109 7.809z" />
         <path d="M16 14.001A4 4 0 0012 18v.002a.5.5 0 001 0V18a3 3 0 013-2.999.5.5 0 000-1z" />
@@ -211,7 +199,7 @@ export const terminal = (props) => {
         />
         <mask
           id="mask0"
-          mask-type="alpha"
+          style={{ maskType: "alpha" }}
           maskUnits="userSpaceOnUse"
           x="6"
           y="24"
@@ -250,9 +238,9 @@ export const terminal = (props) => {
           width="18.95"
           height="25.875"
           filterUnits="userSpaceOnUse"
-          color-interpolation-filters="sRGB"
+          colorInterpolationFilters="sRGB"
         >
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
@@ -264,11 +252,7 @@ export const terminal = (props) => {
             type="matrix"
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
           />
-          <feBlend
-            mode="normal"
-            in2="BackgroundImageFix"
-            result="effect1_dropShadow"
-          />
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
@@ -280,11 +264,7 @@ export const terminal = (props) => {
             type="matrix"
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"
           />
-          <feBlend
-            mode="normal"
-            in2="effect1_dropShadow"
-            result="effect2_dropShadow"
-          />
+          <feBlend mode="normal" in2="effect1_dropShadow" result="effect2_dropShadow" />
           <feBlend
             mode="normal"
             in="SourceGraphic"
@@ -299,9 +279,9 @@ export const terminal = (props) => {
           width="18.95"
           height="18.875"
           filterUnits="userSpaceOnUse"
-          color-interpolation-filters="sRGB"
+          colorInterpolationFilters="sRGB"
         >
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
@@ -313,11 +293,7 @@ export const terminal = (props) => {
             type="matrix"
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
           />
-          <feBlend
-            mode="normal"
-            in2="BackgroundImageFix"
-            result="effect1_dropShadow"
-          />
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
@@ -329,11 +305,7 @@ export const terminal = (props) => {
             type="matrix"
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"
           />
-          <feBlend
-            mode="normal"
-            in2="effect1_dropShadow"
-            result="effect2_dropShadow"
-          />
+          <feBlend mode="normal" in2="effect1_dropShadow" result="effect2_dropShadow" />
           <feBlend
             mode="normal"
             in="SourceGraphic"
@@ -348,9 +320,9 @@ export const terminal = (props) => {
           width="24"
           height="11"
           filterUnits="userSpaceOnUse"
-          color-interpolation-filters="sRGB"
+          colorInterpolationFilters="sRGB"
         >
-          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feFlood floodOpacity="0" result="BackgroundImageFix" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
@@ -362,11 +334,7 @@ export const terminal = (props) => {
             type="matrix"
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
           />
-          <feBlend
-            mode="normal"
-            in2="BackgroundImageFix"
-            result="effect1_dropShadow"
-          />
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow" />
           <feColorMatrix
             in="SourceAlpha"
             type="matrix"
@@ -378,11 +346,7 @@ export const terminal = (props) => {
             type="matrix"
             values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"
           />
-          <feBlend
-            mode="normal"
-            in2="effect1_dropShadow"
-            result="effect2_dropShadow"
-          />
+          <feBlend mode="normal" in2="effect1_dropShadow" result="effect2_dropShadow" />
           <feBlend
             mode="normal"
             in="SourceGraphic"
@@ -398,8 +362,8 @@ export const terminal = (props) => {
           y2="5.1748"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#333333" />
-          <stop offset="1" stop-color="#4D4D4D" />
+          <stop stopColor="#333333" />
+          <stop offset="1" stopColor="#4D4D4D" />
         </linearGradient>
         <linearGradient
           id="paint1_linear"
@@ -409,8 +373,8 @@ export const terminal = (props) => {
           y2="26.9924"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#999999" />
-          <stop offset="1" stop-color="#B3B3B3" />
+          <stop stopColor="#999999" />
+          <stop offset="1" stopColor="#B3B3B3" />
         </linearGradient>
         <linearGradient
           id="paint2_linear"
@@ -420,8 +384,8 @@ export const terminal = (props) => {
           y2="26.9924"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#999999" />
-          <stop offset="1" stop-color="#B3B3B3" />
+          <stop stopColor="#999999" />
+          <stop offset="1" stopColor="#B3B3B3" />
         </linearGradient>
         <linearGradient
           id="paint3_linear"
@@ -431,8 +395,8 @@ export const terminal = (props) => {
           y2="16.9781"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#CCCCCC" />
-          <stop offset="1" stop-color="#E6E6E6" />
+          <stop stopColor="#CCCCCC" />
+          <stop offset="1" stopColor="#E6E6E6" />
         </linearGradient>
         <linearGradient
           id="paint4_linear"
@@ -442,8 +406,8 @@ export const terminal = (props) => {
           y2="16.9781"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#CCCCCC" />
-          <stop offset="1" stop-color="#E6E6E6" />
+          <stop stopColor="#CCCCCC" />
+          <stop offset="1" stopColor="#E6E6E6" />
         </linearGradient>
         <linearGradient
           id="paint5_linear"
@@ -453,8 +417,8 @@ export const terminal = (props) => {
           y2="29.0447"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#CCCCCC" />
-          <stop offset="1" stop-color="#E6E6E6" />
+          <stop stopColor="#CCCCCC" />
+          <stop offset="1" stopColor="#E6E6E6" />
         </linearGradient>
       </defs>
     </svg>
@@ -475,19 +439,9 @@ export const info = (props) => {
 
 export const taskSearch = (props) => {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="-2 -1 26 26"
-      height="28"
-      width="28"
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -1 26 26" height="28" width="28">
       <circle cx="13" cy="11" r="8" fill="#ffffff24"></circle>
-      <g
-        fill="none"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      >
+      <g fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="2">
         <circle cx="13" cy="11" r="8"></circle>
         <path d="M3 21l4-4" strokeLinecap="round"></path>
       </g>

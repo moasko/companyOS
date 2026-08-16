@@ -5,6 +5,9 @@
   "description": "Règles métier partagées entre le shell et l'API — une seule source de vérité",
   "license": "CC0-1.0",
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "exports": {
     ".": "./src/index.js",
     "./campagnes": "./src/campagnes.js",
