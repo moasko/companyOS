@@ -15,6 +15,13 @@ const nameSchema = z
   .regex(/^[a-z0-9-]+$/, "minuscules, chiffres et tirets uniquement");
 
 const MAX_DATA_BYTES = 64 * 1024;
+const MAX_CLASSEUR_BYTES = 8 * 1024 * 1024;
+const MAX_RECORD_BODY_BYTES = 10 * 1024 * 1024;
+
+const limiteDonnees = (names) =>
+  names?.module === "classeur" && names?.collection === "classeurs"
+    ? MAX_CLASSEUR_BYTES
+    : MAX_DATA_BYTES;
 
 /// Collections lues par un **moteur** du serveur, et non par un simple
 /// écran.
@@ -53,14 +60,17 @@ const validateParams = (params, reply) => {
   return { module: module.data, collection: collection.data };
 };
 
-const validateData = (body, reply) => {
+const validateData = (body, reply, names) => {
   const data = body?.data;
   if (data == null || typeof data !== "object" || Array.isArray(data)) {
     reply.code(400).send({ error: "`data` doit être un objet JSON" });
     return null;
   }
-  if (JSON.stringify(data).length > MAX_DATA_BYTES) {
-    reply.code(413).send({ error: "Enregistrement trop volumineux (64 Ko max)" });
+  const taille = Buffer.byteLength(JSON.stringify(data), "utf8");
+  const limite = limiteDonnees(names);
+  if (taille > limite) {
+    const plafond = limite >= 1024 * 1024 ? `${limite / (1024 * 1024)} Mo` : `${limite / 1024} Ko`;
+    reply.code(413).send({ error: `Enregistrement trop volumineux (${plafond} max)` });
     return null;
   }
   return data;
@@ -107,7 +117,7 @@ export default async function recordRoutes(app) {
     return serialize(await auteurs(request.tenantId, records));
   });
 
-  app.post("/:module/:collection", async (request, reply) => {
+  app.post("/:module/:collection", { bodyLimit: MAX_RECORD_BODY_BYTES }, async (request, reply) => {
     const names = validateParams(request.params, reply);
     if (!names) return;
     if (exigeAdmin(names) && !auMoins(request.user?.role, "ADMIN")) {
@@ -116,7 +126,7 @@ export default async function recordRoutes(app) {
           "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
       });
     }
-    let data = validateData(request.body, reply);
+    let data = validateData(request.body, reply, names);
     if (!data) return;
 
     const execution = await executerAutomatisations({
@@ -153,7 +163,7 @@ export default async function recordRoutes(app) {
       );
   });
 
-  app.put("/:module/:collection/:id", async (request, reply) => {
+  app.put("/:module/:collection/:id", { bodyLimit: MAX_RECORD_BODY_BYTES }, async (request, reply) => {
     const names = validateParams(request.params, reply);
     if (!names) return;
     if (exigeAdmin(names) && !auMoins(request.user?.role, "ADMIN")) {
@@ -162,7 +172,7 @@ export default async function recordRoutes(app) {
           "Cette collection déclenche des envois automatiques : seul un administrateur peut y écrire.",
       });
     }
-    let data = validateData(request.body, reply);
+    let data = validateData(request.body, reply, names);
     if (!data) return;
 
     const execution = await executerAutomatisations({
@@ -175,12 +185,20 @@ export default async function recordRoutes(app) {
     data = execution.valeurs;
 
     // updateMany + filtre tenant : impossible de toucher la ligne d'un autre client.
+    const revision = request.body?.updatedAt;
+    if (revision && Number.isNaN(new Date(revision).getTime())) {
+      return reply.code(400).send({ error: "Révision d’enregistrement invalide" });
+    }
     const { count } = await prisma.record.updateMany({
-      where: { id: request.params.id, tenantId: request.tenantId, ...names },
+      where: {
+        id: request.params.id, tenantId: request.tenantId, ...names,
+        ...(revision ? { updatedAt: new Date(revision) } : {}),
+      },
       data: { data, updatedById: request.user.id },
     });
 
     if (count === 0) {
+      if (revision) return reply.code(409).send({ error: "Ce document a été modifié dans une autre fenêtre. Rechargez-le avant d’enregistrer." });
       return reply.code(404).send({ error: "Enregistrement introuvable" });
     }
 

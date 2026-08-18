@@ -1,0 +1,43 @@
+.mcpApp .restWindow { background: #07101f; color: #dce8f8; overflow: auto; }
+.mcpHero { padding: 28px 32px 22px; display: flex; justify-content: space-between; gap: 24px; align-items: center; background: radial-gradient(circle at 15% 0, #173a68 0, #0b1930 45%, #07101f 78%); border-bottom: 1px solid #20334d; }
+.mcpHero h1 { margin: 4px 0; font-size: 30px; letter-spacing: -.03em; }
+.mcpHero p { margin: 0; color: #8fa8c8; }
+.mcpEyebrow { color: #61d7ff; text-transform: uppercase; font-size: 11px; letter-spacing: .14em; font-weight: 700; }
+.mcpHealth { border: 1px solid #78394a; background: #2a1420; color: #ff9eb2; padding: 9px 14px; border-radius: 99px; display: flex; gap: 8px; align-items: center; font-weight: 700; white-space: nowrap; }
+.mcpHealth[data-ok="true"] { border-color: #246b5c; background: #0d2b29; color: #68ebc2; }
+.mcpHealth span { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px currentColor; }
+.mcpTabs { display: flex; padding: 0 28px; gap: 4px; border-bottom: 1px solid #1b2b41; background: #091526; position: sticky; top: 0; z-index: 2; }
+.mcpTabs button { color: #8096b3; background: none; border: 0; border-bottom: 2px solid transparent; padding: 14px 16px; cursor: pointer; }
+.mcpTabs button[data-active="true"] { color: #fff; border-color: #40c7ff; }
+.mcpMain { padding: 24px 28px 40px; max-width: 1100px; width: 100%; margin: 0 auto; }
+.mcpGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+.mcpCard, .mcpPanel { border: 1px solid #1d3049; border-radius: 14px; background: #0c192b; padding: 20px; }
+.mcpCard span, .mcpCard small { display: block; color: #7f96b5; }
+.mcpCard strong { display: block; font-size: 20px; margin: 8px 0; color: #f3f7fc; }
+.mcpCard strong[data-ok="true"] { color: #60e4ba; }
+.mcpPanel { margin-bottom: 16px; }
+.mcpPanel h2 { margin: 0 0 7px; font-size: 17px; }
+.mcpPanel p { margin: 0 0 16px; color: #8da3c0; }
+.mcpToken { display: flex; gap: 10px; padding: 11px; background: #06101d; border: 1px solid #243a55; border-radius: 9px; align-items: center; }
+.mcpToken code { flex: 1; overflow: hidden; color: #65dcff; }
+.mcpApp button { border: 1px solid #2e5878; background: #123451; color: #dff5ff; border-radius: 8px; padding: 8px 13px; cursor: pointer; }
+.mcpApp button:hover { background: #174563; }
+.mcpApp button:disabled { opacity: .45; cursor: default; }
+.mcpWarning { margin-top: 12px; color: #ffc27a; font-size: 12px; }
+.mcpFields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mcpFields label { color: #8ea5c3; font-size: 12px; }
+.mcpFields input { display: block; width: 100%; margin-top: 6px; border: 1px solid #28415e; background: #06101d; color: #e5effb; border-radius: 8px; padding: 10px; }
+.mcpPanelTitle { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+.mcpPanel pre { margin: 14px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all; background: #050d18; border: 1px solid #1a2c43; border-radius: 9px; padding: 14px; color: #99dff7; font-size: 11px; }
+.mcpColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mcpItem { padding: 13px 0; border-bottom: 1px solid #182a40; }
+.mcpItem:last-child { border: 0; }
+.mcpItem code, .mcpItem b { display: block; color: #6bdcff; margin-bottom: 4px; }
+.mcpItem span { color: #8299b8; font-size: 12px; }
+.mcpChoice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+.mcpChoice button { text-align: left; background: #081423; border-color: #263d58; padding: 17px; }
+.mcpChoice button[data-active="true"] { border-color: #4bd2ff; box-shadow: inset 0 0 0 1px #4bd2ff; }
+.mcpChoice strong, .mcpChoice span { display: block; }
+.mcpChoice span { margin-top: 5px; color: #86a0bf; font-size: 12px; }
+.mcpPanel li { color: #9bb0ca; margin: 9px 0; }
+@media (max-width: 760px) { .mcpGrid, .mcpColumns, .mcpFields { grid-template-columns: 1fr; } .mcpHero { align-items: flex-start; flex-direction: column; } .mcpMain { padding: 18px; } .mcpTabs { overflow-x: auto; padding: 0 12px; } }

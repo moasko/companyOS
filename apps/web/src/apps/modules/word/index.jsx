@@ -92,6 +92,7 @@ function WordApp() {
 
   const refEditeur = useRef(null);
   const minuteur = useRef(null);
+  const refImport = useRef(null);
 
   // Le document ouvert : ses octets, et le fichier du cloud d'où il vient.
   // `fichier` est null pour un document neuf jamais enregistré.
@@ -154,6 +155,7 @@ function WordApp() {
     setTitre(node ? sansExtension(node.name) : "Document");
     setModifie(false);
     setEchec("");
+    setVoletReplie(true);
     setCle((c) => c + 1);
   };
 
@@ -169,6 +171,33 @@ function WordApp() {
   const nouveau = async () => {
     if (!(await confirmerAbandon())) return;
     monter(documentVierge(), null);
+  };
+
+  const importerLocal = async (event) => {
+    const local = event.target.files?.[0];
+    event.target.value = "";
+    if (!local) return;
+    if (!/\.docx$/i.test(local.name)) {
+      modal.alert({ title: "Format non pris en charge", message: "Choisissez un fichier Word au format .docx.", tone: "error" });
+      return;
+    }
+    if (local.size > 50 * 1024 * 1024) {
+      modal.alert({ title: "Document trop volumineux", message: "La taille maximale d’ouverture est de 50 Mo.", tone: "error" });
+      return;
+    }
+    if (!(await confirmerAbandon())) return;
+    try {
+      const contenu = new Uint8Array(await local.arrayBuffer());
+      setOctets(contenu);
+      setFichier(null);
+      setTitre(sansExtension(local.name) || "Document");
+      setModifie(false);
+      setEchec("");
+      setVoletReplie(true);
+      setCle((c) => c + 1);
+    } catch (e) {
+      modal.alert({ title: "Ouverture impossible", message: e.message, tone: "error" });
+    }
   };
 
   /// Un ancien document HTML : converti en `.docx`, posé dans le cloud,
@@ -299,6 +328,32 @@ function WordApp() {
   enregistrerRef.current = enregistrer;
 
   useEffect(() => () => clearTimeout(minuteur.current), []);
+
+  // Le navigateur ne doit jamais fermer silencieusement un brouillon.
+  useEffect(() => {
+    if (!modifie) return undefined;
+    const proteger = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", proteger);
+    return () => window.removeEventListener("beforeunload", proteger);
+  }, [modifie]);
+
+  const telechargerCopie = async () => {
+    try {
+      const tampon = await refEditeur.current?.save();
+      if (!tampon) return;
+      const url = URL.createObjectURL(new Blob([tampon], { type: MIME_DOCX }));
+      const lien = document.createElement("a");
+      lien.href = url;
+      lien.download = `${titre.replace(/[\\/:*?"<>|]/g, "") || "Document"}.docx`;
+      lien.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      modal.alert({ title: "Téléchargement impossible", message: e.message, tone: "error" });
+    }
+  };
 
   /// Renommage depuis la barre de titre de l'éditeur.
   const surTitre = async (nouveau) => {
@@ -443,6 +498,7 @@ function WordApp() {
 
           {/* L'éditeur, ou l'accueil quand rien n'est ouvert */}
           <div className="wdScene">
+            <input ref={refImport} className="wdImportCache" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={importerLocal} />
             {octets ? (
               <>
                 {/* La barre de titre du document est celle de CompanyOS —
@@ -476,6 +532,18 @@ function WordApp() {
                             ? "Enregistré dans le cloud"
                             : "Jamais enregistré"}
                   </span>
+                  <button className="wdActionDoc" type="button" title="Ouvrir un document DOCX" onClick={() => refImport.current?.click()}>
+                    <Icon fafa="faFolderOpen" width={12} />
+                    Ouvrir
+                  </button>
+                  <button className="wdActionDoc" type="button" title="Télécharger une copie DOCX" onClick={telechargerCopie}>
+                    <Icon fafa="faDownload" width={12} />
+                    Télécharger
+                  </button>
+                  <button className="wdActionDoc wdActionPrimaire" type="button" onClick={() => enregistrerRef.current()} disabled={enregistrement}>
+                    <Icon fafa="faFloppyDisk" width={12} />
+                    Enregistrer
+                  </button>
                 </div>
                 <Suspense
                   fallback={
@@ -491,8 +559,8 @@ function WordApp() {
                     octets={octets}
                     sombre={sombre}
                     surSauvegarde={() => enregistrerRef.current()}
-                    surOuverture={() => setVoletReplie(false)}
                     surModification={surModification}
+                    surErreur={(message) => setEchec(message)}
                   />
                 </Suspense>
               </>
@@ -510,6 +578,10 @@ function WordApp() {
                   <div className="wdAccueilBtn handcr" onClick={nouveau}>
                     <Icon fafa="faFileCirclePlus" width={13} />
                     Nouveau document
+                  </div>
+                  <div className="wdAccueilBtn wdAccueilBtnSecondaire handcr" onClick={() => refImport.current?.click()}>
+                    <Icon fafa="faFolderOpen" width={13} />
+                    Ouvrir un fichier DOCX
                   </div>
                 </div>
               </div>

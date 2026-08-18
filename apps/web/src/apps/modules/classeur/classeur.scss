@@ -33,6 +33,17 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: width 160ms ease, padding 160ms ease, opacity 120ms ease;
+}
+
+.clsApp .clsShell[data-volet="false"] .clsLateral {
+  width: 0;
+  padding-right: 0;
+  padding-left: 0;
+  overflow: hidden;
+  border-right: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .clsApp .clsLateralTete { font-size: 12px; color: var(--app-muted); }
@@ -90,19 +101,97 @@
   flex-direction: column;
 }
 
+.clsApp .clsEntete {
+  flex: none;
+  border-bottom: 1px solid var(--app-line);
+  background: var(--app-panneau);
+}
+
+.clsApp .clsDocBar {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+}
+
+.clsApp .clsDocIcon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #188038, #0f6a30);
+  color: #fff;
+  box-shadow: 0 5px 12px rgb(24 128 56 / 20%);
+}
+
+.clsApp .clsVoletBtn { margin-right: 2px; }
+
+.clsApp .clsModifiePill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-attention) 13%, transparent);
+  color: var(--app-attention);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.clsApp .clsActionTexte {
+  padding-right: 9px;
+  padding-left: 9px;
+  color: var(--app-muted);
+}
+
+.clsApp .clsRubanTabs {
+  display: flex;
+  min-height: 30px;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 12px;
+  border-top: 1px solid color-mix(in srgb, var(--app-line) 55%, transparent);
+
+  button {
+    position: relative;
+    height: 29px;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    color: var(--app-muted);
+    font: 600 11.5px inherit;
+    cursor: pointer;
+
+    &:hover { color: var(--app-text); }
+    &[data-actif="true"] { color: var(--app-accent); }
+    &[data-actif="true"]::after {
+      position: absolute;
+      right: 9px;
+      bottom: 0;
+      left: 9px;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: var(--app-accent);
+      content: "";
+    }
+  }
+}
+
 .clsApp .clsBarre {
   flex: none;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--app-line);
-  background: var(--app-panneau);
-  flex-wrap: wrap;
+  min-height: 43px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--app-line);
+  background: color-mix(in srgb, var(--app-panneau) 88%, var(--app-bg));
+  overflow-x: auto;
+  flex-wrap: nowrap;
 }
 
 .clsApp .clsTitre {
-  width: 190px;
+  width: min(280px, 32vw);
   padding: 5px 8px;
   border: 1px solid transparent;
   border-radius: var(--app-rayon);
@@ -114,6 +203,85 @@
 
   &:hover { border-color: var(--app-line); }
   &:focus { outline: none; border-color: var(--app-accent); background: var(--app-champ); }
+}
+
+.clsApp .clsGroupe {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-right: 8px;
+  margin-right: 4px;
+  border-right: 1px solid var(--app-line);
+
+  &:last-child { border-right: 0; }
+}
+
+.clsApp .clsRibbonAction {
+  display: inline-flex;
+  min-width: 88px;
+  height: 31px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--app-rayon);
+  background: transparent;
+  color: var(--app-text);
+  font: 500 11.5px inherit;
+  cursor: pointer;
+
+  .uicon { display: flex; color: var(--app-accent); }
+  &:hover { border-color: var(--app-line); background: var(--app-carte); }
+  &[data-on="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
+}
+
+.clsApp .clsFonctionSigle {
+  min-width: 15px;
+  color: var(--app-accent);
+  font-size: 15px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.clsApp .clsRubanSelect {
+  height: 27px;
+  padding: 0 24px 0 7px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-champ);
+  color: var(--app-text);
+  font: 500 11.5px inherit;
+  cursor: pointer;
+
+  &:focus { outline: 2px solid color-mix(in srgb, var(--app-accent) 30%, transparent); }
+}
+
+.clsApp .clsPolice { width: 112px; }
+.clsApp .clsTaillePolice { width: 55px; }
+
+.clsApp .clsZoom {
+  display: flex;
+  height: 29px;
+  align-items: center;
+  overflow: hidden;
+  margin-left: 4px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-rayon);
+  background: var(--app-champ);
+
+  button {
+    min-width: 32px;
+    height: 100%;
+    padding: 0 7px;
+    border: 0;
+    border-right: 1px solid var(--app-line);
+    background: transparent;
+    color: var(--app-muted);
+    font: 600 11px inherit;
+    cursor: pointer;
+    &:last-child { border-right: 0; }
+    &:hover { color: var(--app-accent); background: var(--app-accent-soft); }
+  }
 }
 
 .clsApp .clsSep { width: 1px; height: 18px; background: var(--app-line); margin: 0 4px; }
@@ -139,6 +307,8 @@
   &:disabled { opacity: 0.35; cursor: default; }
   &[data-on="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
 }
+
+.clsApp .clsActionDanger:not(:disabled) { color: var(--app-danger, #d93025); }
 
 .clsApp .clsLarge { min-width: 96px; justify-content: flex-start; }
 
@@ -188,11 +358,175 @@
 // ---------------------------------------------------------------------------
 
 .clsApp .clsGrille {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
   outline: none;
   background: var(--app-bg);
+
+  .clsObjets {
+    position: absolute;
+    z-index: 18;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .clsObjet {
+    position: absolute;
+    box-sizing: border-box;
+    overflow: visible;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--app-text);
+    pointer-events: auto;
+    cursor: move;
+    user-select: none;
+
+    &[data-selectionne] {
+      border-color: var(--app-accent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 20%, transparent);
+    }
+
+    > img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  }
+
+  .clsObjetForme {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border: var(--forme-epaisseur) solid var(--forme-contour);
+    border-radius: 18px;
+    background: var(--forme-remplissage);
+    color: var(--forme-texte);
+    font-weight: 700;
+    place-items: center;
+    padding: 10px;
+    text-align: center;
+    transform-origin: center;
+  }
+  .clsObjetForme[data-forme="rectangle"] { border-radius: 0; }
+  .clsObjetForme[data-forme="ellipse"] { border-radius: 50%; }
+  .clsObjetForme[data-forme="losange"] { width: 72%; height: 72%; margin: 14%; border-radius: 4px; }
+
+  .clsObjet-graphique {
+    overflow: visible;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--app-panneau);
+    box-shadow: 0 2px 10px color-mix(in srgb, #000 14%, transparent);
+
+    .clsMiniGraphique { width: 100%; min-height: 0; flex: 1; }
+    .clsMiniBarres { width: 100%; min-height: 0; flex: 1; box-sizing: border-box; }
+  }
+
+  .clsGraphiquePro { display: flex; width: 100%; height: 100%; min-height: 0; flex-direction: column; }
+  .clsGraphiqueTitre { flex: 0 0 auto; overflow: hidden; margin: 0 0 5px; font-size: 13px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+  .clsGraphGrid { stroke: color-mix(in srgb, var(--app-line) 75%, transparent); stroke-width: 1; }
+  .clsGraphAxe { stroke: color-mix(in srgb, var(--app-muted) 65%, transparent); stroke-width: 1; }
+  .clsGraphLabel { fill: var(--app-muted); font-size: 7px; }
+  .clsGraphLegende { display: flex; flex: 0 0 auto; min-height: 14px; justify-content: center; gap: 9px; overflow: hidden; color: var(--app-muted); font-size: 9px; }
+  .clsGraphLegende i { display: flex; min-width: 0; align-items: center; gap: 4px; font-style: normal; white-space: nowrap; }
+  .clsGraphLegende em { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 2px; }
+  .clsSecteurCorps { display: flex; min-height: 0; flex: 1; align-items: center; justify-content: center; gap: 12px; }
+  .clsGraphiqueSecteur { width: min(62%, 150px); height: 100%; overflow: visible; }
+  .clsSecteurTotal { fill: var(--app-muted); font-size: 8px; }
+  .clsSecteurValeur { fill: var(--app-text); font-size: 10px; font-weight: 700; }
+  .clsGraphLegendeVerticale { max-width: 42%; flex-direction: column; justify-content: center; gap: 4px; }
+  .clsGraphLegendeVerticale i { justify-content: space-between; }
+  .clsGraphLegendeVerticale small { margin-left: 4px; color: var(--app-text); font-size: 9px; font-weight: 600; }
+
+  .clsGraphiqueOutils {
+    position: absolute;
+    z-index: 4;
+    top: -40px;
+    left: 50%;
+    display: flex;
+    padding: 4px;
+    border: 1px solid var(--app-line);
+    border-radius: 8px;
+    background: var(--app-panneau);
+    box-shadow: 0 6px 18px color-mix(in srgb, #000 18%, transparent);
+    transform: translateX(-50%);
+    gap: 2px;
+  }
+  .clsGraphiqueOutils button {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--app-muted);
+    place-items: center;
+    cursor: pointer;
+  }
+  .clsGraphiqueOutils button:hover,
+  .clsGraphiqueOutils button[data-actif] { background: var(--app-accent-soft); color: var(--app-accent); }
+  .clsFormeOutils { max-width: min(440px, 90vw); }
+  .clsFormeOutils button { flex: 0 0 26px; font-size: 9px; font-weight: 700; }
+  .clsCouleurObjet {
+    position: relative;
+    display: grid;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    border-radius: 5px;
+    color: var(--app-muted);
+    place-items: center;
+    cursor: pointer;
+  }
+  .clsCouleurObjet:hover { background: var(--app-accent-soft); color: var(--app-accent); }
+  .clsCouleurObjet input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  .clsObjetTexte {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 8px;
+    border: 1px dashed var(--app-line-strong, var(--app-line));
+    background: color-mix(in srgb, var(--app-panneau) 92%, transparent);
+    white-space: pre-wrap;
+  }
+
+  .clsObjetPoignee {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: 1px solid var(--app-accent);
+    background: #fff;
+    cursor: nwse-resize;
+  }
+
+  .clsObjetRotation {
+    position: absolute;
+    top: -18px;
+    left: calc(50% - 4px);
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--app-accent);
+    border-radius: 50%;
+    background: #fff;
+    padding: 0;
+    cursor: grab;
+  }
+  .clsObjetRotation::after {
+    position: absolute;
+    top: 8px;
+    left: 3px;
+    width: 1px;
+    height: 9px;
+    background: var(--app-accent);
+    content: "";
+  }
 
   &:focus-visible { box-shadow: inset 0 0 0 2px var(--app-accent); }
 
@@ -203,18 +537,69 @@
     border-collapse: separate;
     border-spacing: 0;
     width: max-content;
-    font-size: 12.5px;
+    font-size: calc(12.5px * var(--cls-zoom, 1));
     user-select: none;
   }
 
   tbody td input { user-select: text; }
 
+  .clsCaseCellule {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-accent);
+    place-items: center;
+    cursor: pointer;
+  }
+
+  .clsValidationCellule {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: 0;
+    cursor: pointer;
+  }
+
+  .clsImageCellule { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .clsLienCellule { display: block; overflow: hidden; color: inherit; text-overflow: ellipsis; }
+  .clsFormeCellule { border-radius: 999px; padding: 2px 8px; text-align: center; }
+  .clsCommentaireCellule {
+    position: absolute;
+    z-index: 8;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-top: 8px solid #e94235;
+    border-left: 8px solid transparent;
+  }
+
+  .clsMiniGraphique { display: block; width: 100%; height: 100%; color: var(--app-accent); }
+  .clsMiniBarres { display: flex; height: 20px; align-items: end; gap: 2px; padding: 2px 4px; }
+  .clsMiniBarres i { flex: 1; min-width: 3px; max-width: 10px; border-radius: 2px 2px 0 0; background: var(--app-accent); }
+  .clsMiniSecteur {
+    display: block;
+    width: 20px;
+    height: 20px;
+    margin: auto;
+    border-radius: 50%;
+    background: conic-gradient(var(--app-accent) var(--part), var(--app-line) 0);
+  }
+  .clsObjetVide { color: var(--app-muted); font-size: 10px; }
+
   thead th {
     position: sticky;
     top: 0;
     z-index: 2;
-    min-width: 104px;
-    height: 24px;
+    width: calc(var(--cls-col-width, 88px) * var(--cls-zoom, 1));
+    min-width: calc(var(--cls-col-width, 88px) * var(--cls-zoom, 1));
+    height: calc(24px * var(--cls-zoom, 1));
     padding: 0 8px;
     background: var(--app-panneau);
     border-bottom: 1px solid var(--app-line);
@@ -225,12 +610,15 @@
     cursor: pointer;
 
     &[data-actif="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
+    &[data-filtre]::before { position: absolute; top: 3px; left: 4px; color: var(--app-accent); content: "▼"; font-size: 7px; }
   }
 
   tbody td {
-    height: 26px;
-    max-width: 400px;
-    padding: 0 8px;
+    position: relative;
+    width: calc(var(--cls-col-width, 88px) * var(--cls-zoom, 1));
+    min-width: calc(var(--cls-col-width, 88px) * var(--cls-zoom, 1));
+    max-width: 360px;
+    padding: 0 6px;
     border-bottom: 1px solid var(--app-line);
     border-right: 1px solid var(--app-line);
     overflow: hidden;
@@ -239,22 +627,82 @@
     cursor: cell;
 
     span { display: block; overflow: hidden; text-overflow: ellipsis; }
+    &[style*="white-space: normal"] span { white-space: normal; text-overflow: clip; }
 
-    // La sélection se pose au fond et en anneau interne : un contour
-    // extérieur décalerait la grille d'un pixel à chaque déplacement.
-    &[data-sel] { box-shadow: inset 0 0 0 1.5px var(--app-accent); }
+    // La plage garde un seul contour continu, tandis que la cellule active
+    // reçoit l'anneau fort d'Excel. Le voile translucide respecte les fonds.
+    &[data-sel] {
+      background-image: linear-gradient(
+        color-mix(in srgb, var(--app-accent) 9%, transparent),
+        color-mix(in srgb, var(--app-accent) 9%, transparent)
+      );
+    }
+    &[data-sel]::after {
+      position: absolute;
+      z-index: 7;
+      inset: -1px;
+      border: 0 solid var(--app-accent);
+      content: "";
+      pointer-events: none;
+    }
+    &[data-sel-top]::after { border-top-width: 2px; }
+    &[data-sel-bottom]::after { border-bottom-width: 2px; }
+    &[data-sel-left]::after { border-left-width: 2px; }
+    &[data-sel-right]::after { border-right-width: 2px; }
+    &[data-active] {
+      position: relative;
+      z-index: 6;
+      box-shadow: inset 0 0 0 1.5px var(--app-accent);
+      background-image: linear-gradient(
+        color-mix(in srgb, var(--app-accent) 5%, transparent),
+        color-mix(in srgb, var(--app-accent) 5%, transparent)
+      );
+    }
+    &[data-editing] {
+      background-image: none;
+      box-shadow: inset 0 0 0 1.5px var(--app-accent);
+    }
 
     input {
+      position: relative;
+      z-index: 8;
       width: 100%;
-      height: 24px;
+      height: 100%;
       border: none;
-      background: var(--app-champ);
-      color: var(--app-text);
+      background: transparent;
+      color: inherit;
       font: inherit;
-      font-size: 12.5px;
+      text-align: inherit;
+      text-decoration: inherit;
       padding: 0;
       outline: none;
+      caret-color: var(--app-accent);
+      cursor: text;
     }
+  }
+
+  .clsPoigneeRecopie {
+    position: absolute;
+    z-index: 10;
+    right: -4px;
+    bottom: -4px;
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: 1px solid var(--app-carte);
+    border-radius: 1px;
+    background: var(--app-accent);
+    box-shadow: 0 0 0 1px var(--app-accent);
+    cursor: crosshair;
+
+    &:hover { transform: scale(1.2); }
+  }
+
+  .clsColSpacer {
+    padding: 0;
+    border-right: 0;
+    background: transparent;
+    pointer-events: none;
   }
 }
 
@@ -263,8 +711,9 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  min-width: 44px;
-  padding: 0 8px;
+  width: calc(34px * var(--cls-zoom, 1));
+  min-width: calc(34px * var(--cls-zoom, 1));
+  padding: 0 6px;
   background: var(--app-panneau);
   border-right: 1px solid var(--app-line);
   border-bottom: 1px solid var(--app-line);
@@ -275,10 +724,28 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 
+  .clsPoigneeLigne {
+    position: absolute;
+    z-index: 5;
+    right: 0;
+    bottom: -3px;
+    left: 0;
+    height: 6px;
+    cursor: row-resize;
+  }
+
   &[data-actif="true"] { background: var(--app-accent-soft); color: var(--app-accent); }
 }
 
 .clsApp thead .clsNum { z-index: 3; }
+
+.clsApp .clsToutSelectionner {
+  background:
+    linear-gradient(135deg, transparent 48%, var(--app-muted) 49% 55%, transparent 56%),
+    var(--app-panneau);
+
+  &[data-actif="true"] { background-color: var(--app-accent-soft); }
+}
 
 .clsApp .clsPoignee {
   position: absolute;
@@ -314,7 +781,8 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 5px 10px;
+  min-height: 37px;
+  padding: 4px 10px 0;
   border-top: 1px solid var(--app-line);
   background: var(--app-panneau);
   overflow-x: auto;
@@ -323,7 +791,8 @@
 .clsApp .clsOnglet {
   flex: none;
   max-width: 160px;
-  padding: 5px 12px;
+  min-height: 32px;
+  padding: 6px 14px;
   border: 1px solid transparent;
   border-radius: var(--app-rayon) var(--app-rayon) 0 0;
   background: transparent;
@@ -343,7 +812,14 @@
     border-bottom-color: var(--app-carte);
     color: var(--app-accent);
     font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--app-accent);
   }
+}
+
+@media (max-width: 900px) {
+  .clsApp .clsActionTexte span { display: none; }
+  .clsApp .clsDocBar { padding-right: 8px; padding-left: 8px; }
+  .clsApp .clsRubanTabs, .clsApp .clsBarre { padding-right: 8px; padding-left: 8px; }
 }
 
 .clsApp .clsPlus { min-width: 28px; padding: 5px 8px; }

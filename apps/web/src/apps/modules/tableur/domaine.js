@@ -758,7 +758,7 @@ export const estFormule = (v) => typeof v === "string" && v.trim().startsWith("=
 /// `vues` porte les cellules déjà traversées : une formule qui se
 /// référence, directement ou par un détour, doit dire « cycle » plutôt que
 /// de faire boucler le navigateur jusqu'au plantage.
-export const calculer = (corps, l, c, vues = new Set()) => {
+export const calculer = (corps, l, c, vues = new Set(), resoudreReference = null) => {
   const brute = corps[l]?.[c];
   if (!estFormule(brute)) return brute ?? "";
 
@@ -768,6 +768,7 @@ export const calculer = (corps, l, c, vues = new Set()) => {
 
   try {
     const lire = (rl, rc) => {
+      if (resoudreReference) return resoudreReference(rl, rc, vues);
       const v = corps[rl]?.[rc];
       if (!estFormule(v)) return v;
       const resultat = calculer(corps, rl, rc, vues);

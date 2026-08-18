@@ -1,0 +1,19 @@
+{
+  "name": "@companyos/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Serveur MCP donnant aux assistants un accès contrôlé aux ressources CompanyOS",
+  "bin": {
+    "companyos-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "login": "node src/login.js",
+    "check": "node src/check.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

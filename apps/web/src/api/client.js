@@ -232,8 +232,8 @@ export const api = {
     list: (module, collection) => request(`/records/${module}/${collection}`),
     create: (module, collection, data) =>
       request(`/records/${module}/${collection}`, { method: "POST", body: { data } }),
-    update: (module, collection, id, data) =>
-      request(`/records/${module}/${collection}/${id}`, { method: "PUT", body: { data } }),
+    update: (module, collection, id, data, updatedAt) =>
+      request(`/records/${module}/${collection}/${id}`, { method: "PUT", body: { data, ...(updatedAt ? { updatedAt } : {}) } }),
     remove: (module, collection, id) =>
       request(`/records/${module}/${collection}/${id}`, { method: "DELETE" }),
   },

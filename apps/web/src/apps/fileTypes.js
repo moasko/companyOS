@@ -5,7 +5,7 @@
 // compléter ce tableau — l'Explorateur, le menu contextuel et les
 // visionneuses s'y réfèrent tous.
 
-import { EXTENSIONS } from "./modules/code/domaine";
+import { EXTENSIONS } from "./modules/code/domaine.js";
 
 // `app` est l'identifiant de la fenêtre à ouvrir ; `action` est
 // l'ancienne chaîne Redux, conservée comme clé d'abonnement des
@@ -52,7 +52,11 @@ const FAMILLES = [
   {
     genre: "document",
     label: "Document Word",
-    app: "word",
+    // L'identifiant de fenêtre par défaut est celui de l'icône lorsque le
+    // manifeste ne déclare pas `id`. Le traitement de texte utilise
+    // `winWord` : viser son slug (`word`) faisait croire à l'Explorateur
+    // que l'application n'était pas installée.
+    app: "winWord",
     action: "WORDAPP",
     icone: "winWord",
     mime: /^application\/vnd\.openxmlformats-officedocument\.wordprocessingml/,

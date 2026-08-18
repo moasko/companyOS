@@ -23,19 +23,27 @@ companyos/
 └── docs/               Documentation
 ```
 
-| Espace de travail   | Rôle                                                                 |
-| ------------------- | -------------------------------------------------------------------- |
-| `@companyos/web`    | React 18 · Vite 6 · Redux · TanStack Query · SCSS                     |
-| `@companyos/api`    | Node 22 · Fastify 5 · Prisma 6 · PostgreSQL 17                        |
-| `@companyos/shared` | JavaScript pur — totaux, validations, gabarits, règles d'échéance     |
+| Espace de travail   | Rôle                                                              |
+| ------------------- | ----------------------------------------------------------------- |
+| `@companyos/web`    | React 18 · Vite 6 · Redux · TanStack Query · SCSS                 |
+| `@companyos/api`    | Node 22 · Fastify 5 · Prisma 6 · PostgreSQL 17                    |
+| `@companyos/shared` | JavaScript pur — totaux, validations, gabarits, règles d'échéance |
 
 ### Pourquoi `packages/shared`
 
-Le serveur importait autrefois des fichiers du front (`../../src/apps/modules/…`).
-Cela marchait, mais une modification faite « côté écran » changeait le
-comportement du serveur sans que personne ne s'en aperçoive — c'est exactement
-ce qui avait rendu exploitable une injection HTML dans les emails de campagne.
-Le code que les deux côtés partagent vit maintenant dans un paquet explicite.
+Le serveur importait autrefois des fichiers du front
+(`../../src/apps/modules/…`). Cela marchait, mais une modification faite « côté
+écran » changeait le comportement du serveur sans que personne ne s'en aperçoive
+— c'est exactement ce qui avait rendu exploitable une injection HTML dans les
+emails de campagne. Le code que les deux côtés partagent vit maintenant dans un
+paquet explicite.
+
+## Pilotage par MCP
+
+Un serveur MCP permet à un assistant compatible de découvrir et manipuler les
+applications, fiches, fichiers et fonctions d’administration CompanyOS avec les
+permissions d’un compte réel. Installation, configuration et garde-fous :
+[`apps/mcp/README.md`](apps/mcp/README.md).
 
 ## Démarrer
 
@@ -70,16 +78,16 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Commandes
 
-| Commande               | Effet                                                      |
-| ---------------------- | ---------------------------------------------------------- |
-| `npm run dev:web`      | Shell en développement, port 5173                          |
-| `npm run dev:api`      | API en développement avec rechargement, port 4000          |
-| `npm run build`        | Build de production du shell dans `apps/web/build`         |
-| `npm run lint`         | ESLint sur tout le dépôt                                   |
-| `npm run format`       | Prettier sur tout le dépôt                                 |
-| `npm run db:migrate`   | Crée et applique une migration Prisma                      |
-| `npm run db:studio`    | Ouvre Prisma Studio sur la base                            |
-| `npm run audit:prod`   | Audit des dépendances livrées (hors outillage de build)    |
+| Commande             | Effet                                                   |
+| -------------------- | ------------------------------------------------------- |
+| `npm run dev:web`    | Shell en développement, port 5173                       |
+| `npm run dev:api`    | API en développement avec rechargement, port 4000       |
+| `npm run build`      | Build de production du shell dans `apps/web/build`      |
+| `npm run lint`       | ESLint sur tout le dépôt                                |
+| `npm run format`     | Prettier sur tout le dépôt                              |
+| `npm run db:migrate` | Crée et applique une migration Prisma                   |
+| `npm run db:studio`  | Ouvre Prisma Studio sur la base                         |
+| `npm run audit:prod` | Audit des dépendances livrées (hors outillage de build) |
 
 ## Déploiement
 
@@ -87,10 +95,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Les deux images se construisent depuis la racine du dépôt — c'est là que
-vivent le manifeste des workspaces et le lockfile. Voir
-[DEPLOIEMENT.md](DEPLOIEMENT.md) pour la marche à suivre sur Dokploy et la
-liste des variables d'environnement.
+Les deux images se construisent depuis la racine du dépôt — c'est là que vivent
+le manifeste des workspaces et le lockfile. Voir
+[DEPLOIEMENT.md](DEPLOIEMENT.md) pour la marche à suivre sur Dokploy et la liste
+des variables d'environnement.
 
 ## Documentation
 
@@ -104,7 +112,7 @@ liste des variables d'environnement.
 Le shell — bureau, fenêtres, barre des tâches, menu Démarrer — est dérivé de
 [win11React](https://github.com/blueedgetechno/win11React) de blueedgetechno,
 publié sous [CC0 1.0](LICENSE) (domaine public). Les applications de
-démonstration du projet d'origine ont été retirées et remplacées par les
-modules de gestion ; le reste a été rebrandé et largement réécrit.
+démonstration du projet d'origine ont été retirées et remplacées par les modules
+de gestion ; le reste a été rebrandé et largement réécrit.
 
 CompanyOS conserve la même licence CC0 1.0.

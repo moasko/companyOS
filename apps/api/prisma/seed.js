@@ -124,6 +124,16 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "mcp",
+    name: "MCP Center",
+    description:
+      "Connectez CompanyOS à Codex, Claude et aux assistants compatibles MCP. Gérez le jeton, les permissions, les ressources exposées, la configuration et le diagnostic depuis une seule console.",
+    icon: "terminal",
+    category: "Outils",
+    kind: "NATIVE",
+    version: "1.0.0",
+  },
+  {
     slug: "qrcode",
     name: "Générateur QR",
     description:

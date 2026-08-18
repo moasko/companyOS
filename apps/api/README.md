@@ -82,6 +82,8 @@ passer en S3 ne demande que d'ajouter un pilote exposant `buildKey` / `put` / `r
 | DELETE  | `/api/records/:module/:collection/:id`   | Supprime.                            |
 
 Le corps est `{ "data": { ... } }`, un objet JSON libre de 64 Ko maximum.
+La collection `classeur/classeurs`, qui porte des documents complets plutôt
+que de simples fiches métier, accepte jusqu’à 8 Mo.
 Un nouveau module n'exige donc **aucune migration** : il choisit son couple
 module/collection et écrit.
 

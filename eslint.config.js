@@ -52,10 +52,7 @@ export default [
       // Une variable inutilisée est presque toujours un reste de
       // refactorisation. Les arguments préfixés d'un `_` sont exemptés :
       // c'est la façon habituelle de dire « je sais, je n'en veux pas ».
-      "no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       // Le shell historique utilise encore des `var` redéclarés dans une
       // même fonction. C'est légal en JavaScript et ne doit pas masquer les
       // erreurs réellement bloquantes pendant sa migration progressive.
@@ -73,17 +70,14 @@ export default [
   // L'API et le paquet partagé
   // ------------------------------------------------------------------
   {
-    files: ["apps/api/**/*.js", "packages/shared/**/*.js"],
+    files: ["apps/api/**/*.js", "apps/mcp/**/*.js", "packages/shared/**/*.js"],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: "module",
       globals: { ...globals.node, ...globals.es2021 },
     },
     rules: {
-      "no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       // Sur le serveur, un `console.log` oublié finit dans les journaux de
       // production. `console.error` et `console.warn` restent permis :
       // c'est ainsi que les moteurs de fond signalent un échec.
@@ -106,7 +100,10 @@ export default [
         "error",
         { name: "window", message: "packages/shared s'exécute aussi côté serveur." },
         { name: "document", message: "packages/shared s'exécute aussi côté serveur." },
-        { name: "localStorage", message: "packages/shared s'exécute aussi côté serveur." },
+        {
+          name: "localStorage",
+          message: "packages/shared s'exécute aussi côté serveur.",
+        },
       ],
     },
   },
