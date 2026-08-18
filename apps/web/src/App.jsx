@@ -7,13 +7,7 @@ import "./index.css";
 import "./utils/scroll.scss";
 import "./utils/mobile.scss";
 
-import {
-  BandPane,
-  CalnWid,
-  DesktopApp,
-  SidePane,
-  StartMenu,
-} from "./components/start";
+import { BandPane, CalnWid, DesktopApp, SidePane, StartMenu } from "./components/start";
 import Taskbar from "./components/taskbar";
 import { Background, BootScreen, LockScreen } from "./containers/background";
 
@@ -30,13 +24,10 @@ import { intercepterMailto } from "./apps/mailto";
 import { demarrerSyncNotifications } from "./apps/notifications";
 import { CustomApp } from "./apps/CustomApp";
 import { CustomWebApp } from "./apps/CustomWebApp";
-import {
-  syncInstalledModules,
-  detachAllModules,
-  attachSystemModules,
-} from "./apps/sync";
+import { syncInstalledModules, detachAllModules, attachSystemModules } from "./apps/sync";
 import { appliquerApparence, reinitialiserApparence } from "./apps/appearance";
 import { api, getToken, clearToken } from "./api/client";
+import { demarrerPreferences, arreterPreferences } from "./apps/preferences";
 
 /// Monte une application à sa première ouverture, et pas avant.
 ///
@@ -69,8 +60,8 @@ function ErrorFallback({ error, resetErrorBoundary }) {
       <div className="crashCont">
         <h1>:(</h1>
         <h2>
-          CompanyOS a rencontré un problème et doit redémarrer la session. Vos
-          données ouvertes ne sont pas perdues.
+          CompanyOS a rencontré un problème et doit redémarrer la session. Vos données
+          ouvertes ne sont pas perdues.
         </h2>
         <div className="stopcode">
           <h4>Code d'arrêt</h4>
@@ -105,9 +96,7 @@ function App() {
       // Une préférence locale corrompue ne doit pas empêcher le démarrage.
     }
 
-    var actionType0 = getComputedStyle(event.target).getPropertyValue(
-      "--prefix",
-    );
+    var actionType0 = getComputedStyle(event.target).getPropertyValue("--prefix");
 
     ess.forEach((item, i) => {
       if (!actionType.startsWith(item[0]) && !actionType0.startsWith(item[0])) {
@@ -198,12 +187,14 @@ function App() {
         });
         await syncInstalledModules();
         await appliquerApparence(me.tenant.id);
+        await demarrerPreferences(me.tenant.id);
       } catch (err) {
         // API injoignable : on garde le jeton, la session repartira au
         // prochain chargement. Seul un 401 signifie un jeton mort.
         if (err.status === 401) clearToken();
         dispatch({ type: "SESSION_CLEAR" });
         detachAllModules();
+        arreterPreferences();
         reinitialiserApparence();
       }
     };

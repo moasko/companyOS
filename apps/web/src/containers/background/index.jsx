@@ -4,6 +4,7 @@ import { Icon, Image } from "../../utils/general";
 import { api, setToken, clearToken } from "../../api/client";
 import { syncInstalledModules, detachAllModules } from "../../apps/sync";
 import { appliquerApparence, reinitialiserApparence } from "../../apps/appearance";
+import { demarrerPreferences } from "../../apps/preferences";
 import { resynchroniserNotifications } from "../../apps/notifications";
 import { Avatar } from "../../apps/Avatar";
 import { useTraduction } from "../../utils/intl";
@@ -64,9 +65,7 @@ export const Background = () => {
     <div
       className="background"
       style={{
-        backgroundImage: perso
-          ? `url(${perso})`
-          : `url(img/wallpaper/${wall.src})`,
+        backgroundImage: perso ? `url(${perso})` : `url(img/wallpaper/${wall.src})`,
       }}
     ></div>
   );
@@ -106,12 +105,7 @@ export const BootScreen = (props) => {
       <div className={blackout ? "hidden" : ""}>
         <Image src="/img/asset/logo.svg" ext w={180} />
         <div className="mt-48" id="loader">
-          <svg
-            className="progressRing"
-            height={48}
-            width={48}
-            viewBox="0 0 16 16"
-          >
+          <svg className="progressRing" height={48} width={48} viewBox="0 0 16 16">
             <circle cx="8px" cy="8px" r="7px"></circle>
           </svg>
         </div>
@@ -170,10 +164,14 @@ export const LockScreen = (props) => {
             : await api.register(form);
       setToken(result.token);
       dispatch({ type: "SESSION_SET", payload: result });
-      dispatch({ type: "STNGSETV", payload: { path: "person.name", value: result.user.name } });
+      dispatch({
+        type: "STNGSETV",
+        payload: { path: "person.name", value: result.user.name },
+      });
       await syncInstalledModules();
       await resynchroniserNotifications();
       await appliquerApparence(result.tenant.id);
+      await demarrerPreferences(result.tenant.id);
       proceed();
     } catch (err) {
       setError(err.message || t("connexionImpossible"));
@@ -244,9 +242,7 @@ export const LockScreen = (props) => {
             <div className="mt-2 text-2xl font-medium text-gray-200">
               {session.user.name}
             </div>
-            <div className="text-xs text-gray-400 mt-1">
-              {session.tenant.name}
-            </div>
+            <div className="text-xs text-gray-400 mt-1">{session.tenant.name}</div>
             <div className="flex items-center mt-6 signInBtn" onClick={proceed}>
               {t("ouvrir")}
             </div>
@@ -329,7 +325,11 @@ export const LockScreen = (props) => {
             <div className="flex items-center mt-4 signInBtn" onClick={submit}>
               {busy
                 ? "…"
-                : { login: t("seConnecter"), register: t("creerEspace"), join: t("rejoindre") }[mode]}
+                : {
+                    login: t("seConnecter"),
+                    register: t("creerEspace"),
+                    join: t("rejoindre"),
+                  }[mode]}
             </div>
             <div
               className="text-xs text-gray-400 mt-4 handcr"

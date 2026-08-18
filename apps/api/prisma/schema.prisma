@@ -197,6 +197,9 @@ model User {
   /// balise <img> ne sait pas présenter un jeton d'authentification.
   /// Vide = avatar aux initiales, calculé à l'affichage.
   avatar       String?
+  /// État personnel du shell synchronisé entre les appareils : disposition
+  /// du bureau, fenêtres, thème et préférences régionales. Jamais de secret.
+  preferences  Json     @default("{}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

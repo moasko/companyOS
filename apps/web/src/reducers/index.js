@@ -32,6 +32,44 @@ const allReducers = combineReducers({
   appearance: appearanceReducer,
 });
 
-var store = createStore(allReducers);
+const rootReducer = (state, action) => {
+  const next = allReducers(state, action);
+  if (action.type !== "PREFERENCES_RESTORE") return next;
+  const p = action.payload || {};
+  const windows = { ...next.apps };
+  for (const [id, saved] of Object.entries(p.windows || {})) {
+    if (!windows[id] || !saved || typeof saved !== "object") continue;
+    windows[id] = {
+      ...windows[id],
+      ...Object.fromEntries(
+        ["size", "hide", "max", "z", "dim", "ouvert"]
+          .filter((key) => saved[key] !== undefined)
+          .map((key) => [key, saved[key]]),
+      ),
+    };
+  }
+  return {
+    ...next,
+    apps: windows,
+    wallpaper: { ...next.wallpaper, ...(p.wallpaper || {}) },
+    taskbar: { ...next.taskbar, ...(p.taskbar || {}) },
+    desktop: { ...next.desktop, ...(p.desktop || {}), apps: next.desktop.apps },
+    deskLayout: {
+      ...next.deskLayout,
+      positions: p.deskLayout?.positions || next.deskLayout.positions,
+    },
+    setting: {
+      ...next.setting,
+      person: { ...next.setting.person, ...(p.setting?.person || {}) },
+    },
+    appearance: {
+      ...next.appearance,
+      ...(p.appearance || {}),
+      wallUrl: next.appearance.wallUrl,
+    },
+  };
+};
+
+var store = createStore(rootReducer);
 
 export default store;

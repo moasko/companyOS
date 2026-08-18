@@ -54,6 +54,9 @@ export const api = {
   register: (data) => request("/auth/register", { method: "POST", body: data }),
   login: (data) => request("/auth/login", { method: "POST", body: data }),
   me: () => request("/auth/me"),
+  preferences: () => request("/auth/preferences"),
+  enregistrerPreferences: (preferences) =>
+    request("/auth/preferences", { method: "PUT", body: { preferences } }),
 
   // Membres de l'espace de travail. Lister est ouvert à tous — assigner une
   // tâche suppose de savoir à qui ; tout le reste exige d'être
@@ -109,8 +112,7 @@ export const api = {
   courrierReglages: () => request("/courrier/reglages"),
   courrierEnregistrerReglages: (data) =>
     request("/courrier/reglages", { method: "PUT", body: data }),
-  courrierEnvoyer: (data) =>
-    request("/courrier/envoyer", { method: "POST", body: data }),
+  courrierEnvoyer: (data) => request("/courrier/envoyer", { method: "POST", body: data }),
 
   // Console de l'exploitant du SaaS — réservée aux emails PLATFORM_ADMINS.
   plateforme: () => request("/plateforme"),
@@ -233,7 +235,10 @@ export const api = {
     create: (module, collection, data) =>
       request(`/records/${module}/${collection}`, { method: "POST", body: { data } }),
     update: (module, collection, id, data, updatedAt) =>
-      request(`/records/${module}/${collection}/${id}`, { method: "PUT", body: { data, ...(updatedAt ? { updatedAt } : {}) } }),
+      request(`/records/${module}/${collection}/${id}`, {
+        method: "PUT",
+        body: { data, ...(updatedAt ? { updatedAt } : {}) },
+      }),
     remove: (module, collection, id) =>
       request(`/records/${module}/${collection}/${id}`, { method: "DELETE" }),
   },

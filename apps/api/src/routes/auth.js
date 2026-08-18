@@ -69,7 +69,9 @@ export default async function authRoutes(app) {
   app.post("/register", { config: LIMITE_INSCRIPTION }, async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: "Données invalides", details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: "Données invalides", details: parsed.error.flatten() });
     }
     const { company, name, email, password } = parsed.data;
 
@@ -119,13 +121,23 @@ export default async function authRoutes(app) {
       return { user, tenant };
     });
 
-    await journaliserPour(request, { ...user, tenantId: tenant.id }, "espace.creation", tenant.name);
+    await journaliserPour(
+      request,
+      { ...user, tenantId: tenant.id },
+      "espace.creation",
+      tenant.name,
+    );
 
     return reply.code(201).send(
       serialize({
         token: signToken(user),
         user: profil(user),
-        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, quota: tenant.quota },
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          quota: tenant.quota,
+        },
       }),
     );
   });
@@ -142,7 +154,10 @@ export default async function authRoutes(app) {
     }
     const { email, password } = parsed.data;
 
-    const user = await prisma.user.findUnique({ where: { email }, include: { tenant: true } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { tenant: true },
+    });
     // Message identique dans les deux cas : ne pas révéler quels e-mails existent.
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       return reply.code(401).send({ error: "Identifiants incorrects" });
@@ -214,7 +229,9 @@ export default async function authRoutes(app) {
       data: { name: parsed.data.name.trim() },
     });
 
-    await journaliser(request, "compte.renommage", user.name, { avant: request.user.name });
+    await journaliser(request, "compte.renommage", user.name, {
+      avant: request.user.name,
+    });
 
     return serialize(profil(user));
   });
@@ -246,7 +263,10 @@ export default async function authRoutes(app) {
       data: { avatar: parsed.data.avatar },
     });
 
-    await journaliser(request, parsed.data.avatar ? "compte.photo" : "compte.photo.retrait");
+    await journaliser(
+      request,
+      parsed.data.avatar ? "compte.photo" : "compte.photo.retrait",
+    );
 
     return serialize(profil(user));
   });
@@ -431,13 +451,8 @@ export default async function authRoutes(app) {
   /// ne pas dépendre de cette coïncidence coûte le même nombre de lignes.
   const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const nouveauCode = () =>
-    Array.from(
-      { length: 3 },
-      () =>
-        Array.from(
-          { length: 4 },
-          () => ALPHABET[randomInt(ALPHABET.length)],
-        ).join(""),
+    Array.from({ length: 3 }, () =>
+      Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join(""),
     ).join("-");
 
   const INVITATION_JOURS = 14;
@@ -486,7 +501,11 @@ export default async function authRoutes(app) {
         const [membres, enAttente] = await Promise.all([
           prisma.user.count({ where: { tenantId: request.tenantId } }),
           prisma.invitation.count({
-            where: { tenantId: request.tenantId, acceptedAt: null, email: { not: email } },
+            where: {
+              tenantId: request.tenantId,
+              acceptedAt: null,
+              email: { not: email },
+            },
           }),
         ]);
         if (membres + enAttente >= formule.utilisateursMax) {
@@ -646,4 +665,29 @@ export default async function authRoutes(app) {
       },
     }),
   );
+
+  /// État personnel du shell. Un document JSON borné plutôt qu'une colonne
+  /// par bouton : le bureau évolue plus vite que le schéma métier, tandis que
+  /// la limite empêche d'utiliser cette route comme stockage de fichiers.
+  app.get("/preferences", { preHandler: authenticate }, async (request) => ({
+    preferences: request.user.preferences || {},
+    updatedAt: request.user.updatedAt,
+  }));
+
+  app.put("/preferences", { preHandler: authenticate }, async (request, reply) => {
+    const preferences = request.body?.preferences;
+    if (!preferences || Array.isArray(preferences) || typeof preferences !== "object") {
+      return reply.code(400).send({ error: "Préférences invalides." });
+    }
+    const taille = Buffer.byteLength(JSON.stringify(preferences), "utf8");
+    if (taille > 100_000) {
+      return reply.code(413).send({ error: "Les préférences dépassent 100 Ko." });
+    }
+    const user = await prisma.user.update({
+      where: { id: request.user.id },
+      data: { preferences },
+      select: { updatedAt: true },
+    });
+    return { ok: true, updatedAt: user.updatedAt };
+  });
 }
