@@ -152,6 +152,16 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "image",
+    name: "Atelier Image",
+    description:
+      "Montage d’image avancé et non destructif : calques, texte, formes, filtres, rotation, opacité et export PNG/JPEG haute qualité.",
+    icon: "photos",
+    category: "Création",
+    kind: "NATIVE",
+    version: "1.3.0",
+  },
+  {
     slug: "word",
     name: "Traitement de texte",
     description:

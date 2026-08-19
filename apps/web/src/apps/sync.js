@@ -46,7 +46,16 @@ export const attachModule = (mod) => {
   const state = store.getState();
   const entry = entreeDe(mod);
 
-  if (!state.apps[entry.id]) {
+  // Une mise à jour peut compléter la définition d'un module déjà attaché
+  // (par exemple son action d'ouverture). Réinjecter cette entrée évite de
+  // conserver jusqu'à la prochaine connexion une icône devenue inerte.
+  const existante = state.apps[entry.id];
+  if (
+    !existante ||
+    existante.action !== entry.action ||
+    existante.icon !== entry.icon ||
+    existante.name !== entry.name
+  ) {
     store.dispatch({ type: "ADDAPP", payload: entry });
   }
   if (!state.desktop.apps.some((a) => a.name === entry.name)) {

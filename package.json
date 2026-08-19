@@ -27,6 +27,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspace @companyos/web",
     "db:migrate": "npm run prisma:migrate --workspace @companyos/api",
     "db:deploy": "npm run prisma:deploy --workspace @companyos/api",
     "db:studio": "npm run prisma:studio --workspace @companyos/api",
@@ -39,6 +40,7 @@
     "eslint-plugin-react": "^7.37.3",
     "eslint-plugin-react-hooks": "^5.1.0",
     "globals": "^15.14.0",
-    "prettier": "^3.4.2"
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.2"
   }
 }
