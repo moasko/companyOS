@@ -492,6 +492,248 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; }
   }
+  /* ======================================================================
+     COMPANYOS — NÉO-BRUTALISME
+     Une couche volontairement séparée : le contenu, l'i18n et le responsive
+     restent intacts, seul le langage visuel change. Les ombres sont des
+     volumes francs, jamais des flous décoratifs.
+     ====================================================================== */
+  :root {
+    --brut-noir: #151515;
+    --brut-papier: #fff8e8;
+    --brut-blanc: #fffdf7;
+    --brut-jaune: #ffd84d;
+    --brut-rose: #ff6b9d;
+    --brut-cyan: #42d8df;
+    --brut-vert: #79df88;
+    --brut-ombre: 6px 6px 0 var(--brut-noir);
+    --brut-ombre-petite: 3px 3px 0 var(--brut-noir);
+    --creme: var(--brut-papier);
+    --carte: var(--brut-blanc);
+    --encre: var(--brut-noir);
+    --sourd: #494949;
+    --ligne: var(--brut-noir);
+    --lagon: #173f42;
+    --lagon-2: #102f32;
+    --cyan: var(--brut-cyan);
+    --cyan-clair: #d7fbfc;
+    --cyan-lisible: #7eeaf0;
+    --canard: #075f64;
+    --rayon: 6px;
+  }
+
+  body {
+    background-color: var(--brut-papier);
+    background-image:
+      linear-gradient(rgb(21 21 21 / 5%) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(21 21 21 / 5%) 1px, transparent 1px);
+    background-size: 28px 28px;
+    font-family: "Arial", "Segoe UI", system-ui, sans-serif;
+  }
+
+  h1, h2, h3, .logo, .chiffre b, .prix b {
+    font-family: "Arial Black", "Arial", "Segoe UI", sans-serif;
+    letter-spacing: -.045em;
+  }
+
+  .avantPropos {
+    width: fit-content;
+    padding: 4px 9px;
+    border: 2px solid var(--brut-noir);
+    background: var(--brut-jaune);
+    color: var(--brut-noir);
+    box-shadow: 2px 2px 0 var(--brut-noir);
+  }
+  .enTete-centre .avantPropos,
+  .panneau .avantPropos { margin-inline: auto; color: var(--brut-noir); }
+
+  header.site {
+    background: rgb(255 248 232 / 96%);
+    border-bottom: 3px solid var(--brut-noir);
+    backdrop-filter: none;
+  }
+  .barre { padding-block: 12px; }
+  .logo img { width: 34px; height: 34px; }
+  .barre nav a {
+    padding-inline: 5px;
+    border-bottom: 3px solid transparent;
+    font-weight: 700;
+  }
+  .barre nav a:hover { border-bottom-color: var(--brut-noir); }
+
+  .btn {
+    padding: 11px 22px;
+    border: 3px solid var(--brut-noir) !important;
+    border-radius: 5px;
+    box-shadow: var(--brut-ombre-petite);
+    font-weight: 800;
+    transition: transform .12s, box-shadow .12s, background .12s;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--brut-noir); }
+  .btn:active { transform: translate(3px, 3px); box-shadow: none; }
+  .btn-plein { background: var(--brut-noir); color: #fff; }
+  .btn-plein:hover { background: var(--canard); }
+  .btn-cyan { background: var(--brut-jaune); color: var(--brut-noir); }
+  .btn-cyan:hover { background: var(--brut-cyan); filter: none; }
+  .btn-ligne { background: var(--brut-blanc); color: var(--brut-noir); }
+  .btn-ligne:hover { background: var(--brut-rose); color: var(--brut-noir); }
+  .btn-fantome { background: #fff; color: var(--brut-noir); }
+  .btn-fantome:hover { background: var(--brut-cyan); color: var(--brut-noir); }
+
+  .choix {
+    padding: 2px; border: 2px solid var(--brut-noir); border-radius: 5px;
+    background: var(--brut-blanc); box-shadow: 2px 2px 0 var(--brut-noir);
+  }
+  .choix button { border-radius: 2px; font-weight: 800; }
+  .choix button[data-actif="true"] { background: var(--brut-noir); color: #fff; }
+
+  .scene { padding: 26px 24px 0; }
+  .heros {
+    overflow: visible;
+    border: 3px solid var(--brut-noir);
+    border-radius: 8px;
+    background: var(--lagon);
+    box-shadow: 10px 10px 0 var(--brut-noir);
+  }
+  .heros::before {
+    content: "COMPANY OS / 01";
+    position: absolute;
+    top: -18px;
+    left: 34px;
+    padding: 5px 11px;
+    border: 3px solid var(--brut-noir);
+    background: var(--brut-rose);
+    color: var(--brut-noir);
+    font: 900 11px/1 Arial, sans-serif;
+    letter-spacing: .08em;
+    transform: rotate(-2deg);
+    z-index: 3;
+  }
+  .heros h1 { text-transform: uppercase; text-wrap: balance; }
+  .heros h1 em {
+    display: inline;
+    padding-inline: .08em;
+    background: var(--brut-jaune);
+    color: var(--brut-noir);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .heros .anneau, .panneau .anneau { border-radius: 0; border-width: 4px; opacity: .18; transform: rotate(12deg); }
+
+  .appCarte {
+    border: 3px solid var(--brut-noir);
+    border-radius: 5px;
+    box-shadow: 7px 7px 0 #020f10;
+  }
+  .appCarte header { border-bottom: 2px solid var(--brut-noir); }
+  .carte-crm { transform: rotate(-2deg); }
+  .carte-fact { transform: rotate(2deg); }
+  .carte-flux { transform: rotate(1deg); }
+
+  .bandeau p {
+    padding: 22px 26px;
+    border: 3px solid var(--brut-noir);
+    background: var(--brut-jaune);
+    box-shadow: var(--brut-ombre);
+  }
+  .bandeau p b { color: var(--brut-noir); background: none; }
+
+  .tuileApp, .evidence, .etape, .garde, .plan, .zoom, details {
+    border: 3px solid var(--brut-noir);
+    border-radius: 6px;
+    box-shadow: var(--brut-ombre-petite);
+  }
+  .tuileApp { background: var(--brut-blanc); transition: transform .12s, box-shadow .12s, background .12s; }
+  .tuileApp:nth-child(4n + 1) { background: #e9ffff; }
+  .tuileApp:nth-child(4n + 2) { background: #fff2b8; }
+  .tuileApp:nth-child(4n + 3) { background: #ffe3ed; }
+  .tuileApp:hover {
+    border-color: var(--brut-noir);
+    background: var(--brut-cyan);
+    transform: translate(-3px, -3px) rotate(-1deg);
+    box-shadow: 6px 6px 0 var(--brut-noir);
+  }
+
+  .ecran, .miniFenetre {
+    border: 3px solid var(--brut-noir);
+    border-radius: 5px;
+    box-shadow: 9px 9px 0 var(--brut-noir);
+  }
+  .ecranBarre, .miniFenetre header { border-bottom: 2px solid var(--brut-noir); }
+  .ecranBarre i { border: 1px solid var(--brut-noir); background: var(--brut-rose); }
+  .ecranBarre i:nth-child(2) { background: var(--brut-jaune); }
+  .ecranBarre i:nth-child(3) { background: var(--brut-vert); }
+  .kpi, .miniLigne { border: 2px solid var(--brut-noir); border-radius: 3px; }
+  .kpi:nth-child(2n) { background: #fff4bd; }
+  .puce {
+    border: 2px solid var(--brut-noir);
+    border-radius: 5px;
+    box-shadow: var(--brut-ombre-petite);
+  }
+  .puce i, .etape i, .point .picto, .garde i { border: 2px solid var(--brut-noir); border-radius: 4px; }
+
+  .chaine, .pourquoi { padding-inline: 24px; }
+  .panneau {
+    overflow: visible;
+    border: 3px solid var(--brut-noir);
+    border-radius: 8px;
+    background: var(--lagon);
+    box-shadow: 10px 10px 0 var(--brut-noir);
+  }
+  .deroule, .point {
+    border: 2px solid #fff;
+    border-radius: 5px;
+    box-shadow: 4px 4px 0 var(--brut-cyan);
+  }
+  .maillon .pictoApp, .maillon .fait, .maillon b .etiquette { border-radius: 3px; }
+
+  .etape:nth-child(1) { background: #fff1b1; }
+  .etape:nth-child(2) { background: #dffbfc; }
+  .etape:nth-child(3) { background: #ffe0eb; }
+  .etape i { background: var(--brut-blanc); }
+  .zoom { background: var(--brut-blanc); }
+  .zoom[data-sens="inverse"] { background: #fff4c7; }
+  .zoom li::before { border: 1px solid var(--brut-noir); border-radius: 2px; background: var(--brut-vert); }
+
+  .chiffre {
+    padding: 20px 12px;
+    border: 3px solid var(--brut-noir);
+    background: var(--brut-cyan);
+    box-shadow: var(--brut-ombre-petite);
+  }
+  .chiffre:nth-child(2n) { background: var(--brut-jaune); }
+  .chiffre b, .chiffre span { color: var(--brut-noir); }
+
+  .garde:nth-child(2n) { background: #e4fcff; }
+  .plan { overflow: visible; }
+  .plan[data-populaire="true"] { border-width: 4px; transform: rotate(-1deg); box-shadow: 9px 9px 0 var(--brut-noir); }
+  .plan .badge { border-radius: 3px; background: var(--brut-rose); color: var(--brut-noir); }
+  details summary { font-weight: 800; }
+
+  .appelFinal {
+    border-block: 3px solid var(--brut-noir);
+    background: var(--brut-jaune);
+  }
+  footer { border-top: 3px solid var(--brut-noir); background: var(--brut-noir); }
+
+  a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visible {
+    outline: 4px solid var(--brut-rose);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  @media (max-width: 760px) {
+    .scene, .chaine, .pourquoi { padding-inline: 12px; }
+    .heros, .panneau { box-shadow: 6px 6px 0 var(--brut-noir); }
+    .heros::before { left: 16px; }
+    .barre { border-bottom: 0; }
+    .barre .actions .btn-ligne { display: none; }
+    .puce { box-shadow: 2px 2px 0 var(--brut-noir); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn, .tuileApp { transition: none; }
+  }
 </style>
 </head>
 <body>
