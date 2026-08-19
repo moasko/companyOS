@@ -236,7 +236,7 @@ function PresentationApp() {
         );
 
         if (fichier) {
-          const maj = await api.updateFileContent(fichier.id, contenu);
+          const maj = await api.updateFileContent(fichier.id, contenu, fichier.updatedAt);
           setFichier(maj);
           store.dispatch({ type: "CLOUD_TOUCH" });
           if (!silencieux) {
@@ -291,6 +291,18 @@ function PresentationApp() {
   }, []);
 
   useEffect(() => () => clearTimeout(minuteur.current), []);
+
+  // Une présentation encore sale ne doit pas disparaître lors d'un
+  // rechargement, d'une fermeture d'onglet ou d'un crash du shell.
+  useEffect(() => {
+    if (!modifie) return undefined;
+    const proteger = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", proteger);
+    return () => window.removeEventListener("beforeunload", proteger);
+  }, [modifie]);
 
   const renommer = async (nouveau) => {
     const propre = nouveau.trim().replace(/[\\/:*?"<>|]/g, "");

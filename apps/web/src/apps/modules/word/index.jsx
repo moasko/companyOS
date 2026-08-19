@@ -276,7 +276,7 @@ function WordApp() {
         );
 
         if (fichier) {
-          const maj = await api.updateFileContent(fichier.id, contenu);
+          const maj = await api.updateFileContent(fichier.id, contenu, fichier.updatedAt);
           setFichier(maj);
           store.dispatch({ type: "CLOUD_TOUCH" });
           if (!silencieux) {

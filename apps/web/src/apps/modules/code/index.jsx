@@ -534,8 +534,8 @@ function CodeApp() {
       const fichier = new File([contenu], onglet.nom, {
         type: "text/plain;charset=utf-8",
       });
-      await api.updateFileContent(onglet.id, fichier);
-      setOnglets((l) => marquerEnregistre(l, onglet.id));
+      const maj = await api.updateFileContent(onglet.id, fichier, onglet.updatedAt);
+      setOnglets((l) => marquerEnregistre(l, onglet.id, maj.updatedAt));
     } catch {
       setErreur(t("echecEcriture"));
     } finally {
@@ -548,6 +548,17 @@ function CodeApp() {
   // donne toujours la version courante.
   const enregistrerRef = useRef(enregistrer);
   enregistrerRef.current = enregistrer;
+
+  const travailNonEnregistre = onglets.some(modifie);
+  useEffect(() => {
+    if (!travailNonEnregistre) return undefined;
+    const proteger = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", proteger);
+    return () => window.removeEventListener("beforeunload", proteger);
+  }, [travailNonEnregistre]);
 
   const fermerOnglet = useCallback(
     async (id) => {

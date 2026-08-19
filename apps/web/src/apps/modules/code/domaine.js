@@ -134,6 +134,7 @@ export const ongletDe = (node, contenu) => ({
   langage: langageDe(node.name),
   contenu,
   origine: contenu,
+  updatedAt: node.updatedAt,
   // Monaco garde la position du curseur et le pli du code par modèle : on
   // ne conserve ici que ce qui doit survivre à la fermeture de l'onglet.
   lectureSeule: false,
@@ -167,8 +168,10 @@ export const majContenu = (onglets, id, contenu) =>
   onglets.map((o) => (o.id === id ? { ...o, contenu } : o));
 
 /// Après enregistrement : le contenu courant devient la nouvelle origine.
-export const marquerEnregistre = (onglets, id) =>
-  onglets.map((o) => (o.id === id ? { ...o, origine: o.contenu } : o));
+export const marquerEnregistre = (onglets, id, updatedAt) =>
+  onglets.map((o) =>
+    o.id === id ? { ...o, origine: o.contenu, updatedAt: updatedAt || o.updatedAt } : o,
+  );
 
 // ---------------------------------------------------------------------------
 // Statistiques de la barre d'état

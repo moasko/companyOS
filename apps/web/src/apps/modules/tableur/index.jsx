@@ -512,7 +512,12 @@ function TableurApp() {
     try {
       const blob = new Blob([contenu()], { type: "text/csv;charset=utf-8" });
       if (fichier) {
-        await api.updateFileContent(fichier.id, new File([blob], nom, { type: "text/csv" }));
+        const maj = await api.updateFileContent(
+          fichier.id,
+          new File([blob], nom, { type: "text/csv" }),
+          fichier.updatedAt,
+        );
+        setFichier(maj);
       } else {
         const noeud = await saveToCloud(blob, nom || "sans-titre.csv", { folder: DOSSIER });
         setFichier(noeud);
@@ -526,6 +531,16 @@ function TableurApp() {
       setOccupe(false);
     }
   };
+
+  useEffect(() => {
+    if (!modifie) return undefined;
+    const proteger = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", proteger);
+    return () => window.removeEventListener("beforeunload", proteger);
+  }, [modifie]);
 
   const enregistrerSous = async () => {
     if (!grille) return;

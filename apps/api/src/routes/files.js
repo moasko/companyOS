@@ -496,6 +496,19 @@ export default async function fileRoutes(app) {
       return reply.code(404).send({ error: "Fichier introuvable" });
     }
 
+    const attenduBrut = upload.fields?.expectedUpdatedAt?.value;
+    const attendu = attenduBrut ? new Date(attenduBrut) : null;
+    if (attenduBrut && (!Number.isFinite(attendu?.getTime()) || node.updatedAt.getTime() !== attendu.getTime())) {
+      // La réponse part avant l'écriture du nouveau contenu, mais le flux
+      // multipart doit tout de même être vidé proprement.
+      upload.file.resume();
+      return reply.code(409).send({
+        error: "Ce fichier a été modifié dans une autre fenêtre. Rechargez sa dernière version avant d’enregistrer.",
+        code: "FILE_VERSION_CONFLICT",
+        updatedAt: node.updatedAt.toISOString(),
+      });
+    }
+
     const pilote = await piloteEcriture(request.tenantId);
     const cle = pilote.buildKey(request.tenantId, node.name);
     const taille = await pilote.put(cle, upload.file);
@@ -512,22 +525,41 @@ export default async function fileRoutes(app) {
     }
 
     const ancienne = node.storageKey;
-    const maj = await prisma.$transaction(async (tx) => {
-      const fichier = await tx.fsNode.update({
-        where: { id: node.id },
-        data: {
+    let maj;
+    try {
+      maj = await prisma.$transaction(async (tx) => {
+        // Le contrôle est répété dans l'écriture SQL : deux sauvegardes qui
+        // arrivent ensemble ne peuvent donc pas toutes deux gagner après la
+        // vérification ci-dessus.
+        const filtre = attendu
+          ? { id: node.id, updatedAt: attendu }
+          : { id: node.id };
+        const resultat = await tx.fsNode.updateMany({
+          where: filtre,
+          data: {
           size: BigInt(taille),
           storageKey: cle,
           storage: pilote.nom,
           mimeType: upload.mimetype ? typeNeutralise(upload.mimetype) : node.mimeType,
-        },
+          },
+        });
+        if (resultat.count !== 1) throw Object.assign(new Error("Conflit de version"), { code: "FILE_VERSION_CONFLICT" });
+        await tx.tenant.update({
+          where: { id: request.tenantId },
+          data: { usedBytes: { increment: difference } },
+        });
+        return tx.fsNode.findUnique({ where: { id: node.id } });
       });
-      await tx.tenant.update({
-        where: { id: request.tenantId },
-        data: { usedBytes: { increment: difference } },
-      });
-      return fichier;
-    });
+    } catch (erreur) {
+      await pilote.remove(cle);
+      if (erreur.code === "FILE_VERSION_CONFLICT") {
+        return reply.code(409).send({
+          error: "Ce fichier a été modifié dans une autre fenêtre. Rechargez sa dernière version avant d’enregistrer.",
+          code: erreur.code,
+        });
+      }
+      throw erreur;
+    }
 
     await (await piloteLecture(node.storage, request.tenantId)).remove(ancienne);
     await journaliser(request, "fichier.modification", node.name, {

@@ -212,8 +212,13 @@ export const api = {
   /// Remplace le contenu d'un fichier en gardant son identité — c'est
   /// l'« enregistrer » des applications qui travaillent sur un fichier du
   /// cloud, par opposition à `uploadFile` qui en crée un nouveau.
-  updateFileContent: (id, file) => {
+  updateFileContent: (id, file, expectedUpdatedAt) => {
     const form = new FormData();
+    // Verrou optimiste : le serveur refuse l'écriture si une autre fenêtre
+    // a enregistré le fichier depuis la version que l'éditeur a ouverte.
+    if (expectedUpdatedAt) form.append("expectedUpdatedAt", expectedUpdatedAt);
+    // Le champ de version doit précéder le flux : Fastify rend les champs
+    // multipart disponibles dans l'ordre où ils arrivent.
     form.append("file", file);
     return request(`/files/${id}/content`, { method: "PUT", body: form, isForm: true });
   },
