@@ -552,7 +552,28 @@
     border-bottom: 3px solid var(--brut-noir);
     backdrop-filter: none;
   }
-  .barre { padding-block: 12px; }
+  /* Trois colonnes indépendantes : le menu est réellement centré dans la
+     fenêtre. La largeur des boutons de connexion ne pousse donc plus le
+     premier lien (« Le bureau ») vers le logo. */
+  .barre {
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) auto minmax(170px, 1fr);
+    align-items: center;
+    padding-block: 12px;
+  }
+  .barre .logo {
+    justify-self: start;
+    width: max-content;
+    white-space: nowrap;
+  }
+  .barre nav {
+    justify-self: center;
+    margin: 0;
+  }
+  .barre .actions {
+    justify-self: end;
+    margin: 0;
+  }
   .logo img { width: 34px; height: 34px; }
   .barre nav a {
     padding-inline: 5px;
@@ -729,6 +750,34 @@
     .barre { border-bottom: 0; }
     .barre .actions .btn-ligne { display: none; }
     .puce { box-shadow: 2px 2px 0 var(--brut-noir); }
+  }
+
+  @media (max-width: 1000px) {
+    .barre {
+      display: flex;
+      align-items: center;
+      padding-bottom: 6px;
+    }
+    .barre .logo { flex: 0 0 auto; width: max-content; }
+    .barre nav {
+      justify-self: auto;
+      margin: 0 -24px;
+      border-top: 2px solid var(--brut-noir);
+    }
+    .barre .actions { margin-left: auto; }
+  }
+
+  @media (max-width: 560px) {
+    .barre .logo {
+      width: auto;
+      max-width: calc(100% - 128px);
+    }
+    .barre .actions {
+      width: auto;
+      margin-left: auto;
+    }
+    .barre .actions .choix { display: none; }
+    .barre nav { margin-top: 10px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
