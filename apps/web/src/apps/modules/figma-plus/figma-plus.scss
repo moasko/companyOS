@@ -1,0 +1,107 @@
+.fgApp {
+  container-type: inline-size;
+  --fg-fond: #1e1e1e;
+  --fg-panneau: #2c2c2c;
+  --fg-panneau-clair: #383838;
+  --fg-ligne: #444444;
+  --fg-texte: #ffffff;
+  --fg-sourd: #9ca3af;
+  --fg-accent: #0d99ff;
+  --fg-canvas: #e5e5e5;
+
+  .restWindow { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--fg-fond); color: var(--fg-texte); font: 12px/1.35 "Inter", "Segoe UI", sans-serif; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { transition: background-color .1s ease, border-color .1s ease; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--fg-accent); outline-offset: 1px; }
+  input, textarea, select { color-scheme: dark; }
+}
+
+/* ---- Barre supérieure : outils à gauche, nom centré, actions à droite ---- */
+.fgBarre { position: relative; z-index: 2; flex: 0 0 auto; display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px; border-bottom: 1px solid var(--fg-ligne); background: var(--fg-panneau); }
+.fgOutilsGauche { display: flex; align-items: center; gap: 2px; }
+.fgOutilsGauche button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #d5d7dc; cursor: pointer; }
+.fgOutilsGauche button:hover { background: var(--fg-panneau-clair); }
+.fgOutilsGauche button[data-actif="true"] { background: var(--fg-accent); color: white; }
+.fgNom { position: absolute; left: 50%; transform: translateX(-50%); width: 220px; min-height: 30px; padding: 4px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: center; font-weight: 500; }
+.fgNom:hover { border-color: var(--fg-ligne); background: var(--fg-panneau-clair); }
+.fgNom:focus { border-color: var(--fg-accent); background: var(--fg-panneau-clair); outline: 0; }
+.fgActionsDroite { margin-left: auto; display: flex; align-items: center; gap: 3px; }
+.fgActionsDroite button { min-height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #d5d7dc; cursor: pointer; }
+.fgActionsDroite button:hover:not(:disabled) { background: var(--fg-panneau-clair); }
+.fgActionsDroite button:disabled { opacity: .38; cursor: default; }
+.fgPrimaire { border-color: transparent !important; background: var(--fg-accent); color: white; }
+.fgPrimaire:hover:not(:disabled) { background: #0b86e0 !important; }
+.fgSep { width: 1px; height: 20px; margin: 0 4px; background: var(--fg-ligne); }
+
+/* ---- Corps : calques · canvas · inspecteur -------------------------------- */
+.fgCorps { flex: 1 1 0; min-width: 0; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr) 248px; }
+.fgCalques, .fgInspecteur { min-height: 0; overflow: auto; background: var(--fg-panneau); scrollbar-width: thin; scrollbar-color: #555 transparent; }
+.fgCalques { border-right: 1px solid var(--fg-ligne); display: flex; flex-direction: column; }
+.fgInspecteur { border-left: 1px solid var(--fg-ligne); padding: 0 12px 16px; }
+.fgCalques h3, .fgInspecteur h3 { min-height: 40px; display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 0 12px; border-bottom: 1px solid var(--fg-ligne); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+.fgCalques h3 small, .fgInspecteur h3 small { padding: 1px 6px; border-radius: 9px; background: var(--fg-panneau-clair); color: var(--fg-sourd); font-size: 10px; }
+
+.fgListe { flex: 1 1 0; overflow: auto; padding: 6px; display: grid; gap: 2px; align-content: start; }
+.fgListe > p { padding: 16px 8px; color: var(--fg-sourd); text-align: center; line-height: 1.5; }
+.fgCalque { display: grid; grid-template-columns: minmax(0, 1fr) 24px; align-items: center; border-radius: 5px; }
+.fgCalque:hover { background: #333336; }
+.fgCalque[data-actif="true"] { background: #0d99ff26; box-shadow: inset 2px 0 0 var(--fg-accent); }
+.fgCalque[data-verrouille="true"] { opacity: .6; }
+.fgCalqueNom { min-width: 0; height: 30px; display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: 7px; padding: 0 8px; border: 0; background: transparent; text-align: left; cursor: pointer; color: #d5d7dc; }
+.fgCalqueNom span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fgCalque > button:last-child { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--fg-sourd); cursor: pointer; }
+.fgCalque > button:last-child:hover { color: var(--fg-accent); }
+.fgCalqueActions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; border-top: 1px solid var(--fg-ligne); }
+.fgCalqueActions button { min-height: 26px; border: 1px solid var(--fg-ligne); border-radius: 5px; background: var(--fg-panneau-clair); color: #d5d7dc; cursor: pointer; font-size: 10px; }
+.fgCalqueActions button:hover:not(:disabled) { border-color: #666; background: #454548; }
+.fgCalqueActions button:disabled { opacity: .35; cursor: default; }
+.fgCalqueActions .fgDanger { color: #ff8f8f; }
+.fgCalqueActions .fgDanger:hover:not(:disabled) { background: #4a2b2b; border-color: #7a4444; }
+
+/* ---- Canvas ---------------------------------------------------------------- */
+.fgScene { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--fg-canvas); }
+.fgScene[data-outil="rect"], .fgScene[data-outil="ellipse"], .fgScene[data-outil="ligne"], .fgScene[data-outil="etoile"], .fgScene[data-outil="texte"] { cursor: crosshair; }
+.fgScene.fgPan { cursor: grab; }
+.fgScene.fgPan:active { cursor: grabbing; }
+
+.fgZoomPill { position: absolute; left: 12px; bottom: 12px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--fg-ligne); border-radius: 8px; background: var(--fg-panneau); box-shadow: 0 4px 14px rgb(0 0 0 / 30%); }
+.fgZoomPill button { min-width: 26px; height: 24px; display: flex; align-items: center; justify-content: center; padding: 0 6px; border: 0; border-radius: 5px; background: transparent; color: #d5d7dc; cursor: pointer; }
+.fgZoomPill button:hover { background: var(--fg-panneau-clair); }
+.fgZoomValeur { min-width: 44px; color: var(--fg-sourd); font-size: 11px; }
+
+.fgEditeurTexte { position: absolute; z-index: 15; box-sizing: border-box; margin: 0; padding: 0; border: 1px solid var(--fg-accent); background: rgb(255 255 255 / 92%); outline: none; resize: none; overflow: hidden; line-height: 1.15; }
+
+/* ---- Inspecteur à sections -------------------------------------------------- */
+.fgInspecteur > h3 { margin-inline: -12px; padding-inline: 12px; }
+.fgDoc, .fgProps { padding-top: 4px; }
+.fgDoc p { color: var(--fg-sourd); line-height: 1.5; }
+.fgSection { padding: 10px 0 6px; border-bottom: 1px solid var(--fg-ligne); }
+.fgSection:last-of-type { border-bottom: 0; }
+.fgSection h4 { margin: 0 0 8px; color: var(--fg-sourd); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.fgProps label, .fgDoc label { display: flex; align-items: center; gap: 6px; margin: 6px 0; color: var(--fg-sourd); font-size: 11px; }
+.fgChamp { position: relative; }
+.fgChamp > span { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--fg-sourd); font-size: 10px; pointer-events: none; z-index: 1; }
+.fgChamp input, .fgChamp textarea, .fgChamp select { width: 100%; box-sizing: border-box; min-height: 28px; padding: 4px 8px 4px 34px; border: 1px solid transparent; border-radius: 5px; background: var(--fg-panneau-clair); color: var(--fg-texte); outline: 0; }
+.fgChamp input:hover, .fgChamp textarea:hover, .fgChamp select:hover { border-color: #5a5a5e; }
+.fgChamp input:focus, .fgChamp textarea:focus, .fgChamp select:focus { border-color: var(--fg-accent); background: #323232; }
+.fgChamp input[type="color"] { padding: 2px 2px 2px 26px; height: 28px; cursor: pointer; }
+.fgChamp input[type="number"]::-webkit-inner-spin-button { opacity: 0; }
+.fgChamp input[type="number"]:hover::-webkit-inner-spin-button { opacity: .5; }
+.fgProps textarea { min-height: 52px; resize: vertical; line-height: 1.4; }
+.fgDeux { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.fgTrois { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.fgTrois label { justify-content: flex-start; font-size: 10px; }
+.fgTrois select { min-height: 26px; padding: 2px 6px; }
+.fgCase { display: flex !important; align-items: center; justify-content: flex-start; gap: 6px; }
+.fgCase input { width: 14px; height: 14px; accent-color: var(--fg-accent); }
+.fgAligner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 4px 0; }
+.fgAligner button { height: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--fg-ligne); border-radius: 5px; background: var(--fg-panneau-clair); color: #d5d7dc; cursor: pointer; }
+.fgAligner button:hover:not(:disabled) { border-color: #666; background: #454548; }
+.fgAligner button:disabled { opacity: .35; cursor: default; }
+.fgAide { display: grid; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--fg-ligne); color: var(--fg-sourd); font-size: 11px; }
+.fgAide b { color: var(--fg-texte); }
+
+@container (max-width: 980px) {
+  .fgCorps { grid-template-columns: 180px minmax(0, 1fr); }
+  .fgInspecteur { position: absolute; right: 0; top: 45px; bottom: 0; width: 236px; z-index: 30; box-shadow: -10px 0 28px rgb(0 0 0 / 45%); }
+}

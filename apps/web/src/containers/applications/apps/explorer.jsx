@@ -360,9 +360,13 @@ export const Explorer = () => {
 
   /// Applique une opération à toute la sélection, en s'arrêtant à la
   /// première erreur — mais en rafraîchissant quand même ce qui a été fait.
-  const surSelection = async (operation) => {
+  /// Les cibles sont passées explicitement : le menu contextuel construit
+  /// ses actions avant que `setSelection` du clic droit ne soit appliqué,
+  /// lire l'état ici verrait l'ancienne sélection — vide — et ferait un
+  /// no-op silencieux.
+  const surSelection = async (cibles, operation) => {
     try {
-      for (const node of selectedNodes) await operation(node);
+      for (const node of cibles) await operation(node);
       viderSelection();
     } catch (err) {
       setError(err.message);
@@ -374,12 +378,12 @@ export const Explorer = () => {
     }
   };
 
-  const removeSelected = async () => {
-    if (!selectedNodes.length) return;
-    const contientDossier = selectedNodes.some((n) => n.type === "FOLDER");
+  const removeSelected = async (cibles = selectedNodes) => {
+    if (!cibles.length) return;
+    const contientDossier = cibles.some((n) => n.type === "FOLDER");
     const ok = await modal.confirm({
       title: "Mettre à la corbeille",
-      message: `Mettre ${decrire(selectedNodes)} à la corbeille ?`,
+      message: `Mettre ${decrire(cibles)} à la corbeille ?`,
       detail: contientDossier
         ? "Le contenu des dossiers part avec eux. Récupérable pendant 30 jours depuis la corbeille."
         : "Récupérable pendant 30 jours depuis la corbeille.",
@@ -387,18 +391,18 @@ export const Explorer = () => {
       danger: true,
     });
     if (!ok) return;
-    await surSelection(async (node) => {
+    await surSelection(cibles, async (node) => {
       await api.deleteNode(node.id);
       // La vignette en cache pointerait vers un fichier disparu.
       oublierApercu(node.id);
     });
   };
 
-  const restaurer = async () => {
-    if (!selectedNodes.length) return;
+  const restaurer = async (cibles = selectedNodes) => {
+    if (!cibles.length) return;
     let renommes = 0;
     let remontes = 0;
-    await surSelection(async (node) => {
+    await surSelection(cibles, async (node) => {
       const r = await api.restoreNode(node.id);
       if (r.renommé) renommes += 1;
       if (r.remontéÀLaRacine) remontes += 1;
@@ -422,17 +426,17 @@ export const Explorer = () => {
     }
   };
 
-  const supprimerDefinitivement = async () => {
-    if (!selectedNodes.length) return;
+  const supprimerDefinitivement = async (cibles = selectedNodes) => {
+    if (!cibles.length) return;
     const ok = await modal.confirm({
       title: "Supprimer définitivement",
-      message: `Supprimer définitivement ${decrire(selectedNodes)} ?`,
+      message: `Supprimer définitivement ${decrire(cibles)} ?`,
       detail: "Cette action est irréversible : les fichiers seront effacés du stockage.",
       confirmLabel: "Supprimer définitivement",
       danger: true,
     });
     if (!ok) return;
-    await surSelection((node) => api.purgeNode(node.id));
+    await surSelection(cibles, (node) => api.purgeNode(node.id));
   };
 
   const viderCorbeille = async () => {
@@ -524,7 +528,7 @@ export const Explorer = () => {
         ? {
             nom: `Restaurer ${seul ? "" : `(${cibles.length})`}`.trim(),
             icone: "faTrashArrowUp",
-            action: restaurer,
+            action: () => restaurer(cibles),
           }
         : {
             nom: node.type === "FOLDER" ? "Ouvrir" : "Ouvrir",
@@ -561,14 +565,14 @@ export const Explorer = () => {
             nom: "Supprimer définitivement",
             icone: "faFireFlameSimple",
             danger: true,
-            action: supprimerDefinitivement,
+            action: () => supprimerDefinitivement(cibles),
           }
         : {
             nom: `Mettre à la corbeille${seul ? "" : ` (${cibles.length})`}`,
             icone: "faTrashCan",
             raccourci: "Suppr",
             danger: true,
-            action: removeSelected,
+            action: () => removeSelected(cibles),
           },
     ]);
   };
@@ -621,7 +625,7 @@ export const Explorer = () => {
               <div
                 className="drdwcont flex handcr prtclk"
                 data-off={!selectedNodes.length}
-                onClick={supprimerDefinitivement}
+                onClick={() => supprimerDefinitivement()}
               >
                 <Icon fafa="faFireFlameCurved" width={16} margin="0 6px" />
                 <span>Supprimer définitivement</span>
@@ -678,7 +682,7 @@ export const Explorer = () => {
                 <div
                   className="drdwcont flex handcr prtclk"
                   data-off={!selectedNodes.length}
-                  onClick={removeSelected}
+                  onClick={() => removeSelected()}
                 >
                   <Icon src="cut" ui width={18} margin="0 6px" />
                   <span>

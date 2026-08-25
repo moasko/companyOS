@@ -159,7 +159,27 @@ const apps = [
     icon: "photos",
     category: "Création",
     kind: "NATIVE",
-    version: "1.3.0",
+    version: "2.5.0",
+  },
+  {
+    slug: "studio-video",
+    name: "Studio Vidéo",
+    description:
+      "Montage vidéo multi-pistes dans le navigateur : coupes, textes, formes, filtres, audio et export MP4/WebM. Propulsé par CE.SDK — une clé de licence (VITE_IMGLY_LICENSE) retire le filigrane d’essai.",
+    icon: "movies",
+    category: "Création",
+    kind: "NATIVE",
+    version: "1.0.0",
+  },
+  {
+    slug: "figma-plus",
+    name: "Figma++",
+    description:
+      "Éditeur de design vectoriel temps réel : formes, texte, étoile, ligne, transformations libres avec rotation, multi-sélection, marquee, calques réordonnables, zoom au pointeur, Pan (Espace), annuler/rétablir et export PNG 2×. Propulsé par Konva.",
+    icon: "paint",
+    category: "Création",
+    kind: "NATIVE",
+    version: "1.0.0",
   },
   {
     slug: "word",

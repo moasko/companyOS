@@ -12,5 +12,5 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/apps/modules/image/editor/**/*.ts"]
+  "include": ["src/apps/modules/image/editor/**/*.ts", "src/apps/modules/image/types/**/*.ts", "src/apps/modules/image/logique/**/*.ts"]
 }
