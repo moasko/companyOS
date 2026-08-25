@@ -16,13 +16,16 @@
   input, textarea, select { color-scheme: dark; }
 }
 
-/* ---- Barre supérieure : outils à gauche, nom centré, actions à droite ---- */
-.fgBarre { position: relative; z-index: 2; flex: 0 0 auto; display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px; border-bottom: 1px solid var(--fg-ligne); background: var(--fg-panneau); }
-.fgOutilsGauche { display: flex; align-items: center; gap: 2px; }
+/* ---- Barre supérieure ------------------------------------------------------ */
+.fgBarre { position: relative; z-index: 2; flex: 0 0 auto; display: flex; align-items: center; gap: 4px; min-height: 48px; padding: 0 10px; border-bottom: 1px solid var(--fg-ligne); background: var(--fg-panneau); }
+.fgLogo { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #d5d7dc; cursor: pointer; margin-right: 2px; }
+.fgLogo:hover { background: var(--fg-panneau-clair); }
+.fgOutilsGauche { display: flex; align-items: center; gap: 2px; padding-right: 6px; margin-right: 4px; border-right: 1px solid var(--fg-ligne); }
 .fgOutilsGauche button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #d5d7dc; cursor: pointer; }
 .fgOutilsGauche button:hover { background: var(--fg-panneau-clair); }
 .fgOutilsGauche button[data-actif="true"] { background: var(--fg-accent); color: white; }
 .fgNom { position: absolute; left: 50%; transform: translateX(-50%); width: 220px; min-height: 30px; padding: 4px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: center; font-weight: 500; }
+.fgNomTexte { color: var(--fg-texte); font-weight: 500; }
 .fgNom:hover { border-color: var(--fg-ligne); background: var(--fg-panneau-clair); }
 .fgNom:focus { border-color: var(--fg-accent); background: var(--fg-panneau-clair); outline: 0; }
 .fgActionsDroite { margin-left: auto; display: flex; align-items: center; gap: 3px; }
@@ -33,14 +36,28 @@
 .fgPrimaire:hover:not(:disabled) { background: #0b86e0 !important; }
 .fgSep { width: 1px; height: 20px; margin: 0 4px; background: var(--fg-ligne); }
 
-/* ---- Corps : calques · canvas · inspecteur -------------------------------- */
-.fgCorps { flex: 1 1 0; min-width: 0; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr) 248px; }
+/* ---- Corps ------------------------------------------------------------------- */
+.fgCorps { flex: 1 1 0; min-width: 0; min-height: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr) 240px; }
 .fgCalques, .fgInspecteur { min-height: 0; overflow: auto; background: var(--fg-panneau); scrollbar-width: thin; scrollbar-color: #555 transparent; }
 .fgCalques { border-right: 1px solid var(--fg-ligne); display: flex; flex-direction: column; }
 .fgInspecteur { border-left: 1px solid var(--fg-ligne); padding: 0 12px 16px; }
-.fgCalques h3, .fgInspecteur h3 { min-height: 40px; display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 0 12px; border-bottom: 1px solid var(--fg-ligne); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
-.fgCalques h3 small, .fgInspecteur h3 small { padding: 1px 6px; border-radius: 9px; background: var(--fg-panneau-clair); color: var(--fg-sourd); font-size: 10px; }
 
+.fgPages { padding: 6px; border-bottom: 1px solid var(--fg-ligne); display: grid; gap: 2px; }
+.fgPagesTete { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; color: var(--fg-sourd); font-size: 11px; }
+.fgPagesTete button { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--fg-sourd); cursor: pointer; }
+.fgPagesTete button:hover { background: var(--fg-panneau-clair); color: var(--fg-texte); }
+.fgCalquesTete { border-top: 1px solid var(--fg-ligne); margin-top: 4px; }
+.fgCalquesTete small { color: var(--fg-sourd); font-size: 10px; }
+.fgPageLigne { display: grid; grid-template-columns: minmax(0, 1fr) 22px 22px; align-items: center; border-radius: 5px; }
+.fgPageLigne[data-actif="true"] { background: #0d99ff26; box-shadow: inset 2px 0 0 var(--fg-accent); }
+.fgPageNom { min-width: 0; height: 28px; display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: center; gap: 6px; padding: 0 8px; border: 0; background: transparent; text-align: left; cursor: pointer; color: #d5d7dc; }
+.fgPageNom span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fgPageLigne button { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--fg-sourd); cursor: pointer; }
+.fgPageLigne button:hover { background: var(--fg-panneau-clair); color: var(--fg-texte); }
+.fgPageLigne .fgPageSuppr:hover { color: #ff8f8f; }
+.fgPageInput { width: 100%; min-width: 0; height: 24px; padding: 0 6px; border: 1px solid var(--fg-accent); border-radius: 4px; background: var(--fg-panneau-clair); color: var(--fg-texte); font: inherit; font-size: 11px; outline: 0; }
+
+.fgCalquesTete { margin-inline: 0; }
 .fgListe { flex: 1 1 0; overflow: auto; padding: 6px; display: grid; gap: 2px; align-content: start; }
 .fgListe > p { padding: 16px 8px; color: var(--fg-sourd); text-align: center; line-height: 1.5; }
 .fgCalque { display: grid; grid-template-columns: minmax(0, 1fr) 24px; align-items: center; border-radius: 5px; }
@@ -58,11 +75,11 @@
 .fgCalqueActions .fgDanger { color: #ff8f8f; }
 .fgCalqueActions .fgDanger:hover:not(:disabled) { background: #4a2b2b; border-color: #7a4444; }
 
-/* ---- Canvas ---------------------------------------------------------------- */
+/* ---- Canvas --------------------------------------------------------------------- */
 .fgScene { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--fg-canvas); }
 .fgScene[data-outil="rect"], .fgScene[data-outil="ellipse"], .fgScene[data-outil="ligne"], .fgScene[data-outil="etoile"], .fgScene[data-outil="texte"] { cursor: crosshair; }
-.fgScene.fgPan { cursor: grab; }
-.fgScene.fgPan:active { cursor: grabbing; }
+.fgScene[data-outil="main"], .fgScene.fgPan { cursor: grab; }
+.fgScene[data-outil="main"]:active, .fgScene.fgPan:active { cursor: grabbing; }
 
 .fgZoomPill { position: absolute; left: 12px; bottom: 12px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--fg-ligne); border-radius: 8px; background: var(--fg-panneau); box-shadow: 0 4px 14px rgb(0 0 0 / 30%); }
 .fgZoomPill button { min-width: 26px; height: 24px; display: flex; align-items: center; justify-content: center; padding: 0 6px; border: 0; border-radius: 5px; background: transparent; color: #d5d7dc; cursor: pointer; }
@@ -71,37 +88,43 @@
 
 .fgEditeurTexte { position: absolute; z-index: 15; box-sizing: border-box; margin: 0; padding: 0; border: 1px solid var(--fg-accent); background: rgb(255 255 255 / 92%); outline: none; resize: none; overflow: hidden; line-height: 1.15; }
 
-/* ---- Inspecteur à sections -------------------------------------------------- */
-.fgInspecteur > h3 { margin-inline: -12px; padding-inline: 12px; }
-.fgDoc, .fgProps { padding-top: 4px; }
-.fgDoc p { color: var(--fg-sourd); line-height: 1.5; }
-.fgSection { padding: 10px 0 6px; border-bottom: 1px solid var(--fg-ligne); }
-.fgSection:last-of-type { border-bottom: 0; }
-.fgSection h4 { margin: 0 0 8px; color: var(--fg-sourd); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+/* ---- Inspecteur -------------------------------------------------------------------- */
+.fgAlignerHaut { padding: 10px 0; border-bottom: 1px solid var(--fg-ligne); margin-bottom: 4px; }
+.fgSection { padding: 12px 0 8px; border-bottom: 1px solid var(--fg-ligne); }
+.fgSection h4 { margin: 0 0 8px; color: var(--fg-sourd); font-size: 11px; font-weight: 500; }
 .fgProps label, .fgDoc label { display: flex; align-items: center; gap: 6px; margin: 6px 0; color: var(--fg-sourd); font-size: 11px; }
 .fgChamp { position: relative; }
 .fgChamp > span { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--fg-sourd); font-size: 10px; pointer-events: none; z-index: 1; }
-.fgChamp input, .fgChamp textarea, .fgChamp select { width: 100%; box-sizing: border-box; min-height: 28px; padding: 4px 8px 4px 34px; border: 1px solid transparent; border-radius: 5px; background: var(--fg-panneau-clair); color: var(--fg-texte); outline: 0; }
+.fgChamp input, .fgChamp textarea, .fgChamp select { width: 100%; box-sizing: border-box; min-height: 28px; padding: 4px 8px 4px 30px; border: 1px solid transparent; border-radius: 5px; background: var(--fg-panneau-clair); color: var(--fg-texte); outline: 0; }
 .fgChamp input:hover, .fgChamp textarea:hover, .fgChamp select:hover { border-color: #5a5a5e; }
 .fgChamp input:focus, .fgChamp textarea:focus, .fgChamp select:focus { border-color: var(--fg-accent); background: #323232; }
 .fgChamp input[type="color"] { padding: 2px 2px 2px 26px; height: 28px; cursor: pointer; }
 .fgChamp input[type="number"]::-webkit-inner-spin-button { opacity: 0; }
 .fgChamp input[type="number"]:hover::-webkit-inner-spin-button { opacity: .5; }
-.fgProps textarea { min-height: 52px; resize: vertical; line-height: 1.4; }
+.fgChamp textarea { min-height: 52px; resize: vertical; line-height: 1.4; }
+.fgLigneProp { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+.fgSwatch { width: 28px; height: 28px; flex: 0 0 28px; padding: 2px; border: 1px solid var(--fg-ligne); border-radius: 5px; background: var(--fg-panneau-clair); cursor: pointer; }
+.fgHex { flex: 1; min-height: 28px; padding: 4px 8px; border: 1px solid transparent; border-radius: 5px; background: var(--fg-panneau-clair); text-transform: uppercase; outline: 0; }
+.fgHex:hover { border-color: #5a5a5e; }
+.fgHex:focus { border-color: var(--fg-accent); }
+.fgNombre { width: 52px; flex: 0 0 52px; min-height: 28px; padding: 4px 6px; border: 1px solid transparent; border-radius: 5px; background: var(--fg-panneau-clair); outline: 0; }
+.fgNombre:hover { border-color: #5a5a5e; }
+.fgExportBtn { flex: 1; min-height: 28px; border: 1px solid transparent; border-radius: 5px; background: var(--fg-accent); color: white; cursor: pointer; }
+.fgExportBtn:hover { background: #0b86e0; }
 .fgDeux { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .fgTrois { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.fgTrois label { justify-content: flex-start; font-size: 10px; }
+.fgTrois label { font-size: 10px; }
 .fgTrois select { min-height: 26px; padding: 2px 6px; }
 .fgCase { display: flex !important; align-items: center; justify-content: flex-start; gap: 6px; }
 .fgCase input { width: 14px; height: 14px; accent-color: var(--fg-accent); }
-.fgAligner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 4px 0; }
-.fgAligner button { height: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--fg-ligne); border-radius: 5px; background: var(--fg-panneau-clair); color: #d5d7dc; cursor: pointer; }
+.fgAligner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.fgAligner button { height: 30px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--fg-ligne); border-radius: 5px; background: var(--fg-panneau-clair); color: #d5d7dc; cursor: pointer; }
 .fgAligner button:hover:not(:disabled) { border-color: #666; background: #454548; }
 .fgAligner button:disabled { opacity: .35; cursor: default; }
 .fgAide { display: grid; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--fg-ligne); color: var(--fg-sourd); font-size: 11px; }
 .fgAide b { color: var(--fg-texte); }
 
 @container (max-width: 980px) {
-  .fgCorps { grid-template-columns: 180px minmax(0, 1fr); }
-  .fgInspecteur { position: absolute; right: 0; top: 45px; bottom: 0; width: 236px; z-index: 30; box-shadow: -10px 0 28px rgb(0 0 0 / 45%); }
+  .fgCorps { grid-template-columns: 200px minmax(0, 1fr); }
+  .fgInspecteur { position: absolute; right: 0; top: 49px; bottom: 0; width: 240px; z-index: 30; box-shadow: -10px 0 28px rgb(0 0 0 / 45%); }
 }

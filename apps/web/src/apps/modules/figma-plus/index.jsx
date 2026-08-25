@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Stage, Layer, Rect, Ellipse, Text, Line, Star, Transformer, Group } from "react-konva";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
+import { ouvrirFenetre } from "../../../apps/windows";
 import "./figma-plus.scss";
 
 export const manifest = {
@@ -11,9 +12,9 @@ export const manifest = {
   icon: "paint",
   // Le Bureau ouvre les apps par leur action Redux : indispensable.
   action: "FIGMAPLUSAPP",
-  version: "1.2.0",
+  version: "1.3.0",
   nouveautes: [
-    { version: "1.2.0", texte: "Interface façon Figma : chrome sombre, outils dans la barre du haut, panneau de propriétés à sections, zoom en pilule, badge de dimensions pendant la transformation et édition de texte en double-clic sur le canvas." },
+    { version: "1.3.0", texte: "Fidélité Figma : pages multiples (ajouter, dupliquer, renommer, supprimer), survol bleu sur les objets, Fill/Stroke avec swatch + hex + opacité, effets d'ombre, modes de fusion, outil Main, badge « N sélectionnés » et export depuis le panneau Design." },
   ],
   Window: FigmaPlusApp,
 };
@@ -24,7 +25,7 @@ const id = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(
 const copie = (elements) => elements.map((e) => ({ ...e }));
 
 const nouvelleForme = (outil, monde) => {
-  const commun = { id: id(), nom: outil[0].toUpperCase() + outil.slice(1), x: monde.x, y: monde.y, largeur: 1, hauteur: 1, rotation: 0, opacite: 1, visible: true, verrouille: false, remplissage: outil === "texte" ? "#ffffff" : "#d9d9d9", contour: "#151515", epaisseur: 2 };
+  const commun = { id: id(), nom: outil[0].toUpperCase() + outil.slice(1), x: monde.x, y: monde.y, largeur: 1, hauteur: 1, rotation: 0, opacite: 1, visible: true, verrouille: false, remplissage: outil === "texte" ? "#ffffff" : "#d9d9d9", contour: "#151515", epaisseur: 2, fusion: "normal", ombre: { active: false, couleur: "#000000", flou: 12, x: 0, y: 4 } };
   if (outil === "texte") return { ...commun, type: "texte", texte: "Texte", taille: 36, gras: true, italique: false, alignement: "centre", largeur: 260, hauteur: 46, contour: "transparent", epaisseur: 0 };
   if (outil === "ligne") return { ...commun, type: "ligne", nom: "Ligne", remplissage: "transparent", contour: "#ffffff", epaisseur: 3 };
   if (outil === "etoile") return { ...commun, type: "etoile", nom: "Étoile", remplissage: "#ffd400", contour: "#c9932a" };
@@ -32,11 +33,12 @@ const nouvelleForme = (outil, monde) => {
   return { ...commun, type: "rect", rayon: 0 };
 };
 
+const creerPage = (nom) => ({ id: id(), nom, elements: [] });
+
 // Les ellipses et étoiles Konva sont centrées : lecture/écriture par leur
 // boîte englobante pour garder un modèle uniforme (coin haut-gauche).
 const centreBase = (type) => type === "ellipse" || type === "etoile";
 
-// Mesures d'un nœud sans toucher à son échelle (pour le badge live).
 const mesureNode = (node, element) => {
   const largeur = Math.abs(node.scaleX()) * element.largeur;
   const hauteur = Math.abs(node.scaleY()) * element.hauteur;
@@ -84,7 +86,8 @@ function FigmaPlusApp() {
   const pressePapier = useRef(null);
   const importeur = useRef(null);
 
-  const [elements, setElements] = useState([]);
+  const [pages, setPages] = useState(() => [creerPage("Page 1")]);
+  const [pageActiveId, setPageActiveId] = useState(() => pages[0].id);
   const [selectionIds, setSelectionIds] = useState([]);
   const [historique, setHistorique] = useState({ passe: [], futur: [] });
   const [outil, setOutil] = useState("select");
@@ -93,16 +96,23 @@ function FigmaPlusApp() {
   const [marqueeRect, setMarqueeRect] = useState(null);
   const [guides, setGuides] = useState({ x: null, y: null });
   const [badge, setBadge] = useState(null);
+  const [survolId, setSurvolId] = useState(null);
   const [editionTexteId, setEditionTexteId] = useState(null);
   const [espace, setEspace] = useState(false);
   const [majEnfoncee, setMajEnfoncee] = useState(false);
   const [nomDesign, setNomDesign] = useState("Sans titre");
   const [tailleScene, setTailleScene] = useState({ largeur: 0, hauteur: 0 });
   const [pageFond, setPageFond] = useState("#ffffff");
+  const [echelleExport, setEchelleExport] = useState(2);
 
   const echelle = zoom / 100;
+  const pageActive = pages.find((p) => p.id === pageActiveId) || pages[0];
+  const elements = pageActive.elements;
   const actif = elements.find((e) => e.id === selectionIds.at(-1)) || null;
   const multi = selectionIds.length > 1;
+
+  // Les mutations d'éléments passent toujours par la page active.
+  const setElements = (transformation) => setPages((liste) => liste.map((page) => page.id === pageActiveId ? { ...page, elements: typeof transformation === "function" ? transformation(page.elements) : transformation } : page));
 
   useEffect(() => {
     const element = scene.current;
@@ -133,6 +143,38 @@ function FigmaPlusApp() {
     setSelectionIds([]);
     return { passe: [...h.passe, copie(elements)], futur };
   });
+
+  const changerPage = (identifiant) => {
+    if (identifiant === pageActiveId) return;
+    setPageActiveId(identifiant);
+    setSelectionIds([]);
+    setHistorique({ passe: [], futur: [] });
+    setEditionTexteId(null);
+  };
+  const ajouterPage = () => {
+    const page = creerPage(`Page ${pages.length + 1}`);
+    setPages((liste) => [...liste, page]);
+    changerPage(page.id);
+  };
+  const dupliquerPage = (identifiant) => {
+    const source = pages.find((p) => p.id === identifiant);
+    if (!source) return;
+    const copiePage = { ...source, id: id(), nom: `${source.nom} copie`, elements: copie(source.elements) };
+    const index = pages.findIndex((p) => p.id === identifiant);
+    const liste = [...pages];
+    liste.splice(index + 1, 0, copiePage);
+    setPages(liste);
+    changerPage(copiePage.id);
+  };
+  const supprimerPage = (identifiant) => {
+    if (pages.length <= 1) return;
+    const restantes = pages.filter((p) => p.id !== identifiant);
+    setPages(restantes);
+    if (identifiant === pageActiveId) changerPage(restantes[0].id);
+  };
+  const renommerPage = (identifiant, valeur) => setPages((liste) => liste.map((p) => p.id === identifiant ? { ...p, nom: valeur.trim() || p.nom } : p));
+  const [renommagePageId, setRenommagePageId] = useState(null);
+  const [valeurRenommagePage, setValeurRenommagePage] = useState("");
 
   // ---- Sélection & Transformer -------------------------------------------
   useEffect(() => {
@@ -199,7 +241,7 @@ function FigmaPlusApp() {
 
   const surBas = (event) => {
     const stage = stageRef.current;
-    if (espaceRef.current || event.evt.button === 1) {
+    if (espaceRef.current || outil === "main" || event.evt.button === 1) {
       panning.current = { x: event.evt.clientX, y: event.evt.clientY, pan: { ...pan } };
       event.evt.preventDefault();
       return;
@@ -230,9 +272,15 @@ function FigmaPlusApp() {
   };
 
   const surBougeSouris = (event) => {
+    const stage = stageRef.current;
     if (panning.current) {
       setPan({ x: panning.current.pan.x + (event.evt.clientX - panning.current.x), y: panning.current.pan.y + (event.evt.clientY - panning.current.y) });
       return;
+    }
+    if (outil === "select" && !glisseHisto.current && !brouillon.current && !marquee.current) {
+      const survole = stage.getIntersection(stage.getPointerPosition());
+      const identifiant = survole && survole.id && elements.some((e) => e.id === survole.id()) ? survole.id() : null;
+      if (identifiant !== survolId) setSurvolId(identifiant);
     }
     if (brouillon.current) {
       const pos = monde();
@@ -418,7 +466,7 @@ function FigmaPlusApp() {
     const sauvegarde = tr.nodes();
     tr.nodes([]);
     calqueRef.current?.batchDraw();
-    const url = stageRef.current.toDataURL({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, pixelRatio: 2 });
+    const url = stageRef.current.toDataURL({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, pixelRatio: echelleExport });
     tr.nodes(sauvegarde);
     tr.getLayer()?.batchDraw();
     const lien = document.createElement("a");
@@ -428,7 +476,7 @@ function FigmaPlusApp() {
   };
 
   const sauverProjet = () => {
-    const contenu = JSON.stringify({ format: "companyos-figplus", version: 1, nom: nomDesign, page: { largeur: PAGE_W, hauteur: PAGE_H, fond: pageFond }, elements });
+    const contenu = JSON.stringify({ format: "companyos-figplus", version: 2, nom: nomDesign, page: { largeur: PAGE_W, hauteur: PAGE_H, fond: pageFond }, pageActiveId, pages });
     const url = URL.createObjectURL(new Blob([contenu], { type: "application/json" }));
     const lien = document.createElement("a");
     lien.href = url;
@@ -441,12 +489,20 @@ function FigmaPlusApp() {
     if (!fichier) return;
     try {
       const projet = JSON.parse(await fichier.text());
-      if (projet.format !== "companyos-figplus" || !Array.isArray(projet.elements)) throw new Error("format");
+      const elementsValides = Array.isArray(projet.elements) || Array.isArray(projet.pages);
+      if (projet.format !== "companyos-figplus" || !elementsValides) throw new Error("format");
       pousser(elements);
       setNomDesign(projet.nom || "Design importé");
       setPageFond(projet.page?.fond || "#ffffff");
-      setElements(projet.elements);
-      setSelectionIds([]);
+      if (Array.isArray(projet.pages) && projet.pages.length) {
+        setPages(projet.pages);
+        changerPage(projet.pages.some((p) => p.id === projet.pageActiveId) ? projet.pageActiveId : projet.pages[0].id);
+      } else {
+        const seule = creerPage("Page 1");
+        seule.elements = projet.elements;
+        setPages([seule]);
+        changerPage(seule.id);
+      }
     } catch {
       window.alert("Ce fichier n'est pas un projet Figma++ valide.");
     }
@@ -477,6 +533,7 @@ function FigmaPlusApp() {
       else if (event.key === "ArrowUp") { event.preventDefault(); nudge(0, event.shiftKey ? -10 : -1); }
       else if (event.key === "ArrowDown") { event.preventDefault(); nudge(0, event.shiftKey ? 10 : 1); }
       else if (!cmd && touche === "v") setOutil("select");
+      else if (!cmd && touche === "h") setOutil("main");
       else if (!cmd && touche === "r") setOutil("rect");
       else if (!cmd && touche === "o") setOutil("ellipse");
       else if (!cmd && touche === "t") setOutil("texte");
@@ -506,6 +563,12 @@ function FigmaPlusApp() {
     visible: element.visible !== false,
     scaleX: element.flipX ? -1 : 1,
     scaleY: element.flipY ? -1 : 1,
+    globalCompositeOperation: element.fusion || "normal",
+    shadowEnabled: Boolean(element.ombre?.active),
+    shadowColor: element.ombre?.couleur,
+    shadowBlur: element.ombre?.flou || 0,
+    shadowOffsetX: element.ombre?.x || 0,
+    shadowOffsetY: element.ombre?.y || 0,
     listening: outil === "select",
     draggable: outil === "select" && !espace && !element.verrouille,
     onMouseDown: (e) => {
@@ -556,8 +619,15 @@ function FigmaPlusApp() {
     },
   });
 
+  const propsOmbre = (element) => (element.ombre?.active ? {
+    shadowColor: element.ombre.couleur,
+    shadowBlur: element.ombre.flou || 0,
+    shadowOffsetX: element.ombre.x || 0,
+    shadowOffsetY: element.ombre.y || 0,
+  } : {});
+
   const rendreElement = (element) => {
-    const communs = propsCommuns(element);
+    const communs = { ...propsCommuns(element), ...propsOmbre(element) };
     const remplissage = element.remplissage;
     if (element.type === "rect") return <Rect {...communs} width={element.largeur} height={element.hauteur} fill={remplissage} stroke={element.epaisseur ? element.contour : undefined} strokeWidth={element.epaisseur || 0} cornerRadius={element.rayon || 0} />;
     if (element.type === "ellipse") return <Ellipse {...communs} x={element.x + element.largeur / 2} y={element.y + element.hauteur / 2} radiusX={element.largeur / 2} radiusY={element.hauteur / 2} fill={remplissage} stroke={element.epaisseur ? element.contour : undefined} strokeWidth={element.epaisseur || 0} />;
@@ -567,26 +637,32 @@ function FigmaPlusApp() {
   };
 
   const outils = [
-    ["select", "faArrowPointer", "Sélection (V)"],
+    ["select", "faArrowPointer", "Déplacer (V)"],
+    ["main", "faHand", "Main (H)"],
     ["rect", "faSquare", "Rectangle (R)"],
     ["ellipse", "faCircle", "Ellipse (O)"],
-    ["texte", "faFont", "Texte (T)"],
     ["ligne", "faSlash", "Ligne (L)"],
     ["etoile", "faStar", "Étoile (S)"],
+    ["texte", "faFont", "Texte (T)"],
   ];
 
-  const multi = selectionIds.length > 1;
+  const survole = elements.find((e) => e.id === survolId && !selectionIds.includes(e.id) && e.visible && !e.verrouille) || null;
   const editionTexte = editionTexteId ? elements.find((e) => e.id === editionTexteId) : null;
 
   return (
     <ModuleWindow manifest={manifest} className="fgApp">
       <div className="fgBarre">
+        <button className="fgLogo" title="Boutique d'applications" onClick={() => ouvrirFenetre("store")}><Icon fafa="faFigma" width={13} /></button>
         <div className="fgOutilsGauche">
           {outils.map(([identifiant, icone, titre]) => (
             <button key={identifiant} data-actif={outil === identifiant} title={titre} aria-label={titre} onClick={() => setOutil(identifiant)}><Icon fafa={icone} width={14} /></button>
           ))}
         </div>
-        <input className="fgNom" value={nomDesign} onChange={(e) => setNomDesign(e.target.value)} aria-label="Nom du design" spellCheck={false} />
+        {multi ? (
+          <div className="fgNom fgNomTexte">{selectionIds.length} sélectionné{selectionIds.length > 1 ? "s" : ""}</div>
+        ) : (
+          <input className="fgNom" value={nomDesign} onChange={(e) => setNomDesign(e.target.value)} aria-label="Nom du design" spellCheck={false} />
+        )}
         <div className="fgActionsDroite">
           <button onClick={annuler} disabled={!historique.passe.length} title="Annuler (Ctrl+Z)"><Icon fafa="faRotateLeft" width={12} /></button>
           <button onClick={retablir} disabled={!historique.futur.length} title="Rétablir (Ctrl+Maj+Z)"><Icon fafa="faRotateRight" width={12} /></button>
@@ -594,13 +670,39 @@ function FigmaPlusApp() {
           <button onClick={() => importeur.current?.click()} title="Ouvrir .figplus"><Icon fafa="faFolderOpen" width={12} /></button>
           <input ref={importeur} hidden type="file" accept=".figplus,application/json" onChange={(e) => ouvrirProjet(e.target.files?.[0])} />
           <button onClick={sauverProjet} title="Sauver .figplus"><Icon fafa="faFloppyDisk" width={12} /></button>
-          <button className="fgPrimaire" onClick={exporterPNG}><Icon fafa="faFileExport" width={12} /> Export</button>
+          <button className="fgPrimaire" onClick={exporterPNG} title={`Export PNG ×${echelleExport}`}><Icon fafa="faFileExport" width={12} /> Export</button>
         </div>
       </div>
 
       <div className="fgCorps">
         <aside className="fgCalques">
-          <h3>Calques <small>{elements.length}</small></h3>
+          <div className="fgPages">
+            <div className="fgPagesTete"><span>Pages</span><button title="Nouvelle page" onClick={ajouterPage}><Icon fafa="faPlus" width={10} /></button></div>
+            {pages.map((page) => (
+              <div key={page.id} className="fgPageLigne" data-actif={page.id === pageActiveId}>
+                {renommagePageId === page.id ? (
+                  <input
+                    className="fgPageInput"
+                    autoFocus
+                    value={valeurRenommagePage}
+                    onChange={(e) => setValeurRenommagePage(e.target.value)}
+                    onBlur={() => { renommerPage(page.id, valeurRenommagePage); setRenommagePageId(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "Escape") { renommerPage(page.id, valeurRenommagePage); setRenommagePageId(null); }
+                    }}
+                  />
+                ) : (
+                  <button className="fgPageNom" onClick={() => changerPage(page.id)} onDoubleClick={() => { setRenommagePageId(page.id); setValeurRenommagePage(page.nom); }} title="Double-clic pour renommer">
+                    <Icon fafa="faFile" width={10} />
+                    <span>{page.nom}</span>
+                  </button>
+                )}
+                <button title="Dupliquer" onClick={() => dupliquerPage(page.id)}><Icon fafa="faClone" width={9} /></button>
+                {pages.length > 1 ? <button className="fgPageSuppr" title="Supprimer" onClick={() => supprimerPage(page.id)}><Icon fafa="faTrashCan" width={9} /></button> : null}
+              </div>
+            ))}
+          </div>
+          <div className="fgPagesTete fgCalquesTete"><span>Calques</span><small>{elements.length}</small></div>
           <div className="fgListe">
             {[...elements].reverse().map((element) => (
               <div key={element.id} className="fgCalque" data-actif={selectionIds.includes(element.id)} data-verrouille={Boolean(element.verrouille)}>
@@ -611,7 +713,7 @@ function FigmaPlusApp() {
                 <button title={element.visible ? "Masquer" : "Afficher"} onClick={() => modifier((liste) => liste.map((el) => el.id === element.id ? { ...el, visible: !el.visible } : el), false)}><Icon fafa={element.visible ? "faEye" : "faEyeSlash"} width={11} /></button>
               </div>
             ))}
-            {!elements.length ? <p>Canvas vide — choisis un outil et dessine.</p> : null}
+            {!elements.length ? <p>Page vide — dessine quelque chose.</p> : null}
           </div>
           <div className="fgCalqueActions">
             <button disabled={selectionIds.length !== 1} onClick={() => deplacerNiveau(1)}>Monter</button>
@@ -623,7 +725,7 @@ function FigmaPlusApp() {
           </div>
         </aside>
 
-        <main className={`fgScene${espace ? " fgPan" : ""}`} ref={scene} data-outil={outil}>
+        <main className={`fgScene${espace || outil === "main" ? " fgPan" : ""}`} ref={scene} data-outil={outil}>
           <Stage
             ref={stageRef}
             width={tailleScene.largeur || 800}
@@ -635,16 +737,18 @@ function FigmaPlusApp() {
             onMouseDown={surBas}
             onMouseMove={surBougeSouris}
             onMouseUp={surHaut}
+            onMouseLeave={() => setSurvolId(null)}
             onWheel={surMolette}
           >
             <Layer ref={calqueRef}>
               <Rect name="page" x={0} y={0} width={PAGE_W} height={PAGE_H} fill={pageFond} stroke="#d5d9e0" strokeWidth={1 / echelle} shadowColor="rgba(15,23,42,0.16)" shadowBlur={18} shadowOffsetY={4} />
               {elements.filter((e) => e.visible !== false).map(rendreElement)}
+              {survole ? <Rect x={survole.x} y={survole.y} width={survole.largeur} height={survole.hauteur} rotation={survole.rotation || 0} stroke="#0d99ff" strokeWidth={1.5 / echelle} listening={false} /> : null}
               {guides.x !== null ? <Line points={[guides.x, 0, guides.x, PAGE_H]} stroke="#f24822" strokeWidth={1 / echelle} listening={false} /> : null}
               {guides.y !== null ? <Line points={[0, guides.y, PAGE_W, guides.y]} stroke="#f24822" strokeWidth={1 / echelle} listening={false} /> : null}
               {marqueeRect ? <Rect x={marqueeRect.x} y={marqueeRect.y} width={marqueeRect.largeur} height={marqueeRect.hauteur} fill="rgb(13 153 255 / 10%)" stroke="#0d99ff" strokeWidth={1 / echelle} listening={false} /> : null}
               {badge ? <Group listening={false}><Rect x={badge.x} y={badge.y} width={badge.texte.length * 7.2 / echelle + 10 / echelle} height={18 / echelle} fill="#0d99ff" cornerRadius={3 / echelle} /><Text x={badge.x} y={badge.y} width={badge.texte.length * 7.2 / echelle + 10 / echelle} height={18 / echelle} text={badge.texte} fontSize={11 / echelle} fill="#ffffff" align="center" verticalAlign="middle" /></Group> : null}
-              <Transformer ref={transformeur} rotateEnabled keepRatio={majEnfoncee} anchorSize={9} anchorFill="#ffffff" anchorStroke="#0d99ff" borderStroke="#0d99ff" boundBoxFunc={(vieux, nouveau) => (nouveau.width < 5 || nouveau.height < 5 ? vieux : nouveau)} />
+              <Transformer ref={transformeur} rotateEnabled keepRatio={majEnfoncee} anchorSize={8} anchorCornerRadius={2} anchorFill="#ffffff" anchorStroke="#0d99ff" borderStroke="#0d99ff" borderStrokeWidth={1} boundBoxFunc={(vieux, nouveau) => (nouveau.width < 5 || nouveau.height < 5 ? vieux : nouveau)} />
             </Layer>
           </Stage>
           {editionTexte && (() => {
@@ -682,28 +786,20 @@ function FigmaPlusApp() {
         </main>
 
         <aside className="fgInspecteur">
-          <h3>{multi ? `${selectionIds.length} objets` : actif ? actif.nom : "Page"}</h3>
-          {!actif ? (
-            <div className="fgDoc">
-              <section className="fgSection">
-                <h4>Page</h4>
-                <label className="fgChamp"><span>Fond</span><input type="color" value={pageFond} onChange={(e) => setPageFond(e.target.value)} /></label>
-              </section>
-              <div className="fgAide">
-                <b>Raccourcis</b>
-                <span>V R O T L S — outils</span>
-                <span>Espace + glisser — pan</span>
-                <span>Alt + glisser — dupliquer</span>
-                <span>Maj — carré / 45° / proportions</span>
-                <span>Double-clic — éditer un texte</span>
-                <span>Ctrl+C/V/X/D · Ctrl+Z — édition</span>
-                <span>Ctrl+0 ajuster · Ctrl+1 — 100 %</span>
-                <span>Flèches — nudge (Maj ×10)</span>
-              </div>
+          {multi ? (
+            <div className="fgAligner fgAlignerHaut">
+              <button title="Aligner à gauche" onClick={() => aligner("gauche")}><Icon fafa="faAlignLeft" width={12} /></button>
+              <button title="Centrer horizontalement" onClick={() => aligner("centreH")}><Icon fafa="faAlignCenter" width={12} /></button>
+              <button title="Aligner à droite" onClick={() => aligner("droite")}><Icon fafa="faAlignRight" width={12} /></button>
+              <button title="Aligner en haut" onClick={() => aligner("haut")}><Icon fafa="faArrowUp" width={12} /></button>
+              <button title="Centrer verticalement" onClick={() => aligner("centreV")}><Icon fafa="faArrowsUpDown" width={12} /></button>
+              <button title="Aligner en bas" onClick={() => aligner("bas")}><Icon fafa="faArrowDown" width={12} /></button>
+              <button title="Distribuer horizontalement" disabled={selectionIds.length < 3} onClick={() => distribuer("h")}><Icon fafa="faArrowsLeftRight" width={12} /></button>
+              <button title="Distribuer verticalement" disabled={selectionIds.length < 3} onClick={() => distribuer("v")}><Icon fafa="faArrowsUpDown" width={12} /></button>
             </div>
-          ) : (
-            <div className="fgProps">
-              {!multi ? <label className="fgChamp"><span>Nom</span><input value={actif.nom} onChange={(e) => majSelection("nom", e.target.value)} /></label> : null}
+          ) : null}
+          {actif ? (
+            <>
               <section className="fgSection">
                 <h4>Position</h4>
                 <div className="fgDeux">
@@ -712,21 +808,25 @@ function FigmaPlusApp() {
                   <label className="fgChamp"><span>L</span><input type="number" min="4" value={Math.round(actif.largeur)} onChange={(e) => majSelection("largeur", Math.max(4, Number(e.target.value)))} /></label>
                   <label className="fgChamp"><span>H</span><input type="number" min="4" value={Math.round(actif.hauteur)} onChange={(e) => majSelection("hauteur", Math.max(4, Number(e.target.value)))} /></label>
                 </div>
-                <label className="fgChamp"><span>Rotation</span><input type="number" min="0" max="359" value={actif.rotation || 0} onChange={(e) => majSelection("rotation", Number(e.target.value))} /></label>
+                <div className="fgDeux">
+                  <label className="fgChamp"><span>∠</span><input type="number" min="0" max="359" value={actif.rotation || 0} onChange={(e) => majSelection("rotation", Number(e.target.value))} /></label>
+                  <label className="fgChamp"><span>Rayon</span><input type="number" min="0" value={actif.rayon || 0} onChange={(e) => majSelection("rayon", Math.max(0, Number(e.target.value)))} disabled={actif.type !== "rect"} /></label>
+                </div>
               </section>
               <section className="fgSection">
                 <h4>Apparence</h4>
-                <label className="fgChamp"><span>Opacité</span><input type="number" min="0" max="1" step=".05" value={actif.opacite ?? 1} onChange={(e) => majSelection("opacite", Math.max(0, Math.min(1, Number(e.target.value))))} /></label>
-                {multi ? (
-                  <div className="fgAligner">
-                    <button title="Aligner à gauche" onClick={() => aligner("gauche")}><Icon fafa="faAlignLeft" width={11} /></button>
-                    <button title="Centrer horizontalement" onClick={() => aligner("centreH")}><Icon fafa="faAlignCenter" width={11} /></button>
-                    <button title="Aligner à droite" onClick={() => aligner("droite")}><Icon fafa="faAlignRight" width={11} /></button>
-                    <button title="Aligner en haut" onClick={() => aligner("haut")}><Icon fafa="faArrowUp" width={11} /></button>
-                    <button title="Centrer verticalement" onClick={() => aligner("centreV")}><Icon fafa="faArrowsUpDown" width={11} /></button>
-                    <button title="Aligner en bas" onClick={() => aligner("bas")}><Icon fafa="faArrowDown" width={11} /></button>
-                    <button title="Distribuer horizontalement" disabled={selectionIds.length < 3} onClick={() => distribuer("h")}><Icon fafa="faArrowsLeftRight" width={11} /></button>
-                    <button title="Distribuer verticalement" disabled={selectionIds.length < 3} onClick={() => distribuer("v")}><Icon fafa="faArrowsUpDown" width={11} /></button>
+                <div className="fgDeux">
+                  <label className="fgChamp"><span>Opac.</span><input type="number" min="0" max="1" step=".05" value={actif.opacite ?? 1} onChange={(e) => majSelection("opacite", Math.max(0, Math.min(1, Number(e.target.value))))} /></label>
+                  <label className="fgChamp"><span>Fusion</span>
+                    <select value={actif.fusion || "normal"} onChange={(e) => majSelection("fusion", e.target.value)}>
+                      <option value="normal">Normal</option><option value="multiply">Produit</option><option value="screen">Écran</option><option value="overlay">Incrustation</option><option value="darken">Assombrir</option><option value="lighten">Éclaircir</option>
+                    </select>
+                  </label>
+                </div>
+                {!multi ? (
+                  <div className="fgDeux">
+                    <label className="fgCase">Miroir H<input type="checkbox" checked={Boolean(actif.flipX)} onChange={(e) => majSelection("flipX", e.target.checked)} /></label>
+                    <label className="fgCase">Miroir V<input type="checkbox" checked={Boolean(actif.flipY)} onChange={(e) => majSelection("flipY", e.target.checked)} /></label>
                   </div>
                 ) : null}
               </section>
@@ -745,23 +845,66 @@ function FigmaPlusApp() {
                 </section>
               ) : null}
               <section className="fgSection">
-                <h4>Remplissage & bordure</h4>
-                {actif.type !== "ligne" ? <label className="fgChamp"><span>Rempli.</span><input type="color" value={actif.remplissage?.startsWith("#") ? actif.remplissage : "#d9d9d9"} onChange={(e) => majSelection("remplissage", e.target.value)} /></label> : null}
-                <div className="fgDeux">
-                  <label className="fgChamp"><span>Bord.</span><input type="color" value={actif.contour?.startsWith("#") ? actif.contour : "#151515"} onChange={(e) => majSelection("contour", e.target.value)} /></label>
-                  <label className="fgChamp"><span>Épais.</span><input type="number" min="0" max="40" value={actif.epaisseur || 0} onChange={(e) => majSelection("epaisseur", Math.max(0, Number(e.target.value)))} /></label>
+                <h4>Remplissage</h4>
+                {actif.type !== "ligne" ? (
+                  <div className="fgLigneProp">
+                    <input type="color" className="fgSwatch" value={actif.remplissage?.startsWith("#") ? actif.remplissage : "#d9d9d9"} onChange={(e) => majSelection("remplissage", e.target.value)} />
+                    <input className="fgHex" value={actif.remplissage} onChange={(e) => { const valeur = e.target.value; if (/^#[0-9a-f]{6}$/i.test(valeur)) majSelection("remplissage", valeur); else e.target.value = actif.remplissage; }} spellCheck={false} />
+                  </div>
+                ) : null}
+              </section>
+              <section className="fgSection">
+                <h4>Bordure</h4>
+                <div className="fgLigneProp">
+                  <input type="color" className="fgSwatch" value={actif.contour?.startsWith("#") ? actif.contour : "#151515"} onChange={(e) => majSelection("contour", e.target.value)} />
+                  <input className="fgHex" value={actif.contour} onChange={(e) => { const valeur = e.target.value; if (/^#[0-9a-f]{6}$/i.test(valeur)) majSelection("contour", valeur); else e.target.value = actif.contour; }} spellCheck={false} />
+                  <input type="number" className="fgNombre" min="0" max="40" value={actif.epaisseur || 0} title="Épaisseur" onChange={(e) => majSelection("epaisseur", Math.max(0, Number(e.target.value)))} />
                 </div>
-                {actif.type === "rect" ? <label className="fgChamp"><span>Rayon</span><input type="number" min="0" max={Math.floor(Math.min(actif.largeur, actif.hauteur) / 2)} value={actif.rayon || 0} onChange={(e) => majSelection("rayon", Math.max(0, Number(e.target.value)))} /></label> : null}
+              </section>
+              <section className="fgSection">
+                <h4>Effets</h4>
+                <label className="fgCase">Ombre portée<input type="checkbox" checked={Boolean(actif.ombre?.active)} onChange={(e) => majSelection("ombre", { couleur: "#000000", flou: 12, x: 0, y: 4, ...(actif.ombre || {}), active: e.target.checked })} /></label>
+                {actif.ombre?.active ? (
+                  <div className="fgDeux">
+                    <label className="fgChamp"><span>Flou</span><input type="number" min="0" max="80" value={actif.ombre.flou} onChange={(e) => majSelection("ombre", { ...actif.ombre, flou: Math.max(0, Number(e.target.value)) })} /></label>
+                    <label className="fgChamp"><span>Y</span><input type="number" value={actif.ombre.y} onChange={(e) => majSelection("ombre", { ...actif.ombre, y: Number(e.target.value) })} /></label>
+                    <label className="fgChamp fgColonne"><span>Couleur</span><input type="color" value={actif.ombre.couleur} onChange={(e) => majSelection("ombre", { ...actif.ombre, couleur: e.target.value })} /></label>
+                  </div>
+                ) : null}
               </section>
               <section className="fgSection">
                 <h4>Calque</h4>
-                <div className="fgTrois">
-                  <label className="fgCase">Miroir H<input type="checkbox" checked={Boolean(actif.flipX)} onChange={(e) => majSelection("flipX", e.target.checked)} /></label>
-                  <label className="fgCase">Miroir V<input type="checkbox" checked={Boolean(actif.flipY)} onChange={(e) => majSelection("flipY", e.target.checked)} /></label>
-                  <label className="fgCase">Verrou<input type="checkbox" checked={Boolean(actif.verrouille)} onChange={(e) => majSelection("verrouille", e.target.checked)} /></label>
+                <div className="fgDeux">
+                  <label className="fgCase">Verrouiller<input type="checkbox" checked={Boolean(actif.verrouille)} onChange={(e) => majSelection("verrouille", e.target.checked)} /></label>
+                  <label className="fgCase">Visible<input type="checkbox" checked={actif.visible !== false} onChange={(e) => majSelection("visible", e.target.checked)} /></label>
                 </div>
               </section>
-            </div>
+              <section className="fgSection">
+                <h4>Export</h4>
+                <div className="fgDeux">
+                  <label className="fgChamp"><span>Échelle</span>
+                    <select value={echelleExport} onChange={(e) => setEchelleExport(Number(e.target.value))}><option value={1}>1×</option><option value={2}>2×</option><option value={3}>3×</option></select>
+                  </label>
+                  <button className="fgExportBtn" onClick={exporterPNG}>Exporter PNG</button>
+                </div>
+              </section>
+            </>
+          ) : (
+            <section className="fgSection">
+              <h4>Page</h4>
+              <label className="fgChamp"><span>Fond</span><input type="color" value={pageFond} onChange={(e) => setPageFond(e.target.value)} /></label>
+              <div className="fgAide">
+                <b>Raccourcis</b>
+                <span>V déplacer · H main · R O T L S</span>
+                <span>Espace + glisser — pan</span>
+                <span>Alt + glisser — dupliquer</span>
+                <span>Maj — carré / 45° / proportions</span>
+                <span>Double-clic — éditer un texte</span>
+                <span>Ctrl+C/V/X/D · Ctrl+Z/Y</span>
+                <span>Ctrl+0 ajuster · Ctrl+1 — 100 %</span>
+                <span>Flèches — nudge (Maj ×10)</span>
+              </div>
+            </section>
           )}
         </aside>
       </div>
