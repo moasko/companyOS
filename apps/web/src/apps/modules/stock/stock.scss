@@ -1,1091 +1,1160 @@
-// Stock — trois colonnes : catégories, catalogue, fiche produit.
+// Stock — voir index.jsx.
 //
-// L'ancien module tenait en une colonne parce qu'il n'avait que trois
-// champs à montrer. Un vrai catalogue se navigue par rayons, se regarde en
-// images et se corrige sans quitter la grille : les trois zones sont donc
-// visibles en permanence, comme dans n'importe quel logiciel de gestion.
-//
-// Les jetons de thème restent ceux de la charte CompanyOS (voir le
-// générateur QR) : mêmes noms, mêmes valeurs, thème sombre en fin de
-// fichier.
+// Même grammaire que la Comptabilité et la Paie : quantités et montants en
+// chiffres tabulaires alignés à droite, couleur réservée aux états
+// (rupture, à commander, OK), toujours doublée d'un mot. L'accent sarcelle
+// distingue le Stock. Les boîtes de dialogue vivent hors de la fenêtre :
+// elles reçoivent les mêmes variables.
 
-.stkApp {
-  --stk-bg: #ffffff;
-  --stk-panel: #f8f9fb;
-  --stk-card: #ffffff;
-  --stk-line: #e3e6eb;
-  --stk-text: #1f2733;
-  --stk-muted: #6b7684;
-  --stk-accent: #1a73e8;
-  --stk-accent-soft: #e8f0fe;
-  --stk-field: #ffffff;
-  --stk-green: #188038;
-  --stk-amber: #b06000;
-  --stk-red: #d93025;
-  --stk-rayon: 8px;
+@mixin jetons {
+  --st-fond: #f6f7f9;
+  --st-carte: #ffffff;
+  --st-ligne: #e5e7eb;
+  --st-ligne-douce: #f0f1f3;
+  --st-texte: #111827;
+  --st-doux: #4b5563;
+  --st-pale: #9ca3af;
+  --st-accent: #0f766e;
+  --st-accent-fort: #115e59;
+  --st-accent-fond: #f0fdfa;
+  --st-accent-bord: #99f6e4;
+  --st-sur-accent: #ffffff;
+  --st-ok: #166534;
+  --st-ok-fond: #dcfce7;
+  --st-info: #1e40af;
+  --st-info-fond: #dbeafe;
+  --st-attention: #b45309;
+  --st-attention-texte: #9a3412;
+  --st-attention-fond: #fff7ed;
+  --st-attention-bord: #fed7aa;
+  --st-erreur: #b91c1c;
+  --st-erreur-fond: #fef2f2;
+  --st-erreur-bord: #fecaca;
+  --st-survol: rgb(0 0 0 / 3.5%);
+  --st-piste: #eef0f3;
+  --st-classe-a: #0f766e;
+  --st-classe-b: #0369a1;
+  --st-classe-c: #9ca3af;
+}
 
-  background: var(--stk-bg);
-  color: var(--stk-text);
+@mixin jetons-sombres {
+  --st-fond: #17181c;
+  --st-carte: #22242a;
+  --st-ligne: #34373f;
+  --st-ligne-douce: #2b2e35;
+  --st-texte: #eceef2;
+  --st-doux: #a1a8b3;
+  --st-pale: #6b7280;
+  --st-accent: #2dd4bf;
+  --st-accent-fort: #5eead4;
+  --st-accent-fond: #11302d;
+  --st-accent-bord: #1f5c55;
+  --st-sur-accent: #04201d;
+  --st-ok: #86efac;
+  --st-ok-fond: #14321f;
+  --st-info: #93c5fd;
+  --st-info-fond: #1e2a44;
+  --st-attention: #fbbf24;
+  --st-attention-texte: #fdba74;
+  --st-attention-fond: #33260f;
+  --st-attention-bord: #6b4a12;
+  --st-erreur: #fca5a5;
+  --st-erreur-fond: #3b1d1d;
+  --st-erreur-bord: #7f1d1d;
+  --st-survol: rgb(255 255 255 / 5%);
+  --st-piste: #2f323a;
+  --st-classe-a: #2dd4bf;
+  --st-classe-b: #7dd3fc;
+  --st-classe-c: #6b7280;
+}
+
+.stoApp,
+.stoForm,
+.stoChoix {
+  @include jetons;
+}
+
+body[data-theme="dark"] {
+  .stoApp,
+  .stoForm,
+  .stoChoix {
+    @include jetons-sombres;
+  }
+}
+
+// ---- Fenêtre et navigation ----------------------------------------------------------
+
+.stoApp {
+  background: var(--st-fond);
+  color: var(--st-texte);
 
   &.floatTab[data-size="mini"] {
-    width: 82%;
-    height: 80%;
-    top: 9%;
-    left: 9%;
-    min-width: 940px;
-    min-height: 560px;
+    width: 88%;
+    height: 88%;
+    top: 5%;
+    left: 6%;
+    min-width: min(900px, 96%);
+    min-height: min(560px, 90%);
   }
 
-  .stkLocked {
+  .stoVerrou {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    flex-grow: 1;
-    color: var(--stk-muted);
-    font-size: 0.85em;
-  }
-
-  .stkShell {
-    position: relative;
-    display: grid;
-    // La colonne centrale est en `minmax(0, 1fr)` : sans le 0, une grille
-    // de produits large pousserait les deux autres colonnes hors de la
-    // fenêtre au lieu de défiler.
-    //
-    // Le panneau de droite porte la fiche produit entière — image, prix,
-    // seuil, mouvements — avec des champs par paires. En dessous de 380 px
-    // ces paires deviennent illisibles, et l'image se réduit à une vignette.
-    grid-template-columns: 216px minmax(0, 1fr) 380px;
-    flex-grow: 1;
-    min-height: 0;
-  }
-
-  // ---- Barre latérale -----------------------------------------------------
-
-  .stkNav {
-    border-right: 1px solid var(--stk-line);
-    padding: 10px 8px;
-    overflow-y: auto;
-    min-height: 0;
-    background: var(--stk-panel);
-  }
-
-  .stkNavItem {
-    display: flex;
-    align-items: center;
     gap: 10px;
-    padding: 8px 10px;
-    border-radius: 6px;
-    font-size: 0.78em;
-    color: var(--stk-muted);
-    margin-bottom: 2px;
-
-    .uicon {
-      display: flex;
-      flex-shrink: 0;
-    }
-
-    &:hover {
-      background: rgb(107 118 132 / 10%);
-    }
-
-    &[data-actif="true"] {
-      background: var(--stk-accent-soft);
-      color: var(--stk-accent);
-      font-weight: 600;
-    }
-  }
-
-  .stkNavTitre {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 18px 6px 6px;
-    font-size: 0.66em;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--stk-muted);
-  }
-
-  .stkNavPlus {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    color: var(--stk-muted);
-
-    &:hover {
-      background: var(--stk-accent-soft);
-      color: var(--stk-accent);
-    }
-  }
-
-  .stkCat {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 8px;
-    border-radius: 5px;
-    font-size: 0.78em;
-    color: var(--stk-text);
-
-    &:hover {
-      background: rgb(107 118 132 / 10%);
-
-      .stkCatEdit {
-        opacity: 1;
-      }
-    }
-
-    &[data-actif="true"] {
-      background: var(--stk-accent-soft);
-      color: var(--stk-accent);
-      font-weight: 600;
-    }
-  }
-
-  // Gouttière réservée même sans chevron : sinon les libellés d'un même
-  // niveau ne s'alignent pas selon qu'ils ont ou non des enfants.
-  .stkCatChevron {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 12px;
-    flex-shrink: 0;
-    color: var(--stk-muted);
-  }
-
-  .stkCatNom {
     flex-grow: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.84em;
+    color: var(--st-doux);
   }
 
-  .stkCatCompte {
-    flex-shrink: 0;
-    font-size: 0.85em;
-    font-weight: 400;
-    color: var(--stk-muted);
-  }
-
-  .stkCatEdit {
+  .stoShell {
     display: flex;
-    flex-shrink: 0;
-    opacity: 0;
-    color: var(--stk-muted);
+    flex: 1;
+    min-height: 0;
+    font-size: 13.5px;
 
-    &:hover {
-      color: var(--stk-accent);
-    }
+    button { font: inherit; color: inherit; }
+    input, select, textarea { font: inherit; color: var(--st-texte); }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 1px; }
   }
 
-  .stkCatActions {
-    display: flex;
-    gap: 12px;
-    padding: 10px 10px 4px;
-    margin-top: 6px;
-    border-top: 1px solid var(--stk-line);
-    font-size: 0.72em;
-    color: var(--stk-muted);
-
-    span:hover {
-      color: var(--stk-accent);
-      text-decoration: underline;
-    }
-
-    .stkDanger:hover {
-      color: var(--stk-red);
-    }
-  }
-
-  // ---- Contenu ------------------------------------------------------------
-
-  .stkMain {
-    display: flex;
-    flex-direction: column;
+  .stoPage {
+    flex: 1;
     min-width: 0;
     min-height: 0;
+    overflow-y: auto;
+    container-type: inline-size;
   }
 
-  .stkStats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1px;
-    background: var(--stk-line);
-    border-bottom: 1px solid var(--stk-line);
+  .stoNav {
+    width: 228px;
     flex-shrink: 0;
-  }
-
-  .stkStat {
+    overflow-y: auto;
+    padding: 16px 12px;
+    background: var(--st-carte);
+    border-right: 1px solid var(--st-ligne);
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 12px 16px;
-    background: var(--stk-bg);
 
-    &[data-ton="warn"] .stkStatVal {
-      color: var(--stk-amber);
-    }
-
-    &[data-ton="bad"] .stkStatVal {
-      color: var(--stk-red);
-    }
-
-    &.handcr:hover {
-      background: var(--stk-panel);
-    }
+    nav { display: flex; flex-direction: column; gap: 2px; }
   }
 
-  .stkStatVal {
-    font-size: 1.05em;
-    font-weight: 600;
-  }
-
-  .stkStatLbl {
-    font-size: 0.68em;
-    color: var(--stk-muted);
-  }
-
-  .stkBarre {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--stk-line);
-    flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-
-  .stkRecherche {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-grow: 1;
-    min-width: 180px;
-    padding: 6px 10px;
-    border: 1px solid var(--stk-line);
-    border-radius: 6px;
-    background: var(--stk-field);
-    color: var(--stk-muted);
-
-    &:focus-within {
-      border-color: var(--stk-accent);
-    }
-
-    input {
-      flex-grow: 1;
-      min-width: 0;
-      border: none;
-      outline: none;
-      background: transparent;
-      font-family: inherit;
-      font-size: 0.78em;
-      color: var(--stk-text);
-
-      &::placeholder {
-        color: var(--stk-muted);
-      }
-    }
-
-    .uicon {
-      display: flex;
-      cursor: pointer;
-    }
-  }
-
-  .stkVues {
-    display: flex;
-    border: 1px solid var(--stk-line);
-    border-radius: 6px;
-    overflow: hidden;
-
-    span {
-      display: flex;
-      align-items: center;
-      padding: 6px 9px;
-      color: var(--stk-muted);
-      background: var(--stk-card);
-
-      &[data-actif="true"] {
-        background: var(--stk-accent-soft);
-        color: var(--stk-accent);
-      }
-    }
-  }
-
-  // ---- Grille de produits -------------------------------------------------
-
-  .stkGrille {
-    display: grid;
-    // `auto-fill` plutôt qu'un nombre fixe de colonnes : la fenêtre est
-    // redimensionnable, la grille doit suivre sans point de rupture écrit
-    // à la main.
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 12px;
-    padding: 14px;
-    overflow-y: auto;
-    min-height: 0;
-    align-content: start;
-  }
-
-  .stkCarte {
-    border: 1px solid var(--stk-line);
-    border-radius: var(--stk-rayon);
-    background: var(--stk-card);
-    padding: 8px;
-    transition: border-color 120ms ease, transform 120ms ease;
-
-    &:hover {
-      border-color: #c7d0dd;
-      transform: translateY(-1px);
-    }
-
-    &[data-actif="true"] {
-      border-color: var(--stk-accent);
-      box-shadow: 0 0 0 1px var(--stk-accent);
-    }
-  }
-
-  .stkCarteImg {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    // Carré : un catalogue dont les vignettes n'ont pas toutes la même
-    // hauteur se lit mal, quelles que soient les photos fournies.
-    aspect-ratio: 1;
-    border-radius: 6px;
-    background: rgb(107 118 132 / 8%);
-    color: var(--stk-muted);
-    overflow: hidden;
-    margin-bottom: 8px;
-
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-  }
-
-  .stkPastille {
-    position: absolute;
-    right: 5px;
-    bottom: 5px;
-    min-width: 22px;
-    padding: 2px 6px;
-    border-radius: 100px;
-    font-size: 0.66em;
-    font-weight: 600;
-    text-align: center;
-    color: #fff;
-    background: var(--stk-green);
-
-    &[data-ton="warn"] {
-      background: var(--stk-amber);
-    }
-
-    &[data-ton="bad"] {
-      background: var(--stk-red);
-    }
-  }
-
-  .stkCarteNom {
-    font-size: 0.78em;
-    font-weight: 600;
-    // Deux lignes au plus : au-delà, les cartes d'une même rangée cessent
-    // d'avoir la même hauteur et la grille se déforme.
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    line-height: 1.3;
-    min-height: 2.6em;
-  }
-
-  .stkCarteMeta {
-    font-size: 0.68em;
-    color: var(--stk-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-  }
-
-  .stkCartePrix {
-    font-size: 0.76em;
-    font-weight: 600;
-    color: var(--stk-accent);
-    margin-top: 4px;
-  }
-
-  // ---- Tableaux -----------------------------------------------------------
-
-  .stkTable {
-    overflow-y: auto;
-    min-height: 0;
-    padding-bottom: 10px;
-  }
-
-  .stkTr {
-    display: grid;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--stk-line);
-    font-size: 0.76em;
-
-    &:hover:not(.stkTh) {
-      background: var(--stk-panel);
-    }
-
-    &[data-actif="true"] {
-      background: var(--stk-accent-soft);
-    }
-  }
-
-  .stkTh {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: var(--stk-bg);
-    font-size: 0.66em;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--stk-muted);
-  }
-
-  .stkTrArt {
-    grid-template-columns: 32px minmax(0, 2.2fr) minmax(0, 1.4fr) 90px 60px 110px 100px;
-  }
-
-  .stkTrMvt {
-    grid-template-columns: 92px minmax(0, 1.6fr) 110px 90px minmax(0, 1.4fr) 110px;
-  }
-
-  .stkTrFrn {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 130px 110px 28px;
-  }
-
-  .stkTdImg {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 5px;
-    background: rgb(107 118 132 / 8%);
-    color: var(--stk-muted);
-    overflow: hidden;
-
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-  }
-
-  .stkTdNom {
-    min-width: 0;
-
-    strong {
-      display: block;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    em {
-      font-style: normal;
-      font-size: 0.86em;
-      color: var(--stk-muted);
-    }
-  }
-
-  .stkTdNum {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .stkMuted {
-    color: var(--stk-muted);
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .stkLien {
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-
-    &:hover {
-      color: var(--stk-accent);
-      text-decoration: underline;
-    }
-  }
-
-  .stkTag {
-    display: inline-block;
-    padding: 2px 9px;
-    border-radius: 100px;
-    font-size: 0.86em;
-    background: rgb(24 128 56 / 12%);
-    color: var(--stk-green);
-    white-space: nowrap;
-
-    &[data-ton="warn"] {
-      background: rgb(176 96 0 / 12%);
-      color: var(--stk-amber);
-    }
-
-    &[data-ton="bad"] {
-      background: rgb(217 48 37 / 12%);
-      color: var(--stk-red);
-    }
-  }
-
-  .stkSens {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--stk-green);
-
-    &[data-ton="bad"] {
-      color: var(--stk-red);
-    }
-
-    &[data-ton="info"] {
-      color: var(--stk-accent);
-    }
-
-    .uicon {
-      display: flex;
-    }
-  }
-
-  .stkRetirer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    color: var(--stk-muted);
-
-    &:hover {
-      background: rgb(217 48 37 / 12%);
-      color: var(--stk-red);
-    }
-  }
-
-  // ---- Analyse ------------------------------------------------------------
-
-  .stkAnalyse {
-    padding: 16px 18px;
-    overflow-y: auto;
-    min-height: 0;
-  }
-
-  .stkSousTitre {
-    font-size: 0.68em;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--stk-muted);
-    margin: 6px 0 10px;
-
-    &:not(:first-child) {
-      margin-top: 26px;
-    }
-  }
-
-  .stkJauge {
-    display: grid;
-    grid-template-columns: 140px minmax(0, 1fr) 120px;
-    align-items: center;
-    gap: 12px;
-    font-size: 0.76em;
-    margin-bottom: 8px;
-  }
-
-  .stkJaugeNom {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .stkJaugeFond {
-    height: 8px;
-    border-radius: 100px;
-    background: rgb(107 118 132 / 14%);
-    overflow: hidden;
-  }
-
-  .stkJaugeVal {
-    display: block;
-    height: 100%;
-    border-radius: 100px;
-    background: var(--stk-accent);
-  }
-
-  .stkJaugeChiffre {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    color: var(--stk-muted);
-  }
-
-  .stkAlerte {
-    display: grid;
-    grid-template-columns: 110px minmax(0, 1.6fr) 140px minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-    padding: 9px 12px;
-    border: 1px solid var(--stk-line);
-    border-radius: 6px;
-    margin-bottom: 6px;
-    font-size: 0.76em;
-
-    &:hover {
-      border-color: var(--stk-accent);
-    }
-  }
-
-  .stkAlerteNom {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  // ---- Panneau ------------------------------------------------------------
-
-  .stkPanneau {
-    border-left: 1px solid var(--stk-line);
-    background: var(--stk-panel);
-    padding: 14px;
-    overflow-y: auto;
-    min-height: 0;
-  }
-
-  .stkPanVide {
+  .stoMarque {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    padding: 30px 16px;
-    text-align: center;
-    font-size: 0.76em;
-    color: var(--stk-muted);
-  }
-
-  .stkPanTitre {
-    font-size: 0.86em;
-    font-weight: 600;
-    margin-bottom: 12px;
-  }
-
-  .stkPhoto {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    aspect-ratio: 1;
-    border-radius: var(--stk-rayon);
-    border: 1px solid var(--stk-line);
-    background: var(--stk-card);
-    color: var(--stk-muted);
-    overflow: hidden;
-
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-  }
-
-  .stkPhotoActions {
-    display: flex;
-    justify-content: center;
-    gap: 14px;
-    padding: 8px 0 4px;
-    font-size: 0.72em;
-    color: var(--stk-muted);
-
-    span:hover {
-      color: var(--stk-accent);
-      text-decoration: underline;
-    }
-
-    .stkDanger:hover {
-      color: var(--stk-red);
-    }
-  }
-
-  .stkStockGros {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 0 12px;
-    border-bottom: 1px solid var(--stk-line);
-    margin-bottom: 10px;
-  }
-
-  .stkStockVal {
-    font-size: 1.8em;
-    font-weight: 600;
-    color: var(--stk-green);
-
-    &[data-ton="warn"] {
-      color: var(--stk-amber);
-    }
-
-    &[data-ton="bad"] {
-      color: var(--stk-red);
-    }
-  }
-
-  .stkStockUnite {
-    font-size: 0.74em;
-    color: var(--stk-muted);
-  }
-
-  .stkOnglets {
-    display: flex;
     gap: 2px;
-    padding: 3px;
-    border-radius: 7px;
-    background: rgb(107 118 132 / 10%);
-    margin-bottom: 14px;
+    padding: 2px 10px 12px;
 
-    span {
-      flex: 1;
-      text-align: center;
-      padding: 6px 4px;
-      border-radius: 5px;
-      font-size: 0.74em;
-      color: var(--stk-muted);
-
-      &[data-actif="true"] {
-        background: var(--stk-card);
-        color: var(--stk-text);
-        font-weight: 600;
-      }
-    }
+    b { font-size: 15px; font-weight: 650; }
+    span { color: var(--st-doux); font-size: 12px; }
   }
 
-  .stkField {
+  .stoChampNav {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    margin-bottom: 10px;
-    min-width: 0;
-  }
+    gap: 4px;
+    padding: 0 6px 6px;
 
-  .stkLabel {
-    font-size: 0.7em;
-    color: var(--stk-muted);
-  }
-
-  // `minmax(0, 1fr)` et non `1fr` : la valeur par défaut d'une piste de
-  // grille est `auto`, donc un champ au contenu large refuse de rétrécir
-  // et pousse son voisin. Les deux colonnes doivent pouvoir se serrer.
-  .stkDeux {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0 10px;
-  }
-
-  input[type="text"],
-  input[type="number"],
-  input[type="date"],
-  select,
-  textarea {
-    width: 100%;
-    min-width: 0;
-    font-family: inherit;
-    font-size: 0.76em;
-    color: var(--stk-text);
-    background: var(--stk-field);
-    border: 1px solid var(--stk-line);
-    border-radius: 6px;
-    padding: 7px 9px;
-    resize: vertical;
-
-    &:focus {
-      outline: none;
-      border-color: var(--stk-accent);
+    span { color: var(--st-doux); font-size: 11.5px; }
+    select {
+      height: 34px;
+      padding: 0 8px;
+      border: 1px solid var(--st-ligne);
+      border-radius: 8px;
+      background: var(--st-carte);
+      font-weight: 600;
     }
   }
 
-  .stkBarre select {
-    width: auto;
-    flex-shrink: 0;
+  .stoNavGroupe {
+    padding: 14px 10px 4px;
+    color: var(--st-pale);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
-  .stkMarge {
-    font-size: 0.72em;
-    color: var(--stk-green);
-    margin: -4px 0 10px;
-
-    &[data-negatif="true"] {
-      color: var(--stk-red);
-    }
-  }
-
-  .stkSens3 {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 12px;
-
-    span {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      flex: 1;
-      padding: 7px 4px;
-      border: 1px solid var(--stk-line);
-      border-radius: 6px;
-      font-size: 0.7em;
-      color: var(--stk-muted);
-      background: var(--stk-card);
-
-      .uicon {
-        display: flex;
-      }
-
-      &[data-actif="true"][data-ton="ok"] {
-        border-color: var(--stk-green);
-        color: var(--stk-green);
-        background: rgb(24 128 56 / 10%);
-      }
-
-      &[data-actif="true"][data-ton="bad"] {
-        border-color: var(--stk-red);
-        color: var(--stk-red);
-        background: rgb(217 48 37 / 10%);
-      }
-
-      &[data-actif="true"][data-ton="info"] {
-        border-color: var(--stk-accent);
-        color: var(--stk-accent);
-        background: var(--stk-accent-soft);
-      }
-    }
-  }
-
-  .stkNote {
-    font-size: 0.7em;
-    line-height: 1.5;
-    color: var(--stk-muted);
-    background: var(--stk-accent-soft);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 12px;
-  }
-
-  .stkRecap {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 0.74em;
-    color: var(--stk-muted);
-    padding: 6px 0;
-    border-top: 1px solid var(--stk-line);
-
-    strong {
-      color: var(--stk-text);
-      font-variant-numeric: tabular-nums;
-    }
-  }
-
-  .stkHisto {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .stkHistoLigne {
+  .stoNavItem {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--stk-line);
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
 
-    &:last-child {
-      border-bottom: none;
+    .uicon { display: flex; color: var(--st-doux); flex-shrink: 0; }
+    span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &:hover { background: var(--st-survol); }
+
+    &[aria-current="page"] {
+      background: var(--st-accent-fond);
+      color: var(--st-accent-fort);
+      font-weight: 600;
+
+      .uicon { color: var(--st-accent); }
     }
   }
 
-  .stkHistoInfo {
-    flex-grow: 1;
-    min-width: 0;
+  .stoPastille {
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--st-accent);
+    color: var(--st-sur-accent);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
   }
 
-  .stkHistoTitre {
-    font-size: 0.76em;
+  .stoLangue {
+    margin-top: auto;
+    padding: 14px 10px 0;
+    border-top: 1px solid var(--st-ligne-douce);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--st-doux);
+    font-size: 12px;
+
+    b { color: var(--st-texte); font-weight: 600; }
   }
+}
 
-  .stkHistoMeta {
-    font-size: 0.68em;
-    color: var(--stk-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 1px;
-  }
+// ---- Briques communes (aussi dans les boîtes de dialogue) -------------------------
 
-  // ---- Boutons et états vides ---------------------------------------------
-
-  .stkPrimary {
+.stoApp,
+.stoForm,
+.stoChoix {
+  .stoBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
-    font-size: 0.74em;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--st-ligne);
+    border-radius: 10px;
+    background: var(--st-carte);
+    color: var(--st-texte);
+    font: inherit;
     font-weight: 600;
-    padding: 7px 14px;
-    border-radius: 6px;
-    background: var(--stk-accent);
-    color: #fff;
     white-space: nowrap;
+    cursor: pointer;
 
-    .uicon {
-      display: flex;
+    .uicon { display: flex; }
+    &:hover:not(:disabled) { background: var(--st-survol); }
+    &:disabled { opacity: 0.5; cursor: default; }
+
+    &[data-variante="principal"] {
+      border-color: var(--st-accent);
+      background: var(--st-accent);
+      color: var(--st-sur-accent);
+
+      &:hover:not(:disabled) { background: var(--st-accent-fort); }
     }
 
-    &:hover {
-      background: #1667d2;
-    }
+    &[data-variante="danger"] {
+      border-color: var(--st-erreur-bord);
+      color: var(--st-erreur);
 
-    &[data-off="true"] {
-      opacity: 0.45;
-      pointer-events: none;
+      &:hover:not(:disabled) { background: var(--st-erreur-fond); }
     }
   }
 
-  .stkBtnGhost {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.73em;
-    padding: 7px 13px;
-    border: 1px solid var(--stk-line);
-    border-radius: 6px;
-    background: var(--stk-card);
-    white-space: nowrap;
+  .stoMt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stoDoux { color: var(--st-doux); }
+  .stoRien { margin: 6px 0; color: var(--st-doux); }
+  .stoAide { margin: 0; color: var(--st-doux); font-size: 12.5px; line-height: 1.5; }
+  .stoEllipse { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stoCode { font-family: ui-monospace, Consolas, monospace; color: var(--st-doux); font-size: 0.92em; }
+  .stoFixe { font-weight: 650; }
 
-    &:hover {
-      border-color: #c7d0dd;
-    }
+  [data-ton="rouge"] { color: var(--st-erreur); }
+  [data-ton="vert"] { color: var(--st-ok); }
 
-    &.stkDanger {
-      color: var(--stk-red);
+  .stoLien {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--st-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
 
-      &:hover {
-        border-color: var(--stk-red);
-      }
-    }
+    &:hover { text-decoration: underline; }
   }
 
-  .stkFormActions {
+  .stoLienTexte {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { color: var(--st-accent); }
+  }
+
+  .stoIcone {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: none;
+    color: var(--st-doux);
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:hover { background: var(--st-survol); color: var(--st-texte); }
+    &[aria-pressed="true"] { background: var(--st-accent-fond); color: var(--st-accent); border-color: var(--st-accent-bord); }
+  }
+
+  .stoCase {
     display: flex;
+    flex-direction: row !important;
+    align-items: center;
     gap: 8px;
-    margin: 14px 0 4px;
+    cursor: pointer;
+
+    input { accent-color: var(--st-accent); width: 16px; height: 16px; margin: 0; }
   }
 
-  .stkVide {
+  .stoChip {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--st-piste);
+    color: var(--st-doux);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+
+    &[data-ton="rupture"],
+    &[data-ton="sortie"] { background: var(--st-erreur-fond); color: var(--st-erreur); }
+    &[data-ton="alerte"] { background: var(--st-attention-fond); color: var(--st-attention-texte); }
+    &[data-ton="ok"],
+    &[data-ton="entree"] { background: var(--st-ok-fond); color: var(--st-ok); }
+    &[data-ton="transfert"],
+    &[data-ton="bleu"] { background: var(--st-info-fond); color: var(--st-info); }
+    &[data-ton="inventaire"] { background: var(--st-accent-fond); color: var(--st-accent-fort); }
+  }
+
+  .stoClasse {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    background: var(--st-classe-c);
+
+    &[data-classe="A"] { background: var(--st-classe-a); }
+    &[data-classe="B"] { background: var(--st-classe-b); }
+  }
+
+  .stoVignette {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    border-radius: 8px;
+    background: var(--st-accent-fond);
+    color: var(--st-accent-fort);
+    font-size: 11px;
+    font-weight: 700;
+    object-fit: cover;
+  }
+
+  .stoQte {
+    box-sizing: border-box;
+    width: 80px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--st-ligne);
+    border-radius: 8px;
+    background: var(--st-carte);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stoActionsForm {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .stoDeux {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .stoSegments {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--st-piste);
+
+    button {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--st-doux);
+      font-weight: 600;
+      cursor: pointer;
+
+      .uicon { display: flex; }
+      &[aria-pressed="true"] { background: var(--st-carte); color: var(--st-texte); box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+    }
+  }
+
+  .stoEncadre {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border: 1px solid var(--st-accent-bord);
+    border-radius: 12px;
+    background: var(--st-accent-fond);
+    font-size: 13px;
+    line-height: 1.5;
+
+    b { color: var(--st-accent-fort); }
+  }
+}
+
+// ---- Formulaires des boîtes de dialogue -------------------------------------------
+
+.stoForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(480px, 82vw);
+  font-size: 13.5px;
+  color: var(--st-texte);
+
+  label,
+  fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+
+    > span { color: var(--st-doux); font-size: 12px; font-weight: 600; }
+    > small { color: var(--st-doux); font-size: 12px; }
+  }
+
+  fieldset { margin: 0; padding: 0; border: 0; gap: 8px; }
+  legend { margin-bottom: 6px; padding: 0; color: var(--st-doux); font-size: 12px; font-weight: 600; }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--st-ligne);
+    border-radius: 9px;
+    background: var(--st-carte);
+    color: var(--st-texte);
+    font: inherit;
+  }
+
+  textarea { padding: 8px 10px; resize: vertical; }
+  .stoActionsForm { margin-top: 4px; }
+}
+
+.stoChoix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(420px, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
+
+  button {
+    padding: 9px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--st-texte);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { background: var(--st-accent-fond); color: var(--st-accent-fort); }
+  }
+}
+
+// ---- Page, en-tête, cartes ------------------------------------------------------------
+
+.stoApp {
+  .stoVue { display: flex; flex-direction: column; min-height: 100%; }
+
+  .stoTete {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 14px;
+    padding: 12px 24px;
+    background: var(--st-carte);
+    border-bottom: 1px solid var(--st-ligne);
+  }
+
+  .stoRetour {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px 6px 0;
+    border: 0;
+    border-right: 1px solid var(--st-ligne);
+    background: none;
+    color: var(--st-doux);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { color: var(--st-texte); }
+  }
+
+  .stoTeteTitre {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-right: auto;
+    min-width: 0;
+
+    h1 { margin: 0; font-size: 17px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    span { color: var(--st-doux); font-size: 12.5px; }
+  }
+
+  .stoTeteActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .stoRechercheForm { display: contents; }
+
+  .stoRecherche,
+  .stoChampTete select {
+    box-sizing: border-box;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--st-ligne);
+    border-radius: 10px;
+    background: var(--st-carte);
+  }
+
+  .stoRecherche { width: 240px; max-width: 100%; }
+
+  .stoChampTete {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    span { color: var(--st-doux); font-size: 12.5px; }
+  }
+
+  .stoConteneur {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .stoCarte {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--st-ligne);
+    border-radius: 14px;
+    background: var(--st-carte);
+
+    &[data-ton="accent"] { border-color: var(--st-accent-bord); }
+    &[data-ton="orange"] { border-color: var(--st-attention-bord); }
+  }
+
+  .stoCarteTete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
+    h2 { margin: 0; font-size: 15px; font-weight: 650; }
+    p { margin: 3px 0 0; color: var(--st-doux); font-size: 12.5px; }
+  }
+
+  .stoCarteActions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+  .stoGrille {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+
+    > .stoLarge { flex: 999 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+    > .stoColonne { flex: 1 1 300px; }
+  }
+
+  .stoGrilleEgale > .stoCarte { flex: 1 1 380px; }
+
+  .stoColonne { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .stoKpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .stoKpis5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+  .stoKpi {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--st-ligne);
+    border-radius: 14px;
+    background: var(--st-carte);
+    text-align: left;
+    cursor: pointer;
+
+    &:disabled { cursor: default; opacity: 1; }
+    &:hover:not(:disabled) { border-color: var(--st-accent-bord); }
+
+    span { color: var(--st-doux); font-size: 12.5px; }
+    b { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    small { color: var(--st-doux); font-size: 12px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &[data-ton="rouge"] b { color: var(--st-erreur); }
+    &[data-ton="orange"] b { color: var(--st-attention); }
+  }
+
+  .stoFiltres {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+
+    > button {
+      height: 32px;
+      padding: 0 12px;
+      border: 1px solid var(--st-ligne);
+      border-radius: 999px;
+      background: var(--st-carte);
+      color: var(--st-doux);
+      font-weight: 600;
+      cursor: pointer;
+
+      &[aria-pressed="true"] { border-color: var(--st-accent); background: var(--st-accent-fond); color: var(--st-accent-fort); }
+    }
+
+    > select {
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--st-ligne);
+      border-radius: 9px;
+      background: var(--st-carte);
+    }
+  }
+
+  .stoPeriode {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--st-doux);
+    font-size: 12.5px;
+
+    input { height: 32px; padding: 0 8px; border: 1px solid var(--st-ligne); border-radius: 9px; background: var(--st-carte); }
+  }
+
+  .stoOnglets {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--st-piste);
+
+    button {
+      height: 30px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--st-doux);
+      font-weight: 600;
+      cursor: pointer;
+
+      &[aria-selected="true"] { background: var(--st-carte); color: var(--st-texte); box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+    }
+  }
+
+  .stoPied {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--st-carte);
+    border: 1px solid var(--st-ligne);
+    font-weight: 600;
+  }
+
+  .stoPlus { display: flex; justify-content: center; padding-top: 6px; }
+
+  .stoPiste {
+    display: block;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--st-piste);
+    overflow: hidden;
+
+    > span { display: block; height: 100%; border-radius: 3px; background: var(--st-accent); }
+    > span[data-classe="B"] { background: var(--st-classe-b); }
+    > span[data-classe="C"] { background: var(--st-classe-c); }
+  }
+
+  .stoProgression {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--st-piste);
+    overflow: hidden;
+
+    span { display: block; height: 100%; background: var(--st-accent); transition: width 0.2s; }
+  }
+}
+
+// ---- Tableaux ---------------------------------------------------------------------------
+
+.stoApp {
+  .stoTableau { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; }
+
+  .stoLigneT {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    min-width: 620px;
+    padding: 9px 4px;
+    border: 0;
+    border-top: 1px solid var(--st-ligne-douce);
+    background: none;
+    color: inherit;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+
+    > * { min-width: 0; }
+    &[data-off] { opacity: 0.5; }
+    [data-sens="entree"] { color: var(--st-ok); }
+    [data-sens="sortie"] { color: var(--st-erreur); }
+    input[type="checkbox"] { accent-color: var(--st-accent); width: 16px; height: 16px; margin: 0; }
+    select { height: 30px; max-width: 100%; padding: 0 6px; border: 1px solid var(--st-ligne); border-radius: 8px; background: var(--st-carte); }
+  }
+
+  button.stoLigneT { width: 100%; cursor: pointer; &:hover { background: var(--st-survol); } }
+
+  .stoTableau > .stoLigneT:first-child { border-top: 0; }
+
+  .stoEnteteT { border-top: 0; padding-top: 0; color: var(--st-doux); font-size: 12px; font-weight: 600; }
+
+  .stoQui {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+
+    small { font-size: 12px; }
+  }
+
+  button.stoQui { padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+
+  .stoColsArticles .stoQui,
+  .stoQuiLien { flex-direction: row; align-items: center; gap: 10px; }
+
+  .stoQuiLien {
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+
+    > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    &:hover b { color: var(--st-accent); }
+  }
+
+  .stoColsArticles .stoQui { flex-direction: column; align-items: flex-start; gap: 1px; }
+
+  .stoColsArticles { grid-template-columns: 36px minmax(0, 2.4fr) minmax(0, 1.3fr) 44px minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 1fr); }
+  .stoColsMvt { grid-template-columns: 96px minmax(0, 2fr) 100px 90px minmax(0, 1.3fr) minmax(0, 1.3fr); }
+  .stoColsHisto { grid-template-columns: 96px minmax(0, 2fr) 100px 90px minmax(0, 1.2fr) 90px minmax(0, 1.3fr) 32px; }
+  .stoColsHistoA { grid-template-columns: 96px 100px 90px minmax(0, 1.3fr) 90px minmax(0, 1.5fr) 32px; }
+  .stoColsLots { grid-template-columns: minmax(0, 1fr) 110px 90px minmax(0, 1.2fr) 130px; min-width: 520px; }
+  .stoColsReappro { grid-template-columns: 22px minmax(0, 2.4fr) 80px 80px 80px 80px 96px minmax(0, 1fr); min-width: 760px; }
+  .stoColsLivraison { grid-template-columns: minmax(0, 2fr) 90px 90px minmax(0, 1fr); min-width: 480px; }
+  .stoColsInv { grid-template-columns: 100px 110px minmax(0, 1.4fr) 100px minmax(0, 1fr) 100px; }
+  .stoColsComptage { grid-template-columns: minmax(0, 2fr) minmax(0, 0.9fr) 80px 96px 80px minmax(0, 0.9fr) minmax(0, 1.2fr); min-width: 760px; }
+  .stoColsTop { grid-template-columns: 26px minmax(0, 2fr) 80px minmax(0, 1fr); min-width: 340px; }
+  .stoColsCat { grid-template-columns: minmax(0, 2fr) 100px minmax(0, 1fr) 136px; min-width: 520px; }
+  .stoColsFour { grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) 70px 90px minmax(0, 0.9fr) 36px; min-width: 640px; }
+  .stoColsEtiq { grid-template-columns: 22px minmax(0, 2fr) minmax(0, 1.2fr) 96px; min-width: 440px; }
+
+  .stoCatNom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: calc(var(--niveau, 0) * 22px);
+
+    .uicon { display: flex; color: var(--st-accent); flex: none; }
+  }
+
+  .stoActionsLigne { display: flex; justify-content: flex-end; gap: 2px; }
+}
+
+// ---- Tableau de bord et fiche article -----------------------------------------------------
+
+.stoApp {
+  .stoTaches {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 0;
+      border-top: 1px solid var(--st-ligne-douce);
+
+      &:first-child { border-top: 0; padding-top: 2px; }
+      > span:not(.stoPastilleTache) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      b { font-weight: 600; }
+      small { color: var(--st-doux); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+  }
+
+  .stoPastilleTache {
+    display: grid;
+    place-items: center;
+    flex: none;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    border-radius: 15px;
+    background: var(--st-piste);
+    color: var(--st-doux);
+    font-size: 12.5px;
+    font-weight: 700;
+
+    &[data-ton="accent"] { background: var(--st-accent); color: var(--st-sur-accent); }
+    &[data-ton="bleu"] { background: var(--st-info-fond); color: var(--st-info); }
+    &[data-ton="orange"] { background: var(--st-attention-fond); color: var(--st-attention-texte); }
+  }
+
+  .stoEntrepots,
+  .stoAbc,
+  .stoBarres,
+  .stoListeValeurs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stoEntrepots {
+    gap: 14px;
+
+    li { display: flex; flex-direction: column; gap: 5px; }
+    li > span:first-child { display: flex; justify-content: space-between; gap: 10px; }
+    small { color: var(--st-doux); font-size: 12px; }
+  }
+
+  .stoAbc {
+    gap: 12px;
+
+    li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+    li > .stoPiste { grid-column: 2; }
+    li > small { grid-column: 2; color: var(--st-doux); font-size: 12px; }
+    li > span:not(.stoPiste) { display: flex; flex-direction: column; gap: 1px; }
+    li > span small { color: var(--st-doux); font-size: 12px; }
+  }
+
+  .stoBarres {
+    gap: 10px;
+
+    li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 120px; gap: 12px; align-items: center; }
+  }
+
+  .stoListeValeurs {
+    li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px solid var(--st-ligne-douce);
+
+      &:first-child { border-top: 0; padding-top: 0; }
+      > span { color: var(--st-doux); }
+      > b { text-align: right; font-variant-numeric: tabular-nums; }
+    }
+  }
+
+  .stoCourbe {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 140px;
+    padding-top: 6px;
+
+    > span:not(.stoCourbePoint) {
+      flex: 1;
+      min-width: 0;
+      border-radius: 3px 3px 0 0;
+      background: var(--st-accent);
+      opacity: 0.8;
+
+      &[data-bas="true"] { background: var(--st-attention); }
+    }
+  }
+
+  .stoCourbePoint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1.5px dashed var(--st-erreur);
+    pointer-events: none;
+  }
+
+  .stoCourbeAxe { display: flex; justify-content: space-between; color: var(--st-pale); font-size: 11.5px; }
+
+  .stoParametres {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    label > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    small { color: var(--st-doux); font-size: 11.5px; }
+    input {
+      box-sizing: border-box;
+      width: 84px;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--st-ligne);
+      border-radius: 8px;
+      background: var(--st-carte);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .stoChamps {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+
+    label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    label > span { color: var(--st-doux); font-size: 12px; font-weight: 600; }
+    input:not([type="checkbox"]),
+    select,
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--st-ligne);
+      border-radius: 9px;
+      background: var(--st-carte);
+    }
+    textarea { padding: 8px 10px; resize: vertical; }
+    .stoChampLarge { grid-column: 1 / -1; }
+    .stoCase > span { color: var(--st-texte); font-weight: 500; font-size: 13.5px; }
+  }
+
+  .stoMarge {
+    margin: 0;
+    color: var(--st-ok);
+    font-weight: 600;
+
+    &[data-negatif="true"] { color: var(--st-erreur); }
+  }
+
+  .stoImage {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 14px;
-    flex-grow: 1;
-    padding: 40px;
-    text-align: center;
-    font-size: 0.8em;
-    color: var(--stk-muted);
+    gap: 12px;
+
+    img { width: 160px; height: 160px; object-fit: cover; border-radius: 12px; border: 1px solid var(--st-ligne); }
   }
 
-  .stkEmptyBox {
-    padding: 14px;
-    border: 1px dashed var(--stk-line);
-    border-radius: 6px;
-    font-size: 0.74em;
-    line-height: 1.5;
-    color: var(--stk-muted);
+  .stoColonneBoutons {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .stkNotice {
-    position: absolute;
-    left: 50%;
-    bottom: 16px;
-    transform: translateX(-50%);
-    padding: 8px 16px;
-    border-radius: 100px;
-    background: #1f2733;
-    color: #fff;
-    font-size: 0.74em;
-    box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
-    z-index: 5;
+  .stoChiffres {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+
+    span { display: flex; flex-direction: column; gap: 2px; }
+    small { color: var(--st-doux); font-size: 12px; }
+    b { font-size: 16px; font-variant-numeric: tabular-nums; }
+  }
+
+  .stoPuces { display: flex; flex-wrap: wrap; gap: 6px; .stoChip { margin: 0; } }
+
+  .stoCartesEntrepots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
   }
 }
 
-// Liste de choix d'une catégorie parente, rendue dans une boîte de dialogue :
-// elle vit donc hors de `.stkApp` et porte ses propres couleurs.
-.stkChoix {
-  max-height: 320px;
-  overflow-y: auto;
+// ---- Mode scan --------------------------------------------------------------------------
 
-  .stkChoixLigne {
-    padding: 8px 10px;
-    border-radius: 5px;
-    font-size: 0.86em;
+.stoApp {
+  .stoScanCorps { max-width: 680px; }
 
-    &:hover {
-      background: rgb(26 115 232 / 10%);
-      color: #1a73e8;
+  .stoChamp {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    span { color: var(--st-doux); font-size: 12px; font-weight: 600; }
+    select { height: 38px; padding: 0 10px; border: 1px solid var(--st-ligne); border-radius: 10px; background: var(--st-carte); }
+  }
+
+  .stoLecteur {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px 0 14px;
+    border: 2px solid var(--st-accent);
+    border-radius: 14px;
+    background: var(--st-carte);
+
+    > .uicon { display: flex; color: var(--st-accent); }
+    input { flex: 1; min-width: 0; height: 52px; border: 0; background: none; font-size: 17px; }
+    input:focus-visible { outline: none; }
+    &:focus-within { box-shadow: 0 0 0 3px var(--st-accent-fond); }
+  }
+
+  .stoModes { flex-wrap: wrap; button { flex: 1 1 110px; } }
+
+  .stoVideo { width: 100%; max-height: 320px; border-radius: 14px; background: #000; object-fit: cover; }
+
+  .stoMessage {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--st-ok-fond);
+    font-weight: 600;
+
+    &[data-ton="rouge"] { background: var(--st-erreur-fond); }
+  }
+
+  .stoPanier {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    li:not(.stoRien) {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--st-ligne);
+      border-radius: 12px;
+      background: var(--st-carte);
+
+      > span:nth-child(2) { flex: 1 1 150px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     }
   }
-}
 
-body[data-theme="dark"] .stkApp {
-  --stk-bg: #1e1e26;
-  --stk-panel: #262630;
-  --stk-card: #2b2b36;
-  --stk-line: #35353f;
-  --stk-text: #e8e8ee;
-  --stk-muted: #9a9aa8;
-  --stk-accent: #6ea8ff;
-  --stk-accent-soft: #26344a;
-  --stk-field: #23232c;
-  --stk-green: #6cc98a;
-  --stk-amber: #e0a458;
-  --stk-red: #e2716a;
+  .stoPas {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--st-ligne);
+    border-radius: 10px;
+    overflow: hidden;
 
-  .stkCarte:hover,
-  .stkBtnGhost:hover {
-    border-color: #4a4a58;
+    button { width: 36px; height: 36px; border: 0; background: var(--st-piste); font-size: 17px; font-weight: 700; cursor: pointer; }
+    input { width: 54px; height: 36px; border: 0; background: var(--st-carte); text-align: center; font-variant-numeric: tabular-nums; }
   }
 
-  .stkNotice {
-    background: #3a3a48;
+  .stoPiedScan { position: sticky; bottom: 12px; box-shadow: 0 4px 18px rgb(0 0 0 / 8%); }
+}
+
+// ---- Petites largeurs -----------------------------------------------------------------------
+
+@container (max-width: 860px) {
+  .stoApp .stoKpis,
+  .stoApp .stoKpis5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container (max-width: 560px) {
+  .stoApp {
+    .stoTete { padding: 10px 14px; }
+    .stoConteneur { padding: 14px 14px 30px; }
+    .stoRecherche { width: 100%; }
+    .stoKpis,
+    .stoKpis5 { grid-template-columns: minmax(0, 1fr); }
+    .stoDeux { grid-template-columns: minmax(0, 1fr); }
+    .stoBarres li { grid-template-columns: minmax(0, 1fr) 100px; }
+    .stoBarres li > .stoPiste { display: none; }
   }
 }
 
-body[data-theme="dark"] .stkChoix .stkChoixLigne:hover {
-  background: rgb(110 168 255 / 16%);
-  color: #6ea8ff;
+@media (max-width: 720px) {
+  .stoApp .stoNav { width: 64px; padding: 12px 6px; }
+  .stoApp .stoNav .stoMarque,
+  .stoApp .stoNav .stoChampNav,
+  .stoApp .stoNav .stoNavGroupe,
+  .stoApp .stoNav .stoLangue,
+  .stoApp .stoNavItem span { display: none; }
+  .stoApp .stoNavItem { justify-content: center; position: relative; }
+  .stoApp .stoNavItem .stoPastille { position: absolute; top: 0; right: 0; min-width: 16px; line-height: 16px; font-size: 10px; padding: 0 3px; }
 }

@@ -18,6 +18,9 @@ export const SENS = {
   // le seul mouvement qui écrase l'histoire plutôt que de la prolonger,
   // parce qu'un comptage physique fait autorité sur tous les calculs.
   inventaire: { label: "Inventaire", signe: 0, icone: "faClipboardCheck", ton: "info" },
+  // Un transfert déplace sans rien créer ni détruire : le stock total ne
+  // bouge pas, seule sa répartition entre entrepôts change.
+  transfert: { label: "Transfert", signe: 0, icone: "faRightLeft", ton: "info" },
 };
 
 export const UNITES = [
@@ -55,14 +58,41 @@ const chronologie = (a, b) => {
   return a.createdAt < b.createdAt ? -1 : 1;
 };
 
-/// Niveau de stock de chaque article : { [articleId]: quantité }.
+/// Niveau de chaque article dans chaque entrepôt :
+/// { [articleId]: { [entrepotId]: quantité } }. L'entrepôt "" est celui
+/// des mouvements d'avant les entrepôts, et celui d'une entreprise qui n'en
+/// a qu'un.
+export const niveauxParEntrepot = (mouvements) => {
+  const t = {};
+  const seau = (id) => (t[id] = t[id] || {});
+  for (const m of [...mouvements].sort(chronologie)) {
+    const d = m.data;
+    const s = seau(d.articleId);
+    const q = Number(d.quantite) || 0;
+    const ici = d.entrepotId || "";
+    if (d.sens === "transfert") {
+      s[d.de || ""] = (s[d.de || ""] || 0) - q;
+      s[d.vers || ""] = (s[d.vers || ""] || 0) + q;
+    } else if (d.sens === "inventaire") {
+      // Un inventaire d'avant les entrepôts portait sur tout le stock : il
+      // remet tout à plat. Un inventaire d'entrepôt n'impose que le sien.
+      if (!("entrepotId" in d)) {
+        for (const k of Object.keys(s)) s[k] = 0;
+        s[""] = q;
+      } else s[ici] = q;
+    } else {
+      s[ici] = (s[ici] || 0) + q * (SENS[d.sens]?.signe ?? 0);
+    }
+  }
+  return t;
+};
+
+/// Niveau de stock de chaque article : { [articleId]: quantité }, tous
+/// entrepôts confondus.
 export const niveaux = (mouvements) => {
   const totaux = {};
-  for (const m of [...mouvements].sort(chronologie)) {
-    const id = m.data.articleId;
-    const q = Number(m.data.quantite) || 0;
-    if (m.data.sens === "inventaire") totaux[id] = q;
-    else totaux[id] = (totaux[id] || 0) + q * (SENS[m.data.sens]?.signe ?? 0);
+  for (const [id, parEntrepot] of Object.entries(niveauxParEntrepot(mouvements))) {
+    totaux[id] = Object.values(parEntrepot).reduce((s, q) => s + q, 0);
   }
   return totaux;
 };
