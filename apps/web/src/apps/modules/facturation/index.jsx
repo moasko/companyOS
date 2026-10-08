@@ -6,6 +6,7 @@ import { api } from "../../../api/client";
 import { saveAs } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { composerCourriel } from "../../courrielRequest";
+import { ouvrirDansEditeur } from "../../editeurFacturesRequest";
 import { envoyerA } from "../../notifications";
 import { Auteur } from "../../Auteur";
 import { choisirClient, choisirProduit } from "../../referentiel";
@@ -1096,6 +1097,19 @@ function FacturationApp() {
                       <div className="fctBtnGhost handcr" onClick={exporterPdf}>
                         PDF
                       </div>
+                      {/* La mise en page soignée (modèles, logo, couleurs,
+                          échéancier) se fait dans l'Éditeur de factures,
+                          sur la même fiche : rien n'est dupliqué. */}
+                      {selectedId && draft.type === "facture" ? (
+                        <div
+                          className="fctBtnGhost handcr"
+                          title="Ouvrir cette facture dans l'Éditeur de factures (modèles, logo, envoi)"
+                          onClick={() => ouvrirDansEditeur({ id: selectedId })}
+                        >
+                          <Icon fafa="faWandMagicSparkles" width={11} />
+                          <span>Éditeur avancé</span>
+                        </div>
+                      ) : null}
                     </div>
 
                     {selectedId ? (

@@ -49,6 +49,8 @@ const NOMS_EN = {
   courrier: "Mail",
   crm: "CRM",
   facturation: "Invoicing",
+  "editeur-factures": "Invoice designer",
+  editeurFactures: "Invoice designer",
   frais: "Expenses",
   paie: "Payroll",
   plateforme: "Platform",
