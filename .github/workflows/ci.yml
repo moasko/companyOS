@@ -63,6 +63,24 @@ jobs:
       # `validate` relit le schéma ; `format --check` attrape les schémas
       # modifiés à la main et jamais reformatés, qui produisent ensuite des
       # diffs illisibles.
+      # La CLI `prisma` et `@prisma/client` doivent partager la même version
+      # majeure : un `@prisma/client` passé en 7 avec une CLI en 6 faisait
+      # échouer `prisma generate` dans l'image de l'API — et la production
+      # restait sur l'ancienne version sans que rien ne le signale ici.
+      - name: Versions de Prisma alignées
+        run: |
+          node -e '
+            const l = require("./package-lock.json").packages;
+            const majeures = (nom) => Object.entries(l)
+              .filter(([chemin]) => chemin.endsWith("node_modules/" + nom))
+              .map(([, p]) => p.version.split(".")[0]);
+            const toutes = new Set([...majeures("prisma"), ...majeures("@prisma/client")]);
+            if (toutes.size !== 1) {
+              console.error("prisma et @prisma/client doivent avoir la même version majeure :", [...toutes]);
+              process.exit(1);
+            }
+            console.log("Prisma", [...toutes][0], "— CLI et client alignés.");
+          '
       # `validate` exige que DATABASE_URL existe, pas qu'elle mène quelque
       # part : une valeur factice suffit.
       - run: npx prisma validate --schema apps/api/prisma/schema.prisma
