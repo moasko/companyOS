@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { Icon, ToolBar } from "../../../utils/general";
 import { chercher } from "./boutique";
@@ -6,6 +6,8 @@ import { useNomApp } from "../../../utils/nomsApps";
 import { api } from "../../../api/client";
 import { syncInstalledModules, moduleBySlug } from "../../../apps/sync";
 import { scrollElementTo } from "../../../apps/scrollTo";
+import { etatFenetre, ouvrirFenetre } from "../../../apps/windows";
+import { cleApp } from "../../../reducers/apps";
 import { modal } from "../../../apps/modalRequest";
 import { decrireCapacites } from "../../../apps/donnees";
 import { Contenu, useChargement } from "../../../apps/chargement";
@@ -21,11 +23,18 @@ import "./assets/boutique.scss";
 // de travail. Même charte que les modules — voir src/apps/README.md.
 
 const SECTIONS = [
-  { id: "catalogue", label: "Catalogue", icon: "faGrip" },
+  { id: "catalogue", label: "Découvrir", icon: "faCompass" },
   { id: "misesajour", label: "Mises à jour", icon: "faCircleArrowUp" },
-  { id: "installees", label: "Installées", icon: "faCircleCheck" },
-  { id: "apropos", label: "À propos", icon: "faCircleInfo" },
+  { id: "installees", label: "Installées", icon: "faLayerGroup" },
 ];
+
+/// L'ordre des catégories à l'écran : le métier d'abord, c'est pour lui
+/// qu'on ouvre la Boutique.
+const ORDRE_CATEGORIES = ["Gestion", "Bureautique", "Création", "Outils"];
+
+/// Ce qu'on met en avant à une entreprise qui n'a pas encore tout : les
+/// applications qui font tourner une PME, dans l'ordre où elle en a besoin.
+const A_LA_UNE = ["facturation", "caisse", "stock", "comptabilite", "paie", "rh", "crm", "achats", "conges"];
 
 export const MicroStore = () => {
   const nomApp = useNomApp();
@@ -253,11 +262,108 @@ export const MicroStore = () => {
   /// générique, elles sont donc toujours disponibles.
   const disponible = (app) => app.kind !== "NATIVE" || !!moduleBySlug[app.slug];
 
+  /// L'application a-t-elle une fenêtre qu'on peut ouvrir d'ici ?
+  // La clé de fenêtre est celle du shell : l'`id` du module, à défaut son
+  // icône (le Traitement de texte n'a pas d'`id`).
+  const idFenetre = (app) => (moduleBySlug[app.slug] ? cleApp(moduleBySlug[app.slug]) : app.slug);
+  const ouvrable = (app) => (app.installed || app.isCore) && !!etatFenetre(idFenetre(app));
+  const ouvrir = (app) => ouvrirFenetre(idFenetre(app));
+
+  const voirFiche = (slug) => {
+    setSelected(slug);
+    scrollElementTo(mainRef.current, 0);
+  };
+
+  /// Le catalogue rangé par catégorie, le métier d'abord ; le socle (ce qui
+  /// est livré avec CompanyOS et ne s'installe pas) à part, en dernier.
+  const parCategorie = useMemo(() => {
+    const groupes = new Map();
+    for (const app of visible) {
+      if (app.isCore) continue;
+      if (!groupes.has(app.category)) groupes.set(app.category, []);
+      groupes.get(app.category).push(app);
+    }
+    const rang = (c) => (ORDRE_CATEGORIES.indexOf(c) < 0 ? 99 : ORDRE_CATEGORIES.indexOf(c));
+    return [...groupes.entries()].sort((a, b) => rang(a[0]) - rang(b[0]));
+  }, [visible]);
+  const socle = visible.filter((a) => a.isCore);
+
+  /// L'application mise en avant : la première du métier pas encore
+  /// installée et réellement disponible.
+  const aLaUne = useMemo(() => {
+    const candidates = catalog.filter((a) => !a.isCore && !a.installed && disponible(a));
+    return A_LA_UNE.map((slug) => candidates.find((a) => a.slug === slug)).find(Boolean)
+      || candidates[0]
+      || null;
+  }, [catalog]);
+
+  /// Les applications dont elle lit ou modifie les données : ce avec quoi
+  /// elle « fonctionne ».
+  const liees = useMemo(() => {
+    if (!detail) return [];
+    const cap = moduleBySlug[detail.slug]?.capacites || {};
+    const slugs = new Set(
+      [...(cap.lit || []), ...(cap.ecrit || [])].map((c) => String(c).split(":")[0]),
+    );
+    slugs.delete(detail.slug);
+    return [...slugs].map((slug) => catalog.find((a) => a.slug === slug)).filter(Boolean);
+  }, [detail, catalog]);
+
   const statusOf = (app) => {
     if (app.isCore) return { label: "Socle", tone: "core" };
     if (!disponible(app)) return { label: "Bientôt", tone: "soon" };
     if (!app.installed) return { label: "Disponible", tone: "idle" };
     return { label: "Installée", tone: "ok" };
+  };
+
+  /// Une carte du catalogue : on l'ouvre pour lire la fiche ; le bouton
+  /// fait l'action la plus probable — Ouvrir si c'est installé, Installer
+  /// sinon. Désinstaller n'est jamais à portée d'un clic distrait : il est
+  /// dans la fiche.
+  const carte = (app) => {
+    const status = statusOf(app);
+    return (
+      <div
+        key={app.slug}
+        className="btqCard"
+        role="button"
+        tabIndex={0}
+        data-bientot={!disponible(app) && !app.installed ? "true" : "false"}
+        onClick={() => voirFiche(app.slug)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); voirFiche(app.slug); }
+        }}
+      >
+        <Icon src={app.icon} width={44} />
+        <div className="btqCardCorps">
+          <div className="btqName">{nomApp(app)}</div>
+          <div className="btqCat">
+            {app.category}
+            {status.tone === "ok" ? <span className="btqInstallee"><Icon fafa="faCircleCheck" width={9} /> Installée</span> : null}
+          </div>
+          <div className="btqDesc">{app.description}</div>
+        </div>
+        <div className="btqCardFoot">
+          {status.tone === "soon" ? (
+            <span className="btqTag" data-tone="soon">Bientôt</span>
+          ) : ouvrable(app) ? (
+            <button type="button" className="btqBouton" data-ton="contour" onClick={(e) => { e.stopPropagation(); ouvrir(app); }}>
+              Ouvrir
+            </button>
+          ) : !app.installed && !app.isCore ? (
+            <button
+              type="button"
+              className="btqBouton"
+              data-ton="doux"
+              disabled={!!busySlug}
+              onClick={(e) => { e.stopPropagation(); toggle(app); }}
+            >
+              {busySlug === app.slug ? "Installation…" : "Installer"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -287,398 +393,403 @@ export const MicroStore = () => {
             </div>
           ) : (
             <div className="btqShell">
-              {/* Navigation latérale */}
-              <aside className="btqNav">
+              {/* Le rail de navigation, comme celui du Microsoft Store. */}
+              <nav className="btqNav" aria-label="Boutique">
                 {SECTIONS.map((s) => (
-                  <div
+                  <button
+                    type="button"
                     key={s.id}
-                    className="btqNavItem handcr"
-                    data-active={section === s.id}
-                    onClick={() => goToSection(s.id)}
+                    className="btqNavItem"
+                    data-active={section === s.id && !detail}
+                    onClick={() => { setSelected(null); goToSection(s.id); }}
                   >
-                    <Icon fafa={s.icon} width={13} />
+                    <span className="btqNavIcone">
+                      <Icon fafa={s.icon} width={15} />
+                      {/* Une mise à jour en attente doit se voir sans avoir
+                          à ouvrir l'onglet : c'est tout l'intérêt du suivi. */}
+                      {s.id === "misesajour" && aMettreAJour.length ? (
+                        <span className="btqPastille">{aMettreAJour.length}</span>
+                      ) : null}
+                    </span>
                     <span>{s.label}</span>
-                    {/* Une mise à jour en attente doit se voir sans avoir à
-                        ouvrir l'onglet : c'est tout l'intérêt du suivi. */}
-                    {s.id === "misesajour" && aMettreAJour.length ? (
-                      <span className="btqPastille">{aMettreAJour.length}</span>
-                    ) : null}
-                  </div>
+                  </button>
                 ))}
-              </aside>
+              </nav>
 
-              {/* Colonne centrale */}
               <div className="btqMain cosScroll" ref={mainRef}>
-                <section ref={registerSection("catalogue")} className="btqSection" data-hidden={section !== "catalogue"}>
-                  <h2>
-                    <span className="btqNum">1.</span> Catalogue
-                  </h2>
-                  <p className="btqHint">
-                    Modules de gestion disponibles pour {session.tenant?.name}
-                  </p>
-
-                  <div className="btqField">
+                {/* La recherche reste en haut, quel que soit l'onglet. */}
+                <div className="btqBarre">
+                  <div className="btqRecherche">
+                    <Icon fafa="faMagnifyingGlass" width={13} />
                     <input
-                      type="text"
-                      placeholder="Rechercher un module…"
+                      type="search"
+                      placeholder="Rechercher une application : facturation, paie, stock…"
+                      aria-label="Rechercher une application"
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        setSelected(null);
+                        if (section !== "catalogue") setSection("catalogue");
+                      }}
                     />
                   </div>
-
-                  <div className="btqChips">
-                    {categories.map((cat) => (
-                      <div
-                        key={cat}
-                        className="btqChip handcr"
-                        data-active={filter === cat}
-                        onClick={() => setFilter(cat)}
-                      >
-                        {cat}
-                      </div>
-                    ))}
-                  </div>
-
-                  {error ? <div className="btqWarn">{error}</div> : null}
-
-                  {etat.initial || etat.erreur ? (
-                    <Contenu etat={etat} vide={false} squelette="grille" lignes={9} />
-                  ) : visible.length === 0 ? (
-                    <div className="btqEmptyBox">
-                      {query.trim()
-                        ? `Aucun module ne correspond à « ${query.trim()} »`
-                        : "Aucun module dans cette catégorie."}
-                      {ailleurs.length > 0 && (
-                        <>
-                          {" "}
-                          <button
-                            type="button"
-                            className="btqLien"
-                            onClick={() => setFilter("Tout")}
-                          >
-                            {ailleurs.length === 1
-                              ? "Un module correspond dans une autre catégorie."
-                              : `${ailleurs.length} modules correspondent dans d'autres catégories.`}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                    {/* Dire ce qui est montré, et combien. Sans ce repère,
-                        on ne sait pas si la liste est le catalogue entier
-                        ou le résultat d'un filtre oublié. */}
-                    <p className="btqResultats" role="status">
-                      {query.trim()
-                        ? `${visible.length} résultat${visible.length > 1 ? "s" : ""} pour « ${query.trim()} »`
-                        : filter === "Tout"
-                          ? `${visible.length} modules au catalogue`
-                          : `${visible.length} modules · ${filter}`}
-                    </p>
-                    <div className="btqGrid">
-                      {visible.map((app) => {
-                        const status = statusOf(app);
-                        return (
-                          <div
-                            key={app.slug}
-                            className="btqCard handcr"
-                            data-active={selected === app.slug}
-                            data-bientot={!disponible(app) ? "true" : "false"}
-                            onClick={() => setSelected(app.slug)}
-                          >
-                            <div className="btqCardTop">
-                              <Icon src={app.icon} width={48} />
-                              <div className="btqCardHead">
-                                <div className="btqName">{nomApp(app)}</div>
-                                <div className="btqCat">{app.category}</div>
-                              </div>
-                              {/* L'état va en haut à droite, là où une
-                                  boutique met le prix : c'est la première
-                                  chose qu'on cherche sur une carte, avant
-                                  même de lire la description. */}
-                              <div className="btqTag" data-tone={status.tone}>
-                                {status.label}
-                              </div>
-                            </div>
-                            <div className="btqDesc">{app.description}</div>
-                            <div className="btqCardFoot">
-                              {app.isCore ||
-                              (!disponible(app) && !app.installed) ? null : (
-                                <div
-                                  className="btqAction handcr"
-                                  data-installed={app.installed}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggle(app);
-                                  }}
-                                >
-                                  {busySlug === app.slug
-                                    ? "…"
-                                    : app.installed
-                                      ? "Désinstaller"
-                                      : "Installer"}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    </>
-                  )}
-                </section>
-
-                <section ref={registerSection("misesajour")} className="btqSection" data-hidden={section !== "misesajour"}>
-                  <h2>
-                    <span className="btqNum">2.</span> Mises à jour
-                  </h2>
-                  <p className="btqHint">
-                    Ce que le shell livre, comparé à ce qui est enregistré
-                    dans cet espace de travail
-                  </p>
-
-                  {/* L'erreur doit apparaître là où le geste a eu lieu : une
-                      mise à jour refusée signalée dans l'onglet Catalogue
-                      passe inaperçue, et le bouton semble ne rien faire. */}
-                  {error ? <div className="btqWarn">{error}</div> : null}
-
-                  {!aMettreAJour.length ? (
-                    <div className="btqEmptyBox">
-                      Toutes vos applications sont à jour.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="btqMajTete">
-                        <span>
-                          {aMettreAJour.length} application
-                          {aMettreAJour.length > 1 ? "s" : ""} à mettre à jour
-                        </span>
-                        <div
-                          className="btqPrimary handcr"
-                          data-off={!!busySlug}
-                          onClick={toutMettreAJour}
-                        >
-                          Tout mettre à jour
-                        </div>
-                      </div>
-
-                      {aMettreAJour.map((app) => {
-                        const cible = versionLivree(app, moduleBySlug);
-                        const notes = nouveautesDepuis(app, moduleBySlug);
-                        return (
-                          <div key={app.slug} className="btqMaj">
-                            <Icon src={app.icon} width={26} />
-                            <div className="btqMajInfo">
-                              <div className="btqMajNom">{nomApp(app)}</div>
-                              <div className="btqMajVersions">
-                                {app.installedVersion ? (
-                                  <>
-                                    v{app.installedVersion}
-                                    <Icon fafa="faArrowRight" width={8} />
-                                  </>
-                                ) : (
-                                  "version inconnue → "
-                                )}
-                                <strong>v{cible}</strong>
-                              </div>
-                              {notes.length ? (
-                                <ul className="btqMajNotes">
-                                  {notes.map((n) => (
-                                    <li key={n.version}>{n.texte}</li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <div className="btqMajVide">
-                                  Reprise des données pour cette version.
-                                </div>
-                              )}
-                            </div>
-                            <div
-                              className="btqPrimary handcr"
-                              data-off={busySlug === app.slug}
-                              onClick={() => mettreAJour(app)}
-                            >
-                              {busySlug === app.slug ? "…" : "Mettre à jour"}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
-                </section>
-
-                <section ref={registerSection("installees")} className="btqSection" data-hidden={section !== "installees"}>
-                  <h2>
-                    <span className="btqNum">3.</span> Installées
-                  </h2>
-                  <p className="btqHint">
-                    Modules actifs dans cet espace de travail
-                  </p>
-
-                  <div className="btqList">
-                    {installed.map((app) => {
-                      const status = statusOf(app);
-                      return (
-                        <div key={app.slug} className="btqRow">
-                          <Icon src={app.icon} width={22} />
-                          <div className="btqRowInfo">
-                            <div className="btqRowName">{nomApp(app)}</div>
-                            <div className="btqRowMeta">
-                              {app.category} · v
-                              {app.installedVersion || versionLivree(app, moduleBySlug)}
-                              {miseAJourDisponible(app, moduleBySlug) ? (
-                                <em className="btqMajDispo">
-                                  {" "}
-                                  · v{versionLivree(app, moduleBySlug)} disponible
-                                </em>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="btqTag" data-tone={status.tone}>
-                            {status.label}
-                          </div>
-                          {app.isCore ? null : (
-                            <div
-                              className="btqAction handcr"
-                              data-installed
-                              onClick={() => toggle(app)}
-                            >
-                              Retirer
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                <section ref={registerSection("apropos")} className="btqSection" data-hidden={section !== "apropos"}>
-                  <h2>
-                    <span className="btqNum">4.</span> À propos
-                  </h2>
-                  <p className="btqHint">
-                    Comment fonctionnent les modules de CompanyOS
-                  </p>
-                  <div className="btqAbout">
-                    <p>
-                      Un module installé apparaît immédiatement sur le bureau et
-                      dans le menu Démarrer de tout l'espace de travail. Un module
-                      retiré disparaît de la même manière — ses données restent
-                      conservées et reviennent à la réinstallation.
-                    </p>
-                    <p>
-                      Les modules marqués « Module à venir » sont déjà réservés au
-                      catalogue mais leur interface reste à livrer.
-                    </p>
-                  </div>
-                </section>
-              </div>
-
-              {/* Panneau contextuel */}
-              <aside className="btqSide cosScroll">
-                <div className="btqSideTitle">
-                  {detail ? "Module sélectionné" : "Votre espace"}
                 </div>
 
-                <div className="btqCardDetail">
-                  {detail ? (
-                    <>
-                      <Icon src={detail.icon} width={48} />
-                      <div className="btqDetailName">{nomApp(detail)}</div>
-                      <div className="btqDetailCat">
-                        {detail.category} · v{detail.version}
+                {error ? <div className="btqWarn">{error}</div> : null}
+
+                {detail ? (
+                  // ---------------------------------------------------------
+                  // La fiche d'une application
+                  // ---------------------------------------------------------
+                  <article className="btqFiche">
+                    <button type="button" className="btqRetour" onClick={() => setSelected(null)}>
+                      <Icon fafa="faArrowLeft" width={11} />
+                      <span>Retour</span>
+                    </button>
+
+                    <header className="btqFicheTete">
+                      <span className="btqFicheIcone"><Icon src={detail.icon} width={64} /></span>
+                      <div className="btqFicheInfo">
+                        <h2>{nomApp(detail)}</h2>
+                        <div className="btqFicheMeta">
+                          {detail.category} · version {versionLivree(detail, moduleBySlug) || detail.version}
+                          {detail.kind === "CUSTOM" ? " · créée dans le Studio" : ""}
+                        </div>
+                        <div className="btqFicheActions">
+                          {detail.isCore ? (
+                            <>
+                              {ouvrable(detail) ? (
+                                <button type="button" className="btqBouton" data-ton="plein" onClick={() => ouvrir(detail)}>Ouvrir</button>
+                              ) : null}
+                              <span className="btqTag" data-tone="core">Inclus dans CompanyOS</span>
+                            </>
+                          ) : !disponible(detail) && !detail.installed ? (
+                            <span className="btqTag" data-tone="soon">Bientôt disponible</span>
+                          ) : detail.installed ? (
+                            <>
+                              {ouvrable(detail) ? (
+                                <button type="button" className="btqBouton" data-ton="plein" onClick={() => ouvrir(detail)}>Ouvrir</button>
+                              ) : null}
+                              {miseAJourDisponible(detail, moduleBySlug) ? (
+                                <button type="button" className="btqBouton" data-ton="contour" disabled={!!busySlug} onClick={() => mettreAJour(detail)}>
+                                  Mettre à jour
+                                </button>
+                              ) : null}
+                              <button type="button" className="btqBouton" data-ton="danger" disabled={!!busySlug} onClick={() => toggle(detail)}>
+                                {busySlug === detail.slug ? "Désinstallation…" : "Désinstaller"}
+                              </button>
+                            </>
+                          ) : (
+                            <button type="button" className="btqBouton" data-ton="plein" disabled={!!busySlug} onClick={() => toggle(detail)}>
+                              <Icon fafa="faDownload" width={12} />
+                              <span>{busySlug === detail.slug ? "Installation…" : "Installer"}</span>
+                            </button>
+                          )}
+                        </div>
+                        {!detail.isCore && disponible(detail) ? (
+                          <div className="btqFicheNote">
+                            {detail.installed
+                              ? "Installée pour tout l'espace de travail."
+                              : "Comprise dans votre abonnement · s'installe pour toute l'équipe en un clic."}
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="btqTag" data-tone={statusOf(detail).tone}>
-                        {statusOf(detail).label}
-                      </div>
-                      <div className="btqDetailDesc">{detail.description}</div>
+                    </header>
+
+                    <div className="btqFicheCorps">
+                      <section className="btqBloc btqBlocLarge">
+                        <h3>Description</h3>
+                        <p>{detail.description}</p>
+                      </section>
+
+                      {liees.length ? (
+                        <section className="btqBloc">
+                          <h3>Fonctionne avec</h3>
+                          <div className="btqLiees">
+                            {liees.map((app) => (
+                              <button type="button" key={app.slug} className="btqLiee" onClick={() => voirFiche(app.slug)}>
+                                <Icon src={app.icon} width={22} />
+                                <span>{nomApp(app)}</span>
+                                {app.installed ? <Icon fafa="faCircleCheck" width={10} /> : null}
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
 
                       {/* Ce que l'application ira chercher hors de chez
                           elle. Déclaré dans son manifeste, montré avant
                           l'installation : l'utilisateur doit savoir ce
                           qu'il autorise. */}
-                      {acces.length ? (
-                        <div className="btqAcces">
-                          <div className="btqAccesTitre">
-                            <Icon fafa="faKey" width={11} /> Accès demandés
-                          </div>
-                          {acces.map((a) => (
+                      <section className="btqBloc">
+                        <h3>Accès aux données</h3>
+                        {acces.length ? (
+                          acces.map((a) => (
                             <div className="btqAccesLigne" key={a.verbe}>
-                              <b>{a.verbe}</b> {a.quoi.join(", ")}
+                              <Icon fafa={a.verbe === "Modifie" ? "faPen" : "faEye"} width={11} />
+                              <span><b>{a.verbe}</b> {a.quoi.join(", ")}</span>
                             </div>
-                          ))}
-                        </div>
-                      ) : detail.kind === "NATIVE" ? (
-                        <div className="btqAcces" data-neutre="true">
-                          <div className="btqAccesTitre">
-                            <Icon fafa="faLock" width={11} /> Aucun accès externe
-                          </div>
+                          ))
+                        ) : (
                           <div className="btqAccesLigne">
-                            Cette application ne lit que ses propres données.
+                            <Icon fafa="faLock" width={11} />
+                            <span>Ne lit que ses propres données.</span>
                           </div>
+                        )}
+                      </section>
+
+                      {moduleBySlug[detail.slug]?.nouveautes?.length ? (
+                        <section className="btqBloc">
+                          <h3>Nouveautés</h3>
+                          <ul className="btqNouveautes">
+                            {moduleBySlug[detail.slug].nouveautes.slice(0, 4).map((n) => (
+                              <li key={n.version}><b>v{n.version}</b> {n.texte}</li>
+                            ))}
+                          </ul>
+                        </section>
+                      ) : null}
+
+                      {!detail.isCore ? (
+                        <section className="btqBloc">
+                          <h3>Bon à savoir</h3>
+                          <p>
+                            Désinstaller retire l'application du bureau de toute l'équipe ; les
+                            données saisies sont conservées et reviennent à la réinstallation.
+                            Qui peut l'ouvrir se règle dans Paramètres → Applications.
+                          </p>
+                        </section>
+                      ) : null}
+                    </div>
+                  </article>
+                ) : (
+                  <>
+                    {/* ------------------------------------------------- Découvrir */}
+                    <section ref={registerSection("catalogue")} className="btqSection" data-hidden={section !== "catalogue"}>
+                      {!query.trim() && filter === "Tout" ? (
+                        <div className="btqHero">
+                          <div className="btqHeroTexte">
+                            <span className="btqHeroSur">Boutique CompanyOS</span>
+                            <h2>Des applications pour {session.tenant?.name || "votre entreprise"}</h2>
+                            <p>
+                              {installed.filter((a) => !a.isCore).length} installées ·{" "}
+                              {optional.filter((a) => !a.installed && disponible(a)).length} à découvrir. Toutes
+                              comprises dans votre abonnement, et reliées entre elles.
+                            </p>
+                          </div>
+                          {aLaUne ? (
+                            <div className="btqUne">
+                              <span className="btqUneSur">À la une</span>
+                              <div className="btqUneApp">
+                                <Icon src={aLaUne.icon} width={48} />
+                                <div>
+                                  <b>{nomApp(aLaUne)}</b>
+                                  <span>{aLaUne.description}</span>
+                                </div>
+                              </div>
+                              <div className="btqUneActions">
+                                <button type="button" className="btqBouton" data-ton="blanc" disabled={!!busySlug} onClick={() => toggle(aLaUne)}>
+                                  {busySlug === aLaUne.slug ? "Installation…" : "Installer"}
+                                </button>
+                                <button type="button" className="btqBouton" data-ton="lien" onClick={() => voirFiche(aLaUne.slug)}>
+                                  En savoir plus
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
-                    </>
-                  ) : (
-                    <div className="btqDetailEmpty">
-                      Sélectionnez un module pour voir sa fiche.
-                    </div>
-                  )}
-                </div>
 
-                {/* Module annoncé mais pas encore livré : on le dit, plutôt
-                    que de proposer une installation sans effet. */}
-                {detail && !detail.isCore && !disponible(detail) && !detail.installed ? (
-                  <div className="btqBientot">
-                    <Icon fafa="faHourglassHalf" width={13} />
-                    <div>
-                      <b>Bientôt disponible</b>
-                      <span>
-                        Ce module figure à la feuille de route. Il apparaîtra ici,
-                        installable, dès qu'il sera prêt.
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
+                      <div className="btqChips" role="tablist" aria-label="Catégories">
+                        {categories.map((cat) => (
+                          <button
+                            type="button"
+                            role="tab"
+                            key={cat}
+                            className="btqChip"
+                            aria-selected={filter === cat}
+                            onClick={() => setFilter(cat)}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
 
-                {detail && !detail.isCore && (disponible(detail) || detail.installed) ? (
-                  <div
-                    className="btqPrimary handcr"
-                    data-off={busySlug === detail.slug}
-                    data-installed={detail.installed}
-                    onClick={() => toggle(detail)}
-                  >
-                    <Icon
-                      fafa={detail.installed ? "faTrash" : "faDownload"}
-                      width={12}
-                    />
-                    <span>
-                      {busySlug === detail.slug
-                        ? "…"
-                        : detail.installed
-                          ? "Désinstaller"
-                          : "Installer le module"}
-                    </span>
-                  </div>
-                ) : null}
+                      {etat.initial || etat.erreur ? (
+                        <Contenu etat={etat} vide={false} squelette="grille" lignes={9} />
+                      ) : visible.length === 0 ? (
+                        <div className="btqEmptyBox">
+                          {query.trim()
+                            ? `Aucune application ne correspond à « ${query.trim()} ».`
+                            : "Aucune application dans cette catégorie."}
+                          {ailleurs.length > 0 && (
+                            <>
+                              {" "}
+                              <button type="button" className="btqLien" onClick={() => setFilter("Tout")}>
+                                {ailleurs.length === 1
+                                  ? "Une application correspond dans une autre catégorie."
+                                  : `${ailleurs.length} applications correspondent dans d'autres catégories.`}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : query.trim() || filter !== "Tout" ? (
+                        <>
+                          {/* Dire ce qui est montré, et combien : sinon on ne
+                              sait pas si c'est le catalogue ou un filtre. */}
+                          <p className="btqResultats" role="status">
+                            {query.trim()
+                              ? `${visible.length} résultat${visible.length > 1 ? "s" : ""} pour « ${query.trim()} »`
+                              : `${visible.length} application${visible.length > 1 ? "s" : ""} · ${filter}`}
+                          </p>
+                          <div className="btqGrid">
+                            {visible.map(carte)}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {parCategorie.map(([categorie, apps]) => (
+                            <div key={categorie} className="btqGroupe">
+                              <div className="btqGroupeTete">
+                                <h3>{categorie}</h3>
+                                {apps.length > 6 ? (
+                                  <button type="button" className="btqLien" onClick={() => setFilter(categorie)}>
+                                    Tout voir ({apps.length})
+                                  </button>
+                                ) : null}
+                              </div>
+                              {/* Six par catégorie sur l'accueil : de quoi
+                                  choisir sans faire défiler tout le catalogue. */}
+                              <div className="btqGrid">
+                                {apps.slice(0, 6).map(carte)}
+                              </div>
+                            </div>
+                          ))}
+                          {socle.length ? (
+                            <div className="btqGroupe">
+                              <div className="btqGroupeTete">
+                                <h3>Inclus dans CompanyOS</h3>
+                                <span className="btqGroupeAide">Toujours disponibles, rien à installer</span>
+                              </div>
+                              <div className="btqSocle">
+                                {socle.map((app) => (
+                                  <button type="button" key={app.slug} className="btqSocleApp" onClick={() => voirFiche(app.slug)}>
+                                    <Icon src={app.icon} width={28} />
+                                    <span>{nomApp(app)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </section>
 
-                <div className="btqStats">
-                  <div className="btqStat">
-                    <div className="btqStatVal">{catalog.length}</div>
-                    <div className="btqStatLbl">au catalogue</div>
-                  </div>
-                  <div className="btqStat">
-                    <div className="btqStatVal">{installed.length}</div>
-                    <div className="btqStatLbl">installés</div>
-                  </div>
-                  <div className="btqStat">
-                    <div className="btqStatVal">
-                      {optional.filter((a) => !a.installed).length}
-                    </div>
-                    <div className="btqStatLbl">à découvrir</div>
-                  </div>
-                </div>
-              </aside>
+                    {/* ------------------------------------------------- Mises à jour */}
+                    <section ref={registerSection("misesajour")} className="btqSection" data-hidden={section !== "misesajour"}>
+                      <div className="btqTitre">
+                        <h2>Mises à jour</h2>
+                        {aMettreAJour.length ? (
+                          <button type="button" className="btqBouton" data-ton="plein" disabled={!!busySlug} onClick={toutMettreAJour}>
+                            Tout mettre à jour ({aMettreAJour.length})
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="btqHint">
+                        Une mise à jour reprend les données existantes au nouveau format ; c'est tracé
+                        au journal d'activité.
+                      </p>
+
+                      {!aMettreAJour.length ? (
+                        <div className="btqEmptyBox btqAJour">
+                          <Icon fafa="faCircleCheck" width={22} />
+                          <span>Toutes vos applications sont à jour.</span>
+                        </div>
+                      ) : (
+                        <div className="btqListe">
+                          {aMettreAJour.map((app) => {
+                            const cible = versionLivree(app, moduleBySlug);
+                            const notes = nouveautesDepuis(app, moduleBySlug);
+                            return (
+                              <div key={app.slug} className="btqLigne btqLigneMaj">
+                                <Icon src={app.icon} width={32} />
+                                <div className="btqLigneInfo">
+                                  <button type="button" className="btqLigneNom" onClick={() => voirFiche(app.slug)}>{nomApp(app)}</button>
+                                  <div className="btqLigneMeta">
+                                    {app.installedVersion ? `v${app.installedVersion}` : "version inconnue"}
+                                    <Icon fafa="faArrowRight" width={8} />
+                                    <strong>v{cible}</strong>
+                                  </div>
+                                  {notes.length ? (
+                                    <ul className="btqNouveautes">
+                                      {notes.map((n) => (
+                                        <li key={n.version}>{n.texte}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <div className="btqLigneMeta">Reprise des données pour cette version.</div>
+                                  )}
+                                </div>
+                                <button type="button" className="btqBouton" data-ton="contour" disabled={!!busySlug} onClick={() => mettreAJour(app)}>
+                                  {busySlug === app.slug ? "Mise à jour…" : "Mettre à jour"}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* ------------------------------------------------- Installées */}
+                    <section ref={registerSection("installees")} className="btqSection" data-hidden={section !== "installees"}>
+                      <div className="btqTitre">
+                        <h2>Installées</h2>
+                        <span className="btqHint">{installed.length} applications dans {session.tenant?.name || "cet espace"}</span>
+                      </div>
+
+                      <div className="btqListe">
+                        {[...installed]
+                          .sort((a, b) => Number(a.isCore) - Number(b.isCore) || nomApp(a).localeCompare(nomApp(b), "fr"))
+                          .map((app) => (
+                            <div key={app.slug} className="btqLigne">
+                              <Icon src={app.icon} width={28} />
+                              <div className="btqLigneInfo">
+                                <button type="button" className="btqLigneNom" onClick={() => voirFiche(app.slug)}>{nomApp(app)}</button>
+                                <div className="btqLigneMeta">
+                                  {app.category} · v{app.installedVersion || versionLivree(app, moduleBySlug)}
+                                  {miseAJourDisponible(app, moduleBySlug) ? (
+                                    <em className="btqMajDispo"> · v{versionLivree(app, moduleBySlug)} disponible</em>
+                                  ) : null}
+                                  {app.isCore ? " · inclus dans CompanyOS" : ""}
+                                </div>
+                              </div>
+                              {ouvrable(app) ? (
+                                <button type="button" className="btqBouton" data-ton="contour" onClick={() => ouvrir(app)}>Ouvrir</button>
+                              ) : null}
+                              {app.isCore ? <span className="btqIconeBouton" aria-hidden="true" /> : (
+                                <button
+                                  type="button"
+                                  className="btqIconeBouton"
+                                  title={`Désinstaller ${nomApp(app)}`}
+                                  aria-label={`Désinstaller ${nomApp(app)}`}
+                                  disabled={!!busySlug}
+                                  onClick={() => toggle(app)}
+                                >
+                                  <Icon fafa="faTrashCan" width={12} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+
+                      <p className="btqHint btqAPropos">
+                        Une application installée apparaît aussitôt sur le bureau et dans le menu
+                        Démarrer de toute l'équipe. Désinstallée, elle disparaît de la même manière ;
+                        ses données restent conservées et reviennent à la réinstallation.
+                      </p>
+                    </section>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

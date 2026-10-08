@@ -1,18 +1,30 @@
-﻿// Boutique — même charte que les modules métier.
+// Boutique — dans l'esprit du Microsoft Store.
+//
+// Un rail de navigation à gauche, la recherche toujours en haut, une
+// bannière « à la une », le catalogue rangé par catégorie, et une fiche
+// complète pour chaque application (description, ce avec quoi elle
+// fonctionne, accès aux données, nouveautés). L'ancien panneau de droite,
+// vide tant qu'on n'avait rien choisi, prenait un quart de la largeur :
+// la fiche occupe désormais toute la page, avec un retour.
 
 .boutique {
-  --btq-bg: #ffffff;
-  --btq-panel: #f8f9fb;
+  container-type: inline-size;
+
+  --btq-bg: #f7f8fa;
+  --btq-panel: #ffffff;
   --btq-card: #ffffff;
   --btq-line: #e3e6eb;
-  --btq-text: #1f2733;
-  --btq-muted: #6b7684;
-  --btq-accent: #1a73e8;
-  --btq-accent-soft: #e8f0fe;
-  --btq-field: #ffffff;
-  --btq-green: #188038;
-  --btq-amber: #b06000;
-  --btq-red: #d93025;
+  --btq-text: #1b2230;
+  --btq-muted: #5f6b7a;
+  --btq-accent: #0067c0;
+  --btq-accent-fort: #005aa8;
+  --btq-accent-soft: #e5f0fb;
+  --btq-hover: rgb(0 0 0 / 4%);
+  --btq-green: #107c41;
+  --btq-amber: #a35a00;
+  --btq-red: #c42b1c;
+  --btq-ombre: 0 1px 2px rgb(0 0 0 / 6%), 0 2px 6px rgb(0 0 0 / 4%);
+  --btq-ombre-survol: 0 2px 4px rgb(0 0 0 / 8%), 0 8px 20px rgb(0 0 0 / 8%);
 
   // Avant les règles imbriquées : Sass avertit que l'ordre d'émission des
   // déclarations qui les suivent change dans une version à venir.
@@ -20,12 +32,19 @@
   color: var(--btq-text);
 
   &.floatTab[data-size="mini"] {
-    width: 72%;
-    height: 74%;
-    top: 11%;
-    left: 14%;
-    min-width: 700px;
-    min-height: 460px;
+    width: 78%;
+    height: 82%;
+    top: 8%;
+    left: 11%;
+    // Jamais plus large que l'écran : sur une petite fenêtre de navigateur
+    // la Boutique débordait à droite.
+    min-width: min(720px, 88%);
+    min-height: min(480px, 80%);
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
   }
 
   .btqLocked {
@@ -39,678 +58,751 @@
 
   .btqShell {
     display: grid;
-    grid-template-columns: 178px minmax(0, 1fr) 232px;
+    grid-template-columns: 76px minmax(0, 1fr);
     flex-grow: 1;
     min-height: 0;
+  }
+
+  // ---- Rail de navigation -------------------------------------------------
+
+  .btqNav {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 12px 6px;
     background: var(--btq-bg);
   }
 
-  // ---- Navigation ---------------------------------------------------------
-
-  .btqNav {
-    border-right: 1px solid var(--btq-line);
-    padding: 14px 10px;
+  .btqNavItem {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 5px;
+    padding: 9px 2px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--btq-muted);
+    font-size: 11px;
+    cursor: pointer;
 
-    .btqNavItem {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 8px 11px;
-      border-radius: 6px;
-      font-size: 0.76em;
-      color: var(--btq-muted);
+    &:hover { background: var(--btq-hover); color: var(--btq-text); }
 
-      .uicon {
-        display: flex;
+    // L'élément actif : une barre d'accent à gauche, comme dans le Store.
+    &[data-active="true"] {
+      background: var(--btq-panel);
+      color: var(--btq-text);
+      font-weight: 600;
+      box-shadow: var(--btq-ombre);
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 14px;
+        bottom: 14px;
+        width: 3px;
+        border-radius: 3px;
+        background: var(--btq-accent);
       }
 
-      &:hover {
-        background: rgb(0 0 0 / 3%);
-      }
-
-      &[data-active="true"] {
-        background: var(--btq-accent-soft);
-        color: var(--btq-accent);
-        font-weight: 600;
-      }
+      .btqNavIcone { color: var(--btq-accent); }
     }
+
+    &:focus-visible { outline: 2px solid var(--btq-accent); outline-offset: -2px; }
   }
 
-  // ---- Colonne centrale ---------------------------------------------------
+  .btqNavIcone {
+    position: relative;
+    display: flex;
+
+    .uicon { display: flex; }
+  }
+
+  .btqPastille {
+    position: absolute;
+    top: -8px;
+    left: 11px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--btq-red);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  // ---- Colonne principale ---------------------------------------------------
 
   .btqMain {
+    min-width: 0;
     overflow-y: auto;
-    padding: 18px 24px 28px;
-    min-height: 0;
+    padding: 0 24px 28px;
+    border-top-left-radius: 10px;
+    border-left: 1px solid var(--btq-line);
+    border-top: 1px solid var(--btq-line);
+    background: var(--btq-panel);
   }
 
-  .btqSection {
-    padding-bottom: 4px;
-    margin-bottom: 18px;
-
-    // Onglet inactif : le panneau n'existe pas à l'écran.
-    &[data-hidden="true"] {
-      display: none;
-    }
-
-    h2 {
-      font-size: 0.92em;
-      font-weight: 600;
-      margin: 0;
-    }
+  .btqBarre {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: center;
+    padding: 14px 0 12px;
+    background: linear-gradient(var(--btq-panel) 80%, transparent);
   }
 
-  .btqHint {
-    font-size: 0.72em;
+  .btqRecherche {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: min(560px, 100%);
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--btq-line);
+    border-bottom-color: color-mix(in srgb, var(--btq-text) 30%, var(--btq-line));
+    border-radius: 6px;
+    background: var(--btq-card);
     color: var(--btq-muted);
-    margin: 3px 0 14px;
-  }
 
-  .btqField {
-    margin-bottom: 12px;
+    .uicon { display: flex; }
 
     input {
-      width: 100%;
-      font-size: 0.76em;
-      font-family: inherit;
-      color: var(--btq-text);
-      background: var(--btq-field);
-      border: 1px solid var(--btq-line);
-      border-radius: 6px;
-      padding: 8px 11px;
-
-      &::placeholder {
-        color: #9aa4b2;
-      }
-
-      &:focus {
-        border-color: var(--btq-accent);
-        outline: none;
-      }
-    }
-  }
-
-  .btqChips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-    margin-bottom: 14px;
-  }
-
-  .btqChip {
-    font-size: 0.72em;
-    padding: 6px 13px;
-    border: 1px solid var(--btq-line);
-    border-radius: 100px;
-    background: var(--btq-card);
-    white-space: nowrap;
-
-    &:hover {
-      border-color: #c7d0dd;
-    }
-
-    &[data-active="true"] {
-      border-color: var(--btq-accent);
-      background: var(--btq-accent-soft);
-      color: var(--btq-accent);
-      font-weight: 600;
-    }
-  }
-
-  .btqWarn {
-    margin-bottom: 12px;
-    padding: 8px 11px;
-    border-radius: 6px;
-    background: #fce8e6;
-    border: 1px solid #f5c4bf;
-    color: #b3261e;
-    font-size: 0.72em;
-  }
-
-  .btqEmptyBox {
-    font-size: 0.74em;
-    color: var(--btq-muted);
-    padding: 16px;
-    border: 1px dashed var(--btq-line);
-    border-radius: 7px;
-    background: var(--btq-panel);
-  }
-
-  // ---- Cartes -------------------------------------------------------------
-
-  .btqGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(214px, 1fr));
-    gap: 12px;
-  }
-
-  .btqCard {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px;
-    border: 1px solid var(--btq-line);
-    border-radius: 8px;
-    background: var(--btq-card);
-
-    &:hover {
-      border-color: #c7d0dd;
-    }
-
-    &[data-active="true"] {
-      border-color: var(--btq-accent);
-      background: var(--btq-accent-soft);
-    }
-
-    // Icône à gauche, identité au milieu, état à droite — la disposition
-    // des boutiques d'applications, et celle que l'œil balaie le plus vite.
-    .btqCardTop {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-    }
-
-    .btqCardHead {
-      min-width: 0;
       flex: 1;
-    }
-
-    .btqName {
-      font-size: 0.86em;
-      font-weight: 600;
-      line-height: 1.3;
-      // Deux lignes autorisées : un nom long était coupé au milieu d'un mot
-      // alors que la place existait juste en dessous.
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .btqCat {
-      font-size: 0.68em;
-      color: var(--btq-muted);
-      margin-top: 2px;
-    }
-
-    // Exactement deux lignes, toujours : sans cette limite, les cartes
-    // avaient des hauteurs différentes et la grille se déchirait en
-    // marches d'escalier, ce qui rend la comparaison pénible.
-    .btqDesc {
-      font-size: 0.72em;
-      line-height: 1.5;
-      color: var(--btq-muted);
-      flex-grow: 1;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      min-height: calc(2 * 1.5 * 0.72em);
-    }
-
-    .btqCardFoot {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-  }
-
-  .btqTag {
-    font-size: 0.65em;
-    padding: 3px 10px;
-    border-radius: 100px;
-    white-space: nowrap;
-    background: rgb(107 118 132 / 14%);
-    color: var(--btq-muted);
-
-    &[data-tone="ok"] {
-      background: rgb(24 128 56 / 12%);
-      color: var(--btq-green);
-    }
-    &[data-tone="soon"] {
-      background: rgb(176 96 0 / 12%);
-      color: var(--btq-amber);
-    }
-    &[data-tone="core"] {
-      background: var(--btq-accent-soft);
-      color: var(--btq-accent);
-    }
-  }
-
-  .btqAction {
-    font-size: 0.72em;
-    padding: 5px 13px;
-    border-radius: 5px;
-    background: var(--btq-accent);
-    color: #fff;
-    white-space: nowrap;
-
-    &[data-installed="true"] {
+      min-width: 0;
+      height: 100%;
+      border: 0;
       background: transparent;
-      border: 1px solid var(--btq-line);
       color: var(--btq-text);
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+    }
 
-      &:hover {
-        border-color: var(--btq-red);
-        color: var(--btq-red);
-      }
+    &:focus-within {
+      border-bottom: 2px solid var(--btq-accent);
     }
   }
 
-  // ---- Liste des installées ----------------------------------------------
-
-  .btqList {
-    border: 1px solid var(--btq-line);
-    border-radius: 7px;
-    overflow: hidden;
-  }
-
-  .btqRow {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    padding: 9px 12px;
-    border-bottom: 1px solid var(--btq-line);
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    &:hover {
-      background: var(--btq-panel);
-    }
-
-    .btqRowInfo {
-      flex-grow: 1;
-      min-width: 0;
-    }
-
-    .btqRowName {
-      font-size: 0.78em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .btqRowMeta {
-      font-size: 0.68em;
-      color: var(--btq-muted);
-    }
-  }
-
-  .btqAbout {
-    font-size: 0.74em;
-    line-height: 1.6;
-    color: var(--btq-muted);
-
-    p {
-      margin: 0 0 10px;
-    }
-  }
-
-  // ---- Panneau contextuel -------------------------------------------------
-
-  .btqSide {
-    border-left: 1px solid var(--btq-line);
-    background: var(--btq-panel);
-    padding: 16px 16px 22px;
-    overflow-y: auto;
-    min-height: 0;
-  }
-
-  .btqSideTitle {
-    font-size: 0.78em;
-    font-weight: 600;
-    margin-bottom: 12px;
-  }
-
-  .btqCardDetail {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 6px;
-    padding: 18px 14px;
-    min-height: 160px;
-    justify-content: center;
-    background: var(--btq-card);
-    border: 1px solid var(--btq-line);
-    border-radius: 10px;
-
-    .btqDetailName {
-      font-size: 0.86em;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
-    .btqDetailCat {
-      font-size: 0.68em;
-      color: var(--btq-muted);
-    }
-
-    .btqDetailDesc {
-      font-size: 0.71em;
-      line-height: 1.5;
-      color: var(--btq-muted);
-      margin-top: 6px;
-    }
-
-    .btqDetailEmpty {
-      font-size: 0.72em;
-      color: var(--btq-muted);
-      line-height: 1.5;
-    }
-  }
-
-  .btqPrimary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 14px;
-    padding: 10px 12px;
-    border-radius: 7px;
-    background: var(--btq-accent);
-    color: #fff;
-    font-size: 0.76em;
-    font-weight: 600;
-
-    .uicon {
-      display: flex;
-    }
-
-    &:hover {
-      background: #1667d2;
-    }
-
-    &[data-installed="true"] {
-      background: var(--btq-card);
-      color: var(--btq-red);
-      border: 1px solid var(--btq-line);
-
-      .uicon {
-        color: var(--btq-red);
-      }
-
-      &:hover {
-        border-color: var(--btq-red);
-        background: var(--btq-card);
-      }
-    }
-
-    &[data-off="true"] {
-      opacity: 0.45;
-      pointer-events: none;
-    }
-  }
-
-  .btqStats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 7px;
-    margin-top: 16px;
-
-    .btqStat {
-      border: 1px solid var(--btq-line);
-      border-radius: 7px;
-      background: var(--btq-card);
-      padding: 9px 8px;
-      text-align: center;
-      min-width: 0;
-    }
-
-    .btqStatVal {
-      font-size: 0.95em;
-      font-weight: 600;
-    }
-
-    .btqStatLbl {
-      font-size: 0.6em;
-      color: var(--btq-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      margin-top: 2px;
-    }
-  }
-}
-
-body[data-theme="dark"] .boutique {
-  --btq-bg: #1b1b22;
-  --btq-panel: #202029;
-  --btq-card: #262630;
-  --btq-line: #35353f;
-  --btq-text: #e8e8ee;
-  --btq-muted: #9a9aa8;
-  --btq-accent: #6f8dff;
-  --btq-accent-soft: #2a3050;
-  --btq-field: #262630;
-  --btq-green: #6cd08a;
-  --btq-amber: #e0b060;
-  --btq-red: #f08078;
-
-  .btqNav .btqNavItem:hover,
-  .btqChip:hover,
-  .btqCard:hover {
-    border-color: #4a4a58;
-    background: rgb(255 255 255 / 4%);
-  }
+  .btqSection[data-hidden="true"] { display: none; }
 
   .btqWarn {
-    background: #3a2422;
-    border-color: #5d3230;
-    color: #f0a09a;
+    margin: 4px 0 12px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--btq-red) 10%, transparent);
+    color: var(--btq-red);
+    font-size: 12.5px;
   }
 
-  .btqPrimary:hover {
-    background: #5f7cf0;
-  }
-}
-
-// Accès demandés par une application, affichés avant l'installation.
-.btqAcces {
-  width: 100%;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--btq-line, #e3e6eb);
-  background: var(--btq-panel, #f8f9fb);
-  text-align: left;
-
-  &[data-neutre="true"] {
-    opacity: 0.75;
-  }
-}
-
-.btqAccesTitre {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.7em;
-  font-weight: 600;
-  margin-bottom: 6px;
-
-  .uicon {
-    display: flex;
-  }
-}
-
-.btqAccesLigne {
-  font-size: 0.68em;
-  line-height: 1.5;
-  opacity: 0.85;
-
-  b {
-    font-weight: 600;
-  }
-}
-
-// Module annoncé mais pas encore livré : la fiche reste consultable — la
-// feuille de route intéresse le client — mais rien ne laisse croire qu'on
-// peut l'installer.
-.btqCard[data-bientot="true"] {
-  opacity: 0.62;
-
-  &:hover,
-  &[data-active="true"] {
-    opacity: 1;
-  }
-}
-
-.btqBientot {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  margin-top: 12px;
-  padding: 11px 13px;
-  border-radius: 8px;
-  border: 1px dashed var(--btq-line);
-  background: var(--btq-panel);
-  text-align: left;
-
-  .uicon {
-    display: flex;
-    flex-shrink: 0;
-    margin-top: 1px;
-    color: var(--btq-amber);
-  }
-
-  div {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  b {
-    font-size: 0.74em;
-    font-weight: 600;
-  }
-
-  span {
-    font-size: 0.68em;
-    line-height: 1.5;
-    color: var(--btq-muted);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Mises à jour
-// ---------------------------------------------------------------------------
-
-.boutique {
-  .btqPastille {
-    margin-left: auto;
-    min-width: 18px;
-    padding: 1px 6px;
-    border-radius: 100px;
-    background: var(--btq-accent);
-    color: #fff;
-    font-size: 0.82em;
-    font-weight: 600;
-    text-align: center;
-  }
-
-  .btqMajTete {
+  .btqTitre {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 10px 14px;
-    border: 1px solid var(--btq-line);
-    border-radius: 8px;
-    background: var(--btq-panel);
-    font-size: 0.78em;
-    margin-bottom: 12px;
+    flex-wrap: wrap;
+    margin: 6px 0 4px;
+
+    h2 { margin: 0; font-size: 22px; font-weight: 600; }
   }
 
-  .btqMaj {
+  .btqHint {
+    margin: 0 0 16px;
+    color: var(--btq-muted);
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  .btqAPropos { margin-top: 18px; max-width: 70ch; }
+
+  .btqLien {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--btq-accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  // ---- Boutons ----------------------------------------------------------------
+
+  .btqBouton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 92px;
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: var(--btq-card);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    .uicon { display: flex; }
+
+    &:disabled { opacity: 0.55; cursor: default; }
+    &:focus-visible { outline: 2px solid var(--btq-accent); outline-offset: 2px; }
+
+    &[data-ton="plein"] {
+      background: var(--btq-accent);
+      color: #fff;
+      &:hover:not(:disabled) { background: var(--btq-accent-fort); }
+    }
+
+    &[data-ton="doux"] {
+      background: var(--btq-accent-soft);
+      color: var(--btq-accent);
+      &:hover:not(:disabled) { background: var(--btq-accent); color: #fff; }
+    }
+
+    &[data-ton="contour"] {
+      border-color: var(--btq-line);
+      color: var(--btq-text);
+      &:hover:not(:disabled) { background: var(--btq-hover); }
+    }
+
+    &[data-ton="danger"] {
+      border-color: var(--btq-line);
+      color: var(--btq-red);
+      &:hover:not(:disabled) { background: color-mix(in srgb, var(--btq-red) 8%, transparent); }
+    }
+
+    &[data-ton="blanc"] {
+      background: #fff;
+      color: #0b2547;
+      &:hover:not(:disabled) { background: #eef3fa; }
+    }
+
+    &[data-ton="lien"] {
+      min-width: 0;
+      background: transparent;
+      color: #fff;
+      &:hover { text-decoration: underline; }
+    }
+  }
+
+  .btqIconeBouton {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--btq-muted);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--btq-red) 10%, transparent);
+      color: var(--btq-red);
+    }
+  }
+
+  .btqTag {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 11px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &[data-tone="ok"] { background: color-mix(in srgb, var(--btq-green) 12%, transparent); color: var(--btq-green); }
+    &[data-tone="soon"] { background: color-mix(in srgb, var(--btq-amber) 12%, transparent); color: var(--btq-amber); }
+    &[data-tone="core"] { background: var(--btq-accent-soft); color: var(--btq-accent); }
+    &[data-tone="idle"] { background: var(--btq-hover); color: var(--btq-muted); }
+  }
+
+  // ---- Bannière « à la une » -------------------------------------------------
+
+  .btqHero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 24px;
+    margin: 4px 0 18px;
+    padding: 26px 28px;
+    border-radius: 12px;
+    color: #fff;
+    background:
+      radial-gradient(120% 140% at 100% 0%, rgb(76 160 255 / 55%), transparent 55%),
+      radial-gradient(90% 120% at 0% 100%, rgb(10 175 183 / 45%), transparent 60%),
+      linear-gradient(120deg, #0b3a73, #0a2a52 60%, #0d1f3c);
+  }
+
+  .btqHeroSur,
+  .btqUneSur {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  .btqHeroTexte {
+    h2 { margin: 0; font-size: 24px; font-weight: 600; line-height: 1.2; }
+    p { margin: 10px 0 0; font-size: 13px; line-height: 1.55; opacity: 0.88; }
+  }
+
+  .btqUne {
+    padding: 16px;
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: 10px;
+    background: rgb(255 255 255 / 10%);
+    backdrop-filter: blur(10px);
+  }
+
+  .btqUneApp {
     display: flex;
     align-items: flex-start;
-    gap: 14px;
-    padding: 14px 16px;
-    border: 1px solid var(--btq-line);
-    border-radius: 9px;
-    background: var(--btq-card);
-    margin-bottom: 10px;
+    gap: 12px;
+
+    .uicon { flex: none; }
+    div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    b { font-size: 15px; }
+
+    span {
+      font-size: 12px;
+      line-height: 1.45;
+      opacity: 0.85;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
   }
 
-  .btqMajInfo {
-    flex-grow: 1;
-    min-width: 0;
-  }
-
-  .btqMajNom {
-    font-size: 0.86em;
-    font-weight: 600;
-  }
-
-  .btqMajVersions {
+  .btqUneActions {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.72em;
+    margin-top: 14px;
+  }
+
+  // ---- Catégories ------------------------------------------------------------
+
+  .btqChips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .btqChip {
+    height: 30px;
+    padding: 0 14px;
+    border: 1px solid var(--btq-line);
+    border-radius: 15px;
+    background: var(--btq-card);
+    color: var(--btq-text);
+    font-size: 12.5px;
+    cursor: pointer;
+
+    &:hover { background: var(--btq-hover); }
+
+    &[aria-selected="true"] {
+      border-color: var(--btq-accent);
+      background: var(--btq-accent);
+      color: #fff;
+      font-weight: 600;
+    }
+  }
+
+  .btqResultats {
+    margin: 0 0 12px;
     color: var(--btq-muted);
+    font-size: 12.5px;
+  }
+
+  .btqEmptyBox {
+    padding: 28px 20px;
+    border: 1px dashed var(--btq-line);
+    border-radius: 10px;
+    color: var(--btq-muted);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .btqAJour {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-style: solid;
+
+    .uicon { display: flex; color: var(--btq-green); }
+  }
+
+  // ---- Groupes par catégorie --------------------------------------------------
+
+  .btqGroupe { margin-bottom: 26px; }
+
+  .btqGroupeTete {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+
+    h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  }
+
+  .btqGroupeAide { color: var(--btq-muted); font-size: 12px; }
+
+  .btqGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
+  }
+
+  // ---- Carte ---------------------------------------------------------------------
+
+  .btqCard {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    column-gap: 12px;
+    row-gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--btq-line);
+    border-radius: 10px;
+    background: var(--btq-card);
+    box-shadow: var(--btq-ombre);
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+
+    > .uicon { grid-row: 1; align-self: start; }
+
+    &:hover { box-shadow: var(--btq-ombre-survol); transform: translateY(-1px); }
+    &:focus-visible { outline: 2px solid var(--btq-accent); outline-offset: 2px; }
+    &[data-bientot="true"] { opacity: 0.75; }
+  }
+
+  .btqCardCorps { min-width: 0; }
+
+  .btqName {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btqCat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-top: 2px;
-
-    strong {
-      color: var(--btq-accent);
-    }
-
-    .uicon {
-      display: flex;
-    }
+    color: var(--btq-muted);
+    font-size: 11.5px;
   }
 
-  // Les nouveautés se lisent avant de cliquer : c'est ce qui permet de
-  // décider, et de comprendre après coup ce qui a changé.
-  .btqMajNotes {
-    margin: 8px 0 0;
-    padding-left: 16px;
-    font-size: 0.74em;
+  .btqInstallee {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--btq-green);
+    font-weight: 600;
+
+    .uicon { display: flex; }
+  }
+
+  .btqDesc {
+    margin-top: 7px;
+    color: var(--btq-muted);
+    font-size: 12px;
     line-height: 1.5;
-    color: var(--btq-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
-    li {
-      list-style: disc;
-      margin-bottom: 2px;
+  .btqCardFoot {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    min-height: 0;
+
+    &:empty { display: none; }
+  }
+
+  // ---- Inclus dans CompanyOS ---------------------------------------------------
+
+  .btqSocle {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 8px;
+  }
+
+  .btqSocleApp {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 6px;
+    border: 1px solid var(--btq-line);
+    border-radius: 10px;
+    background: var(--btq-card);
+    font-size: 12px;
+    text-align: center;
+    cursor: pointer;
+
+    &:hover { box-shadow: var(--btq-ombre-survol); }
+  }
+
+  // ---- Fiche d'une application ---------------------------------------------------
+
+  .btqFiche { padding-bottom: 12px; }
+
+  .btqRetour {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 2px 0 10px;
+    padding: 6px 10px 6px 6px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--btq-muted);
+    font-size: 12.5px;
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:hover { background: var(--btq-hover); color: var(--btq-text); }
+  }
+
+  .btqFicheTete {
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+    padding: 22px;
+    border: 1px solid var(--btq-line);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--btq-accent-soft), var(--btq-card) 60%);
+  }
+
+  .btqFicheIcone {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 96px;
+    height: 96px;
+    border-radius: 20px;
+    background: var(--btq-card);
+    box-shadow: var(--btq-ombre-survol);
+  }
+
+  .btqFicheInfo {
+    min-width: 0;
+
+    h2 { margin: 0; font-size: 24px; font-weight: 600; }
+  }
+
+  .btqFicheMeta {
+    margin-top: 4px;
+    color: var(--btq-muted);
+    font-size: 12.5px;
+  }
+
+  .btqFicheActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+
+    .btqBouton { min-width: 120px; height: 34px; }
+  }
+
+  .btqFicheNote {
+    margin-top: 10px;
+    color: var(--btq-muted);
+    font-size: 12px;
+  }
+
+  .btqFicheCorps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .btqBloc {
+    padding: 16px 18px;
+    border: 1px solid var(--btq-line);
+    border-radius: 10px;
+    background: var(--btq-card);
+
+    h3 { margin: 0 0 8px; font-size: 13.5px; font-weight: 600; }
+    p, .btqAccesLigne { margin: 0; color: var(--btq-muted); font-size: 12.5px; line-height: 1.6; }
+  }
+
+  .btqBlocLarge {
+    grid-column: 1 / -1;
+
+    p { color: var(--btq-text); font-size: 13.5px; }
+  }
+
+  .btqLiees {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .btqLiee {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px 5px 6px;
+    border: 1px solid var(--btq-line);
+    border-radius: 18px;
+    background: var(--btq-bg);
+    font-size: 12px;
+    cursor: pointer;
+
+    > .uicon:last-child:not(:first-child) { color: var(--btq-green); }
+    &:hover { border-color: var(--btq-accent); }
+  }
+
+  .btqAccesLigne {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+
+    & + & { margin-top: 6px; }
+    .uicon { display: flex; margin-top: 3px; color: var(--btq-accent); }
+    b { color: var(--btq-text); }
+  }
+
+  .btqNouveautes {
+    margin: 0;
+    padding-left: 16px;
+    color: var(--btq-muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+
+    li + li { margin-top: 4px; }
+    b { color: var(--btq-text); }
+  }
+
+  // ---- Listes : mises à jour, installées -------------------------------------
+
+  .btqListe {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--btq-line);
+    border-radius: 10px;
+    background: var(--btq-card);
+    overflow: hidden;
+  }
+
+  .btqLigne {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 14px;
+
+    & + & { border-top: 1px solid var(--btq-line); }
+    > .uicon { flex: none; }
+    &:hover { background: var(--btq-hover); }
+  }
+
+  .btqLigneMaj { align-items: flex-start; }
+
+  .btqLigneInfo {
+    flex: 1;
+    min-width: 0;
+
+    .btqNouveautes { margin-top: 6px; }
+  }
+
+  .btqLigneNom {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { color: var(--btq-accent); text-decoration: underline; }
+  }
+
+  .btqLigneMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    margin-top: 2px;
+    color: var(--btq-muted);
+    font-size: 12px;
+
+    .uicon { display: flex; }
+    strong { color: var(--btq-text); }
+  }
+
+  .btqMajDispo { color: var(--btq-accent); font-style: normal; font-weight: 600; }
+
+  // ---- Fenêtre étroite --------------------------------------------------------
+
+  @container (max-width: 900px) {
+    .btqHero { grid-template-columns: 1fr; }
+    .btqFicheCorps { grid-template-columns: 1fr; }
+  }
+
+  @container (max-width: 640px) {
+    .btqShell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+
+    .btqNav {
+      flex-direction: row;
+      justify-content: center;
+      padding: 6px;
+
+      .btqNavItem { flex: 1; flex-direction: row; justify-content: center; }
+      .btqNavItem[data-active="true"]::before { display: none; }
     }
-  }
 
-  .btqMajVide {
-    font-size: 0.74em;
-    color: var(--btq-muted);
-    margin-top: 6px;
-  }
-
-  .btqMajDispo {
-    font-style: normal;
-    color: var(--btq-accent);
+    .btqMain { padding: 0 14px 20px; border-left: 0; border-top-left-radius: 0; }
+    .btqFicheTete { flex-direction: column; gap: 14px; }
   }
 }
 
-// Lien d'élargissement de la recherche, dans l'état vide. Un bouton, parce
-// que c'est une action ; l'apparence d'un lien, parce que c'est une
-// suggestion et non le geste principal de l'écran.
-.btqEmptyBox .btqLien {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  color: var(--btq-accent, #1a73e8);
-  text-decoration: underline;
-  cursor: pointer;
-}
+// ---- Thème sombre ---------------------------------------------------------------
 
-// Ligne de résultats, au-dessus de la grille. Discrète : elle informe, elle
-// ne réclame pas l'attention. `role="status"` la fait annoncer aux lecteurs
-// d'écran quand le nombre change — sinon une recherche au clavier ne donne
-// aucun retour perceptible.
-.btqResultats {
-  margin: 0 0 12px;
-  font-size: 0.72em;
-  color: var(--btq-muted);
+body[data-theme="dark"] .boutique {
+  --btq-bg: #1b1d22;
+  --btq-panel: #22252b;
+  --btq-card: #2a2d34;
+  --btq-line: #383c44;
+  --btq-text: #eceef2;
+  --btq-muted: #a3aab5;
+  --btq-accent: #4ca0ff;
+  --btq-accent-fort: #6db2ff;
+  --btq-accent-soft: #233650;
+  --btq-hover: rgb(255 255 255 / 6%);
+  --btq-green: #6ccb8f;
+  --btq-amber: #f0b45c;
+  --btq-red: #ff8a80;
+  --btq-ombre: 0 1px 2px rgb(0 0 0 / 30%);
+  --btq-ombre-survol: 0 4px 16px rgb(0 0 0 / 40%);
+
+  .btqBouton[data-ton="plein"] { color: #0b1a2e; }
 }
