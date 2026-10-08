@@ -20,6 +20,9 @@ import campagnesRoutes from "./routes/campagnes.js";
 import espaceRoutes from "./routes/espace.js";
 import plateformeRoutes from "./routes/plateforme.js";
 import { demarrerCampagnes } from "./campagnes.js";
+import erreursRoutes from "./routes/erreurs.js";
+import { consigner, gestionnaireErreurs } from "./erreurs.js";
+import { demarrerSauvegardes } from "./sauvegardes.js";
 
 const app = Fastify({
   logger: true,
@@ -103,6 +106,23 @@ await app.register(multipart, {
   limits: { fileSize: env.uploadMaxOctets },
 });
 
+// Les 5xx sont consignées au journal des erreurs et leur détail n'est plus
+// renvoyé au client — voir src/erreurs.js.
+app.setErrorHandler(gestionnaireErreurs);
+
+// Une promesse rejetée sans gestionnaire, hors de toute requête — dans un
+// moteur de fond, typiquement — finirait sinon dans les seuls journaux du
+// conteneur.
+process.on("unhandledRejection", (raison) => {
+  app.log.error({ err: raison }, "promesse rejetée sans gestionnaire");
+  consigner({
+    source: "api",
+    message: raison?.message || String(raison),
+    pile: raison?.stack,
+    url: "processus",
+  });
+});
+
 app.get("/health", async () => ({ status: "ok" }));
 
 await app.register(authRoutes, { prefix: "/api/auth" });
@@ -117,6 +137,37 @@ await app.register(courrierRoutes, { prefix: "/api/courrier" });
 await app.register(campagnesRoutes, { prefix: "/api/campagnes" });
 await app.register(espaceRoutes, { prefix: "/api/espace" });
 await app.register(plateformeRoutes, { prefix: "/api/plateforme" });
+await app.register(erreursRoutes, { prefix: "/api/erreurs" });
+
+/// Dit, dans les journaux du conteneur, si chaque adresse de
+/// PLATFORM_ADMINS a bien un compte qui lui ouvrira la console. « Je suis
+/// admin et je n'ai pas accès » se diagnostiquait jusqu'ici à l'aveugle.
+const diagnostiquerExploitants = async () => {
+  if (!env.plateformeAdmins.length) {
+    app.log.warn("PLATFORM_ADMINS est vide : personne n'a accès à la console Plateforme.");
+    return;
+  }
+  for (const email of env.plateformeAdmins) {
+    try {
+      const exact = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      if (exact) {
+        app.log.info(`Exploitant ${email} : compte trouvé, console accessible.`);
+        continue;
+      }
+      const approchant = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { email: true },
+      });
+      app.log.warn(
+        approchant
+          ? `Exploitant ${email} : le compte existe sous « ${approchant.email} » (casse différente) — la console lui est refusée. Corrigez l'adresse du compte en minuscules.`
+          : `Exploitant ${email} : aucun compte. Créez-le avec « node src/exploitant.js ${email} ».`,
+      );
+    } catch (e) {
+      app.log.warn(`Diagnostic des exploitants impossible : ${e.message}`);
+    }
+  }
+};
 
 const shutdown = async () => {
   await app.close();
@@ -133,6 +184,9 @@ try {
   demarrerRelances();
   // Le moteur d'envoi des campagnes — voir src/campagnes.js.
   demarrerCampagnes();
+  // Les sauvegardes de la base et des fichiers — voir src/sauvegardes.js.
+  demarrerSauvegardes();
+  diagnostiquerExploitants();
 } catch (err) {
   app.log.error(err);
   process.exit(1);

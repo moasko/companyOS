@@ -16,6 +16,7 @@ dist/
 
 # Données d'exécution : le stockage des fichiers des espaces de travail
 apps/api/storage/
+apps/api/sauvegardes/
 
 # Journaux
 *.log

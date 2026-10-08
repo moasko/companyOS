@@ -1,19 +1,21 @@
-// Traitement de texte — voir index.jsx.
+// Traitement de texte — voir index.jsx et Editeur.jsx.
 //
-// La feuille est courte à dessein : tout le chrome d'édition (barre de
-// titre, menu, barre d'outils, pages) vient de l'éditeur lui-même, avec
-// son propre thème clair/sombre. Ne reste à habiller que la coquille :
-// le volet des documents et l'écran d'accueil.
+// La disposition est celle de Word : une ligne d'en-tête (Fichier,
+// onglets, titre, Enregistrer), un ruban d'une ligne, la page au centre sur
+// un fond gris, une barre d'état en bas. Tout ce qui n'est pas la page lui
+// prend de la hauteur ; chaque pixel de chrome doit donc se justifier.
 
 .wordApp {
   container-type: inline-size;
   --wd-bg: #ffffff;
   --wd-panel: #f5f6f8;
-  --wd-line: #e3e6eb;
+  --wd-line: #e1e3e6;
   --wd-text: #1f2733;
-  --wd-muted: #6b7684;
+  --wd-muted: #646d79;
   --wd-accent: #2b579a; // le bleu Word, celui de l'icône
   --wd-accent-soft: #e8effa;
+  --wd-canvas: #e9eaed; // le gris autour de la feuille
+  --wd-hover: rgb(0 0 0 / 5%);
 
   background: var(--wd-bg);
   color: var(--wd-text);
@@ -38,6 +40,7 @@
   }
 
   .wdShell {
+    position: relative;
     display: flex;
     flex-grow: 1;
     min-height: 0;
@@ -45,14 +48,23 @@
 
   // ---- Volet des documents ------------------------------------------------
 
+  // Un panneau qui glisse au-dessus du document, ouvert depuis Fichier →
+  // Documents : il ne prend aucune largeur tant qu'on écrit.
   .wdVolet {
-    width: 218px;
-    flex-shrink: 0;
+    position: absolute;
+    // Au-dessus de l'en-tête du document : c'est un tiroir, comme le
+    // panneau Fichier de Word.
+    z-index: 70;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: var(--wd-panel);
+    background: var(--wd-bg);
     border-right: 1px solid var(--wd-line);
+    box-shadow: 8px 0 24px rgb(0 0 0 / 14%);
 
     &[data-replie="true"] {
       display: none;
@@ -88,23 +100,6 @@
     &:hover {
       background: color-mix(in srgb, var(--wd-text) 8%, transparent);
       color: var(--wd-text);
-    }
-  }
-
-  // Volet replié : une poignée fine pour le rouvrir.
-  .wdVoletPoignee {
-    width: 22px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--wd-panel);
-    border-right: 1px solid var(--wd-line);
-    color: var(--wd-muted);
-
-    &:hover {
-      color: var(--wd-text);
-      background: color-mix(in srgb, var(--wd-text) 6%, var(--wd-panel));
     }
   }
 
@@ -202,129 +197,11 @@
     }
   }
 
-  // ---- Barre du document --------------------------------------------------
-
-  .wdBarreDoc {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    min-height: 44px;
-    padding: 7px 14px;
-    border-bottom: 1px solid var(--wd-line);
-    border-radius: 0 !important;
-    background: var(--wd-bg);
-    box-shadow: none;
-
-    .uicon {
-      display: flex;
-      color: var(--wd-accent);
-      flex-shrink: 0;
-    }
-  }
-
-  .wdTitreDoc {
-    flex-grow: 1;
-    min-width: 0;
-    border: 1px solid transparent;
-    border-radius: 5px;
-    padding: 4px 8px;
-    background: transparent;
-    color: var(--wd-text);
-    font-size: 0.84em;
-    font-weight: 600;
-    font-family: inherit;
-
-    &:hover {
-      border-color: var(--wd-line);
-    }
-
-    &:focus {
-      outline: none;
-      border-color: var(--wd-accent);
-      background: var(--wd-bg);
-    }
-  }
-
-  .wdEtatDoc {
-    flex-shrink: 0;
-    font-size: 0.7em;
-    color: var(--wd-muted);
-
-    &[data-modifie="true"] {
-      color: #b26a00;
-    }
-
-    // L'échec prime sur tout le reste : c'est le seul état où l'utilisateur
-    // risque de perdre son travail sans le savoir.
-    &[data-echec="true"] {
-      color: #d93025;
-      font-weight: 600;
-      cursor: help;
-    }
-  }
-
   .wdImportCache {
     display: none;
   }
 
-  .wdActionDoc {
-    height: 30px;
-    min-width: 30px;
-    box-sizing: border-box;
-    border: 1px solid var(--wd-line);
-    border-radius: 4px;
-    background: var(--wd-bg);
-    color: var(--wd-text);
-    padding: 0 10px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font: 600 0.72em/1 inherit;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-    appearance: none;
-
-    &:hover:not(:disabled) {
-      background: var(--wd-panel);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--wd-accent);
-      outline-offset: 2px;
-    }
-
-    .uicon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-    }
-
-    &:disabled {
-      opacity: 0.55;
-      cursor: default;
-    }
-  }
-
-  .wdActionPrimaire {
-    border-color: var(--wd-accent);
-    background: var(--wd-accent);
-    color: #fff;
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--wd-accent) 25%, transparent);
-
-    &:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--wd-accent) 88%, #000);
-    }
-
-    &:active:not(:disabled) {
-      transform: translateY(1px);
-      box-shadow: none;
-    }
-  }
-
-  // ---- L'éditeur incrusté -------------------------------------------------
+  // ---- L'éditeur ----------------------------------------------------------
 
   .wdEditeur {
     flex-grow: 1;
@@ -332,178 +209,300 @@
     display: flex;
     flex-direction: column;
 
-    // La palette de l'éditeur (`--doc-*`) reprend celle du module : même
-    // accent, mêmes fonds — le chrome de la bibliothèque se fond dans la
-    // fenêtre au lieu d'y poser son propre univers.
+    // La palette de l'éditeur (`--doc-*`) reprend celle du module : le
+    // chrome de la bibliothèque se fond dans la fenêtre.
     --doc-primary: var(--wd-accent);
     --doc-primary-hover: color-mix(in srgb, var(--wd-accent) 88%, #000);
     --doc-primary-light: var(--wd-accent-soft);
     --doc-accent: var(--wd-accent);
     --doc-surface: var(--wd-bg);
-    --doc-bg: #f1f2f4;
+    --doc-bg: var(--wd-canvas);
     --doc-bg-subtle: var(--wd-panel);
-    --doc-bg-hover: var(--wd-accent-soft);
+    --doc-bg-hover: var(--wd-hover);
     --doc-text: var(--wd-text);
     --doc-text-muted: var(--wd-muted);
     --doc-border: var(--wd-line);
     --doc-toggle-active-bg: var(--wd-accent-soft);
     --doc-toggle-active-fg: var(--wd-accent);
 
-    .wdRubanOnglets {
+    // ---- En-tête : Fichier, onglets, titre, Enregistrer --------------------
+
+    .wdEntete {
+      position: relative;
+      // Au-dessus des boutons flottants de la zone du document (volet de
+      // navigation) : le menu Fichier doit les recouvrir.
+      z-index: 50;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      height: 36px;
+      padding: 0 8px 0 4px;
+      background: var(--wd-bg);
+    }
+
+    .wdOnglets {
       display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      height: 33px;
-      padding: 0 12px;
-      background: var(--wd-bg);
-      border-bottom: 1px solid var(--wd-line);
-      border-radius: 0;
-
-      button {
-        align-self: stretch;
-        padding: 0 13px;
-        border: 0;
-        border-bottom: 2px solid transparent;
-        background: transparent;
-        color: var(--wd-muted);
-        font: 500 12px/1 inherit;
-        cursor: pointer;
-
-        &:hover {
-          color: var(--wd-text);
-          background: var(--wd-panel);
-        }
-
-        &[aria-selected="true"] {
-          color: var(--wd-accent);
-          border-bottom-color: var(--wd-accent);
-          font-weight: 650;
-        }
-
-        &.wdOngletContextuel {
-          color: #8a4b08;
-
-          &[aria-selected="true"] {
-            color: #b45f06;
-            border-bottom-color: #d97706;
-            background: #fff7e8;
-          }
-        }
-
-        &:focus-visible {
-          outline: 2px solid var(--wd-accent);
-          outline-offset: -3px;
-        }
-      }
-    }
-
-    // Ruban inspiré des suites bureautiques : onglets sobres en haut,
-    // groupes d'outils clairement séparés, puis une vraie zone de travail.
-    .docx-menubar {
-      min-height: 34px;
-      padding: 0 12px;
-      border-bottom: 1px solid var(--wd-line);
-      background: var(--wd-bg);
-      gap: 2px;
-    }
-
-    .docx-menubar__trigger {
-      min-height: 33px;
-      padding: 0 11px;
-      border-radius: 0;
-      color: var(--wd-text);
-      font-size: 12px;
-
-      &:hover,
-      &[data-state="open"] {
-        color: var(--wd-accent);
-        background: var(--wd-accent-soft);
-        box-shadow: inset 0 -2px var(--wd-accent);
-      }
-    }
-
-    .docx-toolbar {
-      min-height: 68px;
-      padding: 7px 12px 17px;
-      gap: 0;
-      align-content: center;
       align-items: stretch;
-      background: var(--wd-bg);
-      border-bottom: 1px solid var(--wd-line);
-      box-shadow: 0 2px 5px color-mix(in srgb, #000 7%, transparent);
-      z-index: 3;
-      overflow: visible;
-      flex-wrap: wrap;
-      border-radius: 0 !important;
+      height: 100%;
+      min-width: 0;
     }
 
-    .docx-toolbar__group {
+    .wdOnglet {
+      position: relative;
+      padding: 0 11px;
+      border: 0;
+      background: transparent;
+      color: var(--wd-text);
+      font: 400 12.5px/1 inherit;
+      white-space: nowrap;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--wd-hover);
+      }
+
+      // L'onglet actif : souligné, comme dans Word.
+      &[aria-selected="true"] {
+        color: var(--wd-accent);
+        font-weight: 600;
+
+        &::after {
+          content: "";
+          position: absolute;
+          left: 10px;
+          right: 10px;
+          bottom: 0;
+          height: 3px;
+          border-radius: 3px 3px 0 0;
+          background: var(--wd-accent);
+        }
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--wd-accent);
+        outline-offset: -3px;
+      }
+    }
+
+    .wdOngletContextuel {
+      color: #a35a00;
+
+      &[aria-selected="true"] {
+        color: #a35a00;
+        &::after { background: #d97706; }
+      }
+    }
+
+    .wdFichier {
       position: relative;
       display: flex;
-      align-items: center;
-      gap: 2px;
-      min-height: 38px;
-      padding: 0 8px;
-      border-right: 1px solid var(--wd-line);
+    }
 
-      &:last-child {
-        border-right: 0;
+    .wdOngletFichier {
+      margin-right: 4px;
+      border-radius: 4px;
+      color: #fff;
+      background: var(--wd-accent);
+      font-weight: 600;
+      margin-block: 5px;
+      padding: 0 12px;
+
+      &:hover,
+      &[aria-expanded="true"] {
+        background: color-mix(in srgb, var(--wd-accent) 86%, #000);
       }
+    }
+
+    .wdMenuFichier {
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0;
+      z-index: 60;
+      min-width: 270px;
+      padding: 6px;
+      border: 1px solid var(--wd-line);
+      border-radius: 8px;
+      background: var(--wd-bg);
+      box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+
+      button {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        width: 100%;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--wd-text);
+        font: 400 12.5px/1.2 inherit;
+        text-align: left;
+        cursor: pointer;
+
+        .uicon {
+          display: flex;
+          width: 16px;
+          justify-content: center;
+          color: var(--wd-muted);
+        }
+
+        span { flex: 1; }
+
+        kbd {
+          font: 11px/1 inherit;
+          color: var(--wd-muted);
+        }
+
+        &:hover,
+        &:focus-visible {
+          outline: none;
+          background: var(--wd-accent-soft);
+          .uicon { color: var(--wd-accent); }
+        }
+      }
+
+      hr {
+        margin: 5px 4px;
+        border: 0;
+        border-top: 1px solid var(--wd-line);
+      }
+    }
+
+    .wdTitreZone {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      justify-self: center;
+    }
+
+    .wdTitreDoc {
+      max-width: 340px;
+      padding: 4px 8px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--wd-text);
+      font: 600 13px/1.2 inherit;
+      text-align: center;
+      text-overflow: ellipsis;
+
+      &:hover { border-color: var(--wd-line); }
+
+      &:focus {
+        outline: none;
+        border-color: var(--wd-accent);
+        background: var(--wd-bg);
+        text-align: left;
+      }
+    }
+
+    .wdEtatDoc {
+      flex-shrink: 0;
+      font-size: 11.5px;
+      color: var(--wd-muted);
+      white-space: nowrap;
+
+      &[data-ton="ok"] { color: var(--wd-muted); }
+      &[data-ton="modifie"] { color: #a35a00; }
+
+      // L'échec prime sur tout le reste : c'est le seul état où l'utilisateur
+      // risque de perdre son travail sans le savoir.
+      &[data-ton="echec"] {
+        color: #d93025;
+        font-weight: 600;
+        cursor: help;
+      }
+    }
+
+    .wdEnteteActions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .wdBoutonEnregistrer {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 26px;
+      padding: 0 11px;
+      border: 1px solid var(--wd-line);
+      border-radius: 4px;
+      background: var(--wd-bg);
+      color: var(--wd-text);
+      font: 600 12px/1 inherit;
+      cursor: pointer;
+
+      .uicon { display: flex; color: var(--wd-accent); }
+
+      &:hover:not(:disabled) { background: var(--wd-hover); }
+      &:disabled { opacity: 0.55; cursor: default; }
+
+      &:focus-visible {
+        outline: 2px solid var(--wd-accent);
+        outline-offset: 1px;
+      }
+    }
+
+    // ---- Ruban : une ligne -------------------------------------------------
+
+    .docx-toolbar.wdRuban {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 1px;
+      min-height: 40px;
+      padding: 4px 10px;
+      margin: 0 6px 6px;
+      border: 1px solid var(--wd-line);
+      border-radius: 8px;
+      background: var(--wd-bg);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+      z-index: 3;
+    }
+
+    // Les groupes que la bibliothèque crée autour des pièces : pas de
+    // bordure ni de libellé, seulement les séparateurs qu'on a posés.
+    .docx-toolbar__group {
+      display: flex;
+      align-items: center;
+      gap: 1px;
+      padding: 0;
+      border: 0;
+
+      &::after { content: none !important; }
     }
 
     .docx-toolbar__separator {
       width: 1px;
-      height: 34px;
-      margin: 2px 4px;
+      height: 22px;
+      margin: 0 6px;
       background: var(--wd-line);
       border: 0;
+      flex-shrink: 0;
     }
-
-    .docx-toolbar:not(.wdRubanInsertion) .docx-toolbar__group::after {
-      position: absolute;
-      left: 4px;
-      right: 4px;
-      bottom: -13px;
-      color: var(--wd-muted);
-      text-align: center;
-      font-size: 9px;
-      line-height: 11px;
-      white-space: nowrap;
-    }
-
-    // Le moteur fournit un identifiant stable par groupe. Les positions ne
-    // dépendent donc plus d'un `nth-child`, qui se décalait dès qu'un
-    // séparateur ou un groupe contextuel apparaissait.
-    .docx-toolbar__group[data-toolbar-group="history"]::after { content: "Historique"; }
-    .docx-toolbar__group[data-toolbar-group="zoom"]::after { content: "Affichage"; }
-    .docx-toolbar__group[data-toolbar-group="styles"]::after { content: "Styles"; }
-    .docx-toolbar__group[data-toolbar-group="font"]::after { content: "Police"; }
-    .docx-toolbar__group[data-toolbar-group="text"]::after { content: "Mise en forme"; }
-    .docx-toolbar__group[data-toolbar-group="script"]::after { content: "Indices"; }
-    .docx-toolbar__group[data-toolbar-group="alignment"]::after { content: "Paragraphe"; }
-    .docx-toolbar__group[data-toolbar-group="list"]::after { content: "Listes"; }
-    .docx-toolbar__group[data-toolbar-group="format"]::after { content: "Nettoyer"; }
-    .docx-toolbar__group[data-toolbar-group="review"]::after { content: "Révision"; }
 
     .docx-toolbar .docx-toolbar__button,
     .docx-toolbar button {
-      min-width: 30px;
-      min-height: 30px;
+      min-width: 28px;
+      height: 28px;
+      min-height: 28px;
       box-sizing: border-box;
       border: 1px solid transparent;
-      border-radius: 3px;
+      border-radius: 4px;
+      background: transparent;
       color: var(--wd-text);
 
       &:hover:not(:disabled) {
-        background: var(--wd-accent-soft);
-        border-color: color-mix(in srgb, var(--wd-accent) 24%, var(--wd-line));
+        background: var(--wd-hover);
       }
 
       &[data-active="true"],
+      &[aria-pressed="true"],
       &[data-active]:not([data-active="false"]) {
         color: var(--wd-accent);
         background: var(--wd-accent-soft);
-        border-color: color-mix(in srgb, var(--wd-accent) 38%, transparent);
       }
 
       &:focus-visible {
@@ -515,83 +514,62 @@
     .docx-toolbar select,
     .docx-toolbar input,
     .docx-toolbar [role="combobox"] {
-      min-height: 30px;
+      height: 28px;
+      min-height: 28px;
       box-sizing: border-box;
       border-color: var(--wd-line);
-      border-radius: 3px;
+      border-radius: 4px;
       background: var(--wd-bg);
       color: var(--wd-text);
     }
 
     .docx-toolbar__stepper {
-      min-height: 30px;
+      height: 28px;
+      min-height: 28px;
       border: 1px solid var(--wd-line);
-      border-radius: 3px;
+      border-radius: 4px;
       background: var(--wd-bg);
       overflow: hidden;
     }
 
-    // Bande d'insertion explicite : les commandes sont les commandes du
-    // moteur (donc état actif/désactivé honnête), simplement présentées
-    // comme un ruban bureautique lisible.
-    .wdRubanInsertion,
-    .wdRubanImage {
-      min-height: 70px;
-      padding: 5px 10px 14px;
-      overflow: visible;
-      flex-wrap: wrap;
-      box-shadow: none;
+    // Insertion, Révision, Image : des commandes qu'une icône seule ne
+    // nomme pas (« N° de page », « Note de fin »…). Un libellé court à côté
+    // de l'icône, sur la même ligne — le ruban simplifié de Word.
+    .wdRubanTexte [data-slot] {
+      gap: 6px;
+      padding: 0 8px;
+      width: auto;
+
+      &::after {
+        font-size: 12px;
+        white-space: nowrap;
+      }
     }
 
+    .wdRubanTexte {
+      [data-slot="table.insert"]::after { content: "Tableau"; }
+      [data-slot="image.insert"]::after { content: "Image"; }
+      [data-slot="text.link"]::after { content: "Lien"; }
+      [data-slot="insert.pageBreak"]::after { content: "Saut de page"; }
+      [data-slot="insert.sectionBreakNextPage"]::after { content: "Section"; }
+      [data-slot="insert.sectionBreakContinuous"]::after { content: "Section continue"; }
+      [data-slot="insert.pageNumber"]::after { content: "N° de page"; }
+      [data-slot="insert.pageXofY"]::after { content: "Page X sur Y"; }
+      [data-slot="insert.totalPages"]::after { content: "Nombre de pages"; }
+      [data-slot="insert.toc"]::after { content: "Sommaire"; }
+      [data-slot="insert.footnote"]::after { content: "Note de bas de page"; }
+      [data-slot="insert.endnote"]::after { content: "Note de fin"; }
+      [data-slot="review.comments"]::after { content: "Commentaires"; }
+      [data-slot="image.properties"]::after { content: "Propriétés"; }
+      [data-slot="image.wrap"]::after { content: "Habillage"; }
+      [data-slot="image.altText"]::after { content: "Texte de remplacement"; }
+    }
+
+    // L'onglet contextuel Image : la même bande, teintée, pour qu'on sache
+    // qu'on agit sur l'image et non sur le texte.
     .wdRubanImage {
-      min-height: 64px;
-      padding-block: 5px 14px;
-      border-top: 2px solid #d97706;
-      background: color-mix(in srgb, #fff7e8 48%, var(--wd-bg));
-
-      .wdInsertionGroupe {
-        border-right-color: color-mix(in srgb, #d97706 25%, var(--wd-line));
-      }
-
-      .docx-toolbar__button:hover:not(:disabled),
-      button:hover:not(:disabled) {
-        background: color-mix(in srgb, #f59e0b 14%, var(--wd-bg));
-        border-color: color-mix(in srgb, #d97706 36%, var(--wd-line));
-      }
-
-      .wdInsertionGroupe {
-        min-height: 42px;
-        align-items: center;
-      }
-
-      [data-groupe="Image"] {
-        min-width: 118px;
-      }
-
-      [data-groupe="Disposition"] {
-        min-width: 82px;
-      }
-
-      [data-slot="image.wrap"] {
-        min-width: 64px;
-      }
-
-      .wdCommandeImage {
-        min-width: 48px;
-        min-height: 44px;
-        flex-direction: column;
-        gap: 2px;
-        padding: 3px 5px;
-
-        > span {
-          font-size: 18px;
-          line-height: 18px;
-        }
-
-        > small {
-          font: 500 9px/11px inherit;
-        }
-      }
+      border-color: color-mix(in srgb, #d97706 40%, var(--wd-line));
+      background: color-mix(in srgb, #fff7e8 55%, var(--wd-bg));
     }
 
     // Sélection directe sur la page : le moteur fournit la géométrie et
@@ -639,78 +617,19 @@
       }
     }
 
-    .wdInsertionGroupe {
-      position: relative;
-      display: flex;
-      align-items: stretch;
-      gap: 3px;
-      min-width: max-content;
-      padding: 0 9px;
-      border-right: 1px solid var(--wd-line);
 
-      &::after {
-        content: attr(data-groupe);
-        position: absolute;
-        left: 5px;
-        right: 5px;
-        bottom: -12px;
-        color: var(--wd-muted);
-        text-align: center;
-        font-size: 9px;
-        line-height: 11px;
-      }
-
-      > button,
-      > [data-slot] {
-        min-width: 52px;
-        min-height: 45px;
-        padding: 4px 7px 18px;
-        position: relative;
-        display: inline-flex;
-        align-items: flex-start;
-        justify-content: center;
-      }
-
-      [data-slot]::after {
-        position: absolute;
-        left: 3px;
-        right: 3px;
-        bottom: 3px;
-        overflow: hidden;
-        color: var(--wd-text);
-        font-size: 9px;
-        line-height: 11px;
-        text-align: center;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      [data-slot="insert.pageBreak"]::after { content: "Saut de page"; }
-      [data-slot="insert.sectionBreakNextPage"]::after { content: "Section"; }
-      [data-slot="insert.sectionBreakContinuous"]::after { content: "Section continue"; }
-      [data-slot="table.insert"]::after { content: "Tableau"; }
-      [data-slot="image.insert"]::after { content: "Image"; }
-      [data-slot="text.link"]::after { content: "Lien"; }
-      [data-slot="insert.toc"]::after { content: "Sommaire"; }
-      [data-slot="insert.footnote"]::after { content: "Note"; }
-      [data-slot="insert.endnote"]::after { content: "Fin"; }
-      [data-slot="insert.pageNumber"]::after { content: "N° de page"; }
-      [data-slot="insert.totalPages"]::after { content: "Total pages"; }
-      [data-slot="insert.pageXofY"]::after { content: "Page X/Y"; }
-      [data-slot="review.comments"]::after { content: "Commentaire"; }
-      [data-slot="image.properties"]::after { content: "Propriétés"; }
-      [data-slot="image.wrap"]::after { content: "Habillage"; }
-    }
+    // ---- La zone du document ---------------------------------------------
 
     .docx-editor__scroll-container,
     .docx-editor-one-surface__viewport {
-      background: #f1f2f4;
+      background: var(--wd-canvas);
       scroll-behavior: smooth;
     }
 
-    .docx-editor-one-surface__page,
-    .docx-editor-page {
-      box-shadow: 0 1px 3px rgb(0 0 0 / 14%), 0 8px 24px rgb(0 0 0 / 7%);
+    // La feuille : blanche, posée sur le gris, ombre douce — quel que soit
+    // le thème de l'OS (voir plus bas pour le thème sombre).
+    .docx-page {
+      box-shadow: 0 0 0 1px rgb(0 0 0 / 5%), 0 2px 6px rgb(0 0 0 / 10%), 0 12px 28px rgb(0 0 0 / 6%);
     }
 
     // Les listes de police, taille, styles et couleurs doivent passer au-
@@ -856,106 +775,283 @@
       }
     }
 
+
     // Le conteneur de défilement des pages prend toute la place restante.
     [class*="viewport"],
     .docx-viewport {
       flex-grow: 1;
       min-height: 0;
     }
+
+    // ---- Barre d'état -----------------------------------------------------
+
+    .wdBarreEtat {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 26px;
+      padding: 0 12px;
+      border-top: 1px solid var(--wd-line);
+      background: var(--wd-bg);
+      color: var(--wd-muted);
+      font-size: 11.5px;
+    }
+
+    .wdBarreEtatEspace { flex: 1; }
+
+    .wdZoom {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 4px;
+        border: 0;
+        border-radius: 3px;
+        background: transparent;
+        color: var(--wd-muted);
+        font: 11.5px/1 inherit;
+        cursor: pointer;
+
+        &:hover { background: var(--wd-hover); color: var(--wd-text); }
+      }
+
+      input[type="range"] {
+        width: 110px;
+        accent-color: var(--wd-accent);
+      }
+
+      .wdZoomValeur {
+        min-width: 44px;
+        font-variant-numeric: tabular-nums;
+      }
+    }
   }
 
-  .wdPatiente,
-  .wdAccueil {
+  // ---- Chargement et accueil ---------------------------------------------
+
+  .wdPatiente {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     flex-grow: 1;
     gap: 12px;
-    padding: 40px;
-    text-align: center;
     color: var(--wd-muted);
 
-    p {
-      max-width: 52ch;
-      font-size: 0.8em;
-      line-height: 1.65;
-      margin: 0;
-    }
+    p { margin: 0; font-size: 0.8em; }
+    .uicon { display: flex; }
+  }
 
-    .uicon {
-      display: flex;
+  // L'accueil de Word : créer, ouvrir, reprendre.
+  .wdAccueil {
+    flex-grow: 1;
+    overflow: auto;
+    background: var(--wd-panel);
+  }
+
+  .wdAccueilCorps {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 34px 32px 40px;
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: 22px;
+      font-weight: 600;
     }
   }
 
-  .wdAccueilTitre {
-    font-size: 1.25em;
-    font-weight: 600;
-    color: var(--wd-text);
-  }
-
-  .wdAccueilActions {
-    margin-top: 8px;
+  .wdAccueilNouveau {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
+    gap: 18px;
+    margin-bottom: 30px;
   }
 
-  .wdAccueilBtn {
+  .wdTuile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--wd-text);
+    font: 500 12.5px/1.2 inherit;
+    cursor: pointer;
+
+    &:hover .wdTuileFeuille,
+    &:focus-visible .wdTuileFeuille {
+      border-color: var(--wd-accent);
+      box-shadow: 0 0 0 2px var(--wd-accent-soft), 0 4px 14px rgb(0 0 0 / 10%);
+    }
+
+    &:focus-visible { outline: none; }
+  }
+
+  // Une feuille A4 en miniature : on sait ce qu'on va obtenir.
+  .wdTuileFeuille {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 9px 18px;
-    border-radius: 7px;
-    background: var(--wd-accent);
-    color: #ffffff;
-    font-size: 0.8em;
-    font-weight: 600;
-
-    &:hover {
-      background: color-mix(in srgb, var(--wd-accent) 88%, #000);
-    }
-  }
-
-  .wdAccueilBtnSecondaire {
-    background: var(--wd-bg);
-    color: var(--wd-text);
+    justify-content: center;
+    width: 118px;
+    height: 152px;
     border: 1px solid var(--wd-line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--wd-accent);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 7%);
+    transition: box-shadow 0.15s, border-color 0.15s;
+
+    .uicon { display: flex; }
+  }
+
+  .wdTuileOuvrir {
+    background: var(--wd-bg);
+    color: var(--wd-muted);
+  }
+
+  .wdAccueilSection {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--wd-line);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .wdAccueilVide {
+    margin: 14px 0 0;
+    max-width: 60ch;
+    color: var(--wd-muted);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .wdRecents {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wdRecent {
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
 
     &:hover {
-      background: var(--wd-panel);
+      background: var(--wd-hover);
+      .wdRecentSuppr { opacity: 1; }
     }
   }
 
-  @container (max-width: 1050px) {
-    .wdActionDoc {
-      padding-inline: 8px;
-      font-size: 0;
+  .wdRecentOuvrir {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--wd-text);
+    font: 400 13px/1.2 inherit;
+    text-align: left;
+    cursor: pointer;
 
-      .uicon { font-size: initial; }
-    }
+    .uicon { display: flex; color: var(--wd-accent); }
 
-    .wdEtatDoc {
-      max-width: 110px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .wdEditeur .docx-toolbar,
-    .wdEditeur .wdRubanInsertion,
-    .wdEditeur .wdRubanImage {
-      flex-wrap: wrap;
-      overflow: visible;
+    &:focus-visible {
+      outline: 2px solid var(--wd-accent);
+      outline-offset: -2px;
+      border-radius: 6px;
     }
   }
 
-  @container (max-width: 760px) {
-    .wdBarreDoc { padding-inline: 8px; }
-    .wdEtatDoc { display: none; }
-    .wdEditeur .docx-menubar { padding-inline: 4px; }
-    .wdEditeur .wdRubanOnglets { padding-inline: 4px; }
+  .wdRecentNom {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wdRecentDate {
+    flex: none;
+    color: var(--wd-muted);
+    font-size: 12px;
+  }
+
+  .wdRecentSuppr {
+    display: flex;
+    margin-right: 6px;
+    padding: 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--wd-muted);
+    opacity: 0;
+    cursor: pointer;
+
+    &:hover { color: #d93025; background: rgb(217 48 37 / 10%); }
+    &:focus-visible { opacity: 1; outline: 2px solid var(--wd-accent); }
+  }
+
+  // ---- Fenêtre étroite ----------------------------------------------------
+  //
+  // Comme Word quand on rétrécit la fenêtre : les commandes secondaires
+  // s'effacent d'abord, les essentielles (gras, italique, couleur, listes,
+  // alignement) restent jusqu'au bout. Tout reste accessible au clavier et
+  // par le clic droit sur le texte.
+
+  @container (max-width: 1240px) {
+    .wdEditeur .wdRubanTexte [data-slot]::after { content: none !important; }
+    .wdEditeur .wdRubanTexte [data-slot] { padding: 0; }
+  }
+
+  @container (max-width: 1180px) {
+    .wdEditeur .wdRuban {
+      [data-slot="script.super"],
+      [data-slot="script.sub"] { display: none; }
+    }
+  }
+
+  @container (max-width: 1060px) {
+    .wdEditeur .wdRuban {
+      [data-slot="text.strike"],
+      [data-slot="list.outdent"],
+      [data-slot="list.indent"],
+      [data-slot="format.clear"] { display: none; }
+    }
+  }
+
+  @container (max-width: 940px) {
+    .wdEditeur .wdRuban {
+      [data-slot="styles.style"],
+      [data-slot="list.lineSpacing"] { display: none; }
+    }
+  }
+
+  // Dernier recours : une seconde ligne plutôt que des commandes coupées.
+  @container (max-width: 780px) {
+    .wdEditeur .docx-toolbar.wdRuban { flex-wrap: wrap; }
+  }
+
+  @container (max-width: 900px) {
+    .wdEditeur .wdEtatDoc { display: none; }
+    .wdEditeur .wdBoutonEnregistrer span { display: none; }
+  }
+
+  @container (max-width: 680px) {
+    .wdEditeur .wdEntete { grid-template-columns: minmax(0, 1fr) auto; }
+    .wdEditeur .wdTitreZone { display: none; }
+    .wdEditeur .wdZoom input[type="range"] { display: none; }
+    .wdAccueilCorps { padding: 22px 16px; }
   }
 }
 
@@ -966,26 +1062,57 @@
   }
 }
 
+// ---- Thème sombre : l'interface s'assombrit, la feuille reste blanche -----
+
 body[data-theme="dark"] .wordApp {
-  --wd-bg: #1f2226;
-  --wd-panel: #17191d;
-  --wd-line: #33383f;
+  --wd-bg: #202226;
+  --wd-panel: #191b1e;
+  --wd-line: #34383e;
   --wd-text: #e6e8ea;
   --wd-muted: #9aa2ad;
   --wd-accent: #6ea1e8;
   --wd-accent-soft: #26364d;
+  --wd-canvas: #141518;
+  --wd-hover: rgb(255 255 255 / 7%);
 
-  .wdAccueilBtn {
-    color: #14161a;
+  .wdEditeur .wdOngletFichier { background: #2b579a; }
+
+  .wdEditeur .wdRubanImage {
+    background: color-mix(in srgb, #d97706 10%, var(--wd-bg));
   }
 
-  .wdEditeur .docx-editor__scroll-container,
-  .wdEditeur .docx-editor-one-surface__viewport {
-    background: #15171a;
+  // La bibliothèque assombrit la page en inversant ses couleurs — le mode
+  // « page sombre » de Word. Ce n'est pas ce qu'on veut ici : la feuille
+  // reste celle qu'on imprimera. On neutralise l'inversion et on rend à la
+  // page ses couleurs d'origine.
+  .wdEditeur.docx-editor.dark {
+    --doc-page-bg: #ffffff;
+    --doc-page-bg-rendered: #ffffff;
+    --doc-page-text: #000000;
+    --doc-caret: #000000;
+    --doc-caret-contrast: #ffffff;
+
+    .docx-page {
+      background: #ffffff !important;
+    }
+
+    .docx-page-content,
+    .docx-page-content [data-highlight],
+    .docx-page-content img,
+    .docx-page-content svg,
+    .docx-page-content canvas,
+    .docx-page-content video,
+    .docx-page-content [data-no-color-invert],
+    .layout-page,
+    .layout-page [data-highlight] {
+      filter: none !important;
+    }
+
+    .docx-page-content ::selection {
+      background-color: rgb(78 157 255 / 32%);
+    }
   }
 
-  .wdEditeur {
-    --doc-bg: #15171a;
-    --doc-primary-hover: color-mix(in srgb, var(--wd-accent) 82%, #fff);
-  }
+  .wdTuileFeuille { background: #fff; }
+  .wdTuileOuvrir { background: var(--wd-bg); }
 }

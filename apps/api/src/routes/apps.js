@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma, serialize } from "../db.js";
-import { authenticate, exigerRole } from "../auth.js";
+import { authenticate, estExploitant, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { MODES, autoriseSelon, regleDe } from "../acces.js";
 
@@ -392,15 +392,40 @@ export default async function appRoutes(app) {
       orderBy: { installedAt: "asc" },
     });
 
+    // La console Plateforme n'est pas dans la Boutique et ne s'installe
+    // pas : elle apparaît d'elle-même chez l'exploitant, quel que soit son
+    // espace, et chez personne d'autre — même si une installation
+    // ancienne traîne dans l'espace.
+    const exploitant = estExploitant(request.user.email);
+    const visibles = installations.filter((i) => i.app.slug !== "plateforme" || exploitant);
+    if (exploitant && !visibles.some((i) => i.app.slug === "plateforme")) {
+      const appConsole = await prisma.app.findFirst({
+        where: { tenantId: null, slug: "plateforme" },
+      });
+      if (appConsole) {
+        visibles.push({
+          app: appConsole,
+          settings: {},
+          acces: null,
+          installedAt: null,
+          version: appConsole.version,
+        });
+      }
+    }
+
     return serialize(
-      installations.map((i) => ({
+      visibles.map((i) => ({
         ...i.app,
         settings: sansSecrets(i.settings),
         // La règle d'accès et ce qu'elle donne pour cette personne : le
         // shell n'affiche que ce qu'elle peut ouvrir. Le contrôle qui
         // compte reste celui des routes de données.
         acces: regleDe(i.app.slug, i),
-        autorise: autoriseSelon(request.user, regleDe(i.app.slug, i)),
+        // La console obéit à PLATFORM_ADMINS, pas au rôle dans l'espace.
+        autorise:
+          i.app.slug === "plateforme"
+            ? exploitant
+            : autoriseSelon(request.user, regleDe(i.app.slug, i)),
         installedAt: i.installedAt,
         // Ce qui est en place, à distinguer de `version` qui est ce que le
         // catalogue propose. C'est l'écart entre les deux qui fait une

@@ -161,6 +161,12 @@ export const api = {
     }),
 
   plateformeStockageLire: () => request("/plateforme/stockage"),
+  /// Santé de la plateforme : sauvegardes et erreurs.
+  plateformeSante: () => request("/plateforme/sante"),
+  plateformeSauvegarder: (type) =>
+    request("/plateforme/sauvegardes", { method: "POST", body: { type } }),
+  plateformeErreurResolue: (id, resolue) =>
+    request(`/plateforme/erreurs/${id}`, { method: "PUT", body: { resolue } }),
   plateformeStockageTest: (config) =>
     request("/plateforme/stockage/test", { method: "POST", body: config }),
   plateformeStockage: (config) =>

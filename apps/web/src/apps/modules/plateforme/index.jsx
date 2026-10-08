@@ -48,6 +48,7 @@ import { Contenu, useChargement } from "../../chargement";
 import { Vide } from "../../ui";
 import { montant as fcfa } from "../../../utils/monnaie";
 import { Stockage } from "./Stockage";
+import { Sante } from "./Sante";
 import "./plateforme.scss";
 
 export const manifest = {
@@ -70,6 +71,7 @@ const SECTIONS = [
   { id: "bord", label: "Tableau de bord", icone: "faGaugeHigh" },
   { id: "espaces", label: "Espaces clients", icone: "faBuilding" },
   { id: "stockage", label: "Stockage", icone: "faCloud" },
+  { id: "sante", label: "Santé", icone: "faHeartPulse" },
 ];
 
 /// Les colonnes triables de la table. `valeur` extrait ce sur quoi on
@@ -110,6 +112,7 @@ function PlateformeApp() {
 
   const [donnees, setDonnees] = useState(null);
   const [stockage, setStockage] = useState(null);
+  const [sante, setSante] = useState(null);
   const [refus, setRefus] = useState(false);
   const [section, setSection] = useState("bord");
   const [recherche, setRecherche] = useState("");
@@ -123,14 +126,17 @@ function PlateformeApp() {
 
   const charger = useCallback(async () => {
     try {
-      const [tableau, config] = await Promise.all([
+      const [tableau, config, etatSante] = await Promise.all([
         api.plateforme(),
         // La configuration du stockage est secondaire : si sa table
         // n'existe pas encore, la console doit quand même s'ouvrir.
         api.plateformeStockageLire().catch(() => null),
+        // La santé aussi : une API d'avant les sauvegardes n'a pas la route.
+        api.plateformeSante().catch(() => null),
       ]);
       setDonnees(tableau);
       setStockage(config);
+      setSante(etatSante);
       setRefus(false);
     } catch (e) {
       if (e.status === 403) setRefus(true);
@@ -335,7 +341,7 @@ function PlateformeApp() {
             <Vide
               icone="faLock"
               titre="Console réservée à l'exploitant"
-              aide="Cette fenêtre montre tous les espaces clients du SaaS. Seuls les comptes listés dans PLATFORM_ADMINS, côté serveur, peuvent l'ouvrir."
+              aide={`Cette fenêtre montre tous les espaces clients du SaaS. Seuls les comptes listés dans PLATFORM_ADMINS, côté serveur, peuvent l'ouvrir — être administrateur de son espace ne suffit pas. Vous êtes connecté avec ${session.user?.email || "un compte inconnu"} : cette adresse doit figurer, exactement, dans PLATFORM_ADMINS.`}
             />
           </div>
         ) : (
@@ -394,6 +400,22 @@ function PlateformeApp() {
                         onDeconnecterMembre={deconnecterMembre}
                         onBasculerSuspension={basculerSuspension}
                       />
+                    ) : null}
+
+                    {section === "sante" ? (
+                      sante ? (
+                        <Sante
+                          sante={sante}
+                          onRecharger={etat.rafraichir}
+                          onAllerStockage={() => setSection("stockage")}
+                        />
+                      ) : (
+                        <Vide
+                          icone="faHeartPulse"
+                          titre="État de santé indisponible"
+                          aide="Le serveur n'a pas répondu, ou la migration de base n'est pas appliquée. Relancez l'API, puis rouvrez cette console."
+                        />
+                      )
                     ) : null}
 
                     {section === "stockage" ? (

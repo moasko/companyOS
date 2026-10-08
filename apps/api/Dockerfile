@@ -14,7 +14,15 @@
 FROM node:22-alpine
 
 # OpenSSL : requis par le moteur Prisma sur Alpine.
-RUN apk add --no-cache openssl
+#
+# Client PostgreSQL : `pg_dump` et `pg_restore` pour les sauvegardes
+# automatiques (src/sauvegardes.js). Sa version majeure doit être **au
+# moins** celle du serveur : un pg_dump plus ancien refuse de sauvegarder
+# (« server version mismatch »), et la console Plateforme affiche alors la
+# sauvegarde en échec. Pour un serveur PostgreSQL 18, construire avec
+# --build-arg PG_CLIENT=postgresql18-client.
+ARG PG_CLIENT=postgresql17-client
+RUN apk add --no-cache openssl ${PG_CLIENT}
 
 WORKDIR /app
 
@@ -40,13 +48,15 @@ COPY apps/api/src apps/api/src
 # docker-compose.prod.yml. Sans volume, chaque redéploiement viderait le
 # cloud des espaces de travail.
 ENV STORAGE_LOCAL_PATH=/data/storage
+ENV SAUVEGARDE_DOSSIER=/data/sauvegardes
 ENV PORT=4000
 ENV NODE_ENV=production
 
 # Ne pas tourner en root : si une faille d'exécution de code est trouvée un
 # jour dans une dépendance, elle s'exécute avec les droits de ce compte et
 # pas ceux de l'hôte du conteneur. `node` existe déjà dans l'image officielle.
-RUN mkdir -p /data/storage && chown -R node:node /data/storage /app
+RUN mkdir -p /data/storage /data/sauvegardes \
+  && chown -R node:node /data/storage /data/sauvegardes /app
 USER node
 
 WORKDIR /app/apps/api
