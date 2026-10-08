@@ -1,5 +1,6 @@
 import { prisma } from "./db.js";
 import { env } from "./env.js";
+import { formuleDe } from "./formules.js";
 
 /// Création d'un espace de travail et de son propriétaire.
 ///
@@ -31,7 +32,13 @@ export const creerEspace = async ({ company, name, email, passwordHash }) => {
 
   return prisma.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
-      data: { name: company, slug, quota: env.defaultTenantQuota },
+      data: {
+        name: company,
+        slug,
+        // Un espace naît en formule Découverte : son quota est celui de la
+        // formule, sauf offre de lancement décidée par l'exploitant.
+        quota: env.defaultTenantQuota ?? BigInt(formuleDe("FREE").quota),
+      },
     });
 
     const user = await tx.user.create({

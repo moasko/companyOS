@@ -27,9 +27,14 @@ export const env = {
     .filter(Boolean),
   storageDriver: process.env.STORAGE_DRIVER || "local",
   storageLocalPath: process.env.STORAGE_LOCAL_PATH || "./storage",
-  defaultTenantQuota: BigInt(
-    process.env.DEFAULT_TENANT_QUOTA || 5 * 1024 * 1024 * 1024,
-  ),
+  // Quota d'un nouvel espace, en octets. Vide = celui de la formule
+  // Découverte, ce qui est le cas normal : un espace gratuit qui recevait
+  // 5 Go là où sa formule en annonce 2 se voyait raboter à 2 Go au premier
+  // changement de formule, sans comprendre pourquoi. À ne renseigner que
+  // pour une offre de lancement délibérée.
+  defaultTenantQuota: process.env.DEFAULT_TENANT_QUOTA
+    ? BigInt(process.env.DEFAULT_TENANT_QUOTA)
+    : null,
 
   // Nombre de sauts de reverse-proxy à qui faire confiance pour lire
   // l'adresse du client dans `X-Forwarded-For`. 0 = aucun (développement,

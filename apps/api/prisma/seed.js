@@ -86,6 +86,10 @@ const apps = [
     icon: "tableur",
     category: "Outils",
     kind: "NATIVE",
+    // Hors Boutique, comme Code : c'est l'outil qui ouvre un .csv reçu, et
+    // il est proposé à l'installation dès qu'on en ouvre un. Dans la
+    // Boutique, il faisait doublon apparent avec le Classeur.
+    published: false,
   },
   {
     slug: "fne",
