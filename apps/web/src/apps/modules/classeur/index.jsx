@@ -238,7 +238,7 @@ const TEXTES = {
     somme: "Somme",
     moyenne: "moyenne",
     nbCellules: "{n} cellules",
-    aide: "Flèches pour se déplacer · Entrée ou F2 pour corriger · Ctrl+B gras · Ctrl+C / Ctrl+V · Ctrl+D recopie",
+    aide: "Flèches ou Entrée pour se déplacer · F2 ou double-clic pour corriger · Ctrl+B gras · Ctrl+C / Ctrl+V · Ctrl+D recopie",
     copierN: "Copier {n} cellule(s)",
     collerIci: "Coller ici",
     viderCellules: "Vider les cellules",
@@ -365,7 +365,7 @@ const TEXTES = {
     somme: "Sum",
     moyenne: "average",
     nbCellules: "{n} cells",
-    aide: "Arrows to move · Enter or F2 to edit · Ctrl+B bold · Ctrl+C / Ctrl+V · Ctrl+D fills down",
+    aide: "Arrows or Enter to move · F2 or double-click to edit · Ctrl+B bold · Ctrl+C / Ctrl+V · Ctrl+D fills down",
     copierN: "Copy {n} cell(s)",
     collerIci: "Paste here",
     viderCellules: "Clear cells",
@@ -975,7 +975,9 @@ function ClasseurApp() {
         case "Home": e.preventDefault(); return setSel((s) => ({ ...s, c: 0, c2: 0 }));
         case "End": e.preventDefault(); return setSel((s) => ({ ...s, c: nbC - 1, c2: nbC - 1 }));
         case "Tab": e.preventDefault(); return deplacer(0, e.shiftKey ? -1 : 1);
-        case "Enter":
+        // Entrée descend, Maj+Entrée remonte — comme dans Excel. On corrige
+        // une cellule avec F2, un double-clic, ou la barre de formule.
+        case "Enter": e.preventDefault(); return deplacer(e.shiftKey ? -1 : 1, 0);
         case "F2":
           e.preventDefault();
           return setEdition({ l: sel.l, c: sel.c, valeur: cellules[sel.l]?.[sel.c]?.f || cellules[sel.l]?.[sel.c]?.v || "" });
@@ -1010,7 +1012,7 @@ function ClasseurApp() {
       ));
     }
     setEdition(null);
-    if (avancer) deplacer(1, 0);
+    if (avancer) deplacer(avancer === -1 ? -1 : 1, 0);
     grilleRef.current?.focus();
   };
 
@@ -2569,7 +2571,7 @@ function ClasseurApp() {
                                     }}
                                     onBlur={(e) => validerEdition(e.target.value, false)}
                                     onKeyDown={(e) => {
-                                      if (e.key === "Enter") { e.preventDefault(); validerEdition(e.currentTarget.value, true); }
+                                      if (e.key === "Enter") { e.preventDefault(); validerEdition(e.currentTarget.value, e.shiftKey ? -1 : 1); }
                                       if (e.key === "Tab") { e.preventDefault(); validerEdition(e.currentTarget.value, false); deplacer(0, 1); }
                                       if (e.key === "Escape") { e.preventDefault(); setEdition(null); grilleRef.current?.focus(); }
                                     }}

@@ -26,17 +26,17 @@
 // « =SOMME(A1:A9) ». `s` est facultatif : une cellule sans mise en forme
 // n'a pas de `s` du tout, ce qui garde les classeurs légers.
 //
-// Le moteur de formules n'est pas réécrit : c'est celui du Tableur CSV,
-// importé tel quel. Deux moteurs divergeraient au premier correctif.
+// Le moteur de formules est partagé avec le Tableur CSV (voir
+// tableur/formules.js) : deux moteurs divergeraient au premier correctif.
 // ─────────────────────────────────────────────────────────────────────────
 
 import {
   calculer as calculerBrut,
-  decoderRef,
   estFormule,
   repereColonne,
   versNombre,
 } from "../tableur/domaine.js";
+import { evaluerFormule, ERREURS } from "../tableur/formules.js";
 
 export { estFormule, repereColonne, versNombre };
 
@@ -88,6 +88,13 @@ export const formater = (valeur, format = "auto", devise = "F", decimales = null
   if (format === "date") {
     const d = new Date(s.length <= 10 ? `${s}T00:00:00` : s);
     return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString("fr-FR");
+  }
+
+  // Une date (saisie au format ISO, ou rendue par AUJOURDHUI, DATE…)
+  // s'affiche à la française, comme dans Excel.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T00:00:00`);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("fr-FR");
   }
 
   const n = versNombre(s);
@@ -159,12 +166,12 @@ export const valeurCalculee = (cellules, l, c) => {
   return estFormule(valeur) ? calculerBrut(brutes(cellules), l, c) : valeur;
 };
 
-const REFERENCE_INTERFEUILLE = /(?:'((?:[^']|'')+)'|([A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_.]*))!\$?([A-Z]+)\$?(\d+)/gi;
-
-/// Calcule une cellule dans le contexte du classeur entier. Excel stocke
-/// `'Paramètres'!$F$4` dans la formule, alors que l'ancien moteur ne voyait
-/// que la feuille active. Les fonctions non encore comprises conservent
-/// leur résultat Excel mis en cache au lieu d'afficher une erreur trompeuse.
+/// Calcule une cellule dans le contexte du classeur entier : les autres
+/// feuilles (`'Paramètres'!$F$4`, `Ventes!A1:A20`) sont lues directement.
+///
+/// Une formule qu'on ne sait pas calculer (fonction inconnue, syntaxe
+/// d'Excel non prise en charge) garde le résultat qu'Excel avait mis en
+/// cache dans le fichier, au lieu d'afficher une erreur trompeuse.
 export const valeurCalculeeClasseur = (classeur, iFeuille, l, c, visites = new Set()) => {
   const feuille = classeur?.feuilles?.[iFeuille];
   const cel = feuille?.cellules?.[l]?.[c];
@@ -173,28 +180,36 @@ export const valeurCalculeeClasseur = (classeur, iFeuille, l, c, visites = new S
   if (!formule) return cel.v ?? "";
 
   const cle = `${iFeuille}:${l}:${c}`;
-  if (visites.has(cle)) return "#CYCLE";
+  if (visites.has(cle)) return ERREURS.CYCLE;
   visites.add(cle);
   try {
-    let source = formule.replace(REFERENCE_INTERFEUILLE, (_, nomEntreQuotes, nomSimple, colonne, ligne) => {
-      const nom = String(nomEntreQuotes || nomSimple || "").replace(/''/g, "'");
-      const cibleFeuille = classeur.feuilles.findIndex((f) => f.nom.toLocaleLowerCase() === nom.toLocaleLowerCase());
-      const position = decoderRef(`${colonne}${ligne}`);
-      if (cibleFeuille < 0 || !position) return "0";
-      const valeur = valeurCalculeeClasseur(classeur, cibleFeuille, position.l, position.c, visites);
-      const nombre = versNombre(valeur);
-      return nombre === null ? "0" : String(nombre);
+    const indexFeuille = (nom) => {
+      if (!nom) return iFeuille;
+      const cible = nom.toLocaleLowerCase();
+      return classeur.feuilles.findIndex((f) => f.nom.toLocaleLowerCase() === cible);
+    };
+    const resultat = evaluerFormule(formule, {
+      cellule: (nom, rl, rc) => {
+        const i = indexFeuille(nom);
+        if (i < 0) return ERREURS.REF;
+        const cible = classeur.feuilles[i].cellules?.[rl]?.[rc];
+        if (!cible) return "";
+        return cible.f || estFormule(cible.v)
+          ? valeurCalculeeClasseur(classeur, i, rl, rc, visites)
+          : cible.v;
+      },
+      dimensions: (nom) => {
+        const i = indexFeuille(nom);
+        const cellules = i < 0 ? [] : classeur.feuilles[i].cellules || [];
+        return {
+          lignes: cellules.length,
+          colonnes: cellules.reduce((m, ligne) => Math.max(m, ligne?.length || 0), 0),
+        };
+      },
     });
-    source = source.replace(/\$/g, "");
-
-    const corps = brutes(feuille.cellules);
-    corps[l] = [...(corps[l] || [])];
-    corps[l][c] = source;
-    const resultat = calculerBrut(corps, l, c, new Set(), (rl, rc) =>
-      valeurCalculeeClasseur(classeur, iFeuille, rl, rc, visites));
     // Le résultat mis en cache par Excel ne sert que s'il existe : sans
     // lui, renvoyer `cel.v` affichait une cellule vide au lieu de l'erreur.
-    if (typeof resultat === "string" && resultat.startsWith("#")
+    if ((resultat === ERREURS.NOM || resultat === ERREURS.SYNTAXE)
       && cel.v !== undefined && cel.v !== null && cel.v !== "" && cel.v !== formule) {
       return cel.v;
     }

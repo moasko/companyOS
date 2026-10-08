@@ -24,6 +24,8 @@
 // Tout est pur : entrée → sortie, aucun état, aucun DOM.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { evaluerFormule, NOMS_FONCTIONS } from "./formules.js";
+
 export const SEPARATEURS = [
   { car: ";", nom: "Point-virgule" },
   { car: ",", nom: "Virgule" },
@@ -533,70 +535,11 @@ export const remplirVersLeBas = (grille, { l1, c1, l2, c2 }) => {
 // Formules
 // ---------------------------------------------------------------------------
 //
-// Une cellule qui commence par « = » est une formule. Le moteur couvre ce
-// dont on se sert vraiment sur un fichier de gestion : les quatre
-// opérations, les parenthèses, les références (A1), les plages (A1:A20) et
-// une trentaine de fonctions.
-//
-// Il est écrit à la main — `eval` sur une saisie utilisateur exécuterait
-// n'importe quel code dans la page, ce qui est hors de question dans un
-// OS qui porte les données d'une entreprise.
-//
-// Les noms de fonctions existent en français **et** en anglais : un
-// fichier venu d'Excel FR écrit `=SOMME(A1:A9)`, un autre `=SUM(A1:A9)`,
-// et les deux doivent marcher.
+// Une cellule qui commence par « = » est une formule. Le moteur vit dans
+// formules.js, partagé avec le Classeur : la syntaxe d'Excel en français et
+// en anglais, une centaine de fonctions, le texte, les dates.
 
-const FONCTIONS = {
-  // Agrégats
-  SOMME: (v) => v.reduce((s, n) => s + n, 0),
-  MOYENNE: (v) => (v.length ? v.reduce((s, n) => s + n, 0) / v.length : 0),
-  MIN: (v) => (v.length ? Math.min(...v) : 0),
-  MAX: (v) => (v.length ? Math.max(...v) : 0),
-  NB: (v) => v.length,
-  MEDIANE: (v) => {
-    if (!v.length) return 0;
-    const t = [...v].sort((a, b) => a - b);
-    const m = Math.floor(t.length / 2);
-    return t.length % 2 ? t[m] : (t[m - 1] + t[m]) / 2;
-  },
-  ECARTYPE: (v) => {
-    if (v.length < 2) return 0;
-    const m = v.reduce((s, n) => s + n, 0) / v.length;
-    return Math.sqrt(v.reduce((s, n) => s + (n - m) ** 2, 0) / (v.length - 1));
-  },
-  PRODUIT: (v) => v.reduce((p, n) => p * n, 1),
-  // Arithmétique
-  ABS: (v) => Math.abs(v[0] ?? 0),
-  ARRONDI: (v) => {
-    const f = 10 ** (v[1] ?? 0);
-    return Math.round((v[0] ?? 0) * f) / f;
-  },
-  PLANCHER: (v) => Math.floor(v[0] ?? 0),
-  PLAFOND: (v) => Math.ceil(v[0] ?? 0),
-  RACINE: (v) => Math.sqrt(Math.max(0, v[0] ?? 0)),
-  PUISSANCE: (v) => (v[0] ?? 0) ** (v[1] ?? 0),
-  MOD: (v) => (v[1] ? (v[0] ?? 0) % v[1] : 0),
-  // Métier : la TVA et les remises sont le calcul quotidien ici.
-  TVA: (v) => (v[0] ?? 0) * ((v[1] ?? 18) / 100),
-  TTC: (v) => (v[0] ?? 0) * (1 + (v[1] ?? 18) / 100),
-  HT: (v) => (v[0] ?? 0) / (1 + (v[1] ?? 18) / 100),
-  REMISE: (v) => (v[0] ?? 0) * (1 - (v[1] ?? 0) / 100),
-  POURCENT: (v) => (v[1] ? ((v[0] ?? 0) / v[1]) * 100 : 0),
-};
-
-/// Les noms anglais renvoient aux mêmes fonctions.
-const ALIAS_FONCTIONS = {
-  SUM: "SOMME", AVERAGE: "MOYENNE", AVG: "MOYENNE", COUNT: "NB",
-  MEDIAN: "MEDIANE", STDEV: "ECARTYPE", PRODUCT: "PRODUIT",
-  ROUND: "ARRONDI", FLOOR: "PLANCHER", CEILING: "PLAFOND", CEIL: "PLAFOND",
-  SQRT: "RACINE", POWER: "PUISSANCE", DISCOUNT: "REMISE", PERCENT: "POURCENT",
-  VAT: "TVA", NET: "HT", GROSS: "TTC",
-};
-
-export const NOMS_FONCTIONS = [
-  ...Object.keys(FONCTIONS),
-  ...Object.keys(ALIAS_FONCTIONS),
-].sort();
+export { NOMS_FONCTIONS };
 
 const REF = /^([A-Z]+)(\d+)$/;
 
@@ -610,147 +553,6 @@ export const decoderRef = (ref) => {
   return { l: Number(m[2]) - 1, c: c - 1 };
 };
 
-/// Découpe une formule en unités : nombres, références, plages, noms,
-/// opérateurs, parenthèses, points-virgules.
-const tokeniser = (src) => {
-  const jetons = [];
-  let i = 0;
-  while (i < src.length) {
-    const c = src[i];
-    if (c === " ") { i += 1; continue; }
-    if ("+-*/^%(),;:".includes(c)) { jetons.push({ t: c }); i += 1; continue; }
-    if (/[0-9.]/.test(c)) {
-      let n = "";
-      while (i < src.length && /[0-9.]/.test(src[i])) { n += src[i]; i += 1; }
-      jetons.push({ t: "nombre", v: Number(n) });
-      continue;
-    }
-    if (/[A-Za-zÀ-ÿ_]/.test(c)) {
-      let m = "";
-      while (i < src.length && /[A-Za-z0-9À-ÿ_]/.test(src[i])) { m += src[i]; i += 1; }
-      jetons.push({ t: "nom", v: m.toUpperCase() });
-      continue;
-    }
-    throw new Error(`Caractère inattendu : ${c}`);
-  }
-  return jetons;
-};
-
-/// Évalue une formule.
-///
-/// `lire(l, c)` rend la valeur d'une cellule ; c'est l'appelant qui gère
-/// la détection des cycles, parce que lui seul sait d'où part le calcul.
-const evaluer = (jetons, lire) => {
-  let p = 0;
-  const fin = () => p >= jetons.length;
-  const voir = () => jetons[p];
-  const manger = (t) => {
-    if (fin() || jetons[p].t !== t) throw new Error(`Attendu ${t}`);
-    return jetons[p++];
-  };
-
-  /// Les valeurs d'une plage A1:B4, aplaties et réduites aux nombres —
-  /// une cellule de texte dans une somme ne vaut pas zéro, elle ne compte
-  /// simplement pas.
-  const plage = (a, b) => {
-    const d = decoderRef(a);
-    const f = decoderRef(b);
-    if (!d || !f) throw new Error("Plage invalide");
-    const out = [];
-    for (let l = Math.min(d.l, f.l); l <= Math.max(d.l, f.l); l += 1) {
-      for (let c = Math.min(d.c, f.c); c <= Math.max(d.c, f.c); c += 1) {
-        const v = versNombre(lire(l, c));
-        if (v !== null) out.push(v);
-      }
-    }
-    return out;
-  };
-
-  // expression → terme (('+'|'-') terme)*
-  const expression = () => {
-    let g = terme();
-    while (!fin() && (voir().t === "+" || voir().t === "-")) {
-      const op = jetons[p++].t;
-      const d = terme();
-      g = op === "+" ? g + d : g - d;
-    }
-    return g;
-  };
-
-  // terme → facteur (('*'|'/'|'%') facteur)*
-  const terme = () => {
-    let g = facteur();
-    while (!fin() && (voir().t === "*" || voir().t === "/" || voir().t === "%")) {
-      const op = jetons[p++].t;
-      const d = facteur();
-      if (op === "*") g *= d;
-      else if (op === "/") {
-        if (d === 0) throw new Error("Division par zéro");
-        g /= d;
-      } else g %= d;
-    }
-    return g;
-  };
-
-  // facteur → base ('^' facteur)?   — la puissance associe à droite
-  const facteur = () => {
-    const g = base();
-    if (!fin() && voir().t === "^") { p += 1; return g ** facteur(); }
-    return g;
-  };
-
-  const base = () => {
-    if (fin()) throw new Error("Formule incomplète");
-    const j = voir();
-
-    if (j.t === "-") { p += 1; return -base(); }
-    if (j.t === "+") { p += 1; return base(); }
-    if (j.t === "nombre") { p += 1; return j.v; }
-
-    if (j.t === "(") {
-      p += 1;
-      const v = expression();
-      manger(")");
-      return v;
-    }
-
-    if (j.t === "nom") {
-      p += 1;
-      // Appel de fonction
-      if (!fin() && voir().t === "(") {
-        p += 1;
-        const nom = ALIAS_FONCTIONS[j.v] || j.v;
-        const fn = FONCTIONS[nom];
-        if (!fn) throw new Error(`Fonction inconnue : ${j.v}`);
-        const args = [];
-        if (!fin() && voir().t !== ")") {
-          for (;;) {
-            // Une plage se reconnaît à « ref : ref ».
-            if (voir()?.t === "nom" && jetons[p + 1]?.t === ":" && jetons[p + 2]?.t === "nom") {
-              args.push(...plage(jetons[p].v, jetons[p + 2].v));
-              p += 3;
-            } else args.push(expression());
-            if (!fin() && (voir().t === "," || voir().t === ";")) { p += 1; continue; }
-            break;
-          }
-        }
-        manger(")");
-        return fn(args);
-      }
-      // Référence simple
-      const r = decoderRef(j.v);
-      if (!r) throw new Error(`Référence inconnue : ${j.v}`);
-      return versNombre(lire(r.l, r.c)) ?? 0;
-    }
-
-    throw new Error("Formule invalide");
-  };
-
-  const valeur = expression();
-  if (!fin()) throw new Error("Formule invalide");
-  return valeur;
-};
-
 export const estFormule = (v) => typeof v === "string" && v.trim().startsWith("=");
 
 /// Calcule la valeur affichée d'une cellule.
@@ -758,6 +560,10 @@ export const estFormule = (v) => typeof v === "string" && v.trim().startsWith("=
 /// `vues` porte les cellules déjà traversées : une formule qui se
 /// référence, directement ou par un détour, doit dire « cycle » plutôt que
 /// de faire boucler le navigateur jusqu'au plantage.
+///
+/// `resoudreReference(l, c, vues)`, s'il est fourni, lit les autres
+/// cellules à la place de `corps` — c'est ainsi que le Classeur branche
+/// ses propres règles (résultats Excel en cache, autres feuilles).
 export const calculer = (corps, l, c, vues = new Set(), resoudreReference = null) => {
   const brute = corps[l]?.[c];
   if (!estFormule(brute)) return brute ?? "";
@@ -765,31 +571,20 @@ export const calculer = (corps, l, c, vues = new Set(), resoudreReference = null
   const cle = `${l}:${c}`;
   if (vues.has(cle)) return "#CYCLE";
   vues.add(cle);
-
   try {
-    const lire = (rl, rc) => {
-      if (resoudreReference) return resoudreReference(rl, rc, vues);
-      const v = corps[rl]?.[rc];
-      if (!estFormule(v)) return v;
-      const resultat = calculer(corps, rl, rc, vues);
-      // Une cellule en erreur contamine celles qui la lisent : sans cette
-      // remontée, « #CYCLE » se convertirait en 0 un cran plus haut et la
-      // formule afficherait un résultat faux au lieu de dire qu'elle ne
-      // peut pas se calculer.
-      if (typeof resultat === "string" && resultat.startsWith("#")) {
-        const erreur = new Error(resultat);
-        erreur.marqueur = resultat;
-        throw erreur;
-      }
-      return resultat;
-    };
-    const valeur = evaluer(tokeniser(brute.trim().slice(1)), lire);
-    if (!Number.isFinite(valeur)) return "#NOMBRE";
-    // Pas de décimales fantômes : 0,1 + 0,2 doit afficher 0,3.
-    return String(Math.round(valeur * 1e10) / 1e10);
-  } catch (e) {
-    if (e.marqueur) return e.marqueur;
-    return e.message === "Division par zéro" ? "#DIV/0" : "#ERREUR";
+    return evaluerFormule(brute, {
+      cellule: (feuille, rl, rc) => {
+        // Le Tableur CSV n'a qu'une feuille.
+        if (feuille) return "#REF!";
+        if (resoudreReference) return resoudreReference(rl, rc, vues);
+        const v = corps[rl]?.[rc];
+        return estFormule(v) ? calculer(corps, rl, rc, vues) : v;
+      },
+      dimensions: () => ({
+        lignes: corps.length,
+        colonnes: corps.reduce((m, ligne) => Math.max(m, ligne?.length || 0), 0),
+      }),
+    });
   } finally {
     vues.delete(cle);
   }
