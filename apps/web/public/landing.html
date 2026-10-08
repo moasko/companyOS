@@ -139,6 +139,10 @@ header.site .actions { display: flex; align-items: center; gap: 6px; margin-left
 .heros .argument { margin-top: 18px; max-width: 560px; font-size: 18px; line-height: 1.5; color: rgb(255 255 255 / 86%); }
 .heros .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .heros .note { margin-top: 16px; font-size: 13px; color: rgb(255 255 255 / 70%); }
+/* Badge Product Hunt, sous l'argument d'essai. */
+.heros .badgePH { display: inline-block; margin-top: 22px; border-radius: 10px; line-height: 0; }
+.heros .badgePH img { display: block; width: 250px; height: 54px; max-width: 100%; }
+.heros .badgePH:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
 /* Le produit, posé comme une photo. */
 .vitrines {
@@ -531,6 +535,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
           <a class="btn btn-contour" href="#tarifs" data-i18n="heros.tarifs">Voir les formules pour les entreprises</a>
         </div>
         <div class="note" data-i18n="heros.note">Formule Découverte gratuite · sans carte bancaire</div>
+        <a class="badgePH" href="https://www.producthunt.com/products/companyos?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-companyos" target="_blank" rel="noopener noreferrer"><img alt="CompanyOS - Run your entire business from one simple platform | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1273262&amp;theme=light&amp;t=1791465259446"></a>
       </div>
       <div class="vitrines" aria-hidden="true">
         <div class="appCarte carte-crm">
