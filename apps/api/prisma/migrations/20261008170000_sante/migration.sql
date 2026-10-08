@@ -1,7 +1,8 @@
+-- Rejouable (IF NOT EXISTS) : voir prisma/reparer-migrations.js.
 -- Santé de la plateforme : historique des sauvegardes et journal des
 -- erreurs, lus par la console de l'exploitant.
 
-CREATE TABLE "sauvegardes" (
+CREATE TABLE IF NOT EXISTS "sauvegardes" (
     "id" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "declencheur" TEXT NOT NULL,
@@ -18,9 +19,9 @@ CREATE TABLE "sauvegardes" (
     CONSTRAINT "sauvegardes_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "sauvegardes_type_debut_idx" ON "sauvegardes"("type", "debut");
+CREATE INDEX IF NOT EXISTS "sauvegardes_type_debut_idx" ON "sauvegardes"("type", "debut");
 
-CREATE TABLE "erreurs" (
+CREATE TABLE IF NOT EXISTS "erreurs" (
     "id" TEXT NOT NULL,
     "empreinte" TEXT NOT NULL,
     "source" TEXT NOT NULL,
@@ -38,5 +39,5 @@ CREATE TABLE "erreurs" (
     CONSTRAINT "erreurs_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "erreurs_empreinte_key" ON "erreurs"("empreinte");
-CREATE INDEX "erreurs_resolue_derniere_idx" ON "erreurs"("resolue", "derniere");
+CREATE UNIQUE INDEX IF NOT EXISTS "erreurs_empreinte_key" ON "erreurs"("empreinte");
+CREATE INDEX IF NOT EXISTS "erreurs_resolue_derniere_idx" ON "erreurs"("resolue", "derniere");

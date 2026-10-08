@@ -11,7 +11,7 @@
     "exploitant": "node src/exploitant.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy",
+    "prisma:deploy": "node prisma/reparer-migrations.js && prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
     "test": "prisma generate >/dev/null && node --test"

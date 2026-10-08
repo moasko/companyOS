@@ -66,4 +66,6 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
   CMD wget -qO- http://127.0.0.1:4000/health || exit 1
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]
+# `reparer-migrations.js` débloque une migration rejouable restée en échec
+# (erreur P3009), sinon le conteneur redémarrerait en boucle.
+CMD ["sh", "-c", "node prisma/reparer-migrations.js && npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]
