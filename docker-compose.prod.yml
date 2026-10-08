@@ -70,7 +70,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       STORAGE_DRIVER: local
       STORAGE_LOCAL_PATH: /data/storage
-      DEFAULT_TENANT_QUOTA: ${DEFAULT_TENANT_QUOTA:-5368709120}
+      # Vide = le quota de la formule Découverte (voir src/formules.js).
+      DEFAULT_TENANT_QUOTA: ${DEFAULT_TENANT_QUOTA:-}
       UPLOAD_MAX_OCTETS: ${UPLOAD_MAX_OCTETS:-134217728}
       # Plafond d'envoi de courriels par espace et par 24 h — garde-fou
       # contre l'usage de la plateforme comme relais de spam.

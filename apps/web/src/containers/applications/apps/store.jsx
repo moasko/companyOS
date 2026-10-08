@@ -245,10 +245,10 @@ export const MicroStore = () => {
   );
 
   /// Une application du catalogue n'est réellement utilisable que si un
-  /// module lui répond dans le shell. `rh` et `comptabilite` sont annoncées
-  /// mais pas encore écrites : les proposer à l'installation donnait un
-  /// « Installée » qui ne produisait rien à l'écran, puisque
-  /// `syncInstalledModules` n'attache que ce qui existe dans le registre.
+  /// module lui répond dans le shell. Une app annoncée au catalogue avant
+  /// que son module soit livré donnait sinon un « Installée » qui ne
+  /// produisait rien à l'écran, puisque `syncInstalledModules` n'attache que
+  /// ce qui existe dans le registre.
   /// Les apps du Studio n'ont pas de module : leur fenêtre est le moteur
   /// générique, elles sont donc toujours disponibles.
   const disponible = (app) => app.kind !== "NATIVE" || !!moduleBySlug[app.slug];

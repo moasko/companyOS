@@ -37,7 +37,7 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `VITE_API_URL` | `https://api.companyos.fr` | figée dans le build du shell |
 | `TRUST_PROXY` | `1` | un proxy devant l'API (Traefik) |
 | `JWT_EXPIRES_IN` | `7d` (défaut) | durée d'une session |
-| `DEFAULT_TENANT_QUOTA` | `5368709120` (défaut, 5 Go) | quota d'un nouvel espace |
+| `DEFAULT_TENANT_QUOTA` | vide (défaut : quota de la formule Découverte) | à ne renseigner que pour une offre de lancement |
 | `UPLOAD_MAX_OCTETS` | `134217728` (défaut, 128 Mo) | taille maximale d'un fichier importé |
 | `MAIL_QUOTA_JOUR` | `500` (défaut) | plafond d'envoi par espace et par 24 h |
 | `PLATFORM_ADMINS` | `vous@companyos.fr` | les comptes exploitants (console Plateforme) |

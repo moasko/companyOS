@@ -86,6 +86,10 @@ const apps = [
     icon: "tableur",
     category: "Outils",
     kind: "NATIVE",
+    // Hors Boutique, comme Code : c'est l'outil qui ouvre un .csv reçu, et
+    // il est proposé à l'installation dès qu'on en ouvre un. Dans la
+    // Boutique, il faisait doublon apparent avec le Classeur.
+    published: false,
   },
   {
     slug: "fne",
@@ -104,6 +108,12 @@ const apps = [
     icon: "code",
     category: "Outils",
     kind: "NATIVE",
+    // Hors Boutique : un éditeur de code ne s'adresse pas à une PME, et le
+    // proposer à côté de la Facturation brouille le catalogue. Il reste
+    // installable — c'est lui qu'on propose quand on ouvre un .js ou un
+    // .json depuis l'Explorateur, et la route d'installation n'exige pas
+    // qu'une application soit publiée.
+    published: false,
   },
   {
     slug: "analyse",
@@ -160,26 +170,6 @@ const apps = [
     category: "Création",
     kind: "NATIVE",
     version: "2.5.0",
-  },
-  {
-    slug: "studio-video",
-    name: "Studio Vidéo",
-    description:
-      "Montage vidéo multi-pistes dans le navigateur : coupes, textes, formes, filtres, audio et export MP4/WebM. Propulsé par CE.SDK — une clé de licence (VITE_IMGLY_LICENSE) retire le filigrane d’essai.",
-    icon: "movies",
-    category: "Création",
-    kind: "NATIVE",
-    version: "1.0.0",
-  },
-  {
-    slug: "figma-plus",
-    name: "Figma++",
-    description:
-      "Éditeur de design vectoriel temps réel : formes, texte, étoile, ligne, transformations libres avec rotation, multi-sélection, marquee, calques réordonnables, zoom au pointeur, Pan (Espace), annuler/rétablir et export PNG 2×. Propulsé par Konva.",
-    icon: "paint",
-    category: "Création",
-    kind: "NATIVE",
-    version: "1.0.0",
   },
   {
     slug: "word",
@@ -335,6 +325,26 @@ const apps = [
     kind: "NATIVE",
   },
 ];
+
+/// Applications retirées du catalogue.
+///
+/// Les retirer de la liste ci-dessus ne suffit pas : leur ligne resterait en
+/// base, et les espaces qui les avaient installées verraient dans leurs
+/// Paramètres une application que plus aucun module ne sait ouvrir. Leur
+/// suppression emporte les installations (cascade). Les fiches qu'elles
+/// auraient enregistrées, elles, restent en base — rien n'est effacé des
+/// données d'un client.
+///
+///   - studio-video : reposait sur CE.SDK, une licence commerciale (filigrane
+///     sans clé), chargé depuis un CDN que la politique de sécurité de
+///     production interdit — il ne s'ouvrait donc pas.
+///   - figma-plus : éditeur de design, hors du besoin d'une PME ; l'Atelier
+///     Image couvre l'affiche ou le visuel ponctuel.
+const retirees = ["studio-video", "figma-plus"];
+const { count: supprimees } = await prisma.app.deleteMany({
+  where: { tenantId: null, slug: { in: retirees } },
+});
+if (supprimees) console.log(`Applications retirées du catalogue : ${supprimees}.`);
 
 // Le catalogue global porte tenantId = null. Prisma refuse un null dans
 // une clé unique composée, donc pas d'`upsert` ici : on cherche puis on
