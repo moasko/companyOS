@@ -191,3 +191,8 @@ test("une formule sans valeur stockée est bien calculée (barre d'état, export
   assert.equal(r.remplies, 3);
   assert.equal(r.somme, 11);
 });
+
+test("une formule en erreur sans valeur Excel en cache affiche l'erreur, pas une cellule vide", () => {
+  const classeur = { titre: "t", feuilles: [{ nom: "F", cellules: [[{ v: "1" }, { f: "=A1/0" }]] }] };
+  assert.equal(valeurCalculeeClasseur(classeur, 0, 0, 1), "#DIV/0");
+});

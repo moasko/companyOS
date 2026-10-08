@@ -192,7 +192,10 @@ export const valeurCalculeeClasseur = (classeur, iFeuille, l, c, visites = new S
     corps[l][c] = source;
     const resultat = calculerBrut(corps, l, c, new Set(), (rl, rc) =>
       valeurCalculeeClasseur(classeur, iFeuille, rl, rc, visites));
-    if (typeof resultat === "string" && resultat.startsWith("#") && cel.v !== "" && cel.v !== formule) {
+    // Le résultat mis en cache par Excel ne sert que s'il existe : sans
+    // lui, renvoyer `cel.v` affichait une cellule vide au lieu de l'erreur.
+    if (typeof resultat === "string" && resultat.startsWith("#")
+      && cel.v !== undefined && cel.v !== null && cel.v !== "" && cel.v !== formule) {
       return cel.v;
     }
     return resultat;
