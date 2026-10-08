@@ -21,6 +21,9 @@ import { journaliser } from "../audit.js";
 import { FORMULES, formuleDe } from "../formules.js";
 import { chargerConfig, enregistrerConfig, testerConfig } from "../storage.js";
 import { masquer } from "../chiffrement.js";
+import { createReadStream } from "node:fs";
+import { env } from "../env.js";
+import { cheminLocal, sauvegarderBase, sauvegarderFichiers } from "../sauvegardes.js";
 
 /// Journalise un geste de l'exploitant **deux fois** : chez lui, comme
 /// toujours, et dans l'espace concerné.
@@ -297,6 +300,96 @@ export default async function plateformeRoutes(app) {
     );
 
     return serialize({ id: maj.id, suspendu: maj.suspendu, suspenduLe: maj.suspenduLe });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Santé : sauvegardes et erreurs
+  // ─────────────────────────────────────────────────────────────────────
+
+  /// L'état de santé de la plateforme, d'un coup d'œil : la dernière
+  /// sauvegarde réussie de chaque type, l'historique récent, et les
+  /// erreurs à traiter.
+  app.get("/sante", async () => {
+    const [historique, derniereBase, derniersFichiers, erreurs, aTraiter, config] =
+      await Promise.all([
+        prisma.sauvegarde.findMany({ orderBy: { debut: "desc" }, take: 30 }),
+        prisma.sauvegarde.findFirst({
+          where: { type: "base", statut: "ok" },
+          orderBy: { debut: "desc" },
+        }),
+        prisma.sauvegarde.findFirst({
+          where: { type: "fichiers", statut: "ok" },
+          orderBy: { debut: "desc" },
+        }),
+        prisma.erreurApp.findMany({
+          orderBy: [{ resolue: "asc" }, { derniere: "desc" }],
+          take: 100,
+        }),
+        prisma.erreurApp.count({ where: { resolue: false } }),
+        chargerConfig(),
+      ]);
+
+    return serialize({
+      sauvegardes: {
+        active: env.sauvegardeActive,
+        heure: env.sauvegardeHeure,
+        retentionJours: env.sauvegardeRetentionJours,
+        fichiersSemaines: env.sauvegardeFichiersSemaines,
+        // Sans stockage objet, les copies restent sur le disque qu'elles
+        // protègent : la console doit le dire, c'est le premier risque.
+        horsSitePossible: config.utilisable,
+        archiveFichiers: env.storageDriver === "local",
+        derniereBase,
+        derniersFichiers,
+        historique,
+      },
+      erreurs: { aTraiter, liste: erreurs },
+    });
+  });
+
+  /// Lancer une sauvegarde tout de suite — avant une mise à jour risquée,
+  /// typiquement. La réponse attend la fin : quelques secondes pour une
+  /// base de PME.
+  app.post("/sauvegardes", async (request, reply) => {
+    const type = request.body?.type === "fichiers" ? "fichiers" : "base";
+    try {
+      const resultat =
+        type === "fichiers"
+          ? await sauvegarderFichiers("manuelle")
+          : await sauvegarderBase("manuelle");
+      await journaliser(request, "plateforme.sauvegarde", resultat.fichier, { type });
+      return serialize(resultat);
+    } catch (e) {
+      return reply.code(500).send({ error: `La sauvegarde a échoué : ${e.message}` });
+    }
+  });
+
+  /// Télécharger une sauvegarde encore présente sur le serveur.
+  ///
+  /// C'est toute la base de toutes les entreprises : le geste est
+  /// journalisé, et réservé — comme toute cette console — à l'exploitant.
+  app.get("/sauvegardes/:id/fichier", async (request, reply) => {
+    const s = await prisma.sauvegarde.findUnique({ where: { id: request.params.id } });
+    const chemin = s?.statut === "ok" ? await cheminLocal(s.fichier) : null;
+    if (!chemin) {
+      return reply.code(404).send({ error: "Cette sauvegarde n'est plus sur le serveur." });
+    }
+    await journaliser(request, "plateforme.sauvegarde.telechargement", s.fichier);
+    reply.header("Content-Disposition", `attachment; filename="${s.fichier}"`);
+    reply.header("Content-Type", "application/octet-stream");
+    return reply.send(createReadStream(chemin));
+  });
+
+  /// Marquer une erreur comme résolue — ou la rouvrir. Une erreur résolue
+  /// qui se reproduit repasse d'elle-même « à traiter ».
+  app.put("/erreurs/:id", async (request, reply) => {
+    const resolue = request.body?.resolue !== false;
+    const { count } = await prisma.erreurApp.updateMany({
+      where: { id: request.params.id },
+      data: { resolue },
+    });
+    if (!count) return reply.code(404).send({ error: "Erreur introuvable." });
+    return { ok: true, resolue };
   });
 
   app.get("/stockage", async () => {

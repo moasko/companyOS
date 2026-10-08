@@ -152,15 +152,69 @@ procédure de reprise en cas de mot de passe perdu.
 
 ## 8. Données et sauvegardes
 
-Deux volumes portent tout l'état :
+L'état de la plateforme vit dans la base PostgreSQL (comptes et toutes les
+données saisies par les clients) et dans le volume `storage-data` (les
+fichiers du cloud, quand ils sont sur le disque).
 
-- `postgres-data` — la base (comptes, enregistrements des modules, journal) ;
-- `storage-data` — les fichiers du cloud des espaces de travail.
+### Sauvegardes automatiques
 
-Sauvegardes : l'onglet **Backups** de Dokploy sait planifier des dumps
-PostgreSQL vers un stockage S3. Pour les fichiers, archivez le volume
-`storage-data` (le chemin réel est visible dans **Volumes**) — un `tar`
-planifié vers le même bucket suffit.
+L'API sauvegarde elle-même, sans rien à installer :
+
+- **la base, chaque jour** vers 2 h UTC (`pg_dump`), gardée 14 jours ;
+- **les fichiers du disque, chaque semaine** (archive `tar.gz`), gardés
+  4 semaines.
+
+Chaque copie est **relue** avant d'être déclarée bonne, et chaque tentative,
+réussie ou non, apparaît dans la console **Plateforme → Santé** : date,
+taille, état, téléchargement. Un échec est signalé par courriel aux
+exploitants quand un relais SMTP est configuré.
+
+Les copies sont écrites dans le volume `sauvegardes-data`, **sur le même
+serveur**. Pour qu'elles survivent à sa perte, configurez un stockage objet
+dans **Plateforme → Stockage** (Cloudflare R2, S3, Wasabi…) : chaque
+sauvegarde de la base y est alors aussi envoyée, sous le préfixe
+`_sauvegardes/`, et purgée à l'expiration.
+
+Réglages (onglet **Environment**, tous facultatifs) :
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `SAUVEGARDE_ACTIVE` | `true` | `false` coupe les sauvegardes |
+| `SAUVEGARDE_HEURE` | `2` | heure UTC de la sauvegarde quotidienne |
+| `SAUVEGARDE_RETENTION_JOURS` | `14` | copies quotidiennes conservées |
+| `SAUVEGARDE_FICHIERS_SEMAINES` | `4` | archives hebdomadaires conservées |
+
+> Le client `pg_dump` de l'image est PostgreSQL 17. Si votre serveur est
+> plus récent, la sauvegarde échoue avec « server version mismatch » et la
+> console l'affiche : reconstruisez l'image avec
+> `--build-arg PG_CLIENT=postgresql18-client`.
+
+### Restaurer
+
+1. Récupérez le fichier `base-….dump` : bouton **Télécharger** de la
+   console, ou votre bucket, sous `_sauvegardes/`.
+2. Restaurez-le dans une **base neuve** — jamais par-dessus la base en
+   service :
+
+   ```bash
+   createdb -h HOTE -U UTILISATEUR companyos_restauree
+   pg_restore --no-owner -h HOTE -U UTILISATEUR -d companyos_restauree base-AAAA-MM-JJTHH-MM.dump
+   ```
+
+3. Vérifiez les données, puis pointez `DATABASE_URL` sur la base restaurée
+   et redéployez.
+
+Pour les fichiers : `tar -xzf fichiers-….tar.gz -C /chemin/du/volume/storage-data`.
+
+Faites l'exercice une fois, à blanc, avant d'en avoir besoin : une
+sauvegarde qu'on n'a jamais restaurée est une hypothèse.
+
+### Journal des erreurs
+
+Les erreurs de l'API (500) et celles des navigateurs des clients sont
+regroupées dans **Plateforme → Santé**, avec le nombre d'occurrences et la
+pile d'appels. Chaque erreur nouvelle — ou résolue qui revient — est envoyée
+par courriel aux adresses de `PLATFORM_ADMINS`.
 
 ## 9. Mises à jour
 

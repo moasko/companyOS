@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import { signalerErreur } from "./utils/rapportErreurs";
 import { useDispatch, useSelector } from "react-redux";
 import "./i18nextConf";
 import { appliquerLangue } from "./utils/langue";
@@ -220,7 +221,10 @@ function App() {
 
   return (
     <div className="App">
-      <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <ErrorBoundary
+        FallbackComponent={ErrorFallback}
+        onError={(erreur) => signalerErreur(erreur, "Écran de plantage")}
+      >
         {!wall.booted ? <BootScreen dir={wall.dir} /> : null}
         {wall.locked ? <LockScreen dir={wall.dir} /> : null}
         <div className="appwrap">

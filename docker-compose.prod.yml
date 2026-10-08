@@ -94,8 +94,15 @@ services:
       # monde. Jamais `true` : ce serait croire l'en-tête envoyé par le
       # client lui-même.
       TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Sauvegardes automatiques — voir apps/api/src/sauvegardes.js et
+      # DEPLOIEMENT.md. La base chaque jour, les fichiers chaque semaine.
+      SAUVEGARDE_ACTIVE: ${SAUVEGARDE_ACTIVE:-true}
+      SAUVEGARDE_HEURE: ${SAUVEGARDE_HEURE:-2}
+      SAUVEGARDE_RETENTION_JOURS: ${SAUVEGARDE_RETENTION_JOURS:-14}
+      SAUVEGARDE_FICHIERS_SEMAINES: ${SAUVEGARDE_FICHIERS_SEMAINES:-4}
     volumes:
       - storage-data:/data/storage
+      - sauvegardes-data:/data/sauvegardes
     expose:
       - "4000"
     networks:
@@ -114,6 +121,7 @@ services:
 
 volumes:
   storage-data:
+  sauvegardes-data:
 
 # Le réseau que Dokploy crée à son installation. Le déclarer `external`
 # plutôt que de le laisser créer un réseau propre à cette pile sert deux

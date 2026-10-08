@@ -4,6 +4,11 @@ import { Provider } from "react-redux";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import store from "./reducers";
+import { installerRapportErreurs } from "./utils/rapportErreurs";
+
+// Les erreurs du navigateur partent au journal de la plateforme — voir
+// src/utils/rapportErreurs.js.
+installerRapportErreurs();
 
 // Deux gestionnaires d'état, et c'est voulu :
 //

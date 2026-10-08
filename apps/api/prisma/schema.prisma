@@ -420,3 +420,63 @@ model PlatformConfig {
 
   @@map("platform_config")
 }
+
+/// Une sauvegarde de la base, réussie ou non.
+///
+/// Garder les échecs est le but : une sauvegarde qui échoue en silence
+/// depuis trois semaines ne se découvre que le jour où l'on en a besoin.
+/// La console de l'exploitant lit cette table pour dire, d'un coup d'œil,
+/// depuis quand la plateforme n'a pas été sauvegardée.
+model Sauvegarde {
+  id          String    @id @default(cuid())
+  /// « base » (pg_dump de toute la base) ou « fichiers » (archive du
+  /// stockage local).
+  type        String
+  /// « auto » (moteur planifié) ou « manuelle » (bouton de la console).
+  declencheur String
+  /// « en_cours », « ok » ou « echec ».
+  statut      String    @default("en_cours")
+  fichier     String?
+  octets      BigInt?
+  /// Empreinte SHA-256 du fichier : de quoi vérifier une copie rapatriée.
+  sha256      String?
+  /// L'archive a été relue avec succès (`pg_restore --list`).
+  verifiee    Boolean   @default(false)
+  /// Copie envoyée hors du serveur, sur le stockage objet de la plateforme.
+  horsSite    Boolean   @default(false)
+  erreur      String?
+  debut       DateTime  @default(now())
+  fin         DateTime?
+
+  @@index([type, debut])
+  @@map("sauvegardes")
+}
+
+/// Une erreur rencontrée par l'API ou par le navigateur d'un utilisateur.
+///
+/// Les occurrences d'une même erreur sont regroupées par leur empreinte
+/// (source, message, premier cadre de la pile) : mille utilisateurs qui
+/// tombent sur le même bogue font une ligne et un compteur, pas mille
+/// lignes. Pas de clé étrangère vers l'espace ni le compte : le journal
+/// doit survivre à leur suppression.
+model ErreurApp {
+  id          String   @id @default(cuid())
+  empreinte   String   @unique
+  /// « api » ou « web ».
+  source      String
+  message     String
+  pile        String?
+  /// Route de l'API, ou adresse de la page côté navigateur.
+  url         String?
+  occurrences Int      @default(1)
+  /// Le dernier espace et le dernier compte touchés, pour reproduire.
+  tenantId    String?
+  userId      String?
+  details     Json?
+  resolue     Boolean  @default(false)
+  premiere    DateTime @default(now())
+  derniere    DateTime @default(now())
+
+  @@index([resolue, derniere])
+  @@map("erreurs")
+}

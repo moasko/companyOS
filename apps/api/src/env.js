@@ -83,4 +83,18 @@ export const env = {
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean),
+
+  // Sauvegardes automatiques — voir src/sauvegardes.js.
+  //   SAUVEGARDE_ACTIVE=false   les coupe (un environnement de test, par
+  //                             exemple) ; actives partout ailleurs.
+  //   SAUVEGARDE_HEURE          heure UTC de la sauvegarde quotidienne de
+  //                             la base (2 h : 2 h à Abidjan).
+  //   SAUVEGARDE_RETENTION_JOURS combien de copies quotidiennes garder.
+  //   SAUVEGARDE_FICHIERS_SEMAINES combien d'archives hebdomadaires du
+  //                             stockage local garder.
+  sauvegardeActive: process.env.SAUVEGARDE_ACTIVE !== "false",
+  sauvegardeDossier: process.env.SAUVEGARDE_DOSSIER || "./sauvegardes",
+  sauvegardeHeure: Number(process.env.SAUVEGARDE_HEURE ?? 2),
+  sauvegardeRetentionJours: Number(process.env.SAUVEGARDE_RETENTION_JOURS || 14),
+  sauvegardeFichiersSemaines: Number(process.env.SAUVEGARDE_FICHIERS_SEMAINES || 4),
 };
