@@ -32,6 +32,8 @@ import { SectionApplications } from "./Applications";
 import { SectionStockage } from "./Stockage";
 import { SectionCompte } from "./Compte";
 import { SectionEspace } from "./Espace";
+import { SectionEntreprise } from "./Entreprise";
+import { consommerRubrique, surRubrique } from "../../../../apps/parametresRequest";
 import { SectionJournal } from "./Journal";
 import { SectionFormule } from "./Formule";
 import { SectionLangue } from "./Langue";
@@ -62,6 +64,7 @@ const SECTIONS = [
   { id: "stockage", label: "Stockage", icon: "faHardDrive" },
   { id: "compte", label: "Compte", icon: "faUser" },
   { id: "espace", label: "Espace de travail", icon: "faBuilding" },
+  { id: "entreprise", label: "Fiche de l'entreprise", icon: "faIdCard" },
   { id: "formule", label: "Formule et tarifs", icon: "faCreditCard" },
   { id: "journal", label: "Journal d'activité", icon: "faClockRotateLeft" },
   { id: "langue", label: "Langue et région", icon: "faLanguage" },
@@ -81,6 +84,7 @@ const TEXTES = {
     "section.stockage": "Storage",
     "section.compte": "Account",
     "section.espace": "Workspace",
+    "section.entreprise": "Company profile",
     "section.formule": "Plan and pricing",
     "section.journal": "Activity log",
     "section.langue": "Language and region",
@@ -464,6 +468,17 @@ export const Settings = () => {
     scrollElementTo(mainRef.current, 0);
   };
 
+  // Une application peut ouvrir les Paramètres sur une rubrique précise
+  // (l'Éditeur de factures, sur la fiche de l'entreprise).
+  useEffect(() => {
+    const prendre = () => {
+      const r = consommerRubrique();
+      if (r && SECTIONS.some((s) => s.id === r)) goToSection(r);
+    };
+    if (!wnapp.hide) prendre();
+    return surRubrique(prendre);
+  }, [wnapp.hide]);
+
   // ---- Actions ------------------------------------------------------------
 
   const changerFond = (nom) => {
@@ -795,6 +810,9 @@ export const Settings = () => {
                 copierCode={copierCode}
                 annulerInvitation={annulerInvitation}
               />
+
+              {/* ---------- Fiche de l'entreprise ---------- */}
+              <SectionEntreprise section={section} />
 
               {/* ---------- Journal d'activité ---------- */}
               <SectionJournal

@@ -7,9 +7,11 @@
 // modèles et la pagination — une facture de quarante lignes tient sur
 // plusieurs pages, en-tête de tableau répété.
 //
-// Limites assumées : les polices sont celles intégrées à tout lecteur PDF
-// (Helvetica), et le logo image n'est pas inclus — ses initiales le
-// remplacent, dans la couleur du modèle.
+// Les images (logo, cachet, signature) sont intégrées en JPEG, que le PDF
+// sait lire tel quel (filtre DCTDecode) : `images.js` les prépare dans le
+// navigateur. Sans elles, les initiales remplacent le logo et le nom du
+// signataire, en cursive, la signature. Limite assumée : les polices sont
+// celles intégrées à tout lecteur PDF (Helvetica).
 
 import { montantDans } from "../../../utils/monnaie";
 import { Page, clip, textWidth } from "../facturation/pdf";
@@ -25,6 +27,7 @@ import {
   montantsEcheancier,
 } from "./domaine";
 import { couleurDe, eclaircir, enRgb, modeleDe } from "./modeles";
+import { ligneLegale } from "../../entreprise/domaine";
 
 const L = 595.28;
 const H = 841.89;
@@ -59,21 +62,40 @@ const couper = (texte, taille, largeur, gras = false) => {
   return lignes;
 };
 
-/// Assemble plusieurs pages en un seul fichier PDF.
-const assembler = (pages) => {
+/// Les octets d'une image, en chaîne « un caractère = un octet » comme le
+/// reste du fichier.
+const enChaine = (octets) => {
+  let s = "";
+  for (let i = 0; i < octets.length; i += 8192) {
+    s += String.fromCharCode.apply(null, octets.subarray(i, i + 8192));
+  }
+  return s;
+};
+
+/// Assemble plusieurs pages en un seul fichier PDF. `images` : les JPEG à
+/// déclarer, par nom ({ Logo: { octets, largeur, hauteur } }).
+const assembler = (pages, images = {}) => {
   const objets = [];
   const ajouter = (corps) => { objets.push(corps); return objets.length; };
   const catalogue = ajouter(null);
   const arbre = ajouter(null);
   const f1 = ajouter("<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>");
   const f2 = ajouter("<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>");
+  const xobjets = Object.entries(images).filter(([, im]) => im?.octets?.length).map(([nom, im]) => {
+    const n = ajouter(
+      `<</Type/XObject/Subtype/Image/Width ${im.largeur}/Height ${im.hauteur}/ColorSpace/DeviceRGB` +
+      `/BitsPerComponent 8/Filter/DCTDecode/Length ${im.octets.length}>>\nstream\n${enChaine(im.octets)}\nendstream`,
+    );
+    return `/${nom} ${n} 0 R`;
+  });
+  const ressourcesImages = xobjets.length ? `/XObject<<${xobjets.join("")}>>` : "";
   const enfants = [];
   for (const page of pages) {
     const contenu = page.stream();
     const flux = ajouter(`<</Length ${contenu.length}>>\nstream\n${contenu}\nendstream`);
     enfants.push(ajouter(
       `<</Type/Page/Parent ${arbre} 0 R/MediaBox[0 0 ${L} ${H}]/Contents ${flux} 0 R` +
-      `/Resources<</Font<</F1 ${f1} 0 R/F2 ${f2} 0 R>>>>>>`,
+      `/Resources<</Font<</F1 ${f1} 0 R/F2 ${f2} 0 R>>${ressourcesImages}>>>>`,
     ));
   }
   objets[catalogue - 1] = `<</Type/Catalog/Pages ${arbre} 0 R>>`;
@@ -98,7 +120,13 @@ const assembler = (pages) => {
 };
 
 /// Le PDF de la facture, dans son modèle.
-export const factureEnPdf = (f, e = {}) => {
+/// Le cadre d'une image ramenée dans une boîte, proportions gardées.
+const ajuster = (im, maxL, maxH) => {
+  const r = Math.min(maxL / im.largeur, maxH / im.hauteur);
+  return [im.largeur * r, im.hauteur * r];
+};
+
+export const factureEnPdf = (f, e = {}, images = {}) => {
   const modele = modeleDe(f.modele).id;
   const hex = couleurDe(f);
   const accent = rgb(hex);
@@ -126,6 +154,11 @@ export const factureEnPdf = (f, e = {}) => {
   };
   const logo = (x, yy, taille) => {
     if (f.afficherLogo === false) return 0;
+    if (images.Logo) {
+      const [l, h] = ajuster(images.Logo, taille * 1.6, taille);
+      page.image("Logo", x, yy + (taille - h) / 2, l, h);
+      return l + 12;
+    }
     page.rect(x, yy, taille, taille, accent);
     texte(initiales(nom), x, yy + taille / 2 + 4.5, { size: taille * 0.36, bold: true, color: BLANC, align: "center", width: taille });
     return taille + 12;
@@ -135,13 +168,17 @@ export const factureEnPdf = (f, e = {}) => {
 
   // ---- En-tête ---------------------------------------------------------------
 
-  const adresse = [e.adresse, [e.ville, e.pays].filter(Boolean).join(", "), [e.email, e.telephone].filter(Boolean).join(" · ")].filter(Boolean);
+  const adresse = [e.adresse, [e.ville, e.pays].filter(Boolean).join(", "), [e.email, e.telephone, e.siteWeb].filter(Boolean).join(" · ")].filter(Boolean);
   const fiscal = [e.ncc && `NCC : ${e.ncc}`, e.rccm && `RCCM : ${e.rccm}`].filter(Boolean).join(" · ");
 
   if (modele === "bandeau") {
     page.rect(0, 0, L, 92, accent);
     const decal = f.afficherLogo === false ? 0 : 40;
-    if (decal) {
+    if (decal && images.Logo) {
+      page.rect(M - 4, 24, 40, 40, BLANC);
+      const [l, h] = ajuster(images.Logo, 34, 34);
+      page.image("Logo", M - 4 + (40 - l) / 2, 24 + (40 - h) / 2, l, h);
+    } else if (decal) {
       page.rect(M, 28, 32, 32, BLANC);
       texte(initiales(nom), M, 49, { size: 12, bold: true, color: accent, align: "center", width: 32 });
     }
@@ -322,21 +359,38 @@ export const factureEnPdf = (f, e = {}) => {
     }
   }
   if (f.afficherSignature !== false) {
-    yn += 22;
-    texte(e.signataire || e.titulaire || nom, xNotes + 110, yn, { size: 15, bold: true, color: accent, align: "center", width: 0 });
-    yn += 8;
+    const centre = xNotes + 110;
+    yn += 10;
+    // Le cachet se pose à gauche de la signature : un JPEG n'a pas de
+    // transparence, superposés ils se masqueraient l'un l'autre.
+    if (images.Cachet) {
+      const [l, h] = ajuster(images.Cachet, 74, 74);
+      page.image("Cachet", centre - 68 - l, yn - 8, l, h);
+    }
+    if (images.Signature) {
+      const [l, h] = ajuster(images.Signature, 130, 46);
+      page.image("Signature", centre - l / 2, yn + 46 - h, l, h);
+      yn += 50;
+    } else {
+      const signe = propre(e.signataire || e.titulaire || nom);
+      yn += 30;
+      texte(signe, centre - textWidth(signe, 15, true) / 2, yn, { size: 15, bold: true, color: accent });
+      yn += 8;
+    }
     page.line(xNotes + 40, yn, xNotes + 180, yn, { color: GRIS_CLAIR });
-    texte("Signature autorisée", xNotes + 110 - textWidth("Signature autorisée", 8, true) / 2, yn + 13, { size: 8, bold: true, color: ENCRE });
+    texte("Signature autorisée", centre - textWidth("Signature autorisée", 8, true) / 2, yn + 13, { size: 8, bold: true, color: ENCRE });
+    const qui = [e.signataire, e.fonctionSignataire].filter(Boolean).join(", ");
+    if (qui) texte(clip(qui, 8, false, 200), centre - Math.min(200, textWidth(propre(qui), 8, false)) / 2, yn + 25, { size: 8, color: GRIS });
   }
 
   // ---- Mentions légales, et numéro de page ----------------------------------------
 
-  const mentions = [e.mentions, modele === "officiel" || modele === "classique" ? null : fiscal].filter(Boolean).join(" — ");
+  const mentions = [ligneLegale(e), e.mentions, modele === "officiel" || modele === "classique" ? null : fiscal].filter(Boolean).join(" — ");
   pages.forEach((p, i) => {
     page = p;
     if (mentions) texte(clip(mentions, 7.5, false, L - 2 * M), 0, H - 26, { size: 7.5, color: GRIS, align: "center", width: L });
     if (pages.length > 1) texte(`${f.numero || ""} · page ${i + 1}/${pages.length}`, DROITE, H - 14, { size: 7, color: GRIS, align: "right" });
   });
 
-  return assembler(pages);
+  return assembler(pages, images);
 };

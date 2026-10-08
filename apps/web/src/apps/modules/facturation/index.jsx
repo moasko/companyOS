@@ -6,6 +6,7 @@ import { api } from "../../../api/client";
 import { saveAs } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { composerCourriel } from "../../courrielRequest";
+import { chargerEntreprise } from "../../entreprise";
 import { ouvrirDansEditeur } from "../../editeurFacturesRequest";
 import { envoyerA } from "../../notifications";
 import { Auteur } from "../../Auteur";
@@ -502,11 +503,12 @@ function FacturationApp() {
     setBusy(true);
     try {
       const e = etatPaiement({ id: selectedId, data: draft }, reglements);
+      const entreprise = await chargerEntreprise();
       const blob = invoiceToPdf({
         facture: draft,
         totaux: totals,
         typeLabel: TYPES[draft.type].label,
-        emetteur: { nom: session.tenant?.name || "CompanyOS" },
+        emetteur: { ...(entreprise || {}), nom: entreprise?.nom || session.tenant?.name || "CompanyOS" },
         statutLabel:
           draft.type === "devis"
             ? STATUTS[draft.statut]?.label || draft.statut

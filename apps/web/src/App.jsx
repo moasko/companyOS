@@ -25,6 +25,8 @@ import { HoteMenuContextuel } from "./apps/MenuContextuel";
 import { ecouterLesCopies } from "./apps/clipboard";
 import { intercepterMailto } from "./apps/mailto";
 import { demarrerSyncNotifications } from "./apps/notifications";
+import { demarrerGardeFenetres } from "./apps/gardeFenetres";
+import store from "./reducers";
 import { CustomApp } from "./apps/CustomApp";
 import { CustomWebApp } from "./apps/CustomWebApp";
 import { syncInstalledModules, detachAllModules, attachSystemModules } from "./apps/sync";
@@ -133,6 +135,9 @@ function App() {
   // fois pour toutes : sans session elle ne fait rien, et la connexion la
   // relance d'elle-même — voir src/apps/notifications.js.
   useEffect(() => demarrerSyncNotifications(), []);
+
+  // Aucune fenêtre ne garde ses boutons hors de l'écran (voir gardeFenetres.js).
+  useEffect(() => demarrerGardeFenetres(store), []);
 
   // Garde-fou du glisser-déposer.
   //

@@ -62,3 +62,48 @@ export const choisirImage = () =>
     input.oncancel = () => resolve(null);
     input.click();
   });
+
+/// Charge une image depuis un fichier, un blob, une data URL ou une URL.
+const chargerImage = (source) =>
+  new Promise((resolve, reject) => {
+    const url = source instanceof Blob ? URL.createObjectURL(source) : source;
+    const img = new Image();
+    const liberer = () => { if (source instanceof Blob) URL.revokeObjectURL(url); };
+    img.onload = () => { liberer(); resolve(img); };
+    img.onerror = () => { liberer(); reject(new Error("Ce fichier n'est pas une image lisible.")); };
+    img.src = url;
+  });
+
+/// Réduit une image **sans la recadrer** (logo, cachet, signature) : son
+/// plus grand côté est ramené à `max` pixels. Le JPEG est posé sur fond
+/// blanc — c'est le format qu'un PDF sait intégrer tel quel.
+/// `agrandir` : pour une image vectorielle (une signature SVG), qui gagne à
+/// être rendue plus grande que sa taille nominale.
+export const reduireImage = async (source, { max = 320, format = "image/jpeg", qualite = 0.88, agrandir = false } = {}) => {
+  if (source instanceof Blob && source.type && !source.type.startsWith("image/")) {
+    throw new Error("Ce fichier n'est pas une image.");
+  }
+  const img = await chargerImage(source);
+  const largeurSource = img.naturalWidth || img.width || max;
+  const hauteurSource = img.naturalHeight || img.height || max;
+  const rapport = max / Math.max(largeurSource, hauteurSource);
+  const echelle = agrandir ? rapport : Math.min(1, rapport);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(largeurSource * echelle));
+  canvas.height = Math.max(1, Math.round(hauteurSource * echelle));
+  const ctx = canvas.getContext("2d");
+  if (format === "image/jpeg") {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return { url: canvas.toDataURL(format, qualite), largeur: canvas.width, hauteur: canvas.height };
+};
+
+/// Les octets d'une data URL (base64).
+export const octetsDe = (dataUrl) => {
+  const binaire = atob(String(dataUrl).split(",")[1] || "");
+  const octets = new Uint8Array(binaire.length);
+  for (let i = 0; i < binaire.length; i += 1) octets[i] = binaire.charCodeAt(i);
+  return octets;
+};

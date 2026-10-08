@@ -13,8 +13,11 @@ import {
   nombreEnLettres,
   problemes,
   recurrencesDues,
+  situationClient,
+  verifier,
   versFacturation,
 } from "../src/apps/modules/editeur-factures/domaine.js";
+import { ligneLegale, manquesDe, tailleFiche } from "../src/apps/entreprise/domaine.js";
 
 const exemple = () => ({
   ...factureVide(),
@@ -108,4 +111,38 @@ test("montant en lettres", () => {
   assert.equal(nombreEnLettres(80000), "quatre-vingt mille");
   assert.equal(nombreEnLettres(2200000), "deux millions deux cent mille");
   assert.match(montantEnLettres(1569400), /^un million cinq cent soixante-neuf mille quatre cents francs CFA$/i);
+});
+
+test("vérifications rattachées à leur champ", () => {
+  const champs = verifier({ ...factureVide(), numero: "", envoi: "immediat", clientNom: "X", clientEmail: "pas-un-mail" }).map((v) => v.champ);
+  assert.ok(champs.includes("numero"));
+  assert.ok(champs.includes("articles"));
+  assert.ok(champs.includes("client"));
+  const sansNom = { ...exemple(), lignes: [{ id: "x", designation: "", qte: 1, pu: 5000, tva: 18 }, ...exemple().lignes] };
+  assert.ok(verifier(sansNom).some((v) => v.message.includes("n'a pas de nom")));
+});
+
+test("situation du client : impayés et retards, hors facture en cours", () => {
+  const doc = (id, statut, echeance, total) => ({
+    id,
+    data: { type: "facture", clientId: "c1", statut, echeance, lignes: [{ designation: "A", qte: 1, pu: total, tva: 0 }] },
+  });
+  const documents = [
+    doc("f1", "envoye", "2026-09-01", 100000),
+    doc("f2", "envoye", "2026-12-01", 50000),
+    doc("f3", "brouillon", "2026-09-01", 70000),
+    doc("f4", "envoye", "2026-09-01", 30000),
+  ];
+  const reglements = [{ data: { documentId: "f4", montant: 30000 } }];
+  const s = situationClient("c1", documents, reglements, "f2", "2026-10-08");
+  assert.deepEqual(s, { nb: 1, reste: 100000, retard: 1 });
+  assert.equal(situationClient(null, documents), null);
+});
+
+test("fiche de l'entreprise : mentions et manques", () => {
+  assert.equal(ligneLegale({ formeJuridique: "SARL", capital: "1 000 000 FCFA" }), "SARL au capital de 1 000 000 FCFA");
+  assert.equal(ligneLegale({ capital: "5 M" }), "Capital : 5 M");
+  assert.deepEqual(manquesDe({ nom: "K", adresse: "Abidjan", ncc: "1", email: "a@b.ci" }), []);
+  assert.ok(manquesDe({}).includes("le NCC"));
+  assert.ok(tailleFiche({ nom: "é" }) > 0);
 });

@@ -9,6 +9,7 @@ import * as FaRegIcons from "@fortawesome/free-regular-svg-icons";
 import * as AllIcons from "./icons";
 import { cheminIcone } from "./iconesCos";
 import { GlypheUi, aUnGlypheUi } from "./iconesUi";
+import { bornes as bornesFenetre } from "../apps/gardeFenetres";
 
 export const Icon = (props) => {
   const sidepane = useSelector((state) => state.sidepane);
@@ -348,6 +349,14 @@ export const ToolBar = (props) => {
       wnapp.classList.add("notrans");
       wnapp.classList.add("z9900");
       posP = [wnapp.offsetTop, wnapp.offsetLeft];
+      // Le décalage de cascade (`translate`) est intégré à la position :
+      // sans cela, la fenêtre sauterait au lâcher, et les bornes du
+      // déplacement seraient fausses d'autant.
+      const decalage = (getComputedStyle(wnapp).translate || "none").split(" ").map(parseFloat);
+      if (decalage.length && !Number.isNaN(decalage[0])) {
+        posP = [posP[0] + (decalage[1] ?? decalage[0]), posP[1] + decalage[0]];
+        wnapp.style.translate = "none";
+      }
       dimP = [
         parseFloat(getComputedStyle(wnapp).height.replaceAll("px", "")),
         parseFloat(getComputedStyle(wnapp).width.replaceAll("px", "")),
@@ -368,6 +377,12 @@ export const ToolBar = (props) => {
     wnapp.style.width = dim1 + "px";
   };
 
+  /// Taille du bureau où vit la fenêtre (barre des tâches exclue).
+  const zone = () => {
+    const z = wnapp.offsetParent || wnapp.parentElement;
+    return [z?.clientHeight || window.innerHeight, z?.clientWidth || window.innerWidth];
+  };
+
   const eleDrag = (e) => {
     e = e || window.event;
     e.preventDefault();
@@ -376,13 +391,26 @@ export const ToolBar = (props) => {
       pos1 = posP[1] + e.clientX - posM[1],
       dim0 = dimP[0] + vec[0] * (e.clientY - posM[0]),
       dim1 = dimP[1] + vec[1] * (e.clientX - posM[1]);
+    const [zh, zl] = zone();
 
-    if (op == 0) setPos(pos0, pos1);
-    else {
+    if (op == 0) {
+      // La barre de titre ne quitte jamais l'écran : ni au-dessus du haut,
+      // ni sous le bas, et les boutons (à droite) restent visibles.
+      const b = bornesFenetre(dimP[1], dimP[0], zl, zh);
+      setPos(
+        Math.min(Math.max(pos0, b.minTop), b.maxTop),
+        Math.min(Math.max(pos1, b.minLeft), b.maxLeft),
+      );
+    } else {
       dim0 = Math.max(dim0, 320);
       dim1 = Math.max(dim1, 320);
       pos0 = posP[0] + Math.min(vec[0], 0) * (dim0 - dimP[0]);
       pos1 = posP[1] + Math.min(vec[1], 0) * (dim1 - dimP[1]);
+      // Le bord tiré s'arrête au bord de l'écran.
+      if (pos0 < 0) { dim0 += pos0; pos0 = 0; }
+      if (pos1 < 0) { dim1 += pos1; pos1 = 0; }
+      dim0 = Math.min(dim0, zh - pos0);
+      dim1 = Math.min(dim1, zl - pos1);
       setPos(pos0, pos1);
       setDim(dim0, dim1);
     }
@@ -403,6 +431,10 @@ export const ToolBar = (props) => {
         height: getComputedStyle(wnapp).height,
         top: getComputedStyle(wnapp).top,
         left: getComputedStyle(wnapp).left,
+        // La taille choisie à la main prime sur le minimum de la feuille de
+        // style de l'app.
+        minWidth: "0px",
+        minHeight: "0px",
       },
     };
 
@@ -413,6 +445,7 @@ export const ToolBar = (props) => {
     <>
       <div
         className="toolbar"
+        data-action={props.app}
         data-float={props.float != null}
         data-noinvert={props.noinvert != null}
         style={{
@@ -424,6 +457,10 @@ export const ToolBar = (props) => {
           data-float={props.float != null}
           onClick={toolClick}
           onMouseDown={toolDrag}
+          // Double-clic sur la barre de titre : agrandir / restaurer, comme
+          // sous Windows — le geste de secours quand les boutons sont loin.
+          onDoubleClick={() => dispatch({ type: props.app, payload: "mxmz" })}
+          title="Double-cliquez pour agrandir ou restaurer"
           data-op="0"
         >
           <Icon src={props.icon} width={14} />

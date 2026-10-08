@@ -128,6 +128,17 @@ class Page {
     );
   }
 
+  /// Pose une image (déclarée à l'assemblage sous `nom`) dans le cadre
+  /// donné, mesuré depuis le haut comme le reste.
+  image(nom, x, y, w, h) {
+    this.ops.push(
+      "q",
+      `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${(this.height - y - h).toFixed(2)} cm`,
+      `/${nom} Do`,
+      "Q",
+    );
+  }
+
   rect(x, y, w, h, color) {
     this.ops.push(
       `${color} rg`,
@@ -194,7 +205,17 @@ export const invoiceToPdf = ({ facture, totaux, emetteur, statutLabel, typeLabel
   // En-tête
   page.rect(0, 0, page.width, 6, accent);
   page.text(emetteur.nom, M, 62, { size: 15, bold: true });
-  page.text("Espace de travail CompanyOS", M, 78, { size: 8.5, color: grey });
+  // L'adresse et les identifiants viennent de la fiche de l'entreprise
+  // (Paramètres › Fiche de l'entreprise) quand elle est remplie.
+  const coordonnees = [
+    [emetteur.adresse, emetteur.ville].filter(Boolean).join(", "),
+    [emetteur.telephone, emetteur.email].filter(Boolean).join(" · "),
+    [emetteur.ncc && `NCC : ${emetteur.ncc}`, emetteur.rccm && `RCCM : ${emetteur.rccm}`].filter(Boolean).join(" · "),
+  ].filter(Boolean);
+  if (!coordonnees.length) coordonnees.push("Espace de travail CompanyOS");
+  coordonnees.slice(0, 3).forEach((l, i) => {
+    page.text(clip(l, 8.5, false, 300), M, 78 + i * 11, { size: 8.5, color: grey });
+  });
 
   // Le titre suit le type : un devis présenté comme une facture serait
   // encaissé par erreur, et un avoir facturé une deuxième fois.

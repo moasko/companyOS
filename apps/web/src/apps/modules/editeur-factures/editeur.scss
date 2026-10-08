@@ -191,7 +191,7 @@ body[data-theme="dark"] .moduleWin.efApp {
 
 .efApp .efMenuEntree {
   display: grid;
-  grid-template-columns: 18px 1fr;
+  grid-template-columns: 18px 1fr auto;
   align-items: start;
   gap: 10px;
   width: 100%;
@@ -204,7 +204,9 @@ body[data-theme="dark"] .moduleWin.efApp {
 
   .uicon { display: flex; margin-top: 2px; color: var(--ef-doux); }
   small { display: block; margin-top: 2px; color: var(--ef-doux); font-size: 11px; }
+  kbd { margin-top: 1px; }
   &:hover:not(:disabled) { background: var(--ef-survol); }
+  &:focus-visible { outline: 2px solid var(--ef-texte); outline-offset: -2px; }
   &:disabled { opacity: 0.45; }
 }
 
@@ -438,7 +440,7 @@ body[data-theme="dark"] .moduleWin.efApp {
     .uicon { display: flex; }
     &:hover { color: var(--ef-texte); }
 
-    &[aria-selected="true"] {
+    &[aria-checked="true"] {
       background: var(--ef-carte);
       color: var(--ef-texte);
       font-weight: 600;
@@ -535,8 +537,8 @@ body[data-theme="dark"] .moduleWin.efApp {
   padding: 8px 10px;
   border-radius: 8px;
 
-  &:hover { background: var(--ef-survol); }
-  &:hover .efRetirer { opacity: 1; }
+  &:hover,
+  &:focus-within { background: var(--ef-survol); }
 }
 
 .efApp .efPoignee {
@@ -636,7 +638,22 @@ body[data-theme="dark"] .moduleWin.efApp {
   &:disabled { opacity: 0.3; cursor: default; }
 }
 
-.efApp .efRetirer { opacity: 0; }
+.efApp .efLigneActions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+
+  .efIconeBouton { width: 22px; height: 20px; }
+}
+
+.efApp .efArticle:hover .efLigneActions,
+.efApp .efArticle:focus-within .efLigneActions { opacity: 1; }
+
+@media (hover: none) {
+  .efApp .efLigneActions { opacity: 1; }
+}
 
 .efApp .efAjouterZone { position: relative; margin-top: 8px; }
 
@@ -669,14 +686,34 @@ body[data-theme="dark"] .moduleWin.efApp {
   .uicon { display: flex; color: var(--ef-orange); }
 }
 
+// Le pied du formulaire reste visible : le total et l'action principale ne
+// quittent jamais l'écran, même au bas d'une longue liste d'articles.
 .efApp .efPiedFormulaire {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 14px;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ef-ligne);
+  background: color-mix(in srgb, var(--ef-carte) 92%, transparent);
+  backdrop-filter: blur(8px);
 }
 
-.efApp .efTotalRappel { color: var(--ef-doux); b { color: var(--ef-texte); font-size: 14px; } }
+.efApp .efTotalRappel {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  flex: 1;
+  min-width: 0;
+  color: var(--ef-doux);
+  font-size: 12px;
+
+  b { color: var(--ef-texte); font-size: 16px; font-variant-numeric: tabular-nums; }
+  small { color: #16a34a; font-size: 11.5px; }
+}
 
 // ---- Aperçu ------------------------------------------------------------------------
 
@@ -702,6 +739,10 @@ body[data-theme="dark"] .moduleWin.efApp {
   z-index: 40;
   background: rgb(0 0 0 / 18%);
 }
+
+.efApp .efPanneau[data-large] { width: min(640px, 96%); }
+
+.efApp .efPanneau:focus { outline: none; }
 
 .efApp .efPanneau {
   position: absolute;
@@ -733,7 +774,9 @@ body[data-theme="dark"] .moduleWin.efApp {
   padding: 14px 16px;
   border-bottom: 1px solid var(--ef-ligne);
 
-  h3 { margin: 0; font-size: 14px; }
+  gap: 12px;
+
+  h3 { margin: 0; margin-right: auto; font-size: 14px; }
 }
 
 .efApp .efPanneauCorps {
@@ -764,7 +807,7 @@ body[data-theme="dark"] .moduleWin.efApp {
   b { font-size: 12.5px; }
   small { color: var(--ef-doux); font-size: 11px; line-height: 1.35; }
   &:hover { border-color: color-mix(in srgb, var(--ef-texte) 35%, var(--ef-ligne)); }
-  &[aria-pressed="true"] { border-color: var(--ef-texte); box-shadow: 0 0 0 1px var(--ef-texte); }
+  &[aria-checked="true"] { border-color: var(--ef-texte); box-shadow: 0 0 0 1px var(--ef-texte); }
 }
 
 .efApp .efVignette {
@@ -797,7 +840,7 @@ body[data-theme="dark"] .moduleWin.efApp {
   box-shadow: 0 0 0 1px var(--ef-ligne);
   cursor: pointer;
 
-  &[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ef-texte); }
+  &[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ef-texte); }
 }
 
 .efApp .efCouleurLibre {
@@ -859,6 +902,7 @@ body[data-theme="dark"] .moduleWin.efApp {
 }
 
 .efApp .efListeMontant { font-weight: 600; white-space: nowrap; }
+.efApp .efListeLigne .efListeDroite { align-items: flex-end; gap: 4px; flex-shrink: 0; }
 
 .efApp .efRecurrence {
   display: flex;
@@ -922,8 +966,8 @@ body[data-theme="dark"] .moduleWin.efApp {
 // ---- Fenêtre étroite ------------------------------------------------------------------
 
 @container (max-width: 1100px) {
-  .efApp .efGroupeBoutons .efBouton span,
-  .efApp .efEnteteTitre p { display: none; }
+  .efApp .efGroupeBoutons .efBouton span { display: none; }
+  .efApp .efEtat > span:last-child { max-width: 260px; }
 }
 
 @container (max-width: 980px) {
@@ -974,6 +1018,16 @@ body[data-theme="dark"] .moduleWin.efApp {
     height: 62px;
     border-radius: 50%;
     object-fit: contain;
+  }
+
+  // Un vrai logo garde ses proportions (souvent plus large que haut) : le
+  // cercle est réservé aux initiales.
+  img.efLogo {
+    width: auto !important;
+    max-width: 170px;
+    height: 62px !important;
+    border-radius: 0 !important;
+    background: none !important;
   }
 
   .efLogoInitiales {
@@ -1159,7 +1213,32 @@ body[data-theme="dark"] .moduleWin.efApp {
     margin-top: 18px;
 
     img { max-width: 170px; max-height: 64px; }
-    b { margin-top: 4px; font-size: 10.5px; }
+    b { margin-top: 4px; padding-top: 5px; border-top: 1px solid var(--ef-filet); font-size: 10.5px; }
+    small { margin-top: 2px; color: var(--ef-gris); font-size: 9.5px; }
+  }
+
+  // Le cachet chevauche la signature, comme sur un document tamponné.
+  .efSignatureZone {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 170px;
+    min-height: 64px;
+
+    .efCachet {
+      position: absolute;
+      left: -46px;
+      top: 50%;
+      width: 92px;
+      height: 92px;
+      max-width: none;
+      max-height: none;
+      object-fit: contain;
+      transform: translateY(-50%) rotate(-8deg);
+      opacity: 0.85;
+      mix-blend-mode: multiply;
+    }
   }
 
   .efSignatureNom {
@@ -1347,4 +1426,307 @@ body[data-theme="dark"] .moduleWin.efApp {
       border-radius: 4px;
     }
   }
+}
+
+
+// ---- État, vérifications, aides (v1.1) -----------------------------------------------
+
+.efApp .efEtat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+.efApp .efPuce {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ef-survol);
+  color: var(--ef-doux);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+
+  &[data-ton="ok"] { background: color-mix(in srgb, #16a34a 14%, transparent); color: #15803d; }
+  &[data-ton="info"] { background: color-mix(in srgb, #2563eb 12%, transparent); color: #1d4ed8; }
+  &[data-ton="warn"] { background: var(--ef-orange-fond); color: var(--ef-orange); }
+  &[data-ton="bad"] { background: color-mix(in srgb, #dc2626 12%, transparent); color: #b91c1c; }
+  &[data-ton="off"] { text-decoration: line-through; }
+}
+
+body[data-theme="dark"] .efApp .efPuce {
+  &[data-ton="ok"] { color: #4ade80; }
+  &[data-ton="info"] { color: #93c5fd; }
+  &[data-ton="bad"] { color: #fca5a5; }
+}
+
+.efApp .efVerif {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  .uicon { display: flex; }
+
+  &[data-ton="attention"] {
+    border-color: color-mix(in srgb, var(--ef-orange) 35%, transparent);
+    background: var(--ef-orange-fond);
+    color: var(--ef-orange);
+    cursor: pointer;
+
+    &:hover { filter: brightness(0.97); }
+  }
+
+  &[data-ton="ok"] { color: #16a34a; }
+}
+
+.efApp kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--ef-ligne);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--ef-fond);
+  color: var(--ef-doux);
+  font-family: inherit;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+// Les erreurs de saisie : signalées là où elles sont, après une tentative
+// d'enregistrement — jamais pendant que l'utilisateur tape.
+.efApp .efChamp[data-erreur] {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #dc2626 12%, transparent);
+}
+
+.efApp .efChampErreur {
+  display: block;
+  margin-top: 4px;
+  color: #dc2626;
+  font-size: 11.5px;
+}
+
+body[data-theme="dark"] .efApp .efChampErreur { color: #fca5a5; }
+
+.efApp .efClientBloc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.efApp .efClient[data-erreur] {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #dc2626 12%, transparent);
+}
+
+.efApp .efSituation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--ef-doux);
+  font-size: 11.5px;
+
+  .uicon { display: flex; }
+  &[data-ton="retard"] { color: #b91c1c; }
+}
+
+body[data-theme="dark"] .efApp .efSituation[data-ton="retard"] { color: #fca5a5; }
+
+.efApp .efBloc[data-erreur] { border-color: #dc2626; }
+
+.efApp .efBlocPied {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.efApp .efArticles[data-erreur] {
+  outline: 1px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.efApp .efArticle input[aria-invalid] { color: #dc2626; }
+.efApp .efArticle input[aria-invalid]::placeholder { color: #dc2626; }
+
+.efApp .efStock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  color: var(--ef-doux);
+  font-size: 10.5px;
+
+  .uicon { display: flex; }
+  &[data-alerte] { color: var(--ef-orange); font-weight: 600; }
+}
+
+.efApp .efSection h2 small {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ef-survol);
+  font-size: 11px;
+
+  &:empty { display: none; }
+}
+
+.efApp .efPieces {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed var(--ef-ligne);
+  border-radius: 10px;
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 4px 4px 8px;
+    border-radius: 7px;
+    background: var(--ef-fond);
+    font-size: 12px;
+
+    .uicon { display: flex; color: var(--ef-doux); }
+    span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
+
+.efApp .efPiecesTete {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+
+  b { font-size: 12.5px; }
+  small { color: var(--ef-doux); font-size: 11.5px; }
+}
+
+.efApp .efApercuConseil {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 auto 12px;
+  padding: 6px 12px;
+  border: 1px dashed color-mix(in srgb, var(--ef-orange) 50%, transparent);
+  border-radius: 999px;
+  background: var(--ef-orange-fond);
+  color: var(--ef-orange);
+  font-size: 12px;
+  cursor: pointer;
+
+  .uicon { display: flex; }
+  &:hover { text-decoration: underline; }
+}
+
+.efApp .efAideTexte {
+  margin: 12px 0 14px;
+  color: var(--ef-doux);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.efApp .efRaccourcis {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px 0 0;
+
+  div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--ef-ligne);
+  }
+
+  dt { order: 2; }
+  dd { margin: 0; }
+}
+
+// Focus visible partout : on doit pouvoir remplir une facture au clavier.
+.efApp .efShell {
+  button:focus-visible,
+  .efClient:focus-visible,
+  .efAjouter:focus-visible {
+    outline: 2px solid var(--ef-texte);
+    outline-offset: 2px;
+  }
+}
+
+// Bascule Formulaire / Aperçu, seulement quand les deux ne tiennent pas côte à côte.
+.efApp .efBascule2 { display: none; }
+
+@container (max-width: 980px) {
+  .efApp .efBascule2 {
+    display: flex;
+    gap: 4px;
+    margin: 10px 16px 0;
+    padding: 3px;
+    border-radius: 9px;
+    background: var(--ef-fond);
+
+    button {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 30px;
+      border: 0;
+      border-radius: 7px;
+      background: none;
+      color: var(--ef-doux);
+      font-weight: 600;
+      cursor: pointer;
+
+      &[aria-selected="true"] { background: var(--ef-carte); color: var(--ef-texte); box-shadow: 0 1px 3px rgb(0 0 0 / 10%); }
+    }
+  }
+
+  .efApp .efShell[data-vue="apercu"] {
+    .efFormulaire { display: none; }
+    .efApercuZone { display: block; padding: 16px; }
+  }
+}
+
+@container (max-width: 640px) {
+  .efApp .efVerif span { display: none; }
+  .efApp .efPiedFormulaire .efBouton span { display: none; }
+  .efApp .efEtat > span:last-child { display: none; }
+}
+
+// La fiche de l'entreprise, ouverte dans un volet de l'éditeur.
+.efApp .efPanneau .feFiche {
+  --fe-fond: var(--ef-carte);
+  --fe-champ: var(--ef-carte);
+  --fe-ligne: var(--ef-ligne);
+  --fe-texte: var(--ef-texte);
+  --fe-doux: var(--ef-doux);
+  --fe-accent: var(--ef-orange);
 }

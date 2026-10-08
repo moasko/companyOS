@@ -12,6 +12,7 @@ import {
   montantsEcheancier,
 } from "./domaine";
 import { couleurDe, eclaircir, modeleDe } from "./modeles";
+import { ligneLegale } from "../../entreprise/domaine";
 
 // La page de la facture, telle que le client la recevra.
 //
@@ -42,8 +43,9 @@ export const Apercu = React.forwardRef(function Apercu({ facture: f, emetteur: e
   ) : null;
 
   const adresse = [e.adresse, [e.ville, e.pays].filter(Boolean).join(", ")].filter(Boolean);
-  const contacts = [e.email, e.telephone].filter(Boolean);
+  const contacts = [e.email, e.telephone, e.siteWeb].filter(Boolean);
   const fiscal = [e.ncc && `NCC : ${e.ncc}`, e.rccm && `RCCM : ${e.rccm}`].filter(Boolean);
+  const legale = ligneLegale(e);
   const fiscalPied = modele.id === "officiel" || modele.id === "classique" ? [] : fiscal;
 
   return (
@@ -195,12 +197,18 @@ export const Apercu = React.forwardRef(function Apercu({ facture: f, emetteur: e
           ) : null}
           {f.afficherSignature !== false ? (
             <div className="efSignature">
-              {e.signatureImage ? (
-                <img src={e.signatureImage} alt="" />
-              ) : (
-                <span className="efSignatureNom">{e.signataire || e.titulaire || nomEmetteur}</span>
-              )}
+              <span className="efSignatureZone">
+                {e.cachet ? <img className="efCachet" src={e.cachet} alt="" /> : null}
+                {e.signatureImage ? (
+                  <img src={e.signatureImage} alt="" />
+                ) : (
+                  <span className="efSignatureNom">{e.signataire || e.titulaire || nomEmetteur}</span>
+                )}
+              </span>
               <b>Signature autorisée</b>
+              {e.signataire || e.fonctionSignataire ? (
+                <small>{[e.signataire, e.fonctionSignataire].filter(Boolean).join(", ")}</small>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -208,8 +216,8 @@ export const Apercu = React.forwardRef(function Apercu({ facture: f, emetteur: e
 
       {/* Les identifiants fiscaux vont en pied de page, sauf dans les
           modèles qui les montrent déjà dans l'en-tête. */}
-      {e.mentions || fiscalPied.length ? (
-        <p className="efMentions">{[e.mentions, fiscalPied.join(" · ")].filter(Boolean).join(" — ")}</p>
+      {legale || e.mentions || fiscalPied.length ? (
+        <p className="efMentions">{[legale, e.mentions, fiscalPied.join(" · ")].filter(Boolean).join(" — ")}</p>
       ) : null}
     </div>
   );

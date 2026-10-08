@@ -1,0 +1,301 @@
+// Fiche de l'entreprise — voir FicheEntreprise.jsx.
+//
+// Le composant vit dans deux maisons (les Paramètres, le volet d'une
+// application) : il porte ses propres jetons, repliés sur ceux de l'OS, et
+// s'adapte à la largeur qu'on lui donne (requêtes de conteneur).
+
+.feFiche {
+  --fe-ligne: var(--app-line, #e3e6eb);
+  --fe-texte: var(--app-text, #1f2733);
+  --fe-doux: var(--app-muted, #6b7684);
+  --fe-champ: var(--app-champ, #ffffff);
+  --fe-carte: var(--app-panneau, #f8f9fb);
+  --fe-accent: var(--app-accent, #1a73e8);
+  --fe-ok: #188038;
+  --fe-attention: #b06000;
+  --fe-danger: #d93025;
+  --fe-fond: var(--app-bg, #ffffff);
+
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: var(--fe-texte);
+  font-size: 13px;
+
+  button { font: inherit; color: inherit; }
+}
+
+body[data-theme="dark"] .feFiche {
+  --fe-ligne: var(--app-line, #35353f);
+  --fe-texte: var(--app-text, #e8e8ee);
+  --fe-doux: var(--app-muted, #9a9aa8);
+  --fe-champ: var(--app-champ, #1e1e26);
+  --fe-carte: var(--app-panneau, #24242c);
+  --fe-accent: var(--app-accent, #6f8dff);
+  --fe-ok: #5fbf7f;
+  --fe-attention: #e0aa54;
+  --fe-danger: #e2716a;
+  --fe-fond: var(--app-bg, #262630);
+}
+
+.feChargement { color: var(--fe-doux); padding: 20px 0; }
+
+.feFiche {
+  .feAvis {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--fe-carte);
+    color: var(--fe-doux);
+    line-height: 1.45;
+
+    .uicon { margin-top: 2px; flex-shrink: 0; }
+    &[data-ton="ok"] { color: var(--fe-ok); background: color-mix(in srgb, var(--fe-ok) 9%, transparent); }
+    &[data-ton="attention"] { color: var(--fe-attention); background: color-mix(in srgb, var(--fe-attention) 10%, transparent); }
+    &[data-ton="info"] { color: var(--fe-accent); background: color-mix(in srgb, var(--fe-accent) 9%, transparent); }
+  }
+
+  .feRubrique {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    h4 {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--fe-doux);
+    }
+  }
+
+  .feGrille {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+
+  .feChamp {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+
+    &[data-large="true"] { grid-column: 1 / -1; }
+
+    > span { font-size: 12px; color: var(--fe-doux); }
+    em { color: var(--fe-danger); font-style: normal; }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid var(--fe-ligne);
+      border-radius: 7px;
+      background: var(--fe-champ);
+      color: var(--fe-texte);
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.4;
+      height: auto;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.12s, box-shadow 0.12s;
+
+      &:focus { border-color: var(--fe-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--fe-accent) 18%, transparent); }
+      &:disabled { opacity: 0.75; cursor: default; }
+      &::placeholder { color: color-mix(in srgb, var(--fe-doux) 70%, transparent); }
+    }
+
+    &[data-invalide="true"] {
+      input { border-color: var(--fe-danger); }
+    }
+  }
+
+  .feErreur { color: var(--fe-danger); font-size: 11.5px; }
+  .feDoux { color: var(--fe-doux); font-size: 12px; }
+
+  .feImages {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .feCarteImage {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--fe-ligne);
+    border-radius: 10px;
+    min-width: 0;
+  }
+
+  .feImage {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 9px;
+    background: #fff;
+    border: 1px solid var(--fe-ligne);
+    overflow: hidden;
+    color: var(--fe-doux);
+
+    &[data-vide="true"] { background: var(--fe-carte); border-style: dashed; }
+    img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  }
+
+  .feCarteTexte {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+
+    small { color: var(--fe-doux); font-size: 11.5px; }
+  }
+
+  .feActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .feBouton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border: 1px solid var(--fe-ligne);
+    border-radius: 7px;
+    background: var(--fe-champ);
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) { border-color: color-mix(in srgb, var(--fe-texte) 30%, transparent); }
+    &:focus-visible { outline: 2px solid var(--fe-accent); outline-offset: 1px; }
+    &:disabled { opacity: 0.5; cursor: default; }
+  }
+
+  .feBouton.fePrincipal {
+    border-color: var(--fe-texte);
+    background: var(--fe-texte);
+    color: var(--fe-champ);
+    font-weight: 600;
+  }
+
+  .feLien {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--fe-accent);
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; }
+    &:disabled { opacity: 0.5; }
+  }
+
+  .feSignatures {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .feSignaturesTete {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    small { color: var(--fe-doux); font-size: 11.5px; }
+  }
+
+  .feSignaturesListe {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+
+  .feSignature {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 84px;
+    padding: 8px;
+    border: 1px solid var(--fe-ligne);
+    border-radius: 9px;
+    background: #fff;
+    color: #1f2733;
+    cursor: pointer;
+    min-width: 0;
+
+    img { max-width: 100%; height: 46px; object-fit: contain; }
+    small { color: #6b7684; font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &[aria-checked="true"] {
+      border-color: var(--fe-accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--fe-accent) 30%, transparent);
+    }
+    &:focus-visible { outline: 2px solid var(--fe-accent); outline-offset: 1px; }
+    &:disabled { cursor: default; }
+  }
+
+  .feSignatureNom {
+    font-family: "Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive;
+    font-size: 21px;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .feSignatureNouvelle {
+    border-style: dashed;
+    background: transparent;
+    color: var(--fe-accent);
+
+    small { color: var(--fe-accent); }
+  }
+
+  .fePied {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0 10px;
+    background: var(--fe-fond);
+    border-top: 1px solid var(--fe-ligne);
+
+    > span { flex: 1; min-width: 0; }
+  }
+
+  .feMessage {
+    flex: 1;
+    font-size: 12.5px;
+
+    &[data-ton="ok"] { color: var(--fe-ok); }
+    &[data-ton="erreur"] { color: var(--fe-danger); }
+  }
+}
+
+@container (max-width: 520px) {
+  .feFiche .feGrille,
+  .feFiche .feImages { grid-template-columns: minmax(0, 1fr); }
+  .feFiche .fePied { flex-wrap: wrap; }
+}
