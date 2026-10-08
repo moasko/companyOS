@@ -37,12 +37,6 @@ const apps = [
     action: "EXPLORER",
   },
   {
-    name: "Terminal",
-    icon: "terminal",
-    type: "app",
-    action: "TERMINAL",
-  },
-  {
     name: "Bloc-notes",
     icon: "notepad",
     type: "app",

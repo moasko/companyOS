@@ -11,7 +11,6 @@ export * from "./apps/notepad";
 export * from "./apps/settings";
 export * from "./apps/store";
 export * from "./apps/taskmanager";
-export * from "./apps/terminal";
 
 export const ScreenPreview = () => {
   const tasks = useSelector((state) => state.taskbar);

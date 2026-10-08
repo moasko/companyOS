@@ -33,15 +33,6 @@ const apps = [
     isCore: true,
   },
   {
-    slug: "terminal",
-    name: "Terminal",
-    description: "Console d'administration de l'espace de travail.",
-    icon: "terminal",
-    category: "Système",
-    kind: "NATIVE",
-    isCore: true,
-  },
-  {
     slug: "notepad",
     name: "Bloc-notes",
     description: "Prendre des notes rapides.",
@@ -340,7 +331,10 @@ const apps = [
 ///     production interdit — il ne s'ouvrait donc pas.
 ///   - figma-plus : éditeur de design, hors du besoin d'une PME ; l'Atelier
 ///     Image couvre l'affiche ou le visuel ponctuel.
-const retirees = ["studio-video", "figma-plus"];
+///   - terminal : une invite de commande n'a pas sa place dans l'OS d'une
+///     PME ; elle intimidait plus qu'elle ne servait. L'administration se
+///     fait depuis les Paramètres et la console Plateforme.
+const retirees = ["studio-video", "figma-plus", "terminal"];
 const { count: supprimees } = await prisma.app.deleteMany({
   where: { tenantId: null, slug: { in: retirees } },
 });

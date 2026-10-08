@@ -60,7 +60,6 @@ const TEXTES = {
     reorganiser: "Réorganiser les icônes",
     fondSuivant: "Fond d'écran suivant",
     personnaliser: "Personnaliser",
-    ouvrirTerminal: "Ouvrir le Terminal",
     ouvrir: "Ouvrir",
     viderCorbeille: "Vider la corbeille",
     retirerBureau: "Retirer du bureau",
@@ -113,7 +112,6 @@ const TEXTES = {
     reorganiser: "Rearrange icons",
     fondSuivant: "Next wallpaper",
     personnaliser: "Personalize",
-    ouvrirTerminal: "Open Terminal",
     ouvrir: "Open",
     viderCorbeille: "Empty recycle bin",
     retirerBureau: "Remove from desktop",
@@ -363,7 +361,6 @@ export const DesktopApp = () => {
       { separateur: true },
       { nom: t("fondSuivant"), icone: "faImage", action: () => dispatch({ type: "WALLNEXT" }) },
       { nom: t("personnaliser"), icone: "faPalette", action: () => ouvrirFenetre("settings") },
-      { nom: t("ouvrirTerminal"), icone: "faTerminal", action: () => ouvrirFenetre("terminal") },
     ]);
 
   const menuApplication = (app, estCorbeille) => (e) =>
@@ -748,14 +745,6 @@ export const BandPane = () => {
           payload="togg"
           open="true"
           src="calculator"
-        />
-        <Icon
-          className="hvlight"
-          width={17}
-          click="TERMINAL"
-          payload="togg"
-          open="true"
-          src="terminal"
         />
         <Icon
           className="hvlight"

@@ -165,18 +165,6 @@ const appReducer = (state = defState, action) => {
     return tmpState;
   } else if (action.type == "EXTERNAL") {
     window.open(action.payload, "_blank");
-  } else if (action.type == "OPENTERM") {
-    var obj = { ...tmpState["terminal"] };
-    obj.dir = action.payload;
-
-    obj.size = "mini";
-    if (obj.hide) obj.ouvert = ordreOuverture++;
-    obj.hide = false;
-    obj.max = true;
-    tmpState.hz += 1;
-    obj.z = tmpState.hz;
-    tmpState["terminal"] = obj;
-    return tmpState;
   } else if (action.type == "ADDAPP") {
     tmpState[cleApp(action.payload)] = nouvelleFenetre(action.payload);
     return tmpState;
