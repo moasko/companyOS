@@ -10,9 +10,11 @@ vivent dans des volumes.
 
 - Un VPS avec [Dokploy](https://dokploy.com) installé
   (`curl -sSL https://dokploy.com/install.sh | sh`).
-- Deux sous-domaines pointant (enregistrement A) vers le VPS, par exemple :
-  - `os.mondomaine.com` — le front ;
-  - `api.mondomaine.com` — l'API.
+- Le domaine `companyos.fr` et ses sous-domaines pointant (enregistrement
+  A, et AAAA si le VPS a une IPv6) vers le VPS :
+  - `companyos.fr` et `www.companyos.fr` — la vitrine ;
+  - `app.companyos.fr` — le shell ;
+  - `api.companyos.fr` — l'API.
 - Ce dépôt accessible à Dokploy (GitHub, GitLab, ou dépôt privé avec clé).
 
 ## 2. Créer le service
@@ -31,15 +33,21 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `POSTGRES_PASSWORD` | un mot de passe fort | la base |
 | `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` | signature des sessions |
 | `ENCRYPTION_KEY` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` | chiffrement des secrets stockés (S3, SMTP) |
-| `CORS_ORIGIN` | `https://os.mondomaine.com` | le shell autorisé à appeler l'API |
-| `VITE_API_URL` | `https://api.mondomaine.com` | figée dans le build du shell |
+| `CORS_ORIGIN` | `https://app.companyos.fr` | le shell autorisé à appeler l'API |
+| `VITE_API_URL` | `https://api.companyos.fr` | figée dans le build du shell |
 | `TRUST_PROXY` | `1` | un proxy devant l'API (Traefik) |
 | `JWT_EXPIRES_IN` | `7d` (défaut) | durée d'une session |
 | `DEFAULT_TENANT_QUOTA` | `5368709120` (défaut, 5 Go) | quota d'un nouvel espace |
 | `UPLOAD_MAX_OCTETS` | `134217728` (défaut, 128 Mo) | taille maximale d'un fichier importé |
 | `MAIL_QUOTA_JOUR` | `500` (défaut) | plafond d'envoi par espace et par 24 h |
-| `PLATFORM_ADMINS` | `patron@mondomaine.com` | les comptes exploitants (console Plateforme) |
+| `PLATFORM_ADMINS` | `vous@companyos.fr` | les comptes exploitants (console Plateforme) |
 
+> `VITE_API_URL` est cuite **au build** — et les images sont construites
+> par GitHub Actions (`.github/workflows/images.yml`), pas par Dokploy. Sa
+> valeur par défaut y est `https://api.companyos.fr` ; pour une autre,
+> déclarez la variable de dépôt `VITE_API_URL` (Settings → Secrets and
+> variables → Actions → Variables) puis relancez le workflow « Images ».
+>
 > `VITE_API_URL` est cuite **au build** : la changer exige un redéploiement,
 > pas seulement un redémarrage.
 
@@ -61,8 +69,13 @@ Onglet **Domains** du service :
 
 | Domaine | Service | Port | HTTPS |
 |---|---|---|---|
-| `os.mondomaine.com` | `web` | `80` | oui (Let's Encrypt) |
-| `api.mondomaine.com` | `api` | `4000` | oui (Let's Encrypt) |
+| `companyos.fr` | `web` | `80` | oui (Let's Encrypt) |
+| `www.companyos.fr` | `web` | `80` | oui (Let's Encrypt) |
+| `app.companyos.fr` | `web` | `80` | oui (Let's Encrypt) |
+| `api.companyos.fr` | `api` | `4000` | oui (Let's Encrypt) |
+
+Les trois premiers vont au même conteneur `web` : c'est `nginx.conf` qui
+distingue la vitrine (domaine nu) de l'OS (`app.`).
 
 Dokploy (Traefik) obtient et renouvelle les certificats tout seul.
 
@@ -75,7 +88,7 @@ Bouton **Deploy**. Au premier démarrage, l'API :
    sans jamais écraser les données existantes ;
 3. démarre sur le port 4000 (`/health` répond `{"status":"ok"}`).
 
-Ouvrez ensuite `https://os.mondomaine.com` et créez le premier espace de
+Ouvrez ensuite `https://app.companyos.fr` et créez le premier espace de
 travail depuis l'écran d'inscription — son créateur en devient le
 propriétaire (formule Découverte ; la formule se change dans
 Paramètres → Formule et tarifs).
@@ -94,7 +107,7 @@ Variables à ajouter dans **Environment** :
 | `SMTP_PORT` | `587` (STARTTLS) ou `465` (TLS) |
 | `SMTP_USER` | l'identifiant du relais |
 | `SMTP_PASS` | la clé SMTP |
-| `MAIL_FROM` | `CompanyOS <no-reply@mondomaine.com>` |
+| `MAIL_FROM` | `CompanyOS <no-reply@companyos.fr>` |
 
 N'importe quel relais convient : Brevo (300 mails/jour gratuits), Resend,
 Mailgun, un Gmail professionnel. Chez le fournisseur, validez le domaine
@@ -108,11 +121,12 @@ d'envoi (SPF + DKIM) pour ne pas finir en indésirable.
 
 ## 7. Landing page et console de l'exploitant
 
-- **Landing page** : le front sert une page publique de présentation sur
-  `/landing.html` (héros, applications, tarifs). Pour un domaine marketing
-  dédié (`www.mondomaine.com`), ajoutez ce domaine au service `web` dans
-  Dokploy — la racine reste l'OS, la page vit sur `/landing.html` ; son
-  bouton « Créer mon espace » ramène vers l'application.
+- **Landing page** : sur `companyos.fr` et `www.companyos.fr`, la racine
+  affiche la page de présentation (`landing.html`) ; son lien « Se
+  connecter » (`/?connexion`) renvoie vers `https://app.companyos.fr`.
+  Tout autre domaine garde l'OS à la racine, la vitrine restant joignable
+  sur `/landing.html`. Pour changer de domaine, modifiez les deux `map` en
+  tête de `apps/web/nginx.conf`.
 - **Console Plateforme** : l'application « Plateforme » montre tous les
   espaces clients (formules, membres, stockage, revenu mensuel) et change
   une formule en un clic. Elle n'obéit qu'aux comptes listés dans
