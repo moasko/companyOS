@@ -5,10 +5,27 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import store from "./reducers";
 import { installerRapportErreurs } from "./utils/rapportErreurs";
+import { registerSW } from "virtual:pwa-register";
 
 // Les erreurs du navigateur partent au journal de la plateforme — voir
 // src/utils/rapportErreurs.js.
 installerRapportErreurs();
+
+// Mise à jour après un déploiement.
+//
+// Le service worker sert l'OS depuis son cache, ce qui le rend rapide et
+// utilisable hors ligne — mais avec l'enregistrement injecté par défaut, la
+// version déployée ne s'affichait qu'au **deuxième** rechargement : la
+// première visite servait encore l'ancienne interface pendant que la
+// nouvelle s'installait en coulisse. « Je déploie et je ne vois rien »,
+// sauf à recharger deux fois.
+//
+// `immediate` installe la nouvelle version dès l'ouverture, et la page se
+// recharge une fois, d'elle-même, quand elle prend la main — en pratique
+// dans les premières secondes, avant qu'on ait commencé à travailler. Pas
+// de vérification périodique ensuite : un rechargement au milieu d'une
+// saisie ferait plus de tort que d'attendre la prochaine ouverture.
+registerSW({ immediate: true });
 
 // Deux gestionnaires d'état, et c'est voulu :
 //
