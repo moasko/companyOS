@@ -251,6 +251,7 @@
   .rhTable {
     min-height: 0;
     padding-bottom: 10px;
+    container-type: inline-size;
   }
 
   .rhTr {
@@ -288,6 +289,27 @@
 
   .rhTrAbs {
     grid-template-columns: minmax(0, 1.4fr) 150px 100px 100px 60px 110px 28px;
+  }
+
+  // Fenêtre étroite : les colonnes secondaires (ancienneté, solde de congés,
+  // date de fin) s'effacent plutôt que de se chevaucher.
+  @container (max-width: 820px) {
+    .rhTrSal {
+      grid-template-columns: 32px minmax(0, 1.5fr) minmax(0, 1fr) 110px 100px 90px;
+
+      > :nth-child(5),
+      > :nth-child(7) {
+        display: none;
+      }
+    }
+
+    .rhTrAbs {
+      grid-template-columns: minmax(0, 1.4fr) 120px 96px 50px 100px 28px;
+
+      > :nth-child(4) {
+        display: none;
+      }
+    }
   }
 
   .rhTdNom {

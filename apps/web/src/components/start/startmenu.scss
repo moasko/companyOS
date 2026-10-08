@@ -167,11 +167,28 @@
     object-fit: contain;
   }
 
+  // Le nom doit se lire sur n'importe quel fond d'écran. Du texte blanc
+  // avec une ombre légère disparaissait sur les fonds clairs (celui par
+  // défaut compris). Une pastille sombre translucide derrière le texte,
+  // comme les noms d'icônes de macOS, le rend lisible partout ; l'ombre
+  // renforcée garde le relief sur les fonds sombres.
   .appName {
+    max-width: 100%;
     text-align: center;
-    color: #fafafa;
-    margin-top: 4px;
-    text-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+    color: #fff;
+    margin-top: 5px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgb(15 20 30 / 42%);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    text-shadow: 0 1px 2px rgb(0 0 0 / 55%);
+    line-height: 1.3;
+  }
+
+  &:focus .appName,
+  &[data-selected="true"] .appName {
+    background: rgb(20 90 180 / 75%);
   }
 }
 
@@ -365,7 +382,7 @@ body[data-theme="dark"] .startMenu {
 
   .pnApp {
     width: 96px;
-    height: 84px;
+    height: 92px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -378,16 +395,22 @@ body[data-theme="dark"] .startMenu {
       background: var(--bg2);
     }
 
+    // Le nom tient dans la case : deux lignes au plus, puis des points de
+    // suspension. Il faisait 24 px de large sans retour à la ligne, et les
+    // noms voisins se chevauchaient (« ParamètresGestionnaire de tâches »).
     .appName {
-      width: 24px;
-      display: flex;
+      width: 88px;
       color: var(--dark-txt);
-      margin-top: 4px;
+      margin-top: 6px;
       font-size: 12px;
+      line-height: 1.25;
       text-align: center;
-      white-space: nowrap;
-      justify-content: center;
       cursor: default;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      word-break: break-word;
     }
   }
 }
@@ -536,4 +559,11 @@ body[data-theme="dark"] .startMenu {
     cursor: default;
     color: var(--sat-txt);
   }
+}
+
+// Récents vides : une phrase, plutôt qu'un grand blanc.
+.reVide {
+  padding: 8px 4px;
+  font-size: 12.5px;
+  color: var(--med-txt, #7a7a7a);
 }

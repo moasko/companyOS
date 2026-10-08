@@ -70,6 +70,15 @@
   right: 24px;
 }
 
+// La marque sur l'écran de verrouillage : elle héritait du noir par défaut,
+// illisible sur le fond bleu nuit.
+.lockBrand {
+  color: rgb(255 255 255 / 70%);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .splashScreen {
   display: flex;
   flex-direction: column;

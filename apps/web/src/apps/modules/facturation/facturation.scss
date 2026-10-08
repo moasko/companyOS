@@ -271,6 +271,27 @@
     grid-template-columns: 120px minmax(0, 1.6fr) 92px 108px 118px 108px 116px;
   }
 
+  // La liste vit entre la barre de filtres et l'aperçu : elle dispose
+  // rarement des 760 px que ses sept colonnes demandent. La colonne Client,
+  // la seule élastique, tombait alors à zéro et son titre chevauchait
+  // « Date ». En dessous de 700 px, l'échéance et le reste à payer
+  // s'effacent (ils restent dans l'aperçu du document) et le client
+  // retrouve sa place.
+  .fctTable {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 700px) {
+    .fctTrDoc {
+      grid-template-columns: 104px minmax(0, 1fr) 84px 108px 104px;
+
+      > :nth-child(4),
+      > :nth-child(6) {
+        display: none;
+      }
+    }
+  }
+
   .fctTrReg {
     grid-template-columns: 92px 120px minmax(0, 1.4fr) 120px minmax(0, 1fr) 118px;
   }

@@ -160,6 +160,7 @@ export const Notepad = () => {
     <div
       className="notepad floatTab dpShad"
       data-size={wnapp.size}
+      data-cascade={wnapp.cascade || 0}
       data-max={wnapp.max}
       style={{
         ...(wnapp.size == "cstm" ? wnapp.dim : null),
