@@ -33,6 +33,7 @@ export const RUBRIQUES = [
     champs: [
       { id: "ncc", label: "NCC (compte contribuable)", placeholder: "1234567 A" },
       { id: "rccm", label: "RCCM", placeholder: "CI-ABJ-03-2024-B12-01234" },
+      { id: "cnpsEmployeur", label: "N° employeur CNPS", placeholder: "123456-A" },
       { id: "regimeFiscal", label: "Régime d'imposition", liste: ["", "Réel normal (RNI)", "Réel simplifié (RSI)", "Taxe d'État de l'entreprenant (TEE)", "Micro-entreprise", "Exonéré"] },
       { id: "centreImpots", label: "Centre des impôts", placeholder: "Cocody Riviera" },
     ],

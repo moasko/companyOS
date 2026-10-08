@@ -41,7 +41,30 @@ export const REGLAGES_DEFAUT = {
     // Assiette mensuelle plafonnée. Valeur retenue par défaut ; une autre
     // source cite 1 647 315 — à confirmer avec le comptable.
     plafond: 3375000,
+    // Assiette des prestations familiales et de l'accident du travail :
+    // plafonnée beaucoup plus bas que la retraite (70 000 F par mois selon
+    // les publications). Mettre la même valeur que `plafond` revient à
+    // l'ancien calcul.
+    plafondPrestations: 70000,
   },
+  // Taxes FDFP à la charge de l'employeur, en % de la masse salariale :
+  // taxe d'apprentissage et taxe additionnelle à la formation continue.
+  fdfp: { apprentissage: 0.4, formationContinue: 1.2 },
+  // Salaire minimum interprofessionnel garanti, mensuel. Un brut en
+  // dessous est signalé, jamais bloqué : un temps partiel l'explique.
+  smig: 75000,
+  // Prime d'ancienneté de la convention collective interprofessionnelle :
+  // 2 % après 2 ans de présence, +1 % par année, plafonnée à 25 %.
+  anciennete: { actif: true, apresAns: 2, tauxInitial: 2, parAn: 1, max: 25 },
+  // Indemnité de transport non imposable proposée chaque mois. Le montant
+  // dépend de la ville : à ajuster.
+  transport: 30000,
+  // Base horaire mensuelle (40 h × 52 / 12) et jours ouvrables de
+  // référence pour les retenues d'absence.
+  heuresMois: 173.33,
+  joursMois: 26,
+  // Majorations des heures supplémentaires, en %.
+  majorations: { h15: 15, h50: 50, h75: 75, h100: 100 },
   // Couverture maladie universelle : forfait mensuel par personne, à la
   // charge de l'employeur par défaut.
   cmu: { montantParPersonne: 1000, aLaChargeEmployeur: true },
@@ -122,14 +145,16 @@ export const its = (brut, situation, enfants, reglages = REGLAGES_DEFAUT) =>
 /// séparées — c'est cette séparation qui distingue le net à payer du coût
 /// employeur.
 export const cotisations = (brut, reglages = REGLAGES_DEFAUT) => {
-  const c = reglages.cnps;
-  // L'assiette est plafonnée : au-delà, les taux ne s'appliquent plus.
+  const c = { ...REGLAGES_DEFAUT.cnps, ...(reglages.cnps || {}) };
+  // L'assiette est plafonnée : au-delà, les taux ne s'appliquent plus. La
+  // retraite et les prestations n'ont pas le même plafond.
   const assiette = Math.min(brut, c.plafond);
+  const assiettePrestations = Math.min(brut, c.plafondPrestations ?? c.plafond);
 
   const retraiteSalarie = (assiette * c.retraiteSalarie) / 100;
   const retraiteEmployeur = (assiette * c.retraiteEmployeur) / 100;
-  const prestationsFamiliales = (assiette * c.prestationsFamiliales) / 100;
-  const accidentTravail = (assiette * c.accidentTravail) / 100;
+  const prestationsFamiliales = (assiettePrestations * c.prestationsFamiliales) / 100;
+  const accidentTravail = (assiettePrestations * c.accidentTravail) / 100;
 
   return {
     // Ce qui sort de la poche du salarié.
@@ -156,47 +181,141 @@ export const cotisations = (brut, reglages = REGLAGES_DEFAUT) => {
 /// imposables (transport), retenues (avances, prêts). Le brut imposable est
 /// le socle du calcul ; les indemnités non imposables s'ajoutent au net
 /// sans passer par l'impôt.
-export const bulletin = (salarie = {}, saisie = {}, reglages = REGLAGES_DEFAUT) => {
+export const bulletin = (salarie = {}, saisie = {}, reglagesPartiels = REGLAGES_DEFAUT) => {
+  const reglages = completer(reglagesPartiels);
   const base = Number(salarie.salaireBase) || 0;
   const primes = Number(saisie.primes) || 0;
-  const indemnites = Number(saisie.indemnites) || 0; // non imposables
+  const indemnites = Number(saisie.indemnites) || 0; // transport, non imposable
   const retenues = Number(saisie.retenues) || 0; // avances, prêts
+  const frais = Number(saisie.frais) || 0; // notes de frais remboursées
   const nbCmu = Number(saisie.personnesCmu ?? 1) || 0;
+  const situation = saisie.situation ?? salarie.situation;
+  const enfants = saisie.enfants ?? salarie.enfants;
 
-  const brut = base + primes;
+  // Entrée ou sortie en cours de mois : le salaire suit les jours
+  // ouvrables de présence.
+  const pr = saisie.prorata;
+  const retenueProrata =
+    pr && pr.sur > 0 && pr.jours < pr.sur ? arrondi(base - (base * pr.jours) / pr.sur) : 0;
+
+  // Absences non rémunérées : au trentième ouvrable du salaire de base.
+  const abs = saisie.absences || {};
+  const joursRetenus = (Number(abs.injustifiee) || 0) + (Number(abs.sansSolde) || 0);
+  const retenueAbsences = arrondi((base * joursRetenus) / reglages.joursMois);
+
+  const ans = anneesDeService(salarie.dateEmbauche, saisie.mois);
+  const tauxAnciennete = tauxDAnciennete(ans, reglages);
+  const primeAnciennete = arrondi((base * tauxAnciennete) / 100);
+
+  const tauxHoraire = base / reglages.heuresMois;
+  const hs = saisie.heuresSup || {};
+  const lignesHs = Object.entries(reglages.majorations)
+    .map(([cle, taux]) => ({ cle, taux, heures: Number(hs[cle]) || 0 }))
+    .filter((x) => x.heures > 0)
+    .map((x) => ({ ...x, montant: arrondi(x.heures * tauxHoraire * (1 + x.taux / 100)) }));
+  const heuresSup = lignesHs.reduce((t, x) => t + x.montant, 0);
+
+  const brut = Math.max(0, base - retenueProrata - retenueAbsences + primeAnciennete + heuresSup + primes);
 
   const cot = cotisations(brut, reglages);
-  const impot = its(brut, salarie.situation, salarie.enfants, reglages);
-  const cmuSalarie = reglages.cmu.aLaChargeEmployeur
-    ? 0
-    : reglages.cmu.montantParPersonne * nbCmu;
-  const cmuEmployeur = reglages.cmu.aLaChargeEmployeur
-    ? reglages.cmu.montantParPersonne * nbCmu
-    : 0;
+  const impot = its(brut, situation, enfants, reglages);
+  const cmuSalarie = reglages.cmu.aLaChargeEmployeur ? 0 : reglages.cmu.montantParPersonne * nbCmu;
+  const cmuEmployeur = reglages.cmu.aLaChargeEmployeur ? reglages.cmu.montantParPersonne * nbCmu : 0;
+  const tauxFdfp = (reglages.fdfp.apprentissage || 0) + (reglages.fdfp.formationContinue || 0);
+  const fdfp = arrondi((brut * tauxFdfp) / 100);
 
   const totalRetenuesSalarie = cot.salariale + impot + cmuSalarie + retenues;
-  const net = arrondi(brut + indemnites - totalRetenuesSalarie);
+  const net = arrondi(brut + indemnites + frais - totalRetenuesSalarie);
 
-  const chargesPatronales = cot.patronale + cmuEmployeur;
+  const chargesPatronales = cot.patronale + cmuEmployeur + fdfp;
+  // Le remboursement de frais n'est pas un coût salarial : la charge est
+  // déjà passée par la note de frais.
   const coutTotal = arrondi(brut + indemnites + chargesPatronales);
+
+  // Les rubriques du bulletin, dans l'ordre où elles s'impriment. Le
+  // bulletin à l'écran, le PDF et l'export en dérivent : un seul calcul.
+  const R = (code, libelle, o = {}) => ({ code, libelle, base: "", taux: "", gain: 0, retenue: 0, patronal: 0, ...o });
+  const assietteRet = Math.min(brut, reglages.cnps.plafond);
+  const assiettePf = Math.min(brut, reglages.cnps.plafondPrestations ?? reglages.cnps.plafond);
+  const rubriques = [
+    R("100", "salaireBase", { base, gain: base }),
+    retenueProrata ? R("110", "prorata", { base: `${pr.jours}/${pr.sur}`, retenue: retenueProrata }) : null,
+    primeAnciennete ? R("120", "anciennete", { base, taux: tauxAnciennete, gain: primeAnciennete, ans }) : null,
+    ...lignesHs.map((x, i) => R(`13${i}`, "heuresSup", { base: x.heures, taux: x.taux, gain: x.montant })),
+    primes ? R("140", "primes", { gain: primes }) : null,
+    retenueAbsences ? R("150", "absences", { base: joursRetenus, retenue: retenueAbsences }) : null,
+    R("199", "brut", { gain: brut, sousTotal: true }),
+    R("400", "cnpsRetraite", { base: assietteRet, taux: reglages.cnps.retraiteSalarie, retenue: cot.detail.retraiteSalarie, patronal: cot.detail.retraiteEmployeur }),
+    R("410", "cnpsPf", { base: assiettePf, taux: reglages.cnps.prestationsFamiliales, patronal: cot.detail.prestationsFamiliales }),
+    R("420", "cnpsAt", { base: assiettePf, taux: reglages.cnps.accidentTravail, patronal: cot.detail.accidentTravail }),
+    R("450", "its", { base: brut, retenue: impot }),
+    R("470", "cmu", { base: nbCmu, retenue: arrondi(cmuSalarie), patronal: arrondi(cmuEmployeur) }),
+    fdfp ? R("480", "fdfp", { base: brut, taux: tauxFdfp, patronal: fdfp }) : null,
+    indemnites ? R("600", "transport", { gain: indemnites }) : null,
+    frais ? R("610", "frais", { gain: frais }) : null,
+    retenues ? R("700", "avances", { retenue: retenues }) : null,
+  ].filter(Boolean);
 
   return {
     brut: arrondi(brut),
     base: arrondi(base),
     primes: arrondi(primes),
+    primeAnciennete,
+    tauxAnciennete,
+    heuresSup,
+    retenueAbsences,
+    retenueProrata,
     indemnites: arrondi(indemnites),
+    frais: arrondi(frais),
     cotisationsSalariales: cot.salariale,
     its: impot,
     cmuSalarie: arrondi(cmuSalarie),
     retenues: arrondi(retenues),
     net,
+    fdfp,
     chargesPatronales: arrondi(chargesPatronales),
     cmuEmployeur: arrondi(cmuEmployeur),
     coutTotal,
     cotisations: cot,
-    parts: parts(salarie.situation, salarie.enfants, reglages),
+    parts: parts(situation, enfants, reglages),
+    rubriques,
   };
 };
+
+/// Des réglages enregistrés avant l'ajout d'un paramètre gardent la valeur
+/// par défaut de ce paramètre : un ancien espace ne doit pas perdre son
+/// calcul parce qu'une clé lui manque.
+export const completer = (r = {}) => ({
+  ...REGLAGES_DEFAUT,
+  ...r,
+  cnps: { ...REGLAGES_DEFAUT.cnps, ...(r.cnps || {}) },
+  cmu: { ...REGLAGES_DEFAUT.cmu, ...(r.cmu || {}) },
+  fdfp: { ...REGLAGES_DEFAUT.fdfp, ...(r.fdfp || {}) },
+  anciennete: { ...REGLAGES_DEFAUT.anciennete, ...(r.anciennete || {}) },
+  majorations: { ...REGLAGES_DEFAUT.majorations, ...(r.majorations || {}) },
+  ricf: { ...REGLAGES_DEFAUT.ricf, ...(r.ricf || {}) },
+  its: r.its?.length ? r.its.map((t) => ({ ...t, jusqua: t.jusqua ?? Infinity })) : REGLAGES_DEFAUT.its,
+});
+
+/// Années complètes de service à la fin du mois payé.
+export const anneesDeService = (dateEmbauche, mois) => {
+  if (!dateEmbauche) return 0;
+  const fin = mois ? finDeMois(mois) : new Date().toISOString().slice(0, 10);
+  const [a1, m1, j1] = String(dateEmbauche).split("-").map(Number);
+  const [a2, m2, j2] = fin.split("-").map(Number);
+  let ans = a2 - a1;
+  if (m2 < m1 || (m2 === m1 && j2 < j1)) ans -= 1;
+  return Math.max(0, ans);
+};
+
+export const tauxDAnciennete = (ans, reglages = REGLAGES_DEFAUT) => {
+  const a = completer(reglages).anciennete;
+  if (!a.actif || ans < a.apresAns) return 0;
+  return Math.min(a.max, a.tauxInitial + (ans - a.apresAns) * a.parAn);
+};
+
+export const finDeMois = (aaaaMm) =>
+  new Date(Date.UTC(Number(aaaaMm.slice(0, 4)), Number(aaaaMm.slice(5, 7)), 0)).toISOString().slice(0, 10);
 
 // ---------------------------------------------------------------------------
 // Reprise comptable
@@ -213,16 +332,20 @@ export const bulletin = (salarie = {}, saisie = {}, reglages = REGLAGES_DEFAUT) 
 export const ecritureDeBulletin = (b, salarie = {}, mois = "") => {
   const nom = `${salarie.prenom || ""} ${salarie.nom || ""}`.trim() || "salarié";
   const cnpsTotal = b.cotisations.salariale + b.cotisations.patronale;
+  const fdfp = Number(b.fdfp) || 0;
   const lignes = [
     { compte: "661", debit: b.brut + b.indemnites, credit: 0 },
-    { compte: "664", debit: b.chargesPatronales, credit: 0 },
+    { compte: "664", debit: b.chargesPatronales - fdfp, credit: 0 },
+    // Les taxes FDFP sont des impôts sur salaires, pas des charges sociales.
+    { compte: "641", debit: fdfp, credit: 0 },
     { compte: "421", debit: 0, credit: b.net },
     { compte: "431", debit: 0, credit: cnpsTotal + b.cmuEmployeur + b.cmuSalarie },
-    { compte: "447", debit: 0, credit: b.its },
+    { compte: "447", debit: 0, credit: b.its + fdfp },
   ];
   // Les retenues (avances déjà versées) ne créent pas de dette : elles
-  // remboursent l'entreprise. Le net les intègre déjà ; l'écart éventuel se
-  // rattrape sur le compte de personnel.
+  // remboursent l'entreprise. Les frais remboursés, eux, sont déjà au
+  // crédit du personnel par la note de frais. Le net intègre les deux ;
+  // l'écart se rattrape sur le compte de personnel.
   const ecart = lignes.reduce((s, l) => s + l.debit - l.credit, 0);
   if (ecart !== 0) {
     const perso = lignes.find((l) => l.compte === "421");
@@ -230,10 +353,12 @@ export const ecritureDeBulletin = (b, salarie = {}, mois = "") => {
   }
 
   return {
-    date: `${mois || new Date().toISOString().slice(0, 7)}-28`,
+    date: mois ? finDeMois(mois) : `${new Date().toISOString().slice(0, 7)}-28`,
     libelle: `Salaire ${mois} — ${nom}`.trim(),
     piece: `PAIE-${mois}`,
     tiers: nom,
+    journal: "OD",
+    source: "Paie",
     origine: `paie:${mois}:${salarie.matricule || nom}`,
     lignes: lignes.filter((l) => l.debit || l.credit),
   };
@@ -251,13 +376,14 @@ export const recapitulatif = (bulletins = []) => {
     brut: arrondi(somme("brut")),
     net: arrondi(somme("net")),
     cotisations: arrondi(somme("cotisationsSalariales")) + arrondi(bulletins.reduce((s, b) => s + b.cotisations.patronale, 0)),
+    chargesPatronales: arrondi(somme("chargesPatronales")),
     its: arrondi(somme("its")),
     coutTotal: arrondi(somme("coutTotal")),
   };
 };
 
 /// Montant lisible, dans la devise d'affichage de l'espace.
-export { montant as fcfa } from "../../../utils/monnaie";
+export { montant as fcfa } from "../../../utils/monnaie.js";
 
 /// Le mois précédent au format AAAA-MM — le mois qu'on paie d'ordinaire.
 export const moisParDefaut = () => {

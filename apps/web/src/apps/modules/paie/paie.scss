@@ -1,334 +1,1147 @@
 // Paie — voir index.jsx.
 //
-// Deux colonnes : la liste des salariés du mois à gauche, le bulletin au
-// centre. Les montants sont en chasse fixe et alignés à droite ; un débit
-// (ce qui se retranche du brut) porte un signe moins et une teinte, pour se
-// distinguer d'un versement d'un coup d'œil.
+// Même grammaire que la Comptabilité : montants en chiffres tabulaires
+// alignés à droite, couleur réservée aux états (prêt, à vérifier, bloqué),
+// toujours doublée d'un mot ou d'un signe. L'accent indigo distingue la
+// Paie dans la barre des tâches. Les boîtes de dialogue vivent hors de la
+// fenêtre : elles reçoivent les mêmes variables.
 
-.paieApp {
-  --pa-bg: #ffffff;
-  --pa-panel: #f7f8fa;
-  --pa-line: #e3e6eb;
-  --pa-text: #1f2733;
-  --pa-muted: #6b7684;
-  --pa-accent: #d97706; // ambre : les ressources humaines, la famille RH
-  --pa-accent-soft: #fdf1e3;
-  --pa-ok: #047857;
-  --pa-danger: #c0392b;
+@mixin jetons {
+  --pa-fond: #f6f7f9;
+  --pa-carte: #ffffff;
+  --pa-ligne: #e5e7eb;
+  --pa-ligne-douce: #f0f1f3;
+  --pa-texte: #111827;
+  --pa-doux: #4b5563;
+  --pa-pale: #9ca3af;
+  --pa-accent: #4338ca;
+  --pa-accent-fort: #3730a3;
+  --pa-accent-fond: #eef2ff;
+  --pa-accent-bord: #c7d2fe;
+  --pa-sur-accent: #ffffff;
+  --pa-ok: #166534;
+  --pa-ok-fond: #dcfce7;
+  --pa-info: #1e40af;
+  --pa-info-fond: #dbeafe;
+  --pa-attention: #b45309;
+  --pa-attention-texte: #9a3412;
+  --pa-attention-fond: #fff7ed;
+  --pa-attention-bord: #fed7aa;
+  --pa-erreur: #b91c1c;
+  --pa-erreur-fond: #fef2f2;
+  --pa-erreur-bord: #fecaca;
+  --pa-sous: #f9fafb;
+  --pa-survol: rgb(0 0 0 / 3.5%);
+  --pa-piste: #eef0f3;
+  --pa-papier: #ffffff;
+  --pa-conges: #065f46;
+  --pa-conges-fond: #ecfdf5;
+}
 
-  background: var(--pa-bg);
-  color: var(--pa-text);
+@mixin jetons-sombres {
+  --pa-fond: #17181c;
+  --pa-carte: #22242a;
+  --pa-ligne: #34373f;
+  --pa-ligne-douce: #2b2e35;
+  --pa-texte: #eceef2;
+  --pa-doux: #a1a8b3;
+  --pa-pale: #6b7280;
+  --pa-accent: #818cf8;
+  --pa-accent-fort: #a5b4fc;
+  --pa-accent-fond: #24264a;
+  --pa-accent-bord: #3f428a;
+  --pa-sur-accent: #111236;
+  --pa-ok: #86efac;
+  --pa-ok-fond: #14321f;
+  --pa-info: #93c5fd;
+  --pa-info-fond: #1e2a44;
+  --pa-attention: #fbbf24;
+  --pa-attention-texte: #fdba74;
+  --pa-attention-fond: #33260f;
+  --pa-attention-bord: #6b4a12;
+  --pa-erreur: #fca5a5;
+  --pa-erreur-fond: #3b1d1d;
+  --pa-erreur-bord: #7f1d1d;
+  --pa-sous: #26282e;
+  --pa-survol: rgb(255 255 255 / 5%);
+  --pa-piste: #2f323a;
+  --pa-papier: #2a2c33;
+  --pa-conges: #6ee7b7;
+  --pa-conges-fond: #12302a;
+}
+
+.paiApp,
+.paiForm,
+.paiChoix {
+  @include jetons;
+}
+
+body[data-theme="dark"] {
+  .paiApp,
+  .paiForm,
+  .paiChoix {
+    @include jetons-sombres;
+  }
+}
+
+// ---- Fenêtre et navigation -------------------------------------------------------
+
+.paiApp {
+  background: var(--pa-fond);
+  color: var(--pa-texte);
 
   &.floatTab[data-size="mini"] {
-    width: 82%;
-    height: 84%;
-    top: 7%;
-    left: 9%;
-    min-width: 880px;
-    min-height: 560px;
+    width: 88%;
+    height: 88%;
+    top: 5%;
+    left: 6%;
+    min-width: min(900px, 96%);
+    min-height: min(560px, 90%);
   }
 
-  .paieVerrou {
+  .paiVerrou {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-grow: 1;
     font-size: 0.84em;
-    color: var(--pa-muted);
+    color: var(--pa-doux);
   }
 
-  .paieShell {
+  .paiShell {
     display: flex;
-    flex-grow: 1;
+    flex: 1;
     min-height: 0;
+    font-size: 13.5px;
+
+    button { font: inherit; color: inherit; }
+    input, select { font: inherit; color: var(--pa-texte); }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible { outline: 2px solid var(--pa-accent); outline-offset: 1px; }
   }
 
-  // ---- Liste --------------------------------------------------------------
+  .paiPage {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    container-type: inline-size;
+  }
 
-  .paieListe {
-    width: 280px;
+  .paiNav {
+    width: 228px;
     flex-shrink: 0;
+    overflow-y: auto;
+    padding: 16px 12px;
+    background: var(--pa-carte);
+    border-right: 1px solid var(--pa-ligne);
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    background: var(--pa-panel);
-    border-right: 1px solid var(--pa-line);
+    gap: 2px;
+
+    nav { display: flex; flex-direction: column; gap: 2px; }
   }
 
-  .paieMois {
+  .paiMarque {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 10px 12px;
+
+    b { font-size: 15px; font-weight: 650; }
+    span { color: var(--pa-doux); font-size: 12px; }
+  }
+
+  .paiChampNav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 6px 6px;
+
+    span { color: var(--pa-doux); font-size: 11.5px; }
+    select {
+      height: 34px;
+      padding: 0 8px;
+      border: 1px solid var(--pa-ligne);
+      border-radius: 8px;
+      background: var(--pa-carte);
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+  }
+
+  .paiNavGroupe {
+    padding: 14px 10px 4px;
+    color: var(--pa-pale);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .paiNavItem {
     display: flex;
     align-items: center;
-    gap: 9px;
-    padding: 12px 14px 8px;
-    color: var(--pa-muted);
-
-    .uicon {
-      display: flex;
-    }
-
-    input {
-      flex-grow: 1;
-      padding: 6px 10px;
-      border: 1px solid var(--pa-line);
-      border-radius: 7px;
-      background: var(--pa-bg);
-      color: var(--pa-text);
-      font-family: inherit;
-      font-size: 0.82em;
-    }
-  }
-
-  .paieCartes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 4px 14px 10px;
-
-    .paieCarte:first-child {
-      grid-column: 1 / -1;
-    }
-  }
-
-  .paieCarte {
-    padding: 9px 12px;
-    border: 1px solid var(--pa-line);
+    gap: 10px;
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
     border-radius: 8px;
-    background: var(--pa-bg);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
 
-    span {
-      display: block;
-      font-size: 0.66em;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--pa-muted);
-    }
+    .uicon { display: flex; color: var(--pa-doux); flex-shrink: 0; }
+    span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    b {
-      font-size: 0.98em;
-      font-variant-numeric: tabular-nums;
+    &:hover { background: var(--pa-survol); }
+
+    &[aria-current="page"] {
+      background: var(--pa-accent-fond);
+      color: var(--pa-accent-fort);
+      font-weight: 600;
+
+      .uicon { color: var(--pa-accent); }
     }
   }
 
-  .paieActions {
-    display: flex;
-    gap: 8px;
-    padding: 0 14px 10px;
+  .paiPastille {
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--pa-accent);
+    color: var(--pa-sur-accent);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
   }
 
-  .paieSalaries {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 0 10px 10px;
+  .paiLangue {
+    margin-top: auto;
+    padding: 14px 10px 0;
+    border-top: 1px solid var(--pa-ligne-douce);
     display: flex;
     flex-direction: column;
     gap: 3px;
-  }
+    color: var(--pa-doux);
+    font-size: 12px;
 
-  .paieSalarie {
-    padding: 9px 11px;
-    border-radius: 7px;
-
-    &:hover {
-      background: color-mix(in srgb, var(--pa-text) 6%, transparent);
-    }
-
-    &[data-actif="true"] {
-      background: var(--pa-accent-soft);
-    }
-  }
-
-  .paieSalarieNom {
-    font-size: 0.82em;
-    font-weight: 600;
-  }
-
-  .paieSalarieBas {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 8px;
-    margin-top: 2px;
-    font-size: 0.72em;
-    color: var(--pa-muted);
-  }
-
-  .paieNet {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    color: var(--pa-ok);
-  }
-
-  .paieAFaire {
-    color: var(--pa-accent);
-    font-style: italic;
-  }
-
-  .paieVide {
-    padding: 20px 12px;
-    font-size: 0.78em;
-    line-height: 1.5;
-    color: var(--pa-muted);
-  }
-
-  // ---- Centre -------------------------------------------------------------
-
-  .paieCentre {
-    flex-grow: 1;
-    min-width: 0;
-    overflow-y: auto;
-    padding: 18px 22px;
-  }
-
-  .paieAccueil {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    gap: 12px;
-    text-align: center;
-    color: var(--pa-muted);
-
-    p {
-      max-width: 48ch;
-      font-size: 0.82em;
-      line-height: 1.6;
-      margin: 0;
-    }
-
-    .uicon {
-      display: flex;
-    }
-  }
-
-  .paieAccueilTitre {
-    font-size: 1.2em;
-    font-weight: 600;
-    color: var(--pa-text);
-  }
-
-  .paieBulletinTete {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 14px;
-
-    h3 {
-      margin: 0;
-      font-size: 1em;
-    }
-  }
-
-  .paieBulletinFin {
-    margin-left: auto;
-  }
-
-  .paieDejaEtabli {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 11px;
-    border-radius: 100px;
-    background: color-mix(in srgb, var(--pa-ok) 12%, transparent);
-    color: var(--pa-ok);
-    font-size: 0.72em;
-    font-weight: 600;
-
-    .uicon {
-      display: flex;
-    }
-  }
-
-  .paieAide {
-    margin: 4px 0 0;
-    font-size: 0.74em;
-    line-height: 1.5;
-    color: var(--pa-muted);
-  }
-
-  .paieBloc {
-    padding: 14px 16px;
-    margin-bottom: 14px;
-    border: 1px solid var(--pa-line);
-    border-radius: 10px;
-
-    h4 {
-      margin: 0 0 10px;
-      font-size: 0.8em;
-      font-weight: 600;
-    }
-  }
-
-  .paieChamps {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
-
-    select,
-    input {
-      box-sizing: border-box;
-      width: 100%;
-      padding: 7px 10px;
-      border: 1px solid var(--pa-line);
-      border-radius: 7px;
-      background: var(--pa-bg);
-      color: var(--pa-text);
-      font-family: inherit;
-      font-size: 0.8em;
-    }
-  }
-
-  // ---- Tableau du bulletin ------------------------------------------------
-
-  .paieTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8em;
-
-    td {
-      padding: 6px 8px;
-      border-bottom: 1px solid color-mix(in srgb, var(--pa-line) 55%, transparent);
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    tr[data-fort="true"] td {
-      font-weight: 700;
-      border-top: 1px solid var(--pa-line);
-    }
-
-    tr[data-accent="true"] td {
-      color: var(--pa-ok);
-      font-size: 1.1em;
-    }
-  }
-
-  .paieMt {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-
-    &[data-negatif="true"] {
-      color: var(--pa-danger);
-    }
-  }
-
-  .paieBoutons {
-    display: flex;
-    gap: 9px;
+    b { color: var(--pa-texte); font-weight: 600; }
   }
 }
 
-body[data-theme="dark"] .paieApp {
-  --pa-bg: #1f2226;
-  --pa-panel: #17191d;
-  --pa-line: #33383f;
-  --pa-text: #e6e8ea;
-  --pa-muted: #9aa2ad;
-  --pa-accent: #f0a44e;
-  --pa-accent-soft: #3a2a18;
-  --pa-ok: #34d399;
-  --pa-danger: #f87171;
+// ---- Boutons et petits éléments (aussi dans les boîtes de dialogue) ------------
+
+.paiApp,
+.paiForm,
+.paiChoix {
+  .paiBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 10px;
+    background: var(--pa-carte);
+    color: var(--pa-texte);
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:hover:not(:disabled) { background: var(--pa-survol); }
+    &:disabled { opacity: 0.5; cursor: default; }
+
+    &[data-variante="principal"] {
+      border-color: var(--pa-accent);
+      background: var(--pa-accent);
+      color: var(--pa-sur-accent);
+
+      &:hover:not(:disabled) { background: var(--pa-accent-fort); }
+    }
+  }
+
+  .paiMt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .paiDoux { color: var(--pa-doux); }
+  .paiPale { color: var(--pa-pale); }
+  .paiPetit { font-size: 12px; margin: 0; }
+  .paiRien { margin: 6px 0; color: var(--pa-doux); }
+  .paiEllipse { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .paiCode { font-family: ui-monospace, Consolas, monospace; color: var(--pa-doux); font-size: 0.92em; }
+
+  .paiLien {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--pa-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  .paiCase {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+
+    input { accent-color: var(--pa-accent); width: 16px; height: 16px; margin: 0; }
+  }
+
+  .paiStatut {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: var(--pa-piste);
+    color: var(--pa-doux);
+
+    &[data-statut="pret"] { background: var(--pa-ok-fond); color: var(--pa-ok); }
+    &[data-statut="verifier"] { background: var(--pa-attention-fond); color: var(--pa-attention-texte); }
+    &[data-statut="bloque"] { background: var(--pa-erreur-fond); color: var(--pa-erreur); }
+    &[data-statut="entree"] { background: var(--pa-info-fond); color: var(--pa-info); }
+  }
+
+  .paiPuce {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    font-size: 12.5px;
+    font-weight: 700;
+
+    &[data-niveau="ok"] { background: var(--pa-ok-fond); color: var(--pa-ok); }
+    &[data-niveau="bloquant"] { border: 2px solid var(--pa-erreur); color: var(--pa-erreur); }
+    &[data-niveau="attention"] { border: 2px solid var(--pa-attention); color: var(--pa-attention); }
+    &[data-niveau="info"] { background: var(--pa-info-fond); color: var(--pa-info); }
+    &[data-niveau="courant"] { background: var(--pa-accent); color: var(--pa-sur-accent); }
+    &[data-niveau="avenir"] { border: 2px solid var(--pa-ligne); color: var(--pa-pale); }
+  }
+
+  .paiInfo {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--pa-info-fond);
+    color: var(--pa-info);
+    font-size: 13px;
+    line-height: 1.5;
+
+    .uicon { display: flex; flex: none; margin-top: 2px; }
+    &[data-ton="attention"] { background: var(--pa-attention-fond); color: var(--pa-attention-texte); }
+    &[data-ton="ok"] { background: var(--pa-ok-fond); color: var(--pa-ok); }
+  }
+
+  .paiChamps {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+
+    label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    label > span { color: var(--pa-doux); font-size: 12px; font-weight: 600; }
+    input:not([type="checkbox"]), select {
+      box-sizing: border-box;
+      width: 100%;
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--pa-ligne);
+      border-radius: 9px;
+      background: var(--pa-carte);
+    }
+    .paiChampLarge { grid-column: 1 / -1; }
+  }
+
+  .paiGrosChamp { font-size: 16px !important; font-weight: 650; text-align: right; }
+
+  .paiOnglets {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 9px;
+    background: var(--pa-piste);
+
+    button {
+      height: 28px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--pa-doux);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+
+      &[aria-pressed="true"] { background: var(--pa-carte); color: var(--pa-texte); box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+    }
+  }
+}
+
+// ---- Page, en-tête, cartes ----------------------------------------------------------
+
+.paiApp {
+  .paiVue { display: flex; flex-direction: column; min-height: 100%; }
+
+  .paiTete {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 14px;
+    padding: 12px 24px;
+    background: var(--pa-carte);
+    border-bottom: 1px solid var(--pa-ligne);
+  }
+
+  .paiRetour {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px 6px 0;
+    border: 0;
+    border-right: 1px solid var(--pa-ligne);
+    background: none;
+    color: var(--pa-doux);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { color: var(--pa-texte); }
+  }
+
+  .paiTeteTitre {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-right: auto;
+    min-width: 0;
+
+    h1 { margin: 0; font-size: 17px; font-weight: 650; }
+    h1::first-letter { text-transform: uppercase; }
+    span { color: var(--pa-doux); font-size: 12.5px; }
+  }
+
+  .paiTeteActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+  .paiSelectTete,
+  .paiRecherche {
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 10px;
+    background: var(--pa-carte);
+  }
+
+  .paiRecherche { width: 200px; max-width: 100%; }
+
+  .paiGroupe { display: flex; gap: 6px; }
+
+  .paiBtnIcone {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 10px;
+    background: var(--pa-carte);
+    cursor: pointer;
+
+    .uicon { display: flex; }
+  }
+
+  .paiConteneur {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .paiCarte {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 14px;
+    background: var(--pa-carte);
+
+    &[data-ton="attention"] { border-color: var(--pa-attention-bord); }
+    &[data-ton="erreur"] { border-color: var(--pa-erreur-bord); }
+  }
+
+  .paiCarteTete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
+    h2 { margin: 0; font-size: 15px; font-weight: 650; }
+    p { margin: 3px 0 0; color: var(--pa-doux); font-size: 12.5px; }
+  }
+
+  .paiCarteActions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+  .paiGrille {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+
+    > .paiLarge { flex: 999 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+    > .paiColonne { flex: 1 1 300px; }
+  }
+
+  .paiColonne { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .paiKpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+
+  .paiKpi {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 14px;
+    background: var(--pa-carte);
+
+    span { color: var(--pa-doux); font-size: 12.5px; }
+    b { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    small { color: var(--pa-doux); font-size: 12px; line-height: 1.4; }
+  }
+}
+
+// ---- Cycle --------------------------------------------------------------------------
+
+.paiApp {
+  .paiEtapes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+
+  .paiEtape {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 12px;
+    background: var(--pa-carte);
+    text-align: left;
+    cursor: pointer;
+
+    > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    b { font-size: 13.5px; font-weight: 650; }
+    small { color: var(--pa-doux); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &[data-etat="encours"] {
+      border-color: var(--pa-accent);
+      box-shadow: 0 0 0 3px var(--pa-accent-fond);
+
+      small { color: var(--pa-attention); }
+    }
+  }
+
+  .paiActions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 0;
+      border-top: 1px solid var(--pa-ligne-douce);
+
+      &:first-child { border-top: 0; padding-top: 2px; }
+      > span:not(.paiPuce) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      b { font-weight: 600; }
+      small { color: var(--pa-doux); font-size: 12.5px; }
+    }
+  }
+
+  .paiTableau { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; }
+
+  .paiLigneT {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    min-width: 600px;
+    padding: 9px 4px;
+    border: 0;
+    border-top: 1px solid var(--pa-ligne-douce);
+    background: none;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+
+    > span { min-width: 0; }
+  }
+
+  button.paiLigneT { width: 100%; cursor: pointer; &:hover { background: var(--pa-survol); } }
+
+  .paiEnteteT { border-top: 0; padding-top: 0; color: var(--pa-doux); font-size: 12px; font-weight: 600; }
+
+  .paiColsSalaries { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 110px 110px 90px 100px; }
+
+  .paiLigneT [data-fort="true"] { color: var(--pa-attention); font-weight: 600; }
+
+  .paiQui { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  .paiAvatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--pa-accent-fond);
+    color: var(--pa-accent-fort);
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+
+  .paiEcheances {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    li { display: flex; gap: 12px; align-items: center; }
+    li > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    li > span:last-child b { font-weight: 600; font-size: 13px; }
+    li > span:last-child small { color: var(--pa-doux); font-size: 12px; }
+  }
+
+  .paiDate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: none;
+    width: 46px;
+    padding: 4px 0;
+    border-radius: 8px;
+    background: var(--pa-piste);
+
+    b { font-size: 15px; }
+    small { font-size: 10.5px; color: var(--pa-doux); }
+    &[data-ton="ok"] { background: var(--pa-ok-fond); color: var(--pa-ok); }
+    &[data-ton="accent"] { background: var(--pa-accent-fond); color: var(--pa-accent-fort); }
+  }
+
+  .paiBarres { display: flex; align-items: stretch; gap: 10px; height: 130px; }
+
+  .paiBarreCol {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    color: var(--pa-doux);
+
+    small { height: 14px; color: var(--pa-texte); font-weight: 600; white-space: nowrap; }
+  }
+
+  .paiBarrePiste { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+
+  .paiBarre {
+    display: block;
+    width: 100%;
+    max-width: 30px;
+    border-radius: 4px 4px 0 0;
+    background: var(--pa-accent-bord);
+
+    &[data-dernier="true"] { background: var(--pa-accent); }
+  }
+}
+
+// ---- Variables ----------------------------------------------------------------------
+
+.paiApp {
+  .paiLegende {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    align-items: center;
+    color: var(--pa-doux);
+    font-size: 12.5px;
+
+    b { color: var(--pa-texte); }
+  }
+
+  [data-org] {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  [data-org="conges"] { background: var(--pa-conges-fond); color: var(--pa-conges); }
+  [data-org="frais"] { background: var(--pa-attention-fond); color: var(--pa-attention-texte); }
+  [data-org="contrat"] { background: var(--pa-accent-fond); color: var(--pa-accent-fort); }
+  [data-org="saisi"] { background: var(--pa-piste); color: var(--pa-doux); }
+  [data-org][data-alerte="true"] { background: var(--pa-erreur-fond); color: var(--pa-erreur); }
+
+  .paiCarteGrille { padding: 0; gap: 0; }
+  .paiDefile { overflow-x: auto; }
+  .paiVariables { min-width: 1060px; display: flex; flex-direction: column; }
+
+  .paiVL {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.3fr) 150px 120px 110px 110px 100px 100px 120px 120px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 16px;
+    border-top: 1px solid var(--pa-ligne-douce);
+
+    &.paiEnteteT { border-top: 0; padding-top: 12px; padding-bottom: 8px; }
+    &[data-actif="true"] { background: var(--pa-accent-fond); }
+
+    select {
+      height: 32px;
+      padding: 0 6px;
+      border: 1px solid var(--pa-ligne);
+      border-radius: 7px;
+      background: var(--pa-carte);
+      font-size: 12.5px;
+    }
+  }
+
+  .paiTotalV { background: var(--pa-sous); color: var(--pa-doux); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .paiQuiV { display: flex; flex-direction: column; gap: 2px; min-width: 0; small { color: var(--pa-doux); font-size: 11.5px; } }
+
+  .paiCellule { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; min-width: 0; small { color: var(--pa-doux); font-size: 11.5px; } }
+
+  .paiCellule.paiMt { align-items: flex-end; }
+
+  .paiLienCellule {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    margin-left: -6px;
+    border: 1px dashed transparent;
+    border-radius: 7px;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { border-color: var(--pa-ligne); }
+    &:disabled { cursor: default; }
+  }
+
+  .paiMtSaisie {
+    box-sizing: border-box;
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 7px;
+    background: var(--pa-carte);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+
+    &[data-saisi="true"] { background: var(--pa-sous); font-weight: 600; }
+    &:disabled { background: transparent; border-color: transparent; }
+  }
+
+  .paiNetV {
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    font-weight: 650;
+    cursor: pointer;
+
+    i { margin-left: 4px; color: var(--pa-attention); font-style: normal; }
+    &:hover { color: var(--pa-accent); }
+  }
+
+  .paiApercu { border-color: var(--pa-accent-bord); }
+
+  .paiApercuListe,
+  .paiMajorations,
+  .paiHistorique,
+  .paiResultats {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      border-top: 1px solid var(--pa-ligne-douce);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+    li:first-child { border-top: 0; }
+  }
+
+  .paiApercuListe li[data-sous="true"] { font-weight: 650; }
+  .paiApercuListe li[data-net="true"] { border-top: 2px solid var(--pa-accent-bord); color: var(--pa-accent-fort); font-weight: 700; }
+  .paiFort { color: var(--pa-accent-fort); font-size: 16px; }
+}
+
+// ---- Bulletin -----------------------------------------------------------------------
+
+.paiApp {
+  .paiBulletinPage { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+
+  .paiFeuille {
+    flex: 999 1 640px;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 26px 30px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 6px;
+    background: var(--pa-papier);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-size: 12.5px;
+  }
+
+  .paiFeuilleTete {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+
+    > div { display: flex; flex-direction: column; gap: 3px; }
+    b { font-size: 15px; }
+    span { color: var(--pa-doux); }
+    .paiDroite { text-align: right; }
+  }
+
+  .paiTitreDoc { color: var(--pa-accent-fort); letter-spacing: 0.03em; }
+
+  .paiIdentite {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 14px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--pa-sous);
+
+    span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    small { color: var(--pa-doux); font-size: 11px; }
+    b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+
+  .paiRubriques { display: flex; flex-direction: column; overflow-x: auto; }
+
+  .paiRub {
+    display: grid;
+    grid-template-columns: 40px minmax(160px, 1fr) 90px 64px 96px 96px 96px;
+    gap: 8px;
+    min-width: 620px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--pa-ligne-douce);
+    font-variant-numeric: tabular-nums;
+
+    &[data-sous="true"] { background: var(--pa-sous); font-weight: 700; }
+  }
+
+  .paiRubTete {
+    border-bottom: 2px solid var(--pa-ligne);
+    color: var(--pa-doux);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .paiNetBloc {
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 240px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    background: var(--pa-accent-fond);
+    color: var(--pa-accent-fort);
+
+    span { font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    b { font-size: 24px; font-variant-numeric: tabular-nums; }
+  }
+
+  .paiRemise {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    button {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--pa-ligne);
+      border-radius: 12px;
+      background: var(--pa-carte);
+      text-align: left;
+      cursor: pointer;
+
+      &:hover:not(:disabled) { border-color: var(--pa-accent-bord); }
+      &:disabled { opacity: 0.55; cursor: default; }
+      > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      b { font-weight: 600; }
+      small { color: var(--pa-doux); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+    }
+  }
+
+  .paiRemiseIcone {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--pa-accent-fond);
+    color: var(--pa-accent-fort);
+
+    .uicon { display: flex; }
+  }
+}
+
+// ---- Paiement et déclarations ---------------------------------------------------------
+
+.paiApp {
+  .paiPaiements { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+  .paiPaiement {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 12px;
+
+    small { color: var(--pa-doux); font-size: 12.5px; }
+  }
+
+  .paiPaiementTete { display: flex; justify-content: space-between; gap: 10px; width: 100%; b { font-weight: 650; } }
+  .paiGros { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  .paiDeclarations { display: flex; flex-direction: column; }
+
+  .paiDeclaration {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 130px 110px auto;
+    gap: 14px;
+    align-items: center;
+    padding: 13px 0;
+    border-top: 1px solid var(--pa-ligne-douce);
+
+    &:first-child { border-top: 0; }
+    > span:first-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    > span:first-child b { font-weight: 600; }
+    > span:first-child small { color: var(--pa-doux); font-size: 12.5px; }
+  }
+
+  .paiEcheance { display: flex; flex-direction: column; gap: 2px; small { color: var(--pa-doux); font-size: 11.5px; } b { font-size: 13px; font-weight: 600; } }
+
+  .paiDeclActions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+  .paiDisa {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--pa-accent-fond);
+    color: var(--pa-accent-fort);
+    font-size: 13px;
+    line-height: 1.5;
+
+    > span:nth-child(2) { flex: 1 1 280px; }
+  }
+
+  .paiProgres {
+    flex: none;
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--pa-accent-bord);
+    overflow: hidden;
+
+    > span { display: block; height: 100%; background: var(--pa-accent); }
+  }
+
+  .paiEcriture { display: flex; flex-direction: column; }
+
+  // Débit et crédit dans une même colonne, marqués D ou C : la carte est
+  // étroite, quatre colonnes y écrasaient les intitulés.
+  .paiEcrLigne {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--pa-ligne-douce);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+
+    &:first-child { border-top: 0; }
+  }
+
+  .paiEcrLigne [data-sens]::before {
+    content: "D";
+    display: inline-block;
+    margin-right: 6px;
+    color: var(--pa-pale);
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .paiEcrLigne [data-sens="credit"]::before { content: "C"; }
+
+  // Les variables prennent toute la largeur : l'aperçu et les majorations
+  // passent dessous, côte à côte.
+  .paiGrille.paiPile {
+    > .paiLarge { flex-basis: 100%; }
+    > .paiColonne { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+    > .paiColonne > * { flex: 1 1 340px; }
+  }
+
+  .paiReglages {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+
+  .paiTranches {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+    align-items: center;
+
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid var(--pa-ligne);
+      border-radius: 8px;
+      background: var(--pa-carte);
+      text-align: right;
+    }
+  }
+}
+
+// ---- Boîtes de dialogue ----------------------------------------------------------------
+
+.paiForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, 86vw);
+  color: var(--pa-texte);
+  font-size: 13px;
+
+  label { display: flex; flex-direction: column; gap: 5px; }
+  label > span { color: var(--pa-doux); font-size: 12px; font-weight: 600; }
+  input {
+    box-sizing: border-box;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 9px;
+    background: var(--pa-carte);
+    color: var(--pa-texte);
+    font: inherit;
+    text-align: right;
+  }
+
+  .paiActionsForm { display: flex; justify-content: flex-end; gap: 8px; }
+}
+
+.paiChoix {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, 86vw);
+  color: var(--pa-texte);
+
+  p { margin: 0; color: var(--pa-doux); font-size: 12.5px; line-height: 1.5; }
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--pa-ligne);
+    border-radius: 12px;
+    background: var(--pa-carte);
+    color: var(--pa-texte);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { border-color: var(--pa-accent); background: var(--pa-accent-fond); }
+    .uicon { display: flex; color: var(--pa-accent); }
+  }
+}
+
+// ---- Fenêtre étroite -----------------------------------------------------------------
+
+@container (max-width: 980px) {
+  .paiApp .paiKpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .paiApp .paiEtapes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .paiApp .paiPaiements { grid-template-columns: minmax(0, 1fr); }
+  .paiApp .paiDeclaration { grid-template-columns: minmax(0, 1fr) 120px; }
+  .paiApp .paiDeclActions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+@container (max-width: 640px) {
+  .paiApp .paiKpis,
+  .paiApp .paiEtapes { grid-template-columns: minmax(0, 1fr); }
+  .paiApp .paiConteneur { padding: 14px 14px 28px; }
+  .paiApp .paiTete { padding: 10px 14px; }
+  .paiApp .paiIdentite { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 820px) {
+  .paiApp .paiNav { width: 64px; padding: 12px 8px; }
+  .paiApp .paiNavItem span,
+  .paiApp .paiNavGroupe,
+  .paiApp .paiMarque,
+  .paiApp .paiChampNav,
+  .paiApp .paiLangue { display: none; }
+  .paiApp .paiNavItem { justify-content: center; position: relative; }
+  .paiApp .paiPastille { position: absolute; top: 2px; right: 0; }
 }

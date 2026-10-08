@@ -1,33 +1,58 @@
 // Paie.
 //
 // ─────────────────────────────────────────────────────────────────────────
-// CE QUE CETTE APPLICATION COMPLÈTE
+// LE MODÈLE : UN CYCLE, PAS UNE PILE DE BULLETINS
 //
-// Les RH tenaient les salariés, leur salaire de base, leur numéro CNPS —
-// mais aucun bulletin. Or la paie est mensuelle, obligatoire, et
-// lourdement réglementée en Côte d'Ivoire. C'est aussi la troisième sortie
-// de trésorerie d'une PME, après les achats : la Caisse et la Facturation
-// couvrent les ventes, les Achats couvrent les fournisseurs, la Paie
-// couvre les salaires.
+// Les outils de paie les plus appréciés (PayFit en tête) ont changé une
+// chose : la paie n'est plus une liste de bulletins qu'on remplit un à un,
+// c'est un cycle mensuel qu'on fait avancer — éléments variables,
+// contrôles, validation, paiement, déclarations. Le logiciel dit à chaque
+// étape ce qui empêche de passer à la suivante, et montre l'effet d'une
+// saisie sur le bulletin au moment où on la fait.
 //
-// Elle ne ressaisit rien : les salariés viennent des RH, et chaque bulletin
-// propose son écriture à la Comptabilité — comme les tickets de caisse et
-// les factures d'achat. Les barèmes (CNPS, ITS, CMU) et leurs calculs sont
-// dans domaine.js, éprouvés seuls, et modifiables : un taux change par
-// décret, pas par mise à jour du logiciel.
+// La rigueur, elle, vient des logiciels de paie ivoiriens (Sage Paie en
+// tête) : bulletin conforme, CNPS (retraite, prestations familiales,
+// accident du travail), ITS à la DGI, FDFP, CMU, DISA annuelle, et
+// l'écriture de paie pour la Comptabilité.
+//
+// CE QUI N'EST JAMAIS RESSAISI
+//
+//   - les salariés, leur contrat, leur banque : l'app Ressources humaines ;
+//   - les absences : l'app Congés (une absence injustifiée ou sans solde
+//     retient le salaire, un congé payé s'affiche) ;
+//   - les notes de frais approuvées : l'app Frais, remboursées avec le
+//     salaire puis marquées « remboursées » au paiement ;
+//   - l'employeur (raison sociale, NCC, n° CNPS, logo) : la fiche
+//     entreprise.
+//
+// Et en sortie : les bulletins PDF (Cloud, Courrier), l'ordre de virement,
+// les bordereaux, l'écriture de paie que la Comptabilité reprend seule.
+//
+// La langue de l'écran suit celle du système ; le bulletin reste en
+// français, langue légale. Les règles sont dans domaine.js et cycle.js,
+// testées sans navigateur.
 // ─────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
 import { api } from "../../../api/client";
 import { modal } from "../../modalRequest";
 import { notifier } from "../../notifications";
-import { saveAs } from "../../cloud";
 import { Contenu, useChargement } from "../../chargement";
-import { Bouton, Champ, Notice } from "../../ui";
+import { useEntreprise } from "../../entreprise";
+import { useLangue, useTraduction } from "../../../utils/intl";
+import { LANGUES } from "../../../utils/langue";
 import * as D from "./domaine";
+import * as C from "./cycle";
+import { TEXTES, dateDe, deMois, formateur, nomDuMois, nombreDe } from "./textes";
+import { Ctx, aujourdhui } from "./commun";
+import { Cycle } from "./Cycle";
+import { Variables } from "./Variables";
+import { Bulletins } from "./Bulletins";
+import { Paiement } from "./Paiement";
+import { Reglages } from "./Reglages";
 import "./paie.scss";
 
 export const manifest = {
@@ -39,463 +64,351 @@ export const manifest = {
   Window: PaieApp,
 };
 
-const money = D.fcfa;
+const NAV = [
+  { groupe: "grpSuivre" },
+  { id: "cycle", label: "navCycle", icone: "faRotate" },
+  { groupe: "grpPreparer" },
+  { id: "variables", label: "navVariables", icone: "faTableList" },
+  { id: "bulletins", label: "navBulletins", icone: "faFileInvoice" },
+  { groupe: "grpPayer" },
+  { id: "paiement", label: "navPaiement", icone: "faMoneyCheckDollar" },
+  { groupe: "grpReglages" },
+  { id: "reglages", label: "navReglages", icone: "faSliders" },
+];
+
+const VUES = { cycle: Cycle, variables: Variables, bulletins: Bulletins, paiement: Paiement, reglages: Reglages };
 
 function PaieApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id]);
   const session = useSelector((state) => state.session);
   const ouvert = !!wnapp && !wnapp.hide && session.status === "authenticated";
+  const { entreprise } = useEntreprise(ouvert);
+  const tBrut = useTraduction(TEXTES);
+  // Un mois passé en paramètre fournit aussi sa forme élidée : « Paie
+  // d'octobre », « Paie de mars ».
+  const t = useCallback(
+    (cle, params) => tBrut(cle, params?.mois ? { ...params, deMois: deMois(params.mois) } : params),
+    [tBrut],
+  );
+  const langue = useLangue();
+  const m = useMemo(() => formateur(langue), [langue]);
+  const n = useMemo(() => nombreDe(langue), [langue]);
 
-  const [salaries, setSalaries] = useState([]);
-  const [bulletins, setBulletins] = useState([]);
-  const [reglages, setReglages] = useState(null);
-  const [mois, setMois] = useState(D.moisParDefaut());
-  const [selection, setSelection] = useState(null); // matricule ouvert
+  const [section, setSection] = useState("cycle");
+  const [intention, setIntention] = useState(null);
+  const [mois, setMois] = useState(null);
   const [occupe, setOccupe] = useState(false);
+  const [donnees, setDonnees] = useState({ salaries: [], absences: [], notes: [], bulletins: [], reglages: null, cycles: [] });
 
   const charger = useCallback(async () => {
-    const [s, b, r] = await Promise.all([
-      api.records.list("rh", "salaries").catch(() => []),
+    const liste = (mod, col) => api.records.list(mod, col).catch(() => []);
+    const [salaries, absences, notes, bulletins, reglages, cycles] = await Promise.all([
+      liste("rh", "salaries"),
+      liste("rh", "absences"),
+      liste("frais", "notes"),
       api.records.list(manifest.slug, "bulletins"),
-      api.records.list(manifest.slug, "reglages").catch(() => []),
+      liste(manifest.slug, "reglages"),
+      liste(manifest.slug, "cycles"),
     ]);
-    setSalaries(s.filter((x) => x.data.statut !== "sorti"));
-    setBulletins(b);
-    setReglages(r[0]?.data || null);
+    setDonnees({ salaries, absences, notes, bulletins, reglages: reglages[0] || null, cycles });
   }, []);
   const etat = useChargement(ouvert, charger);
 
-  const parametres = reglages || D.REGLAGES_DEFAUT;
+  const { salaries, absences, notes, bulletins, cycles } = donnees;
+  const reglages = useMemo(() => D.completer(donnees.reglages?.data || {}), [donnees.reglages]);
 
-  // Les bulletins du mois affiché, indexés par matricule.
-  const duMois = useMemo(() => {
-    const m = new Map();
-    for (const b of bulletins) {
-      if (b.data.mois === mois) m.set(b.data.matricule, b);
+  // Le mois ouvert par défaut : le précédent s'il reste à payer, sinon le
+  // mois en cours — on paie d'ordinaire à la fin du mois travaillé.
+  const moisCourant = aujourdhui().slice(0, 7);
+  const moisActif = useMemo(() => {
+    if (mois) return mois;
+    const prec = C.moisPrecedent(moisCourant);
+    const cyclePrec = cycles.find((c) => c.data.mois === prec);
+    const aDesBulletins = bulletins.some((b) => b.data.mois === prec);
+    return aDesBulletins && !["paye", "declare"].includes(cyclePrec?.data?.etat) ? prec : moisCourant;
+  }, [mois, cycles, bulletins, moisCourant]);
+
+  const cycle = cycles.find((c) => c.data.mois === moisActif) || null;
+  const fige = ["valide", "paye", "declare"].includes(cycle?.data?.etat);
+
+  // Les lignes du mois : une par salarié payé, avec sa saisie et son calcul.
+  const lignes = useMemo(() => {
+    const duMois = new Map(bulletins.filter((b) => b.data.mois === moisActif).map((b) => [b.data.matricule, b]));
+    if (fige) {
+      return [...duMois.values()].map((b) => {
+        const salarie = salaries.find((s) => s.data.matricule === b.data.matricule) || { id: "", data: { matricule: b.data.matricule } };
+        return { salarie, saisie: b.data.saisie || {}, calcul: b.data.calcul, enregistre: true, record: b };
+      });
     }
-    return m;
-  }, [bulletins, mois]);
+    return salaries
+      .filter((s) => C.payeLeMois(s.data, moisActif))
+      .sort((a, b) => `${a.data.nom} ${a.data.prenom}`.localeCompare(`${b.data.nom} ${b.data.prenom}`, "fr"))
+      .map((s) => {
+        const saisie = C.saisieInitiale({ salarie: s, mois: moisActif, bulletins, absences, notes, reglages });
+        const record = duMois.get(s.data.matricule) || null;
+        return { salarie: s, saisie, calcul: C.calculer(s, saisie, reglages), enregistre: !!record, record };
+      });
+  }, [bulletins, salaries, absences, notes, reglages, moisActif, fige]);
 
-  // Le récapitulatif du mois se calcule sur les bulletins réels.
-  const recap = useMemo(
-    () => D.recapitulatif([...duMois.values()].map((b) => b.data.calcul)),
-    [duMois],
-  );
+  const precedents = useMemo(() => {
+    const prec = C.moisPrecedent(moisActif);
+    return new Map(bulletins.filter((b) => b.data.mois === prec).map((b) => [b.data.matricule, b.data.calcul]));
+  }, [bulletins, moisActif]);
 
-  const salarieOuvert = salaries.find((s) => s.data.matricule === selection) || null;
-  const bulletinOuvert = selection ? duMois.get(selection) : null;
+  const controles = useMemo(() => (fige ? [] : C.controles({ lignes, precedents, reglages })), [lignes, precedents, reglages, fige]);
+  const bloquants = controles.filter((c) => c.niveau === "bloquant");
+  const totaux = useMemo(() => C.totaux(lignes.map((l) => l.calcul)), [lignes]);
 
-  // ---- Génération ---------------------------------------------------------
+  // ---- Actions ------------------------------------------------------------
 
-  /// Prépare un bulletin pour un salarié, ou reprend l'existant. La saisie
-  /// variable (primes, retenues) part de zéro ; la situation familiale part
-  /// du dernier bulletin connu — elle change rarement d'un mois à l'autre.
-  const brouillonPour = (salarie) => {
-    const existant = duMois.get(salarie.data.matricule);
-    if (existant) return existant.data.saisie;
-    // Dernier bulletin de ce salarié, pour reprendre situation et enfants.
-    const dernier = bulletins
-      .filter((b) => b.data.matricule === salarie.data.matricule)
-      .sort((a, b) => String(b.data.mois).localeCompare(String(a.data.mois)))[0];
-    return {
-      primes: 0,
-      indemnites: 0,
-      retenues: 0,
-      personnesCmu: 1,
-      situation: dernier?.data.saisie?.situation || salarie.data.situation || "celibataire",
-      enfants: dernier?.data.saisie?.enfants ?? salarie.data.enfants ?? 0,
-    };
-  };
-
-  const enregistrerBulletin = async (salarie, saisie) => {
-    const infos = {
-      salaireBase: Number(salarie.data.salaireBase) || 0,
-      situation: saisie.situation,
-      enfants: saisie.enfants,
-      prenom: salarie.data.prenom,
-      nom: salarie.data.nom,
-      matricule: salarie.data.matricule,
-    };
-    const calcul = D.bulletin(infos, saisie, parametres);
-    const donnees = { mois, matricule: salarie.data.matricule, saisie, calcul };
-
-    const existant = duMois.get(salarie.data.matricule);
+  const tache = async (fn) => {
     setOccupe(true);
     try {
-      if (existant) {
-        await api.records.update(manifest.slug, "bulletins", existant.id, donnees);
-      } else {
-        await api.records.create(manifest.slug, "bulletins", donnees);
-      }
-      await etat.rafraichir();
+      return await fn();
     } catch (e) {
-      modal.alert({ title: "Enregistrement impossible", message: e.message, tone: "error" });
+      modal.alert({ title: t("appNom"), message: e.message, tone: "error" });
+      return null;
     } finally {
       setOccupe(false);
     }
   };
 
-  const genererTout = async () => {
-    const manquants = salaries.filter((s) => !duMois.get(s.data.matricule));
-    if (!manquants.length) return;
+  const ecrire = async (ligne, saisie) => {
+    const calcul = C.calculer(ligne.salarie, saisie, reglages);
+    const data = { mois: moisActif, matricule: ligne.salarie.data.matricule, saisie, calcul };
+    if (ligne.record) await api.records.update(manifest.slug, "bulletins", ligne.record.id, data);
+    else await api.records.create(manifest.slug, "bulletins", data);
+  };
+
+  /// Enregistre la saisie d'un salarié (une ligne des variables, ou le
+  /// bulletin). Une valeur reprise d'une autre app et changée à la main
+  /// est marquée comme telle : la reprise ne l'écrasera plus.
+  const enregistrerLigne = (ligne, patch) =>
+    fige
+      ? null
+      : tache(async () => {
+          const saisie = { ...ligne.saisie, ...patch };
+          if (patch.absences) saisie.absencesManuelles = true;
+          if ("frais" in patch) saisie.fraisManuels = true;
+          await ecrire(ligne, saisie);
+          await etat.rafraichir();
+        });
+
+  const preparerTout = () =>
+    tache(async () => {
+      for (const l of lignes) await ecrire(l, l.saisie);
+      await etat.rafraichir();
+    });
+
+  const majCycle = async (patch) => {
+    const data = { mois: moisActif, ...(cycle?.data || {}), ...patch };
+    if (cycle) await api.records.update(manifest.slug, "cycles", cycle.id, data);
+    else await api.records.create(manifest.slug, "cycles", data);
+  };
+
+  const auteur = session.user?.name || session.user?.email || "";
+
+  const valider = async () => {
+    if (bloquants.length) return;
+    const attention = controles.filter((c) => c.niveau === "attention" && c.code !== "nonEnregistre").length;
     const ok = await modal.confirm({
-      title: `Générer ${manquants.length} bulletin(s) ?`,
-      message: `Un bulletin sera créé pour chaque salarié sans bulletin en ${mois}.`,
-      detail:
-        "Les montants partent du salaire de base ; vous pourrez ajouter primes et retenues fiche par fiche.",
-      confirmLabel: "Générer les bulletins",
+      title: t("validerTitre", { mois: nomDuMois(moisActif, langue) }),
+      message: t("validerMessage", { n: lignes.length, net: m(totaux.net) }) + (attention ? ` ${t("validerAttention", { n: attention })}` : ""),
+      detail: t("validerDetail"),
+      confirmLabel: t("valider"),
     });
     if (!ok) return;
-    setOccupe(true);
-    try {
-      for (const s of manquants) {
-        const saisie = brouillonPour(s);
-        const infos = {
-          salaireBase: Number(s.data.salaireBase) || 0,
-          situation: saisie.situation,
-          enfants: saisie.enfants,
-          prenom: s.data.prenom,
-          nom: s.data.nom,
-          matricule: s.data.matricule,
-        };
-        await api.records.create(manifest.slug, "bulletins", {
-          mois,
-          matricule: s.data.matricule,
-          saisie,
-          calcul: D.bulletin(infos, saisie, parametres),
-        });
-      }
+    const fait = await tache(async () => {
+      // On réenregistre chaque bulletin avec le calcul du moment : ce sont
+      // ces montants qui seront payés et déclarés.
+      for (const l of lignes) await ecrire(l, l.saisie);
+      await majCycle({ etat: "valide", valideLe: aujourdhui(), validePar: auteur });
       await etat.rafraichir();
+      return true;
+    });
+    if (fait) {
       notifier({
-        titre: "Bulletins générés",
-        message: `${manquants.length} bulletin(s) pour ${mois}.`,
-        app: "Paie",
+        titre: t("validee", { mois: nomDuMois(moisActif, langue) }),
+        message: t("valideeMsg", { n: lignes.length }),
+        app: t("appNom"),
         ton: "success",
       });
-    } catch (e) {
-      modal.alert({ title: "Génération interrompue", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
+      setSection("paiement");
     }
   };
 
-  const supprimerBulletin = async (bulletin) => {
+  const rouvrir = async () => {
     const ok = await modal.confirm({
-      title: "Supprimer ce bulletin ?",
-      message: `Le bulletin de ${mois} sera retiré.`,
-      confirmLabel: "Supprimer",
+      title: t("rouvrirTitre", { mois: nomDuMois(moisActif, langue) }),
+      detail: t("rouvrirDetail"),
+      confirmLabel: t("rouvrir"),
       danger: true,
     });
     if (!ok) return;
-    await api.records.remove(manifest.slug, "bulletins", bulletin.id);
-    await etat.rafraichir();
+    await tache(async () => {
+      await majCycle({ etat: "preparation", valideLe: "", validePar: "" });
+      await etat.rafraichir();
+    });
   };
 
-  /// Journal de paie du mois, exporté dans le cloud pour le comptable.
-  const exporter = async () => {
-    const lignes = [
-      ["Matricule", "Nom", "Brut", "Cotisations", "ITS", "Net", "Charges patronales", "Coût total"],
-    ];
-    for (const b of duMois.values()) {
-      const s = salaries.find((x) => x.data.matricule === b.data.matricule);
-      const c = b.data.calcul;
-      lignes.push([
-        b.data.matricule,
-        s ? `${s.data.prenom} ${s.data.nom}` : b.data.matricule,
-        c.brut,
-        c.cotisationsSalariales,
-        c.its,
-        c.net,
-        c.chargesPatronales,
-        c.coutTotal,
-      ]);
-    }
-    const csv =
-      "﻿" +
-      lignes.map((l) => l.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
-    const node = await saveAs(
-      new Blob([csv], { type: "text/csv;charset=utf-8" }),
-      `journal-paie-${mois}.csv`,
-      { folder: "Paie" },
-    );
-    if (node) {
-      modal.alert({ title: "Journal exporté", message: `« ${node.name} » est dans votre cloud.`, tone: "success" });
-    }
+  const marquerPaye = async () => {
+    const ok = await modal.confirm({
+      title: t("marquerPayeTitre", { mois: nomDuMois(moisActif, langue) }),
+      detail: t("marquerPayeDetail"),
+      confirmLabel: t("marquerPaye"),
+    });
+    if (!ok) return;
+    await tache(async () => {
+      // Les notes de frais payées avec le salaire sont soldées dans
+      // l'app Frais : la même note ne se rembourse pas deux fois.
+      const ids = new Set(lignes.flatMap((l) => l.saisie.notesFrais || []));
+      for (const note of notes) {
+        if (ids.has(note.id) && note.data.etat === "approuvee") {
+          await api.records.update("frais", "notes", note.id, { ...note.data, etat: "remboursee" }).catch(() => {});
+        }
+      }
+      await majCycle({ etat: "paye", payeLe: aujourdhui() });
+      await etat.rafraichir();
+    });
   };
 
-  // ---- Rendu --------------------------------------------------------------
+  const marquerDeclare = (type) =>
+    tache(async () => {
+      const declarations = { ...(cycle?.data?.declarations || {}), [type]: { le: aujourdhui(), par: auteur } };
+      const tout = ["cnps", "its", "fdfp", "cmu"].every((k) => declarations[k]);
+      await majCycle({ declarations, ...(tout && cycle?.data?.etat === "paye" ? { etat: "declare" } : {}) });
+      await etat.rafraichir();
+    });
+
+  const majReglages = (data) =>
+    tache(async () => {
+      if (donnees.reglages) await api.records.update(manifest.slug, "reglages", donnees.reglages.id, data);
+      else await api.records.create(manifest.slug, "reglages", data);
+      await etat.rafraichir();
+      return true;
+    });
+
+  const aller = (s, opts = null) => {
+    setSection(s);
+    setIntention(opts);
+  };
+
+  // Une autre application peut ouvrir la Paie sur un salarié.
+  useEffect(() => {
+    const suivre = (e) => {
+      if (e.detail.app !== manifest.id) return;
+      const { section: s, ...reste } = e.detail.params || {};
+      if (s && VUES[s]) aller(s, reste);
+    };
+    window.addEventListener("companyos:lien", suivre);
+    return () => window.removeEventListener("companyos:lien", suivre);
+  }, []);
+
+  const valeur = {
+    t,
+    langue,
+    m,
+    n,
+    nomMois: (x, o) => nomDuMois(x, langue, o),
+    date: (iso) => dateDe(iso, langue),
+    entreprise: entreprise || {},
+    salaries,
+    bulletins,
+    absences,
+    notes,
+    reglages,
+    reglagesBruts: donnees.reglages?.data || null,
+    cycles,
+    mois: moisActif,
+    setMois,
+    cycle,
+    fige,
+    lignes,
+    precedents,
+    controles,
+    bloquants,
+    totaux,
+    occupe,
+    intention,
+    peutAdministrer: ["OWNER", "ADMIN"].includes(session.user?.role),
+    aller,
+    tache,
+    enregistrerLigne,
+    preparerTout,
+    valider,
+    rouvrir,
+    marquerPaye,
+    marquerDeclare,
+    majReglages,
+    rafraichir: etat.rafraichir,
+  };
 
   if (!ouvert) {
     return (
-      <ModuleWindow manifest={manifest} className="paieApp">
-        <div className="paieVerrou">Connectez-vous pour établir la paie.</div>
+      <ModuleWindow manifest={manifest} className="paiApp">
+        <div className="paiVerrou">{t("verrou")}</div>
       </ModuleWindow>
     );
   }
 
+  const Vue = VUES[section] || Cycle;
+  const optionsMois = [];
+  for (let i = -1, x = C.moisSuivant(moisCourant); i < 12; i += 1) {
+    x = C.moisPrecedent(x);
+    optionsMois.push(x);
+  }
+  if (!optionsMois.includes(moisActif)) optionsMois.unshift(moisActif);
+
   return (
-    <ModuleWindow manifest={manifest} className="paieApp">
-      <div className="paieShell">
-        <aside className="paieListe">
-          <div className="paieMois">
-            <Icon fafa="faCalendarDays" width={13} />
-            <input type="month" value={mois} onChange={(e) => setMois(e.target.value)} />
-          </div>
-
-          <div className="paieCartes">
-            <div className="paieCarte">
-              <span>Effectif payé</span>
-              <b>
-                {duMois.size} / {salaries.length}
-              </b>
+    <ModuleWindow manifest={manifest} className="paiApp">
+      <Ctx.Provider value={valeur}>
+        <div className="paiShell" lang={langue}>
+          <aside className="paiNav cosScroll" aria-label={t("appNom")}>
+            <div className="paiMarque">
+              <b>{t("appNom")}</b>
+              <span>{entreprise?.nom || ""}{entreprise?.pays ? ` · ${entreprise.pays}` : ""}</span>
             </div>
-            <div className="paieCarte">
-              <span>Masse nette</span>
-              <b>{money(recap.net)}</b>
-            </div>
-            <div className="paieCarte">
-              <span>Coût total</span>
-              <b>{money(recap.coutTotal)}</b>
-            </div>
-          </div>
-
-          <div className="paieActions">
-            <Bouton icone="faWandMagicSparkles" off={occupe} onClick={genererTout}>
-              Générer les manquants
-            </Bouton>
-            <Bouton
-              variante="secondaire"
-              icone="faFileCsv"
-              off={!duMois.size}
-              onClick={exporter}
-            >
-              Journal
-            </Bouton>
-          </div>
-
-          <div className="paieSalaries cosScroll">
-            <Contenu
-              etat={etat}
-              vide={!salaries.length}
-              lignes={6}
-              rendreVide={() => (
-                <div className="paieVide">
-                  Aucun salarié. Les fiches viennent de l'application Ressources
-                  humaines.
-                </div>
-              )}
-            >
-              {salaries.map((s) => {
-                const b = duMois.get(s.data.matricule);
-                return (
-                  <div
-                    key={s.id}
-                    className="paieSalarie handcr"
-                    data-actif={selection === s.data.matricule}
-                    onClick={() => setSelection(s.data.matricule)}
+            <label className="paiChampNav">
+              <span>{t("moisDePaie")}</span>
+              <select value={moisActif} onChange={(e) => setMois(e.target.value)}>
+                {optionsMois.map((x) => (
+                  <option key={x} value={x}>{nomDuMois(x, langue)}</option>
+                ))}
+              </select>
+            </label>
+            <nav>
+              {NAV.map((item) =>
+                item.groupe ? (
+                  <div key={item.groupe} className="paiNavGroupe">{t(item.groupe)}</div>
+                ) : (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="paiNavItem"
+                    aria-current={section === item.id ? "page" : undefined}
+                    onClick={() => aller(item.id)}
                   >
-                    <div className="paieSalarieNom">
-                      {s.data.prenom} {s.data.nom}
-                    </div>
-                    <div className="paieSalarieBas">
-                      <span>{s.data.poste || s.data.matricule}</span>
-                      {b ? (
-                        <span className="paieNet">{money(b.data.calcul.net)}</span>
-                      ) : (
-                        <span className="paieAFaire">à établir</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </Contenu>
-          </div>
-        </aside>
-
-        <div className="paieCentre cosScroll">
-          {salarieOuvert ? (
-            <Bulletin
-              salarie={salarieOuvert}
-              mois={mois}
-              saisieInitiale={brouillonPour(salarieOuvert)}
-              existant={bulletinOuvert}
-              reglages={parametres}
-              occupe={occupe}
-              onEnregistrer={(saisie) => enregistrerBulletin(salarieOuvert, saisie)}
-              onSupprimer={() => bulletinOuvert && supprimerBulletin(bulletinOuvert)}
-            />
-          ) : (
-            <div className="paieAccueil">
-              <Icon className="paieAccueilIcone" src="paie" width={52} />
-              <div className="paieAccueilTitre">Paie du mois</div>
-              <p>
-                Choisissez un salarié pour établir son bulletin, ou générez
-                d'un coup ceux qui manquent. Les barèmes CNPS et ITS sont
-                appliqués automatiquement — et modifiables dans les réglages.
-              </p>
+                    <Icon fafa={item.icone} width={13} />
+                    <span>{t(item.label)}</span>
+                    {item.id === "cycle" && controles.filter((c) => c.niveau !== "info").length ? (
+                      <em className="paiPastille">{controles.filter((c) => c.niveau !== "info").length}</em>
+                    ) : null}
+                  </button>
+                ),
+              )}
+            </nav>
+            <div className="paiLangue">
+              <span>{t("langue")} : {t("langueAuto")}</span>
+              <b>{LANGUES.find((l) => l.code === langue)?.nom || langue}</b>
             </div>
-          )}
+          </aside>
+          <main className="paiPage cosScroll">
+            <Contenu etat={etat} vide={false} lignes={8}>
+              <Vue key={`${section}-${moisActif}`} />
+            </Contenu>
+          </main>
         </div>
-      </div>
+      </Ctx.Provider>
     </ModuleWindow>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Bulletin
-// ---------------------------------------------------------------------------
-
-const Bulletin = ({
-  salarie,
-  mois,
-  saisieInitiale,
-  existant,
-  reglages,
-  occupe,
-  onEnregistrer,
-  onSupprimer,
-}) => {
-  const [saisie, setSaisie] = useState(saisieInitiale);
-
-  // Rechargé quand on change de salarié : sans clé, l'état resterait celui
-  // du précédent.
-  React.useEffect(() => setSaisie(saisieInitiale), [salarie.id, existant?.id]);
-
-  const maj = (patch) => setSaisie((s) => ({ ...s, ...patch }));
-
-  const infos = {
-    salaireBase: Number(salarie.data.salaireBase) || 0,
-    situation: saisie.situation,
-    enfants: saisie.enfants,
-  };
-  const b = D.bulletin(infos, saisie, reglages);
-
-  return (
-    <div className="paieBulletin">
-      <div className="paieBulletinTete">
-        <div>
-          <h3>
-            {salarie.data.prenom} {salarie.data.nom}
-          </h3>
-          <p className="paieAide">
-            {salarie.data.poste || "—"} · matricule {salarie.data.matricule} ·
-            CNPS {salarie.data.numeroCnps || "non renseigné"} · {mois}
-          </p>
-        </div>
-        <div className="paieBulletinFin">
-          {existant ? (
-            <span className="paieDejaEtabli">
-              <Icon fafa="faCircleCheck" width={12} /> Établi
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Éléments variables du mois */}
-      <div className="paieBloc">
-        <h4>Éléments du mois</h4>
-        <div className="paieChamps">
-          <Champ label="Situation familiale">
-            <select value={saisie.situation} onChange={(e) => maj({ situation: e.target.value })}>
-              {D.SITUATIONS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ label="Enfants à charge">
-            <input
-              type="number"
-              min="0"
-              value={saisie.enfants}
-              onChange={(e) => maj({ enfants: Number(e.target.value) })}
-            />
-          </Champ>
-          <Champ label="Primes imposables" aide="Rendement, ancienneté…">
-            <input
-              type="number"
-              value={saisie.primes}
-              onChange={(e) => maj({ primes: Number(e.target.value) })}
-            />
-          </Champ>
-          <Champ label="Indemnités non imposables" aide="Transport…">
-            <input
-              type="number"
-              value={saisie.indemnites}
-              onChange={(e) => maj({ indemnites: Number(e.target.value) })}
-            />
-          </Champ>
-          <Champ label="Retenues" aide="Avances, prêts">
-            <input
-              type="number"
-              value={saisie.retenues}
-              onChange={(e) => maj({ retenues: Number(e.target.value) })}
-            />
-          </Champ>
-        </div>
-      </div>
-
-      {/* Le bulletin calculé */}
-      <div className="paieBloc">
-        <h4>Bulletin de paie</h4>
-        <table className="paieTable">
-          <tbody>
-            <Ligne libelle="Salaire de base" valeur={b.base} />
-            {b.primes ? <Ligne libelle="Primes" valeur={b.primes} /> : null}
-            <Ligne libelle="Salaire brut" valeur={b.brut} fort />
-            <Ligne libelle="Cotisation CNPS (6,3 %)" valeur={-b.cotisationsSalariales} />
-            <Ligne
-              libelle={`Impôt sur salaire (ITS, ${b.parts} part${b.parts > 1 ? "s" : ""})`}
-              valeur={-b.its}
-            />
-            {b.cmuSalarie ? <Ligne libelle="CMU" valeur={-b.cmuSalarie} /> : null}
-            {b.retenues ? <Ligne libelle="Retenues" valeur={-b.retenues} /> : null}
-            {b.indemnites ? <Ligne libelle="Indemnités (non imposables)" valeur={b.indemnites} /> : null}
-            <Ligne libelle="Net à payer" valeur={b.net} fort accent />
-          </tbody>
-        </table>
-      </div>
-
-      {/* Coût employeur — la part invisible sur la fiche du salarié */}
-      <div className="paieBloc">
-        <h4>Coût pour l'entreprise</h4>
-        <table className="paieTable">
-          <tbody>
-            <Ligne libelle="Salaire brut + indemnités" valeur={b.brut + b.indemnites} />
-            <Ligne
-              libelle="Charges patronales (CNPS employeur, CMU)"
-              valeur={b.chargesPatronales}
-            />
-            <Ligne libelle="Coût total" valeur={b.coutTotal} fort />
-          </tbody>
-        </table>
-        <p className="paieAide">
-          Le salarié touche {money(b.net)} ; l'entreprise dépense{" "}
-          {money(b.coutTotal)}. L'écart, ce sont les cotisations et l'impôt
-          reversés à la CNPS et à l'État.
-        </p>
-      </div>
-
-      <div className="paieBoutons">
-        <Bouton icone="faFloppyDisk" off={occupe} onClick={() => onEnregistrer(saisie)}>
-          {existant ? "Mettre à jour le bulletin" : "Établir le bulletin"}
-        </Bouton>
-        {existant ? (
-          <Bouton variante="secondaire" icone="faTrashCan" onClick={onSupprimer}>
-            Supprimer
-          </Bouton>
-        ) : null}
-      </div>
-    </div>
-  );
-};
-
-const Ligne = ({ libelle, valeur, fort, accent }) => (
-  <tr data-fort={fort ? "true" : "false"} data-accent={accent ? "true" : "false"}>
-    <td>{libelle}</td>
-    <td className="paieMt" data-negatif={valeur < 0}>
-      {valeur < 0 ? `− ${money(-valeur)}` : money(valeur)}
-    </td>
-  </tr>
-);
