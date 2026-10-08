@@ -1,0 +1,171 @@
+// Panneau « Aujourd'hui » du bureau : une carte de verre en haut à droite,
+// sous les fenêtres. Il ne prend jamais la place d'une icône — la grille du
+// bureau part de la gauche — et se replie en une ligne.
+
+.ajdPanneau {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 290px;
+  max-width: calc(100vw - 28px);
+  border-radius: 14px;
+  background: rgb(250 251 253 / 78%);
+  backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 55%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+  color: #1b1f27;
+  font-size: 13px;
+  overflow: hidden;
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+}
+
+body[data-theme="dark"] .ajdPanneau {
+  background: rgb(32 35 42 / 78%);
+  border-color: rgb(255 255 255 / 10%);
+  color: #eef1f6;
+}
+
+.ajdTete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 11px 14px;
+
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+
+  b {
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  small {
+    opacity: 0.65;
+    font-size: 11.5px;
+
+    &::first-letter {
+      text-transform: uppercase;
+    }
+  }
+
+  &:hover {
+    background: rgb(127 127 127 / 8%);
+  }
+}
+
+.ajdPanneau[data-replie="false"] .ajdTete {
+  border-bottom: 1px solid rgb(127 127 127 / 18%);
+}
+
+.ajdLignes {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+}
+
+.ajdLigne {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 9px;
+
+  &:hover,
+  &:focus-visible {
+    background: rgb(127 127 127 / 12%);
+    outline: none;
+  }
+
+  > :last-child {
+    opacity: 0.4;
+  }
+}
+
+.ajdIcone {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgb(0 103 192 / 12%);
+  color: #0067c0;
+}
+
+.ajdLigne[data-ton="ok"] .ajdIcone {
+  background: rgb(16 124 65 / 13%);
+  color: #107c41;
+}
+
+.ajdLigne[data-ton="attention"] .ajdIcone {
+  background: rgb(202 128 0 / 15%);
+  color: #b26b00;
+}
+
+.ajdLigne[data-ton="alerte"] .ajdIcone {
+  background: rgb(196 43 28 / 13%);
+  color: #c42b1c;
+}
+
+.ajdTexte {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  b,
+  small {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  b {
+    font-weight: 600;
+  }
+
+  small {
+    opacity: 0.65;
+    font-size: 11.5px;
+  }
+}
+
+body[data-theme="dark"] {
+  .ajdIcone {
+    background: rgb(76 160 255 / 18%);
+    color: #79b8ff;
+  }
+
+  .ajdLigne[data-ton="ok"] .ajdIcone {
+    background: rgb(60 200 120 / 18%);
+    color: #6ee09a;
+  }
+
+  .ajdLigne[data-ton="attention"] .ajdIcone {
+    background: rgb(255 185 60 / 18%);
+    color: #ffc65c;
+  }
+
+  .ajdLigne[data-ton="alerte"] .ajdIcone {
+    background: rgb(255 100 90 / 18%);
+    color: #ff8a80;
+  }
+}
+
+// Sur un téléphone, le lanceur plein écran reprend ces informations.
+@media (max-width: 640px) {
+  .desktop > .ajdPanneau {
+    display: none;
+  }
+}

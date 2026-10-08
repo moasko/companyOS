@@ -9,6 +9,8 @@ import "./utils/scroll.scss";
 import "./utils/mobile.scss";
 
 import { BandPane, CalnWid, DesktopApp, SidePane, StartMenu } from "./components/start";
+import { Aujourdhui } from "./components/start/Aujourdhui";
+import { Lanceur } from "./components/start/Lanceur";
 import Taskbar from "./components/taskbar";
 import { Background, BootScreen, LockScreen } from "./containers/background";
 
@@ -231,6 +233,8 @@ function App() {
           <Background />
           <div className="desktop">
             <DesktopApp />
+            <Aujourdhui />
+            <Lanceur />
             {Object.keys(Applications).map((key, idx) => {
               var WinApp = Applications[key];
               return <WinApp key={idx} />;

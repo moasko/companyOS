@@ -1,0 +1,305 @@
+// Mode téléphone (≤ 640 px) — voir Lanceur.jsx.
+
+$barre: 62px;
+
+@media (max-width: 640px) {
+  // ---- Ce qui disparaît : bureau à icônes, barre des tâches, panneau ----
+  .desktop > .desktopCont,
+  .desktop > .ajdPanneau,
+  .taskbar {
+    display: none !important;
+  }
+
+  // ---- Une application à la fois, en plein écran -------------------------
+  //
+  // La taille et la position des fenêtres viennent de styles en ligne
+  // (géométrie retenue, cascade) et de feuilles propres à chaque app :
+  // seul `!important` les remet toutes d'équerre.
+  .floatTab:not([data-hide="true"]) {
+    position: fixed !important;
+    inset: 0 0 calc(#{$barre} + env(safe-area-inset-bottom)) 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    translate: none !important;
+    border-radius: 0 !important;
+    filter: none !important;
+
+    .resizecont {
+      display: none;
+    }
+
+    // Réduire et agrandir n'ont plus de sens : « Accueil » réduit, et tout
+    // est déjà plein écran. Reste la croix.
+    .actbtns > :not(:last-child) {
+      display: none;
+    }
+
+    .toolbar,
+    .windowScreen {
+      border-radius: 0 !important;
+    }
+  }
+
+  // Une fenêtre réduite ne doit pas rester visible en surimpression.
+  .floatTab[data-max="false"] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+.telLanceur {
+  position: fixed;
+  inset: 0 0 calc(#{$barre} + env(safe-area-inset-bottom)) 0;
+  overflow-y: auto;
+  padding: 22px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: #fff;
+  background:
+    radial-gradient(120% 70% at 10% 0%, rgb(0 120 212 / 55%), transparent 60%),
+    radial-gradient(90% 60% at 100% 30%, rgb(16 124 110 / 45%), transparent 65%),
+    #0d1522;
+
+  &[data-masque="true"] {
+    visibility: hidden;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.telTete {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .telHeure {
+    font-size: 44px;
+    font-weight: 300;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .telDate {
+    font-size: 14px;
+    opacity: 0.8;
+
+    &::first-letter {
+      text-transform: uppercase;
+    }
+  }
+
+  h1 {
+    margin: 14px 0 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .telEspace {
+    font-size: 13px;
+    opacity: 0.65;
+  }
+}
+
+// Les lignes « Aujourd'hui » reprennent le style du panneau du bureau, sur
+// une carte de verre adaptée au fond sombre.
+.telJour {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  backdrop-filter: blur(16px);
+  font-size: 14px;
+
+  .ajdLigne {
+    text-align: left;
+    min-height: 52px;
+  }
+
+  .ajdIcone {
+    background: rgb(76 160 255 / 22%);
+    color: #8cc4ff;
+  }
+
+  .ajdLigne[data-ton="ok"] .ajdIcone {
+    background: rgb(60 200 120 / 22%);
+    color: #7fe6a8;
+  }
+
+  .ajdLigne[data-ton="attention"] .ajdIcone {
+    background: rgb(255 185 60 / 22%);
+    color: #ffcc70;
+  }
+
+  .ajdLigne[data-ton="alerte"] .ajdIcone {
+    background: rgb(255 100 90 / 22%);
+    color: #ff9a90;
+  }
+}
+
+.telGrille {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px 8px;
+}
+
+.telApp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 0;
+
+  .uicon {
+    pointer-events: none;
+  }
+
+  span {
+    max-width: 100%;
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-shadow: 0 1px 3px rgb(0 0 0 / 50%);
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+}
+
+// ---- Barre du bas -----------------------------------------------------------
+
+.telBarre {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  height: calc(#{$barre} + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgb(18 22 30 / 92%);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid rgb(255 255 255 / 8%);
+  color: #e8ecf2;
+
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font: inherit;
+    font-size: 11px;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:active {
+      background: rgb(255 255 255 / 8%);
+    }
+  }
+}
+
+.telCompte {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1.5px solid currentcolor;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+// ---- Volet des applications ouvertes ----------------------------------------
+
+.telVoile {
+  position: fixed;
+  inset: 0 0 calc(#{$barre} + env(safe-area-inset-bottom)) 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(0 0 0 / 45%);
+}
+
+.telVolet {
+  width: 100%;
+  max-height: 70%;
+  overflow-y: auto;
+  padding: 16px 12px 12px;
+  border-radius: 18px 18px 0 0;
+  background: #1b212c;
+  color: #eef1f6;
+
+  h2 {
+    margin: 0 4px 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+}
+
+.telOuverte {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+
+  > button:first-child {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 0 10px;
+    text-align: left;
+
+    .uicon {
+      pointer-events: none;
+    }
+  }
+
+  &:active {
+    background: rgb(255 255 255 / 6%);
+  }
+}
+
+.telFermer {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  opacity: 0.7;
+}
+
+.telRien {
+  margin: 8px 4px 12px;
+  opacity: 0.7;
+}
