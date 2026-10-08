@@ -228,6 +228,16 @@ volumes traversent les redéploiements intacts.
   pas exactement au domaine du front (schéma `https://` compris).
 - **Le front appelle localhost:4000** : `VITE_API_URL` manquait au build —
   renseignez-la puis redéployez.
+- **`Error: P3009 … migration … failed`** : une migration a échoué une
+  fois et Prisma refuse depuis tout déploiement. Au démarrage,
+  `prisma/reparer-migrations.js` affiche dans les journaux de l'API
+  l'erreur d'origine (« Erreur d'origine : … ») et débloque seul les
+  migrations écrites pour être rejouées. Pour une autre migration, corrigez
+  la base puis, depuis un poste qui a `DATABASE_URL` de production :
+  `npx prisma migrate resolve --rolled-back <nom>` (rien n'a été appliqué)
+  ou `--applied <nom>` (appliquée à la main), et redéployez. N'utilisez
+  jamais `prisma db push` sur la base de production : c'est ce qui crée ces
+  écarts entre la base et l'historique des migrations.
 - **`migrate deploy` échoue** : la base n'était pas prête ; le
   `depends_on: service_healthy` l'attend, mais un premier démarrage très
   lent peut nécessiter un simple redéploiement.
