@@ -57,8 +57,11 @@ export const CLASSES = {
 export const PLAN = [
   // Classe 1 — ressources durables
   { code: "101", label: "Capital social" },
-  { code: "106", label: "Réserves" },
+  { code: "106", label: "Écarts de réévaluation" },
   { code: "110", label: "Report à nouveau créditeur" },
+  { code: "111", label: "Réserve légale" },
+  { code: "118", label: "Autres réserves" },
+  { code: "121", label: "Report à nouveau créditeur" },
   { code: "129", label: "Report à nouveau débiteur" },
   { code: "131", label: "Résultat net de l'exercice" },
   { code: "162", label: "Emprunts auprès des établissements de crédit" },
@@ -78,25 +81,30 @@ export const PLAN = [
 
   // Classe 4 — tiers
   { code: "401", label: "Fournisseurs" },
+  { code: "409", label: "Fournisseurs, avances versées" },
   { code: "411", label: "Clients" },
   { code: "419", label: "Clients créditeurs (avances reçues)" },
   { code: "421", label: "Personnel, rémunérations dues" },
   { code: "431", label: "Sécurité sociale (CNPS)" },
   { code: "4431", label: "TVA facturée sur ventes" },
   { code: "4441", label: "État, TVA due" },
+  { code: "4449", label: "État, crédit de TVA à reporter" },
   { code: "4451", label: "TVA récupérable sur immobilisations" },
   { code: "4452", label: "TVA récupérable sur achats" },
   { code: "447", label: "État, impôts retenus à la source" },
+  { code: "471", label: "Compte d'attente (à imputer)" },
 
   // Classe 5 — trésorerie
   { code: "521", label: "Banque" },
   { code: "531", label: "Mobile Money" },
   { code: "571", label: "Caisse" },
+  { code: "585", label: "Virements de fonds" },
 
   // Classe 6 — charges
   { code: "601", label: "Achats de marchandises" },
   { code: "602", label: "Achats de matières premières" },
   { code: "6031", label: "Variation des stocks de marchandises" },
+  { code: "604", label: "Achats stockés de matières et fournitures" },
   { code: "605", label: "Autres achats (eau, électricité, carburant)" },
   { code: "611", label: "Transports sur achats" },
   { code: "614", label: "Transports du personnel" },
@@ -111,6 +119,7 @@ export const PLAN = [
   { code: "646", label: "Droits d'enregistrement" },
   { code: "661", label: "Rémunérations du personnel" },
   { code: "664", label: "Charges sociales" },
+  { code: "671", label: "Intérêts des emprunts" },
   { code: "681", label: "Dotations aux amortissements d'exploitation" },
 
   // Classe 7 — produits
@@ -358,6 +367,7 @@ export const MODELES = [
 /// Comptes de trésorerie proposés par les modèles.
 export const TRESORERIE = [
   { code: "571", label: "Caisse" },
+  { code: "585", label: "Virements de fonds" },
   { code: "521", label: "Banque" },
   { code: "531", label: "Mobile Money" },
 ];
@@ -515,7 +525,9 @@ export const ecrituresSuggerees = ({
       piece: d.numero || origine,
       date: d.date || d.emission,
       libelle: `${d.type === "avoir" ? "Avoir" : "Facture"} ${d.numero || ""} — ${d.clientNom || d.client || "client"}`.trim(),
-      tiers: d.clientNom || d.client || "",
+      tiers: d.clientNom || d.clientEntreprise || d.client || "",
+      echeance: d.echeance || "",
+      journal: "VTE",
       lignes,
       source: "Facturation",
     });
@@ -545,7 +557,8 @@ export const ecrituresSuggerees = ({
       piece: doc?.data?.numero || origine,
       date: d.date,
       libelle: `Règlement${numero}${d.moyen ? ` (${d.moyen})` : ""}`,
-      tiers: doc?.data?.clientNom || "",
+      tiers: doc?.data?.clientNom || doc?.data?.clientEntreprise || "",
+      journal: { Espèces: "CAI", "Mobile Money": "MM" }[d.moyen] || "BQ",
       lignes: [
         { compte: parMoyen[d.moyen] || "571", debit: montant, credit: 0 },
         { compte: "411", debit: 0, credit: montant },
@@ -562,7 +575,7 @@ export const ecrituresSuggerees = ({
       const origine = `caisse:${numero}`;
       if (deja.has(origine)) continue;
       const e = ecritureTicket(d, numero);
-      if (e?.lignes?.length) out.push({ ...e, origine, source: "Caisse" });
+      if (e?.lignes?.length) out.push({ journal: "CAI", ...e, origine, source: "Caisse" });
     }
   }
 
@@ -590,7 +603,7 @@ const dansPeriode = (date, { du, au } = {}) => {
 /// résultat, bilan, TVA — respecte l'axe sans que chaque fonction ait à le
 /// savoir. C'est le principe du journal unique : une seule table de lignes,
 /// et des restitutions qui n'en sont que des agrégations.
-const lignesDe = (ecritures, contexte) => {
+export const lignesDe = (ecritures, contexte) => {
   const axe = contexte?.axe;
   const out = [];
   for (const e of ecritures) {
@@ -729,7 +742,12 @@ export const bilan = (ecritures, periode) => {
 /// facturée aux clients, moins celle déjà payée aux fournisseurs. Négatif,
 /// c'est un crédit reportable — pas un remboursement automatique.
 export const tva = (ecritures, periode) => {
-  const b = balance(ecritures, periode);
+  // L'écriture de liquidation solde 4431 et 4452 vers 4441 : la compter
+  // effacerait la TVA du mois qu'elle sert justement à déclarer.
+  const b = balance(
+    ecritures.filter((e) => !String((e.data || e).origine || "").startsWith("tva:")),
+    periode,
+  );
   const solde = (code) => b.find((c) => c.compte === code) || { debit: 0, credit: 0 };
 
   const collectee = solde("4431").credit - solde("4431").debit;
@@ -776,19 +794,27 @@ export const tresorerie = (ecritures, periode) => {
 ///
 /// `seuil` absorbe les arrondis : un reliquat d'un franc n'est pas une
 /// créance, c'est une erreur de centime qu'on ne va pas relancer.
-export const postesOuverts = (ecritures, compte, contexte, { seuil = 1 } = {}) => {
+export const postesOuverts = (
+  ecritures,
+  compte,
+  contexte,
+  { seuil = 1, lettres = null } = {},
+) => {
   const parPiece = new Map();
 
-  for (const l of lignesDe(ecritures, contexte)) {
-    if (l.compte !== compte) continue;
-    // Sans pièce, la ligne forme son propre poste : elle ne peut se
-    // rapprocher de rien, et c'est une information en soi.
-    const cle = l.piece || `ligne:${l.ecritureId}`;
+  for (const l of lignesDeTiers(ecritures, compte, contexte)) {
+    // Un lettrage manuel complet rassemble ses lignes sous sa lettre : elles
+    // s'annulent et le poste disparaît. Sinon, sans pièce, la ligne forme
+    // son propre poste : elle ne peut se rapprocher de rien, et c'est une
+    // information en soi.
+    const lettre = lettres?.get(l.cle);
+    const cle = lettre ? `lettre:${lettre}` : l.piece || `ligne:${l.ecritureId}`;
     const p = parPiece.get(cle) || {
       piece: l.piece || "",
       tiers: l.tiers || "",
       libelle: l.libelle || "",
       date: l.date,
+      echeance: l.echeance || "",
       debit: 0,
       credit: 0,
       lignes: [],
@@ -804,7 +830,9 @@ export const postesOuverts = (ecritures, compte, contexte, { seuil = 1 } = {}) =
     if (String(l.date) < String(p.date)) {
       p.date = l.date;
       p.libelle = l.libelle || p.libelle;
+      if (l.echeance) p.echeance = l.echeance;
     }
+    if (!p.echeance && l.echeance) p.echeance = l.echeance;
     if (!p.tiers && l.tiers) p.tiers = l.tiers;
     parPiece.set(cle, p);
   }
@@ -815,18 +843,46 @@ export const postesOuverts = (ecritures, compte, contexte, { seuil = 1 } = {}) =
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 };
 
+/// Les lignes d'un compte de tiers, chacune avec sa clé stable
+/// « écriture#rang » — c'est elle que le lettrage manuel désigne.
+export const lignesDeTiers = (ecritures, compte, contexte) => {
+  const out = [];
+  for (const e of ecritures) {
+    const d = e.data || e;
+    if (!dansPeriode(d.date, contexte)) continue;
+    if (contexte?.axe && d.axe !== contexte.axe) continue;
+    (d.lignes || []).forEach((l, rang) => {
+      if (l.compte !== compte) return;
+      out.push({
+        ...l,
+        cle: `${e.id}#${rang}`,
+        date: d.date,
+        libelle: l.libelle || d.libelle,
+        tiers: l.tiers || d.tiers || "",
+        piece: d.piece || d.origine || "",
+        numero: d.numero || "",
+        echeance: d.echeance || "",
+        journal: d.journal || "",
+        ecritureId: e.id,
+        origine: d.origine || "",
+      });
+    });
+  }
+  return out;
+};
+
 /// Ce que doivent les clients, par tiers, avec l'ancienneté.
 ///
 /// Les tranches sont celles qu'utilise le recouvrement : à jour, puis 30,
 /// 60, 90 jours et au-delà. Passé 90 jours, une créance change de nature —
 /// on ne relance plus, on provisionne.
-export const balanceAgee = (ecritures, compte, contexte, maintenant) => {
+export const balanceAgee = (ecritures, compte, contexte, maintenant, lettres, echeances) => {
   const jour = maintenant || new Date().toISOString().slice(0, 10);
   const jours = (d) =>
     Math.floor((new Date(jour) - new Date(d)) / 86400000);
 
   const parTiers = new Map();
-  for (const p of postesOuverts(ecritures, compte, contexte)) {
+  for (const p of postesOuverts(ecritures, compte, contexte, { lettres })) {
     const nom = p.tiers || "Sans tiers";
     const t = parTiers.get(nom) || {
       tiers: nom,
@@ -838,7 +894,12 @@ export const balanceAgee = (ecritures, compte, contexte, maintenant) => {
       plus: 0,
       postes: [],
     };
-    const age = jours(p.date);
+    // L'ancienneté se compte depuis l'échéance quand la pièce en porte une :
+    // une facture à 30 jours n'est pas « en retard » le lendemain de son
+    // émission. À défaut, depuis la date de la pièce.
+    // `echeances` (pièce → date) complète les écritures passées avant que
+    // l'échéance ne soit reprise : la Facturation la connaît toujours.
+    const age = jours(p.echeance || echeances?.get(p.piece) || p.date);
     const m = p.solde;
     t.total += m;
     if (age <= 0) t.aJour += m;
@@ -877,7 +938,7 @@ export const controle = (ecritures) => {
 };
 
 /// Montant lisible, dans la devise d'affichage de l'espace.
-export { montant as fcfa } from "../../../utils/monnaie";
+export { montant as fcfa } from "../../../utils/monnaie.js";
 
 /// Le premier et le dernier jour d'un mois, au format ISO.
 export const mois = (aaaaMm) => ({

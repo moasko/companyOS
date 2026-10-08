@@ -394,3 +394,7 @@ export const factureEnPdf = (f, e = {}, images = {}) => {
 
   return assembler(pages, images);
 };
+
+/// L'assembleur multipage, pour les modules qui composent leurs propres
+/// documents (la Comptabilité et ses états).
+export { assembler };

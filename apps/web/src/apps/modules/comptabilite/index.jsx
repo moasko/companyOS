@@ -3,65 +3,51 @@
 // ─────────────────────────────────────────────────────────────────────────
 // CE QUI DISTINGUE CETTE APPLICATION
 //
-// Les logiciels de référence — Pennylane, Xero, Sage — sont excellents sur
-// l'automatisation *bancaire* : ils se branchent au compte, catégorisent
-// les mouvements, rapprochent. Cela suppose deux choses qu'une PME
-// ivoirienne n'a pas forcément : un compte bancaire connecté à une API, et
-// des ventes qui passent par la banque. Ici, une bonne part du chiffre se
-// fait en espèces et en mobile money.
+// Les logiciels les plus répandus — Sage et Ciel en Afrique francophone,
+// QuickBooks, Xero et Pennylane ailleurs — partagent une même discipline :
+// des journaux, des pièces numérotées sans trou, un justificatif derrière
+// chaque pièce, une banque rapprochée, des comptes de tiers lettrés, et une
+// clôture qui verrouille le passé. Cette application la reprend en entier,
+// avec trois choix propres à une PME ivoirienne :
 //
-// Trois choix en découlent :
+//   1. **Les écritures viennent des autres applications.** Factures et
+//      règlements (Facturation), tickets (Caisse), factures fournisseur et
+//      paiements (Achats), bulletins (Paie), notes de frais : tout arrive
+//      dans « À traiter », prêt à valider, marqué de son origine pour ne
+//      jamais être compté deux fois. Un logiciel externe ne peut pas faire
+//      cela : il faudrait d'abord lui ressaisir les pièces.
 //
-//   1. **Aucun numéro de compte à connaître.** L'utilisateur choisit une
-//      phrase — « J'ai payé le loyer » — et saisit le montant qu'il a sous
-//      les yeux, taxe comprise. La partie double est écrite pour lui, et
-//      montrée avant validation : simple à l'usage, vérifiable au
-//      contrôle.
-//
-//   2. **Les écritures viennent de la Facturation.** CompanyOS possède
-//      déjà les factures et les règlements. Chaque pièce émise propose son
-//      écriture, marquée de son origine pour ne jamais être comptée deux
-//      fois. Un logiciel externe ne peut pas faire cela : il faudrait
-//      d'abord lui ressaisir les factures.
+//   2. **Deux façons de saisir.** Au compte, par pièce et au clavier, pour
+//      le comptable ; par phrase — « J'ai payé le loyer » — pour celui qui
+//      ne connaît pas son plan. Les deux produisent la même écriture.
 //
 //   3. **Le mobile money est un compte de trésorerie de plein droit**
-//      (531), aux côtés de la caisse et de la banque — pas une case
-//      « autre ».
+//      (531), rapproché comme une banque.
 //
 // CE QUI EST REPRIS DE SAP S/4HANA FINANCE
 //
-// Quatre idées, transposées à l'échelle d'une PME :
+//   - **le journal unique** : une seule collection d'écritures, dont
+//     balance, états, TVA et analytique ne sont que des agrégations ;
+//   - **les postes ouverts** et le lettrage : « qui doit quoi, depuis
+//     quand, sur quelle facture » ;
+//   - **la dimension analytique** portée par l'écriture ;
+//   - **la clôture de période**, précédée de contrôles qui disent ce qui
+//     empêche de verrouiller.
 //
-//   - **le journal unique** (leur table ACDOCA) : une seule collection de
-//     lignes, dont balance, résultat, bilan, TVA et analytique ne sont que
-//     des agrégations. Rien n'est tenu en double, donc rien ne peut
-//     diverger ;
-//   - **les postes ouverts** : un compte de tiers ne se lit pas par son
-//     solde mais poste par poste, ce qui donne enfin « qui doit quoi,
-//     depuis quand, sur quelle facture » ;
-//   - **la dimension analytique** portée par la ligne : un axe — boutique,
-//     chantier, activité — et tous les états se recalculent dessus ;
-//   - **la clôture de période** : le passé se verrouille, on n'antidate pas
-//     dans un mois dont la TVA est déclarée.
-//
-// Ce qui n'est *pas* repris : périmètres analytiques multiples, devises
-// parallèles, référentiels comptables simultanés. Une PME n'en a pas
-// l'usage, et chacun coûterait sa complexité à l'écran.
-//
-// Le référentiel est le SYSCOHADA révisé (AUDCIF), en vigueur dans les 17
-// pays de l'OHADA. Voir domaine.js, où vivent toutes les règles.
+// Le référentiel est le SYSCOHADA révisé (AUDCIF). Les règles vivent dans
+// domaine.js, journaux.js, banque.js, lettrage.js, etats.js et cloture.js —
+// toutes testées sans navigateur.
 // ─────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
 import { api } from "../../../api/client";
 import { modal } from "../../modalRequest";
-import { saveAs } from "../../cloud";
+import { notifier } from "../../notifications";
 import { Contenu, useChargement } from "../../chargement";
-import { Auteur } from "../../Auteur";
-import { Bouton, Champ, Notice, Vide } from "../../ui";
+import { useEntreprise } from "../../entreprise";
 import { totaux } from "@companyos/shared/facturation";
 import { ecritureDuTicket } from "../caisse/domaine";
 import {
@@ -71,6 +57,17 @@ import {
 import { ecritureDeBulletin } from "../paie/domaine";
 import { ecritureDeNote } from "../frais/domaine";
 import * as D from "./domaine";
+import { journalDe, prochainNumero } from "./journaux";
+import { indexLettres } from "./lettrage";
+import { aTraiter as listeATraiter, nomMois } from "./cloture";
+import { Cpt, aujourdhui } from "./commun";
+import { Pilotage, ATraiter } from "./Pilotage";
+import { Saisie } from "./Saisie";
+import { Banque } from "./Banque";
+import { Tiers } from "./Tiers";
+import { Journaux, GrandLivre, Balance, Plan } from "./Registres";
+import { Etats, Tva } from "./Etats";
+import { Cloture } from "./Cloture";
 import "./comptabilite.scss";
 
 export const manifest = {
@@ -82,99 +79,134 @@ export const manifest = {
   Window: ComptabiliteApp,
 };
 
-const SECTIONS = [
-  { id: "tableau", label: "Tableau de bord", icone: "faChartPie" },
-  { id: "saisie", label: "Enregistrer", icone: "faPlus" },
-  { id: "tiers", label: "Qui me doit quoi", icone: "faHandHoldingDollar" },
-  { id: "journal", label: "Journal", icone: "faBook" },
+const NAV = [
+  { groupe: "Suivre" },
+  { id: "pilotage", label: "Pilotage", icone: "faChartPie" },
+  { id: "atraiter", label: "À traiter", icone: "faInbox", badge: "reprises" },
+  { groupe: "Tenir" },
+  { id: "saisie", label: "Saisie par pièce", icone: "faPenToSquare" },
+  { id: "banque", label: "Banque et rapprochement", icone: "faBuildingColumns", badge: "banque" },
+  { id: "tiers", label: "Tiers et lettrage", icone: "faHandHoldingDollar" },
+  { id: "journal", label: "Journaux", icone: "faBook" },
+  { groupe: "Analyser" },
   { id: "grandlivre", label: "Grand livre", icone: "faListUl" },
   { id: "balance", label: "Balance", icone: "faScaleBalanced" },
-  { id: "resultat", label: "Compte de résultat", icone: "faArrowTrendUp" },
-  { id: "bilan", label: "Bilan", icone: "faBuildingColumns" },
+  { id: "etats", label: "États financiers", icone: "faFileInvoiceDollar" },
   { id: "tva", label: "TVA", icone: "faReceipt" },
-  { id: "plan", label: "Plan comptable", icone: "faSitemap" },
+  { groupe: "Fin de période" },
   { id: "cloture", label: "Clôture", icone: "faLock" },
+  { id: "plan", label: "Plan comptable", icone: "faSitemap" },
 ];
 
-const aujourdhui = () => new Date().toISOString().slice(0, 10);
-const moisCourant = () => new Date().toISOString().slice(0, 7);
+const VUES = {
+  pilotage: Pilotage,
+  atraiter: ATraiter,
+  saisie: Saisie,
+  banque: Banque,
+  tiers: Tiers,
+  journal: Journaux,
+  grandlivre: GrandLivre,
+  balance: Balance,
+  etats: Etats,
+  tva: Tva,
+  cloture: Cloture,
+  plan: Plan,
+};
 
 function ComptabiliteApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id]);
   const session = useSelector((state) => state.session);
   const ouvert = !!wnapp && !wnapp.hide && session.status === "authenticated";
+  const { entreprise } = useEntreprise(ouvert);
 
-  const [section, setSection] = useState("tableau");
-  const [ecritures, setEcritures] = useState([]);
-  const [documents, setDocuments] = useState([]);
-  const [reglements, setReglements] = useState([]);
-  const [ticketsCaisse, setTicketsCaisse] = useState([]);
-  const [achats, setAchats] = useState({ factures: [], paiements: [], fournisseurs: [] });
-  const [paie, setPaie] = useState({ bulletins: [], salaries: [] });
-  const [notesFrais, setNotesFrais] = useState([]);
-
-  // Période observée. L'exercice entier par défaut : une PME regarde son
-  // année, et se restreint au mois quand elle déclare la TVA.
-  const [periode, setPeriode] = useState(() =>
-    D.exercice(new Date().getFullYear()),
-  );
-
-  const [compteOuvert, setCompteOuvert] = useState("411");
-  // L'axe analytique observé. Vide = toute l'entreprise.
+  const [section, setSection] = useState("pilotage");
+  const [intention, setIntention] = useState(null);
+  const [donnees, setDonnees] = useState({
+    ecritures: [],
+    documents: [],
+    reglements: [],
+    tickets: [],
+    achats: { factures: [], paiements: [], fournisseurs: [] },
+    paie: { bulletins: [], salaries: [] },
+    notesFrais: [],
+    releves: [],
+    lettrages: [],
+    clientsCrm: [],
+    reglages: null,
+  });
+  const [periode, setPeriode] = useState(() => D.exercice(new Date().getFullYear()));
   const [axe, setAxe] = useState("");
-  const [reglages, setReglages] = useState(null);
-  const [brouillon, setBrouillon] = useState(null);
   const [occupe, setOccupe] = useState(false);
 
   const charger = useCallback(async () => {
-    const [e, f, r, g, tk, af, ap, four, bul, sal, ndf] = await Promise.all([
+    const liste = (m, c) => api.records.list(m, c).catch(() => []);
+    const [e, f, r, g, tk, af, ap, four, bul, sal, ndf, rel, let_, crm] = await Promise.all([
       api.records.list(manifest.slug, "ecritures"),
-      // La Facturation peut ne pas être installée : la comptabilité reste
-      // utilisable, simplement sans reprise automatique.
-      api.records.list("facturation", "factures").catch(() => []),
-      api.records.list("facturation", "reglements").catch(() => []),
-      api.records.list(manifest.slug, "reglages").catch(() => []),
-      // La Caisse aussi : chaque ticket propose son écriture.
-      api.records.list("caisse", "tickets").catch(() => []),
-      // Et les Achats : factures fournisseur et paiements.
-      api.records.list("achats", "factures").catch(() => []),
-      api.records.list("achats", "paiements").catch(() => []),
-      api.records.list("stock", "fournisseurs").catch(() => []),
-      // La Paie : chaque bulletin propose son écriture de salaire.
-      api.records.list("paie", "bulletins").catch(() => []),
-      api.records.list("rh", "salaries").catch(() => []),
-      // Les Notes de frais : chaque note approuvée propose sa charge.
-      api.records.list("frais", "notes").catch(() => []),
+      // Chaque application peut ne pas être installée : la comptabilité
+      // reste utilisable, simplement sans la reprise correspondante.
+      liste("facturation", "factures"),
+      liste("facturation", "reglements"),
+      liste(manifest.slug, "reglages"),
+      liste("caisse", "tickets"),
+      liste("achats", "factures"),
+      liste("achats", "paiements"),
+      liste("stock", "fournisseurs"),
+      liste("paie", "bulletins"),
+      liste("rh", "salaries"),
+      liste("frais", "notes"),
+      liste(manifest.slug, "releves"),
+      liste(manifest.slug, "lettrages"),
+      liste("crm", "clients"),
     ]);
-    setEcritures(e);
-    setDocuments(f);
-    setReglements(r);
-    setReglages(g[0] || null);
-    setTicketsCaisse(tk);
-    setAchats({ factures: af, paiements: ap, fournisseurs: four });
-    setPaie({ bulletins: bul, salaries: sal });
-    setNotesFrais(ndf);
+    setDonnees({
+      ecritures: e,
+      documents: f,
+      reglements: r,
+      reglages: g[0] || null,
+      tickets: tk,
+      achats: { factures: af, paiements: ap, fournisseurs: four },
+      paie: { bulletins: bul, salaries: sal },
+      notesFrais: ndf,
+      releves: rel,
+      lettrages: let_,
+      clientsCrm: crm,
+    });
   }, []);
   const etat = useChargement(ouvert, charger);
+
+  // Une autre application peut ouvrir la Comptabilité sur un écran précis
+  // (« voir l'écriture de cette facture »).
+  useEffect(() => {
+    const aller = (ev) => {
+      if (ev.detail.app !== manifest.id) return;
+      const { section: s, ...reste } = ev.detail.params || {};
+      if (s && VUES[s]) {
+        setSection(s);
+        setIntention(Object.keys(reste).length ? reste : null);
+      }
+    };
+    window.addEventListener("companyos:lien", aller);
+    return () => window.removeEventListener("companyos:lien", aller);
+  }, []);
+
+  const { ecritures, documents, reglements, tickets, achats, paie, notesFrais, reglages, releves, lettrages } = donnees;
 
   // ---- Dérivations --------------------------------------------------------
 
   const suggerees = useMemo(() => {
-    // Les Achats construisent leurs propositions avec leur propre domaine :
-    // la Comptabilité ne connaît pas la forme d'une facture fournisseur.
-    const nomF = (id) =>
-      achats.fournisseurs.find((f) => f.id === id)?.data?.nom || "";
+    const nomF = (id) => achats.fournisseurs.find((f) => f.id === id)?.data?.nom || "";
     const propositions = [
-      ...achats.factures.map((f) =>
-        ecritureAchat({ id: f.id, ...f.data }, nomF(f.data.fournisseurId)),
-      ),
+      ...achats.factures.map((f) => ({
+        journal: "ACH",
+        source: "Achats",
+        ...ecritureAchat({ id: f.id, ...f.data }, nomF(f.data.fournisseurId)),
+      })),
       ...achats.paiements.map((p) => {
         const fac = achats.factures.find((f) => f.id === p.data.factureId);
-        return ecriturePaiementAchat(
-          { id: p.id, ...p.data },
-          fac,
-          nomF(fac?.data?.fournisseurId),
-        );
+        return {
+          source: "Achats",
+          ...ecriturePaiementAchat({ id: p.id, ...p.data }, fac, nomF(fac?.data?.fournisseurId)),
+        };
       }),
       // Une note de frais compte dès qu'elle est approuvée — la charge est
       // née, même si le remboursement attend.
@@ -182,217 +214,279 @@ function ComptabiliteApp() {
         .filter((n) => ["approuvee", "remboursee"].includes(n.data.etat))
         .map((n) => {
           const sal = paie.salaries.find((x) => x.id === n.data.salarieId);
-          const nom = sal
-            ? `${sal.data.prenom || ""} ${sal.data.nom || ""}`.trim()
-            : "salarié";
-          return ecritureDeNote(n.data, n.id, nom);
+          const nom = sal ? `${sal.data.prenom || ""} ${sal.data.nom || ""}`.trim() : "salarié";
+          return { journal: "OD", source: "Notes de frais", ...ecritureDeNote(n.data, n.id, nom) };
         }),
-      ...paie.bulletins.map((bul) => {
-        const sal = paie.salaries.find((x) => x.data.matricule === bul.data.matricule);
-        return ecritureDeBulletin(bul.data.calcul, sal?.data || {}, bul.data.mois);
-      }),
-    ];
+      ...paie.bulletins
+        .filter((bul) => bul.data?.calcul)
+        .map((bul) => {
+          const sal = paie.salaries.find((x) => x.data.matricule === bul.data.matricule);
+          return { journal: "OD", source: "Paie", ...ecritureDeBulletin(bul.data.calcul, sal?.data || {}, bul.data.mois) };
+        }),
+    ].filter(Boolean);
     return D.ecrituresSuggerees({
       documents,
       reglements,
-      tickets: ticketsCaisse,
+      tickets,
       ecritureTicket: ecritureDuTicket,
       propositions,
       ecritures,
       totauxDe: totaux,
     });
-  }, [documents, reglements, ticketsCaisse, achats, paie, notesFrais, ecritures]);
+  }, [documents, reglements, tickets, achats, paie, notesFrais, ecritures]);
 
   // Période et axe voyagent ensemble : c'est le contexte d'observation, et
   // toutes les restitutions le respectent sans le savoir (voir lignesDe).
   const contexte = useMemo(() => ({ ...periode, axe: axe || undefined }), [periode, axe]);
-  const clotureAu = reglages?.data?.clotureAu || "";
+  const r = reglages?.data || {};
+  const clotureAu = r.clotureAu || "";
+
+  // Les relevés importés, regroupés par compte de trésorerie.
+  const relevesParCompte = useMemo(() => {
+    const m = {};
+    for (const rec of releves) {
+      const c = rec.data.compte;
+      if (!m[c]) m[c] = { lignes: [], records: [], solde: null, soldeAu: "" };
+      m[c].records.push(rec);
+      for (const l of rec.data.lignes || []) m[c].lignes.push({ ...l, recordId: rec.id });
+      if (rec.data.solde != null && String(rec.data.au) >= String(m[c].soldeAu)) {
+        m[c].solde = rec.data.solde;
+        m[c].soldeAu = rec.data.au;
+      }
+    }
+    for (const c of Object.keys(m)) m[c].lignes.sort((a, b) => a.date.localeCompare(b.date));
+    return m;
+  }, [releves]);
+
+  const lettres = useMemo(
+    () => ({ 411: indexLettres(lettrages, "411"), 401: indexLettres(lettrages, "401") }),
+    [lettrages],
+  );
+
+  // Les échéances des factures, pour compter l'ancienneté d'une créance
+  // depuis la date où elle est due, et non depuis son émission.
+  const echeances = useMemo(
+    () => new Map(documents.filter((d) => d.data?.numero && d.data?.echeance).map((d) => [d.data.numero, d.data.echeance])),
+    [documents],
+  );
+
+  const clientsAges = useMemo(
+    () => D.balanceAgee(ecritures, "411", { axe: axe || undefined }, aujourdhui(), lettres["411"], echeances),
+    [ecritures, axe, lettres, echeances],
+  );
+
+  const taches = useMemo(
+    () =>
+      listeATraiter({
+        suggerees,
+        releves: relevesParCompte,
+        ecritures,
+        lettres,
+        tvaDeclarees: r.tvaDeclarees || {},
+        aujourdhui: aujourdhui(),
+        clientsEnRetard: clientsAges
+          .filter((c) => c.j60 + c.j90 + c.plus > 0)
+          .map((c) => ({ tiers: c.tiers, montant: c.j60 + c.j90 + c.plus })),
+      }),
+    [suggerees, relevesParCompte, ecritures, lettres, r.tvaDeclarees, clientsAges],
+  );
 
   const controle = useMemo(() => D.controle(ecritures), [ecritures]);
-  const resultat = useMemo(() => D.compteDeResultat(ecritures, contexte), [ecritures, contexte]);
-  const leBilan = useMemo(() => D.bilan(ecritures, contexte), [ecritures, contexte]);
-  const laBalance = useMemo(() => D.balance(ecritures, contexte), [ecritures, contexte]);
-  const laTva = useMemo(() => D.tva(ecritures, contexte), [ecritures, contexte]);
-  const laTreso = useMemo(() => D.tresorerie(ecritures, contexte), [ecritures, contexte]);
   const lesAxes = useMemo(() => D.axes(ecritures), [ecritures]);
-  const clients = useMemo(
-    () => D.balanceAgee(ecritures, "411", contexte),
-    [ecritures, contexte],
-  );
-  const fournisseurs = useMemo(
-    () => D.balanceAgee(ecritures, "401", contexte),
-    [ecritures, contexte],
-  );
 
-  const journal = useMemo(
-    () =>
-      ecritures
-        .filter((e) => {
-          const d = e.data?.date;
-          if (axe && e.data?.axe !== axe) return false;
-          return (!periode.du || d >= periode.du) && (!periode.au || d <= periode.au);
-        })
-        .sort((a, b) => String(b.data?.date).localeCompare(String(a.data?.date))),
-    [ecritures, periode, axe],
-  );
+  const badges = {
+    reprises: suggerees.length,
+    banque: Object.values(relevesParCompte).reduce((s, x) => s + x.lignes.filter((l) => !l.ecriture).length, 0),
+  };
 
-  // ---- Écriture -----------------------------------------------------------
+  // ---- Actions ------------------------------------------------------------
 
-  const enregistrer = async (ecriture) => {
+  const auteur = session.user?.name || session.user?.email || "";
+
+  const tache = async (fn, titreErreur = "Enregistrement impossible") => {
+    setOccupe(true);
+    try {
+      return await fn();
+    } catch (e) {
+      modal.alert({ title: titreErreur, message: e.message, tone: "error" });
+      return null;
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  /// Numérote une écriture dans son journal. `deja` : les écritures créées
+  /// dans la même série, pas encore rechargées — sans elles, deux pièces
+  /// validées d'un coup prendraient le même numéro.
+  const numeroter = (e, deja = []) => {
+    if (e.numero) return e;
+    const journal = e.journal || journalDe(e);
+    return { ...e, journal, numero: prochainNumero([...ecritures, ...deja], journal, e.date) };
+  };
+
+  const creer = async (ecriture, { recharger = true } = {}) => {
     const soucis = D.problemes(ecriture, { clotureAu });
     if (soucis.length) {
-      return modal.alert({
-        title: "Cette écriture ne peut pas être enregistrée",
-        message: soucis.join("\n"),
-        tone: "error",
-      });
+      await modal.alert({ title: "Cette écriture ne peut pas être enregistrée", message: soucis.join("\n"), tone: "error" });
+      return null;
     }
-    setOccupe(true);
-    try {
-      await api.records.create(manifest.slug, "ecritures", ecriture);
-      await etat.rafraichir();
-      setBrouillon(null);
-    } catch (e) {
-      modal.alert({ title: "Enregistrement impossible", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  /// Accepter une écriture proposée par la Facturation.
-  const accepter = async (proposition) => {
-    setOccupe(true);
-    try {
-      await api.records.create(manifest.slug, "ecritures", proposition);
-      await etat.rafraichir();
-    } catch (e) {
-      modal.alert({ title: "Enregistrement impossible", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  const toutAccepter = async () => {
-    const ok = await modal.confirm({
-      title: `Comptabiliser ${suggerees.length} opération(s) ?`,
-      message: "Chaque pièce de la Facturation produira son écriture au journal.",
-      detail:
-        "Elles restent modifiables ensuite, et aucune pièce ne sera comptabilisée deux fois.",
-      confirmLabel: "Tout comptabiliser",
+    return tache(async () => {
+      const rec = await api.records.create(manifest.slug, "ecritures", numeroter(ecriture));
+      if (recharger) await etat.rafraichir();
+      return rec;
     });
+  };
+
+  const accepterListe = async (liste, { confirmer = true } = {}) => {
+    if (!liste.length) return;
+    const fermees = liste.filter((p) => D.estClos(p.date, clotureAu));
+    const ok = !confirmer || (await modal.confirm({
+      title: `Comptabiliser ${liste.length} opération(s) ?`,
+      message: "Chaque pièce produira son écriture, numérotée dans son journal.",
+      detail: fermees.length
+        ? `${fermees.length} pièce(s) tombent dans une période verrouillée : elles resteront en attente.`
+        : "Aucune pièce ne sera comptabilisée deux fois : chacune garde la trace de son origine.",
+      confirmLabel: "Comptabiliser",
+    }));
     if (!ok) return;
-    setOccupe(true);
-    try {
-      for (const p of suggerees) {
-        await api.records.create(manifest.slug, "ecritures", p);
+    await tache(async () => {
+      const faites = [];
+      for (const p of liste) {
+        if (D.estClos(p.date, clotureAu) || D.problemes(p).length) continue;
+        const e = numeroter(p, faites);
+        await api.records.create(manifest.slug, "ecritures", e);
+        faites.push(e);
       }
       await etat.rafraichir();
-    } catch (e) {
-      modal.alert({ title: "Enregistrement interrompu", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
-    }
+      if (faites.length < liste.length) {
+        modal.alert({
+          title: `${faites.length} sur ${liste.length} comptabilisée(s)`,
+          message: "Les autres sont dans une période verrouillée ou incomplètes : elles restent dans « À traiter ».",
+          tone: "warning",
+        });
+      }
+    }, "Enregistrement interrompu");
   };
 
   /// Une écriture enregistrée ne se modifie pas : elle se contre-passe.
-  /// C'est la règle comptable, et c'est aussi ce qui rend le journal
-  /// opposable — un livre qu'on peut réécrire ne prouve rien.
+  /// C'est la règle comptable, et ce qui rend le journal opposable.
   const contrepasser = async (ecriture) => {
     const ok = await modal.confirm({
-      title: "Annuler cette écriture ?",
+      title: "Contre-passer cette écriture ?",
       message: `« ${ecriture.data.libelle} »`,
       detail:
-        "Une écriture inverse sera ajoutée à la date du jour. L'originale reste au journal : c'est ce qui rend la comptabilité vérifiable.",
+        "Une écriture inverse sera ajoutée à la date du jour, dans le même journal. L'originale reste : c'est ce qui rend la comptabilité vérifiable.",
       confirmLabel: "Contre-passer",
       danger: true,
     });
     if (!ok) return;
-    await enregistrer({
+    await creer({
+      journal: journalDe(ecriture),
       date: aujourdhui(),
-      libelle: `Annulation — ${ecriture.data.libelle}`,
+      libelle: `Extourne — ${ecriture.data.libelle}`,
+      piece: ecriture.data.numero || ecriture.data.piece || "",
+      tiers: ecriture.data.tiers || "",
       contrepasse: ecriture.id,
-      lignes: ecriture.data.lignes.map((l) => ({
-        compte: l.compte,
-        debit: l.credit,
-        credit: l.debit,
-      })),
+      lignes: ecriture.data.lignes.map((l) => ({ ...l, debit: l.credit, credit: l.debit })),
     });
   };
 
-  /// Verrouille tout ce qui précède une date.
-  const cloturer = async (date) => {
-    const ok = await modal.confirm({
-      title: date ? `Clôturer jusqu'au ${date} ?` : "Rouvrir la période ?",
-      message: date
-        ? "Plus aucune écriture ne pourra être datée de cette période."
-        : "Les écritures pourront de nouveau être datées dans le passé.",
-      detail: date
-        ? "Rien n'est effacé ni figé : les états restent consultables, et la clôture peut être reculée."
-        : "À n'utiliser que pour corriger une clôture posée trop tôt.",
-      confirmLabel: date ? "Clôturer" : "Rouvrir",
-      danger: !date,
-    });
-    if (!ok) return;
-    setOccupe(true);
-    try {
-      if (reglages) {
-        await api.records.update(manifest.slug, "reglages", reglages.id, {
-          ...reglages.data,
-          clotureAu: date,
-        });
-      } else {
-        await api.records.create(manifest.slug, "reglages", { clotureAu: date });
-      }
+  /// Le justificatif est une métadonnée de la pièce : l'ajouter ne touche
+  /// à aucun montant, il n'y a donc pas lieu de contre-passer.
+  const joindre = (ecriture, node) =>
+    tache(async () => {
+      await api.records.update(manifest.slug, "ecritures", ecriture.id, {
+        ...ecriture.data,
+        justificatif: { id: node.id, name: node.name, mimeType: node.mimeType || "" },
+      });
       await etat.rafraichir();
-    } catch (e) {
-      modal.alert({ title: "Clôture impossible", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
-    }
-  };
+    });
 
-  /// Export pour l'expert-comptable. Un cabinet attend un fichier plat,
-  /// une ligne par ligne d'écriture — c'est ce que tous les logiciels de
-  /// production comptable savent lire.
-  const exporter = async () => {
-    const lignes = [
-      ["Date", "Libellé", "Compte", "Intitulé", "Débit", "Crédit", "Tiers"],
-    ];
-    for (const e of journal) {
-      for (const l of e.data.lignes || []) {
-        lignes.push([
-          e.data.date,
-          e.data.libelle,
-          l.compte,
-          D.intitule(l.compte),
-          l.debit || 0,
-          l.credit || 0,
-          e.data.tiers || "",
-        ]);
-      }
-    }
-    // BOM UTF-8 et point-virgule : c'est ce qu'attend Excel en français.
-    const csv =
-      "﻿" +
-      lignes
-        .map((l) => l.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";"))
-        .join("\r\n");
+  const majReglages = (patch) =>
+    tache(async () => {
+      const data = { ...(reglages?.data || {}), ...patch };
+      if (reglages) await api.records.update(manifest.slug, "reglages", reglages.id, data);
+      else await api.records.create(manifest.slug, "reglages", data);
+      await etat.rafraichir();
+      return true;
+    });
 
-    const node = await saveAs(
-      new Blob([csv], { type: "text/csv;charset=utf-8" }),
-      `journal-${periode.du}-${periode.au}.csv`,
-      { folder: "Comptabilité" },
-    );
-    if (node) {
-      modal.alert({
-        title: "Journal exporté",
-        message: `« ${node.name} » est dans votre cloud.`,
-        tone: "success",
+  const verrouiller = async (au) => {
+    const fait = await majReglages({
+      clotureAu: au,
+      historique: [...(r.historique || []), { au, le: aujourdhui(), par: auteur }],
+    });
+    if (fait) {
+      notifier({
+        titre: `${nomMois(au.slice(0, 7))} verrouillé`,
+        message: "Toute correction passera désormais par une écriture d'extourne.",
+        app: manifest.name,
+        ton: "success",
       });
     }
   };
 
-  // ---- Rendu --------------------------------------------------------------
+  const rouvrir = async (au) => {
+    const ok = await modal.confirm({
+      title: au ? `Rouvrir jusqu'au ${au} ?` : "Rouvrir toutes les périodes ?",
+      message: "Les écritures pourront de nouveau être datées dans ces mois.",
+      detail: "À réserver à la correction d'une clôture posée trop tôt : une déclaration déjà déposée ne correspondrait plus aux livres.",
+      confirmLabel: "Rouvrir",
+      danger: true,
+    });
+    if (!ok) return;
+    await majReglages({
+      clotureAu: au,
+      historique: [...(r.historique || []), { au, le: aujourdhui(), par: auteur, reouverture: true }],
+    });
+  };
+
+  const aller = (s, opts = null) => {
+    setSection(s);
+    setIntention(opts);
+  };
+
+  const valeur = {
+    // Données
+    ecritures,
+    documents,
+    suggerees,
+    releves,
+    relevesParCompte,
+    lettrages,
+    lettres,
+    clientsCrm: donnees.clientsCrm,
+    fournisseurs: achats.fournisseurs,
+    reglages: r,
+    clotureAu,
+    entreprise: entreprise || {},
+    taches,
+    clientsAges,
+    echeances,
+    controle,
+    // Contexte
+    periode,
+    setPeriode,
+    contexte,
+    axe,
+    occupe,
+    intention,
+    session,
+    auteur,
+    peutAdministrer: ["OWNER", "ADMIN"].includes(session.user?.role),
+    // Actions
+    aller,
+    rafraichir: etat.rafraichir,
+    tache,
+    creer,
+    accepterListe,
+    contrepasser,
+    joindre,
+    majReglages,
+    verrouiller,
+    rouvrir,
+    numeroter,
+  };
 
   if (!ouvert) {
     return (
@@ -402,904 +496,99 @@ function ComptabiliteApp() {
     );
   }
 
+  const Vue = VUES[section] || Pilotage;
+
   return (
     <ModuleWindow manifest={manifest} className="cptApp">
-      <div className="cptShell">
-        <aside className="cptNav cosScroll">
-          {SECTIONS.map((s) => (
-            <div
-              key={s.id}
-              className="cptNavItem handcr"
-              data-actif={section === s.id}
-              onClick={() => setSection(s.id)}
-            >
-              <Icon fafa={s.icone} width={13} />
-              <span>{s.label}</span>
-              {s.id === "saisie" && suggerees.length ? (
-                <em className="cptPastille">{suggerees.length}</em>
-              ) : null}
+      <Cpt.Provider value={valeur}>
+        <div className="cptShell">
+          <aside className="cptNav cosScroll" aria-label="Sections de la comptabilité">
+            <div className="cptMarque">
+              <b>Comptabilité</b>
+              <span>{entreprise?.nom ? `${entreprise.nom} · ` : ""}SYSCOHADA</span>
             </div>
-          ))}
-        </aside>
-
-        <div className="cptCentre cosScroll">
-          <div className="cptEntete">
-            <Periode valeur={periode} onChanger={setPeriode} />
-            {lesAxes.length ? (
-              <div className="cptPeriode">
-                <Icon fafa="faLayerGroup" width={12} />
-                <select value={axe} onChange={(e) => setAxe(e.target.value)}>
-                  <option value="">Toute l'entreprise</option>
-                  {lesAxes.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-            <div className="cptEnteteFin">
-              {/* La fenêtre charge à l'ouverture. Une facture émise pendant
-                  qu'elle est ouverte n'apparaîtrait donc pas dans les
-                  reprises — d'où ce bouton, qui va rechercher les pièces
-                  sans qu'on ait à fermer et rouvrir. */}
-              <Bouton
-                variante="secondaire"
-                icone="faArrowsRotate"
-                off={occupe}
-                onClick={() => etat.rafraichir()}
-                title="Rechercher les nouvelles pièces de la Facturation"
-              >
-                Actualiser
-              </Bouton>
+            <nav>
+              {NAV.map((n) =>
+                n.groupe ? (
+                  <div key={n.groupe} className="cptNavGroupe">{n.groupe}</div>
+                ) : (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className="cptNavItem"
+                    aria-current={section === n.id ? "page" : undefined}
+                    onClick={() => aller(n.id)}
+                  >
+                    <Icon fafa={n.icone} width={13} />
+                    <span>{n.label}</span>
+                    {n.badge && badges[n.badge] ? <em className="cptPastille">{badges[n.badge]}</em> : null}
+                  </button>
+                ),
+              )}
+            </nav>
+            <div className="cptObservation">
+              <label>
+                <span>Période observée</span>
+                <ChoixPeriode valeur={periode} onChanger={setPeriode} />
+              </label>
+              {lesAxes.length ? (
+                <label>
+                  <span>Axe analytique</span>
+                  <select value={axe} onChange={(e) => setAxe(e.target.value)}>
+                    <option value="">Toute l'entreprise</option>
+                    {lesAxes.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               {!controle.equilibre ? (
                 <span className="cptAlerte" title="Le total des débits doit égaler celui des crédits">
                   <Icon fafa="faTriangleExclamation" width={12} />
                   Journal déséquilibré de {D.fcfa(Math.abs(controle.ecart))}
                 </span>
               ) : null}
-              <Bouton variante="secondaire" icone="faFileCsv" onClick={exporter}>
-                Export comptable
-              </Bouton>
+              <button type="button" className="cptLienDiscret" disabled={occupe} onClick={() => etat.rafraichir()}>
+                <Icon fafa="faArrowsRotate" width={11} />
+                Actualiser les pièces des autres apps
+              </button>
             </div>
-          </div>
+          </aside>
 
-          <Contenu etat={etat} vide={false} lignes={8}>
-            {section === "tableau" ? (
-              <Tableau
-                resultat={resultat}
-                treso={laTreso}
-                tva={laTva}
-                bilan={leBilan}
-                suggerees={suggerees}
-                onVoirSaisie={() => setSection("saisie")}
-              />
-            ) : section === "saisie" ? (
-              <Saisie
-                suggerees={suggerees}
-                occupe={occupe}
-                brouillon={brouillon}
-                setBrouillon={setBrouillon}
-                onAccepter={accepter}
-                onToutAccepter={toutAccepter}
-                onEnregistrer={enregistrer}
-              />
-            ) : section === "tiers" ? (
-              <Tiers clients={clients} fournisseurs={fournisseurs} />
-            ) : section === "journal" ? (
-              <Journal journal={journal} onContrepasser={contrepasser} />
-            ) : section === "grandlivre" ? (
-              <GrandLivre
-                balance={laBalance}
-                compte={compteOuvert}
-                onChoisir={setCompteOuvert}
-                lignes={D.grandLivre(ecritures, compteOuvert, periode)}
-              />
-            ) : section === "balance" ? (
-              <Balance balance={laBalance} />
-            ) : section === "resultat" ? (
-              <Resultat resultat={resultat} />
-            ) : section === "bilan" ? (
-              <Bilan bilan={leBilan} />
-            ) : section === "tva" ? (
-              <Tva tva={laTva} periode={periode} onPeriode={setPeriode} />
-            ) : section === "cloture" ? (
-              <Cloture
-                clotureAu={clotureAu}
-                reglages={reglages}
-                occupe={occupe}
-                onCloturer={cloturer}
-              />
-            ) : (
-              <Plan />
-            )}
-          </Contenu>
+          <main className="cptPage cosScroll">
+            <Contenu etat={etat} vide={false} lignes={8}>
+              <Vue key={section} />
+            </Contenu>
+          </main>
         </div>
-      </div>
+      </Cpt.Provider>
     </ModuleWindow>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Période
-// ---------------------------------------------------------------------------
-
-const Periode = ({ valeur, onChanger }) => {
+const ChoixPeriode = ({ valeur, onChanger }) => {
   const annee = new Date().getFullYear();
+  const options = [
+    { ...D.exercice(annee), label: `Exercice ${annee}` },
+    { ...D.exercice(annee - 1), label: `Exercice ${annee - 1}` },
+    ...Array.from({ length: 12 }, (_, i) => {
+      const m = `${annee}-${String(i + 1).padStart(2, "0")}`;
+      return { ...D.mois(m), label: nomMois(m) };
+    }),
+  ];
+  const cle = `${valeur.du}|${valeur.au}`;
   return (
-    <div className="cptPeriode">
-      <Icon fafa="faCalendarDays" width={12} />
-      <select
-        value={`${valeur.du}|${valeur.au}`}
-        onChange={(e) => {
-          const [du, au] = e.target.value.split("|");
-          onChanger({ du, au });
-        }}
-      >
-        <option value={`${D.exercice(annee).du}|${D.exercice(annee).au}`}>
-          Exercice {annee}
-        </option>
-        <option value={`${D.exercice(annee - 1).du}|${D.exercice(annee - 1).au}`}>
-          Exercice {annee - 1}
-        </option>
-        {Array.from({ length: 12 }, (_, i) => {
-          const m = `${annee}-${String(i + 1).padStart(2, "0")}`;
-          const p = D.mois(m);
-          return (
-            <option key={m} value={`${p.du}|${p.au}`}>
-              {new Date(annee, i, 1).toLocaleDateString("fr-FR", {
-                month: "long",
-                year: "numeric",
-              })}
-            </option>
-          );
-        })}
-      </select>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Tableau de bord
-// ---------------------------------------------------------------------------
-
-const Tableau = ({ resultat, treso, tva, bilan, suggerees, onVoirSaisie }) => (
-  <>
-    {suggerees.length ? (
-      <div className="cptRappel handcr" onClick={onVoirSaisie}>
-        <Icon fafa="faWandMagicSparkles" width={16} />
-        <div>
-          <b>{suggerees.length} opération(s) prêtes à comptabiliser</b>
-          <span>
-            Vos factures et règlements attendent leur écriture. Un clic suffit.
-          </span>
-        </div>
-        <Icon fafa="faChevronRight" width={12} />
-      </div>
-    ) : null}
-
-    <div className="cptCartes">
-      <Carte
-        titre="Trésorerie"
-        valeur={D.fcfa(treso.total)}
-        ton={treso.total >= 0 ? "ok" : "danger"}
-        detail={treso.comptes.map((c) => `${D.intitule(c.compte)} ${D.fcfa(c.montant)}`).join(" · ")}
-      />
-      <Carte
-        titre="Résultat de la période"
-        valeur={D.fcfa(resultat.resultat)}
-        ton={resultat.resultat >= 0 ? "ok" : "danger"}
-        detail={`${D.fcfa(resultat.totalProduits)} de produits — ${D.fcfa(resultat.totalCharges)} de charges`}
-      />
-      <Carte
-        titre={tva.aPayer ? "TVA à reverser" : "Crédit de TVA"}
-        valeur={D.fcfa(tva.aPayer || tva.credit)}
-        ton={tva.aPayer ? "attention" : "ok"}
-        detail={`Collectée ${D.fcfa(tva.collectee)} — déductible ${D.fcfa(tva.deductible)}`}
-      />
-      <Carte
-        titre="Total du bilan"
-        valeur={D.fcfa(bilan.totalActif)}
-        ton={bilan.equilibre ? "ok" : "danger"}
-        detail={bilan.equilibre ? "Actif et passif s'équilibrent" : "Bilan déséquilibré"}
-      />
-    </div>
-
-    <div className="cptDeux">
-      <div className="cptBloc">
-        <h3>D'où vient l'argent</h3>
-        {resultat.produits.length ? (
-          <Barres lignes={resultat.produits} total={resultat.totalProduits} ton="ok" />
-        ) : (
-          <p className="cptRien">Aucun produit sur la période.</p>
-        )}
-      </div>
-      <div className="cptBloc">
-        <h3>Où il part</h3>
-        {resultat.charges.length ? (
-          <Barres lignes={resultat.charges} total={resultat.totalCharges} ton="danger" />
-        ) : (
-          <p className="cptRien">Aucune charge sur la période.</p>
-        )}
-      </div>
-    </div>
-  </>
-);
-
-const Carte = ({ titre, valeur, detail, ton }) => (
-  <div className="cptCarte" data-ton={ton}>
-    <div className="cptCarteTitre">{titre}</div>
-    <div className="cptCarteValeur">{valeur}</div>
-    {detail ? <div className="cptCarteDetail">{detail}</div> : null}
-  </div>
-);
-
-/// Barres proportionnelles — un tableau de chiffres ne montre pas les
-/// ordres de grandeur, et c'est justement ce qu'on cherche d'un coup d'œil.
-const Barres = ({ lignes, total, ton }) => (
-  <div className="cptBarres">
-    {[...lignes]
-      .sort((a, b) => b.montant - a.montant)
-      .slice(0, 8)
-      .map((l) => (
-        <div key={l.compte} className="cptBarre">
-          <span className="cptBarreNom" title={`${l.compte} — ${l.label}`}>
-            {l.label}
-          </span>
-          <span className="cptBarrePiste">
-            <span
-              className="cptBarreRemplie"
-              data-ton={ton}
-              style={{ width: `${total ? (l.montant / total) * 100 : 0}%` }}
-            />
-          </span>
-          <span className="cptBarreVal">{D.fcfa(l.montant)}</span>
-        </div>
+    <select
+      value={cle}
+      onChange={(e) => {
+        const [du, au] = e.target.value.split("|");
+        onChanger({ du, au });
+      }}
+    >
+      {options.some((o) => `${o.du}|${o.au}` === cle) ? null : <option value={cle}>{`${valeur.du} → ${valeur.au}`}</option>}
+      {options.map((o) => (
+        <option key={`${o.du}|${o.au}`} value={`${o.du}|${o.au}`}>{o.label}</option>
       ))}
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// Saisie
-// ---------------------------------------------------------------------------
-
-const Saisie = ({
-  suggerees,
-  occupe,
-  brouillon,
-  setBrouillon,
-  onAccepter,
-  onToutAccepter,
-  onEnregistrer,
-}) => {
-  const familles = useMemo(() => {
-    const m = new Map();
-    for (const mod of D.MODELES) {
-      if (!m.has(mod.famille)) m.set(mod.famille, []);
-      m.get(mod.famille).push(mod);
-    }
-    return [...m.entries()];
-  }, []);
-
-  const modele = brouillon?.modele
-    ? D.MODELES.find((m) => m.id === brouillon.modele)
-    : null;
-
-  const apercu = useMemo(() => {
-    if (!modele || !brouillon?.montant) return null;
-    return D.ecritureDepuisModele({
-      modele,
-      montant: brouillon.montant,
-      date: brouillon.date,
-      libelle: brouillon.libelle,
-      taux: brouillon.taux,
-      compteTresorerie: brouillon.compteTresorerie,
-      tiers: brouillon.tiers,
-    });
-  }, [modele, brouillon]);
-
-  return (
-    <>
-      {suggerees.length ? (
-        <div className="cptBloc">
-          <div className="cptBlocEntete">
-            <h3>Reprises de la Facturation</h3>
-            <Bouton icone="faCheckDouble" off={occupe} onClick={onToutAccepter}>
-              Tout comptabiliser ({suggerees.length})
-            </Bouton>
-          </div>
-          <p className="cptAide">
-            Ces écritures découlent de pièces déjà émises dans CompanyOS. Elles ne
-            seront jamais comptabilisées deux fois : chacune garde la trace de sa
-            pièce d'origine.
-          </p>
-          <div className="cptSuggestions">
-            {suggerees.slice(0, 25).map((s) => (
-              <div key={s.origine} className="cptSuggestion">
-                <div className="cptSugTete">
-                  <span className="cptSugDate">{s.date}</span>
-                  <span className="cptSugLib">{s.libelle}</span>
-                  <Bouton
-                    variante="secondaire"
-                    icone="faCheck"
-                    off={occupe}
-                    onClick={() => onAccepter(s)}
-                  >
-                    Comptabiliser
-                  </Bouton>
-                </div>
-                <LignesEcriture lignes={s.lignes} />
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="cptBloc">
-        <h3>Enregistrer une opération</h3>
-        <p className="cptAide">
-          Choisissez ce que vous avez fait. Les comptes sont trouvés pour vous —
-          vous verrez l'écriture avant de l'enregistrer.
-        </p>
-
-        <div className="cptModeles">
-          {familles.map(([famille, liste]) => (
-            <div key={famille} className="cptFamille">
-              <div className="cptFamilleNom">{famille}</div>
-              <div className="cptFamilleListe">
-                {liste.map((m) => (
-                  <div
-                    key={m.id}
-                    className="cptModele handcr"
-                    data-actif={brouillon?.modele === m.id}
-                    onClick={() =>
-                      setBrouillon({
-                        modele: m.id,
-                        date: aujourdhui(),
-                        montant: "",
-                        libelle: "",
-                        taux: 18,
-                        compteTresorerie: m.tresorerie ? "571" : undefined,
-                        tiers: "",
-                      })
-                    }
-                  >
-                    {m.phrase}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {modele ? (
-          <div className="cptFormulaire">
-            {modele.aide ? <Notice ton="info">{modele.aide}</Notice> : null}
-
-            <div className="cptChamps">
-              <Champ label="Montant reçu ou payé" aide="Tel qu'il est sur le reçu, taxe comprise">
-                <input
-                  type="number"
-                  autoFocus
-                  value={brouillon.montant}
-                  onChange={(e) =>
-                    setBrouillon((b) => ({ ...b, montant: e.target.value }))
-                  }
-                  placeholder="0"
-                />
-              </Champ>
-              <Champ label="Date">
-                <input
-                  type="date"
-                  value={brouillon.date}
-                  onChange={(e) => setBrouillon((b) => ({ ...b, date: e.target.value }))}
-                />
-              </Champ>
-              {modele.tva ? (
-                <Champ label="TVA">
-                  <select
-                    value={brouillon.taux}
-                    onChange={(e) =>
-                      setBrouillon((b) => ({ ...b, taux: Number(e.target.value) }))
-                    }
-                  >
-                    {D.TAUX_TVA.map((t) => (
-                      <option key={t} value={t}>
-                        {t ? `${t} %` : "Exonéré"}
-                      </option>
-                    ))}
-                  </select>
-                </Champ>
-              ) : null}
-              {modele.tresorerie ? (
-                <Champ label="Payé par">
-                  <select
-                    value={brouillon.compteTresorerie}
-                    onChange={(e) =>
-                      setBrouillon((b) => ({ ...b, compteTresorerie: e.target.value }))
-                    }
-                  >
-                    {D.TRESORERIE.map((t) => (
-                      <option key={t.code} value={t.code}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </Champ>
-              ) : null}
-            </div>
-
-            <Champ label="Précision" aide="Facultatif — ce qui vous aidera à vous en souvenir">
-              <input
-                value={brouillon.libelle}
-                onChange={(e) => setBrouillon((b) => ({ ...b, libelle: e.target.value }))}
-                placeholder={modele.phrase}
-              />
-            </Champ>
-
-            {apercu ? (
-              <div className="cptApercu">
-                <div className="cptApercuTitre">
-                  Voici l'écriture qui sera enregistrée
-                </div>
-                <LignesEcriture lignes={apercu.lignes} />
-              </div>
-            ) : null}
-
-            <div className="cptActions">
-              <Bouton
-                icone="faCheck"
-                off={occupe || !apercu}
-                onClick={() => onEnregistrer(apercu)}
-              >
-                Enregistrer au journal
-              </Bouton>
-              <Bouton variante="secondaire" onClick={() => setBrouillon(null)}>
-                Annuler
-              </Bouton>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </>
-  );
-};
-
-/// Les lignes d'une écriture, toujours affichées de la même façon : c'est
-/// ce qui permet à l'utilisateur d'apprendre la partie double sans qu'on
-/// la lui impose.
-const LignesEcriture = ({ lignes }) => (
-  <table className="cptLignes">
-    <tbody>
-      {lignes.map((l, i) => (
-        <tr key={i}>
-          <td className="cptCode">{l.compte}</td>
-          <td className="cptLib">{D.intitule(l.compte)}</td>
-          <td className="cptMt">{l.debit ? D.fcfa(l.debit) : ""}</td>
-          <td className="cptMt">{l.credit ? D.fcfa(l.credit) : ""}</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
-
-// ---------------------------------------------------------------------------
-// Journal
-// ---------------------------------------------------------------------------
-
-const Journal = ({ journal, onContrepasser }) =>
-  journal.length ? (
-    <div className="cptBloc">
-      <h3>Journal — {journal.length} écriture(s)</h3>
-      <p className="cptAide">
-        Le journal ne se corrige pas : une écriture fausse s'annule par une
-        écriture inverse. C'est ce qui le rend opposable.
-      </p>
-      {journal.map((e) => (
-        <div key={e.id} className="cptEcriture">
-          <div className="cptEcrTete">
-            <span className="cptSugDate">{e.data.date}</span>
-            <span className="cptSugLib">{e.data.libelle}</span>
-            {e.data.origine ? (
-              <span className="cptOrigine" title="Reprise automatique de la Facturation">
-                <Icon fafa="faLink" width={9} /> Facturation
-              </span>
-            ) : null}
-            <span
-              className="cptContrepasser handcr"
-              title="Annuler par une écriture inverse"
-              onClick={() => onContrepasser(e)}
-            >
-              <Icon fafa="faRotateLeft" width={11} />
-            </span>
-          </div>
-          <LignesEcriture lignes={e.data.lignes || []} />
-          <Auteur record={e} />
-        </div>
-      ))}
-    </div>
-  ) : (
-    <Vide
-      icone="faBook"
-      titre="Aucune écriture sur la période"
-      aide="Enregistrez une opération, ou reprenez celles que la Facturation propose."
-    />
-  );
-
-// ---------------------------------------------------------------------------
-// Grand livre, balance, états
-// ---------------------------------------------------------------------------
-
-const GrandLivre = ({ balance, compte, onChoisir, lignes }) => (
-  <div className="cptBloc">
-    <div className="cptBlocEntete">
-      <h3>Grand livre</h3>
-      <select value={compte} onChange={(e) => onChoisir(e.target.value)}>
-        {balance.length ? (
-          balance.map((c) => (
-            <option key={c.compte} value={c.compte}>
-              {c.compte} — {c.label}
-            </option>
-          ))
-        ) : (
-          <option value="">Aucun compte mouvementé</option>
-        )}
-      </select>
-    </div>
-    {lignes.length ? (
-      <table className="cptTable">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Libellé</th>
-            <th className="cptMt">Débit</th>
-            <th className="cptMt">Crédit</th>
-            <th className="cptMt">Solde</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lignes.map((l, i) => (
-            <tr key={i}>
-              <td>{l.date}</td>
-              <td>{l.libelle}</td>
-              <td className="cptMt">{l.debit ? D.fcfa(l.debit) : ""}</td>
-              <td className="cptMt">{l.credit ? D.fcfa(l.credit) : ""}</td>
-              <td className="cptMt cptSolde">{D.fcfa(l.solde)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    ) : (
-      <p className="cptRien">Ce compte n'a pas bougé sur la période.</p>
-    )}
-  </div>
-);
-
-const Balance = ({ balance }) => {
-  const t = balance.reduce(
-    (s, c) => ({ debit: s.debit + c.debit, credit: s.credit + c.credit }),
-    { debit: 0, credit: 0 },
-  );
-  return balance.length ? (
-    <div className="cptBloc">
-      <h3>Balance générale</h3>
-      <table className="cptTable">
-        <thead>
-          <tr>
-            <th>Compte</th>
-            <th>Intitulé</th>
-            <th className="cptMt">Débit</th>
-            <th className="cptMt">Crédit</th>
-            <th className="cptMt">Solde</th>
-          </tr>
-        </thead>
-        <tbody>
-          {balance.map((c) => (
-            <tr key={c.compte}>
-              <td className="cptCode">{c.compte}</td>
-              <td>{c.label}</td>
-              <td className="cptMt">{D.fcfa(c.debit)}</td>
-              <td className="cptMt">{D.fcfa(c.credit)}</td>
-              <td className="cptMt cptSolde">{D.fcfa(c.solde)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={2}>Totaux</td>
-            <td className="cptMt">{D.fcfa(t.debit)}</td>
-            <td className="cptMt">{D.fcfa(t.credit)}</td>
-            <td className="cptMt">{D.fcfa(t.debit - t.credit)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  ) : (
-    <Vide icone="faScaleBalanced" titre="Rien à équilibrer pour l'instant" />
-  );
-};
-
-const Resultat = ({ resultat }) => (
-  <div className="cptBloc">
-    <h3>Compte de résultat</h3>
-    <div className="cptDeux">
-      <Colonne titre="Charges" lignes={resultat.charges} total={resultat.totalCharges} />
-      <Colonne titre="Produits" lignes={resultat.produits} total={resultat.totalProduits} />
-    </div>
-    <div className="cptResultat" data-ton={resultat.resultat >= 0 ? "ok" : "danger"}>
-      <span>{resultat.resultat >= 0 ? "Bénéfice" : "Perte"}</span>
-      <b>{D.fcfa(Math.abs(resultat.resultat))}</b>
-    </div>
-  </div>
-);
-
-const Bilan = ({ bilan }) => (
-  <div className="cptBloc">
-    <h3>Bilan</h3>
-    <div className="cptDeux">
-      <Colonne titre="Actif — ce que l'entreprise possède" lignes={bilan.actif} total={bilan.totalActif} />
-      <Colonne
-        titre="Passif — ce qu'elle doit"
-        lignes={[
-          ...bilan.passif,
-          {
-            compte: "131",
-            label: bilan.resultat >= 0 ? "Résultat de l'exercice" : "Résultat de l'exercice (perte)",
-            montant: bilan.resultat,
-          },
-        ]}
-        total={bilan.totalPassif}
-      />
-    </div>
-    {!bilan.equilibre ? (
-      <Notice ton="erreur">
-        L'actif et le passif ne s'équilibrent pas. Une écriture est fausse — le
-        journal vous dira laquelle.
-      </Notice>
-    ) : null}
-  </div>
-);
-
-const Colonne = ({ titre, lignes, total }) => (
-  <div>
-    <h4 className="cptColTitre">{titre}</h4>
-    <table className="cptTable">
-      <tbody>
-        {lignes.length ? (
-          lignes.map((l) => (
-            <tr key={l.compte}>
-              <td className="cptCode">{l.compte}</td>
-              <td>{l.label}</td>
-              <td className="cptMt">{D.fcfa(l.montant)}</td>
-            </tr>
-          ))
-        ) : (
-          <tr>
-            <td colSpan={3} className="cptRien">
-              Rien à cette rubrique.
-            </td>
-          </tr>
-        )}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colSpan={2}>Total</td>
-          <td className="cptMt">{D.fcfa(total)}</td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-);
-
-const Tva = ({ tva, periode, onPeriode }) => (
-  <div className="cptBloc">
-    <h3>TVA de la période</h3>
-    <p className="cptAide">
-      En Côte d'Ivoire, la déclaration mensuelle (CA02) se dépose avant le 15 du
-      mois suivant. Choisissez le mois en haut de l'écran pour obtenir les
-      montants à reporter.
-    </p>
-    <table className="cptTable">
-      <tbody>
-        <tr>
-          <td className="cptCode">4431</td>
-          <td>TVA facturée à vos clients</td>
-          <td className="cptMt">{D.fcfa(tva.collectee)}</td>
-        </tr>
-        <tr>
-          <td className="cptCode">4452</td>
-          <td>TVA payée à vos fournisseurs, récupérable</td>
-          <td className="cptMt">− {D.fcfa(tva.deductible)}</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colSpan={2}>{tva.aPayer ? "À reverser à l'État" : "Crédit de TVA reportable"}</td>
-          <td className="cptMt">{D.fcfa(tva.aPayer || tva.credit)}</td>
-        </tr>
-      </tfoot>
-    </table>
-    {tva.credit ? (
-      <Notice ton="info">
-        Vous avez payé plus de TVA que vous n'en avez facturé. Ce crédit se
-        reporte sur les mois suivants ; il n'est pas remboursé automatiquement.
-      </Notice>
-    ) : null}
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// Postes ouverts
-// ---------------------------------------------------------------------------
-
-/// « Qui me doit quoi » — la question que le solde d'un compte de tiers ne
-/// répond jamais. Chaque poste garde sa facture d'origine et son âge.
-const Tiers = ({ clients, fournisseurs }) => (
-  <>
-    <ColonneTiers
-      titre="Ce que vos clients vous doivent"
-      aide="Chaque ligne est une facture non soldée. Le rapprochement avec les règlements est automatique : ce qui reste ici n'a réellement pas été payé."
-      vide="Aucune facture en attente de règlement."
-      tiers={clients}
-      sens={1}
-    />
-    <ColonneTiers
-      titre="Ce que vous devez à vos fournisseurs"
-      aide="Les factures d'achat que vous n'avez pas encore réglées."
-      vide="Rien à payer à ce jour."
-      tiers={fournisseurs}
-      sens={-1}
-    />
-  </>
-);
-
-const ColonneTiers = ({ titre, aide, vide, tiers, sens }) => {
-  const total = tiers.reduce((s, t) => s + t.total, 0);
-  return (
-    <div className="cptBloc">
-      <h3>{titre}</h3>
-      <p className="cptAide">{aide}</p>
-      {tiers.length ? (
-        <table className="cptTable">
-          <thead>
-            <tr>
-              <th>Tiers</th>
-              <th className="cptMt">À jour</th>
-              <th className="cptMt">1 – 30 j</th>
-              <th className="cptMt">31 – 60 j</th>
-              <th className="cptMt">61 – 90 j</th>
-              <th className="cptMt">+ de 90 j</th>
-              <th className="cptMt">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tiers.map((t) => (
-              <React.Fragment key={t.tiers}>
-                <tr className="cptTiersLigne">
-                  <td>{t.tiers}</td>
-                  <td className="cptMt">{t.aJour ? D.fcfa(t.aJour * sens) : ""}</td>
-                  <td className="cptMt">{t.j30 ? D.fcfa(t.j30 * sens) : ""}</td>
-                  <td className="cptMt">{t.j60 ? D.fcfa(t.j60 * sens) : ""}</td>
-                  <td className="cptMt">{t.j90 ? D.fcfa(t.j90 * sens) : ""}</td>
-                  {/* Au-delà de 90 jours, une créance change de nature : on
-                      ne relance plus, on provisionne. D'où la mise en
-                      évidence. */}
-                  <td className="cptMt cptRetard">
-                    {t.plus ? D.fcfa(t.plus * sens) : ""}
-                  </td>
-                  <td className="cptMt cptSolde">{D.fcfa(t.total * sens)}</td>
-                </tr>
-                {t.postes.map((p) => (
-                  <tr key={p.piece + p.date} className="cptPoste">
-                    <td colSpan={5}>
-                      <span className="cptCode">{p.piece || "sans pièce"}</span>{" "}
-                      {p.libelle}
-                    </td>
-                    <td className="cptMt">{p.age > 0 ? `${p.age} j` : "à jour"}</td>
-                    <td className="cptMt">{D.fcfa(p.solde * sens)}</td>
-                  </tr>
-                ))}
-              </React.Fragment>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={6}>Total</td>
-              <td className="cptMt">{D.fcfa(total * sens)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      ) : (
-        <p className="cptRien">{vide}</p>
-      )}
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Clôture
-// ---------------------------------------------------------------------------
-
-const Cloture = ({ clotureAu, occupe, onCloturer }) => {
-  const [date, setDate] = useState(clotureAu || "");
-  return (
-    <div className="cptBloc">
-      <h3>Clôture de période</h3>
-      <p className="cptAide">
-        Une fois la TVA d'un mois déclarée, plus rien ne doit pouvoir s'y
-        ajouter : sinon vos livres cessent de correspondre à ce que vous avez
-        déposé, et personne ne s'en aperçoit avant le contrôle. La clôture
-        n'efface rien et ne fige aucun état — elle empêche seulement de dater
-        une écriture dans le passé.
-      </p>
-
-      {clotureAu ? (
-        <Notice ton="info" icone="faLock">
-          Les écritures sont verrouillées jusqu'au {clotureAu} inclus.
-        </Notice>
-      ) : (
-        <Notice ton="attention" icone="faLockOpen">
-          Aucune période n'est close : une écriture peut être datée de
-          n'importe quand.
-        </Notice>
-      )}
-
-      <div className="cptChamps">
-        <Champ label="Clôturer jusqu'au" aide="Inclus. Laissez vide pour tout rouvrir.">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Champ>
-      </div>
-      <div className="cptActions">
-        <Bouton icone="faLock" off={occupe || date === clotureAu} onClick={() => onCloturer(date)}>
-          {date ? "Clôturer la période" : "Rouvrir tout"}
-        </Bouton>
-      </div>
-    </div>
-  );
-};
-
-const Plan = () => {
-  const [q, setQ] = useState("");
-  const liste = D.PLAN.filter(
-    (c) =>
-      !q.trim() ||
-      c.code.includes(q.trim()) ||
-      c.label.toLowerCase().includes(q.trim().toLowerCase()),
-  );
-  return (
-    <div className="cptBloc">
-      <h3>Plan comptable SYSCOHADA révisé</h3>
-      <p className="cptAide">
-        Le référentiel des 17 pays de l'OHADA. Vous n'avez pas à le connaître :
-        il est là pour vérifier, ou pour répondre à votre comptable.
-      </p>
-      <input
-        className="cptRecherche"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Chercher un compte ou un mot…"
-      />
-      {Object.entries(D.CLASSES)
-        .filter(([n]) => liste.some((c) => D.classeDe(c.code) === Number(n)))
-        .map(([n, cl]) => (
-          <div key={n} className="cptClasse">
-            <div className="cptClasseNom">
-              Classe {n} — {cl.label}
-            </div>
-            <table className="cptTable">
-              <tbody>
-                {liste
-                  .filter((c) => D.classeDe(c.code) === Number(n))
-                  .map((c) => (
-                    <tr key={c.code}>
-                      <td className="cptCode">{c.code}</td>
-                      <td>{c.label}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
-    </div>
+    </select>
   );
 };
