@@ -145,30 +145,9 @@ header.site .actions { display: flex; align-items: center; gap: 6px; margin-left
 .heros .badgePH:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
 /* Le produit, posé comme une photo. */
-.vitrines {
-  position: relative; border-radius: 12px; padding: 48px 22px 22px;
-  background: linear-gradient(180deg, #f7f9fb, #e9eef3);
-  box-shadow: 0 30px 80px rgb(0 0 0 / 45%), 0 0 0 1px rgb(255 255 255 / 10%);
-  display: grid; grid-template-columns: 1.15fr 1fr; grid-template-rows: auto 1fr; gap: 14px; color: var(--texte);
-}
-.vitrines::before {
-  content: "CompanyOS"; position: absolute; inset: 0 0 auto; height: 34px;
-  display: flex; align-items: center; padding-left: 14px; font-size: 12px; color: var(--texte-3);
-  background: #fff; border-bottom: 1px solid var(--ligne); border-radius: 12px 12px 0 0;
-}
-.vitrines::after {
-  /* Les trois boutons d'une fenêtre Windows, à droite. */
-  content: "—   ▢   ✕"; position: absolute; right: 16px; top: 9px; font-size: 11px; color: #707070; white-space: pre;
-}
-.appCarte { background: #fff; border-radius: 8px; box-shadow: var(--ombre-carte); overflow: hidden; }
-.appCarte > header { padding: 10px 14px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--gris); }
-.appCarte > header i { display: none; }
-.appCarte .corps { padding: 12px 14px 14px; font-size: 13px; color: var(--texte-2); }
-.carte-crm { grid-column: 1; grid-row: 1; }
-.carte-flux { grid-column: 1; grid-row: 2; }
-.carte-fact { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; }
-.carte-fact .corps { flex: 1; display: flex; flex-direction: column; }
-.carte-fact .barres { flex: 1; min-height: 90px; height: auto; }
+/* La vraie capture du bureau, cadrée comme une fenêtre posée sur le fond. */
+.captureHero { margin: 0; border-radius: 12px; overflow: hidden; border: 1px solid rgb(255 255 255 / 14%); box-shadow: 0 30px 80px rgb(0 0 0 / 45%); background: #eef3fb; }
+.captureHero img { display: block; width: 100%; height: auto; }
 .jauge { margin-top: 12px; }
 .legende { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
 .rail { height: 7px; border-radius: 99px; background: var(--gris); overflow: hidden; }
@@ -202,7 +181,8 @@ header.site .actions { display: flex; align-items: center; gap: 6px; margin-left
 .maillon b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 15.5px; font-weight: 600; }
 .maillon small { display: block; color: #b3b3b3; font-size: 13.5px; margin-top: 2px; }
 .etiquette { font-size: 11.5px; font-weight: 600; color: #000; background: var(--jaune); padding: 1px 7px; border-radius: 2px; }
-.fait { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #107c10; color: #fff; font-style: normal; font-size: 12px; font-weight: 700; flex: none; }
+.fait { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #107c10; color: #fff; font-style: normal; flex: none; }
+.fait .icone { width: 14px; height: 14px; stroke-width: 3; }
 
 /* ---- Bande bleue de recherche --------------------------------------------- */
 
@@ -237,6 +217,10 @@ header.site .actions { display: flex; align-items: center; gap: 6px; margin-left
 .carte:hover { box-shadow: var(--ombre-survol); }
 .carteImage { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
 .carteImage img { width: 76px; height: 76px; filter: drop-shadow(0 10px 18px rgb(0 0 0 / 22%)); }
+/* Carte avec capture : l'écran déborde en bas à droite, l'icône de l'app en médaillon. */
+.carteCapture { place-items: stretch; padding: 18px 0 0 18px; }
+.carteCapture .capture { width: 100%; height: 100%; object-fit: cover; object-position: left top; border-radius: 8px 0 0 0; box-shadow: 0 10px 30px rgb(0 40 90 / 22%); filter: none; }
+.carteCapture .carteIcone { position: absolute; left: 14px; bottom: 14px; width: 44px; height: 44px; filter: drop-shadow(0 6px 12px rgb(0 0 0 / 25%)); }
 .carteImage[data-teinte="vert"] { background: linear-gradient(135deg, #e3f4ea, #b9e3c9); }
 .carteImage[data-teinte="orange"] { background: linear-gradient(135deg, #fff1df, #ffd8a8); }
 .carteImage[data-teinte="bleu"] { background: linear-gradient(135deg, #e5f1fb, #b7d9f4); }
@@ -256,8 +240,9 @@ header.site .actions { display: flex; align-items: center; gap: 6px; margin-left
 .carteLarge p { flex: 0; font-size: 16px; }
 .carteLarge ul { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; color: var(--texte-2); }
 .carteLarge li { position: relative; padding-left: 26px; }
-.carteLarge li::before { content: "✓"; position: absolute; left: 0; color: var(--bleu); font-weight: 700; }
+.carteLarge li::before { content: ""; position: absolute; left: 0; top: 0.2em; width: 16px; height: 16px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230067b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E") center / 14px no-repeat; }
 .carteLarge .visuel { background: linear-gradient(135deg, #dcecfb, #f4f8fc 60%, #e6f4f4); padding: 40px clamp(20px, 3vw, 44px); display: grid; place-items: center; }
+.carteLarge .visuel .capture { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 18px 40px rgb(0 40 90 / 18%); }
 .ecran { width: 100%; background: #fff; border-radius: 10px; box-shadow: 0 18px 40px rgb(0 40 90 / 18%); overflow: hidden; }
 .ecranBarre { display: flex; align-items: center; height: 34px; padding: 0 14px; font-size: 12px; color: var(--texte-3); border-bottom: 1px solid var(--gris); }
 .ecranBarre i { display: none; }
@@ -310,10 +295,11 @@ section { padding: 72px 0; }
 .histoireTexte p { margin-top: 14px; color: var(--texte-2); font-size: 16px; }
 .histoireTexte ul { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
 .histoireTexte li { position: relative; padding-left: 26px; }
-.histoireTexte li::before { content: "✓"; position: absolute; left: 0; color: var(--bleu); font-weight: 700; }
+.histoireTexte li::before { content: ""; position: absolute; left: 0; top: 0.2em; width: 16px; height: 16px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230067b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E") center / 14px no-repeat; }
 .histoireTexte .btn { align-self: flex-start; margin-top: 26px; }
 .histoireVisuel { position: relative; display: grid; place-items: center; padding: 40px; background: linear-gradient(135deg, #0a1426, #0d3b66); }
 .histoireVisuel[data-teinte="sarcelle"] { background: linear-gradient(135deg, #062a2c, #0b5f63); }
+.histoireVisuel .capture { display: block; width: min(100%, 620px); height: auto; border-radius: 10px; box-shadow: 0 24px 60px rgb(0 0 0 / 40%); }
 .miniFenetre { width: min(100%, 420px); background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 24px 60px rgb(0 0 0 / 40%); }
 .miniFenetre > header { padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--texte-3); border-bottom: 1px solid var(--gris); }
 .miniFenetre .corps { padding: 6px 16px; }
@@ -377,7 +363,7 @@ section { padding: 72px 0; }
 .tarif > p { color: var(--texte-2); min-height: 3em; }
 .tarif ul { list-style: none; padding: 18px 0 0; margin: 18px 0 26px; display: grid; gap: 10px; align-content: start; flex: 1; border-top: 1px solid var(--ligne); }
 .tarif li { position: relative; padding-left: 28px; }
-.tarif li::before { content: "✓"; position: absolute; left: 2px; color: var(--bleu); font-weight: 700; }
+.tarif li::before { content: ""; position: absolute; left: 2px; top: 0.2em; width: 16px; height: 16px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230067b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E") center / 14px no-repeat; }
 .tarif .btn { width: 100%; }
 .noteDevise { margin-top: 18px; color: var(--texte-3); font-size: 13px; }
 
@@ -453,9 +439,6 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
   .heros h1 { font-size: 34px; }
   .heros .argument { font-size: 16px; }
   .heros .actions .btn { flex: 1 1 100%; }
-  .vitrines { grid-template-columns: 1fr; padding: 44px 12px 12px; }
-  .carte-crm, .carte-fact, .carte-flux { grid-row: auto; grid-column: auto; }
-  .carte-flux { display: none; }
   .raccourcis ul { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px 8px; }
   .raccourcis a { font-size: 13px; text-align: center; }
   .grilleCartes, .etapes, .gardes, .tarifs, .chiffres { grid-template-columns: 1fr; }
@@ -537,47 +520,11 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
         <div class="note" data-i18n="heros.note">Formule Découverte gratuite · sans carte bancaire</div>
         <a class="badgePH" href="https://www.producthunt.com/products/companyos?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-companyos" target="_blank" rel="noopener noreferrer"><img alt="CompanyOS - Run your entire business from one simple platform | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1273262&amp;theme=light&amp;t=1791465259446"></a>
       </div>
-      <div class="vitrines" aria-hidden="true">
-        <div class="appCarte carte-crm">
-          <header><span data-i18n="carte.crm.nom">CRM</span></header>
-          <div class="corps">
-            <b style="color:var(--texte)">Pipeline</b> <small data-i18n="carte.crm.tempsReel">· temps réel</small>
-            <div class="jauge">
-              <div class="legende"><span data-i18n="carte.crm.prospection">Prospection</span><span>72 %</span></div>
-              <div class="rail"><i style="width:72%; background:#0078d4"></i></div>
-            </div>
-            <div class="jauge">
-              <div class="legende"><span data-i18n="carte.crm.negociation">Négociation</span><span>48 %</span></div>
-              <div class="rail"><i style="width:48%; background:#ffb900"></i></div>
-            </div>
-            <div class="jauge">
-              <div class="legende"><span data-i18n="carte.crm.signe">Signé</span><span>91 %</span></div>
-              <div class="rail"><i style="width:91%; background:#107c10"></i></div>
-            </div>
-          </div>
-        </div>
-        <div class="appCarte carte-fact">
-          <header><span data-i18n="carte.fact.nom">Facturation</span></header>
-          <div class="corps">
-            <small data-i18n="carte.fact.encaisse">Encaissé ce mois</small>
-            <div class="gros">1,84 M F</div>
-            <div class="barres">
-              <i style="height:34%"></i><i style="height:52%"></i><i style="height:40%"></i>
-              <i style="height:68%"></i><i style="height:100%"></i><i style="height:74%"></i>
-              <i style="height:86%"></i>
-            </div>
-          </div>
-        </div>
-        <div class="appCarte carte-flux">
-          <header><span data-i18n="carte.flux.nom">En arrière-plan</span></header>
-          <div class="corps">
-            <div class="fluxLigne"><i>✓</i><span data-i18n="carte.flux.l1">Facture FA-0241 générée</span></div>
-            <div class="fluxLigne"><i>✓</i><span data-i18n="carte.flux.l2">Stock mis à jour</span></div>
-            <div class="fluxLigne"><i>✓</i><span data-i18n="carte.flux.l3">Écriture comptable proposée</span></div>
-            <div class="fluxLigne"><i>✓</i><span data-i18n="carte.flux.l4">Gérant notifié</span></div>
-          </div>
-        </div>
-      </div>
+      <figure class="captureHero">
+        <img src="img/landing/hero.webp" width="1600" height="1000" fetchpriority="high"
+          alt="Le bureau CompanyOS : la Facturation ouverte en fenêtre, le panneau Aujourd'hui à droite"
+          data-i18n-alt="capt.hero">
+      </figure>
     </div>
   </section>
 
@@ -603,7 +550,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             <b data-i18n="maillon.1.t">Vente encaissée <span class="etiquette">Caisse</span></b>
             <small data-i18n="maillon.1.d">Espèces + Orange Money sur le même ticket.</small>
           </div>
-          <i class="fait">✓</i>
+          <i class="fait"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></i>
         </div>
         <div class="maillon">
           <div class="pictoApp"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 7.5l-9-5-9 5v9l9 5 9-5z"/><path d="M3 7.5l9 5 9-5M12 12.5v9"/></svg></div>
@@ -611,7 +558,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             <b data-i18n="maillon.2.t">Stock déduit <span class="etiquette">Stock</span></b>
             <small data-i18n="maillon.2.d">Chaque article vendu sort de l'inventaire, à la pièce.</small>
           </div>
-          <i class="fait">✓</i>
+          <i class="fait"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></i>
         </div>
         <div class="maillon">
           <div class="pictoApp"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"/></svg></div>
@@ -619,7 +566,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             <b data-i18n="maillon.3.t">Écriture comptable proposée <span class="etiquette">Comptabilité</span></b>
             <small data-i18n="maillon.3.d">Journal de caisse SYSCOHADA, équilibré, prêt à valider.</small>
           </div>
-          <i class="fait">✓</i>
+          <i class="fait"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></i>
         </div>
         <div class="maillon">
           <div class="pictoApp"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><path d="M6 21v-7M11 21V7M16 21V11M21 21V4"/></svg></div>
@@ -627,7 +574,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             <b data-i18n="maillon.4.t">Statistiques à jour <span class="etiquette">Tableau de bord</span></b>
             <small data-i18n="maillon.4.d">La recette du jour s'affiche sur le bureau du gérant.</small>
           </div>
-          <i class="fait">✓</i>
+          <i class="fait"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></i>
         </div>
         <div class="maillon">
           <div class="pictoApp"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 5 2 6.5 2 6.5H4s2-1.5 2-6.5"/><path d="M10 19.5a2 2 0 0 0 4 0"/></svg></div>
@@ -635,7 +582,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             <b data-i18n="maillon.5.t">Alerte de rupture envoyée <span class="etiquette">Notifications</span></b>
             <small data-i18n="maillon.5.d">Le riz 25 kg passe sous le seuil : l'acheteur est prévenu.</small>
           </div>
-          <i class="fait">✓</i>
+          <i class="fait"><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></i>
         </div>
       </div>
       <div>
@@ -673,7 +620,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
     <div class="cadre">
       <div class="grilleCartes">
         <article class="carte" id="carte-facturation">
-          <div class="carteImage" data-teinte="vert"><img src="img/icon/cos/facturation.svg" alt=""></div>
+          <div class="carteImage carteCapture" data-teinte="vert"><img class="capture" src="img/landing/carte-facturation.webp" width="720" height="405" loading="lazy" alt="La Facturation : factures, états de paiement et relances" data-i18n-alt="capt.facturation"><img class="carteIcone" src="img/icon/cos/facturation.svg" alt=""></div>
           <div class="carteCorps">
             <span class="badge" data-i18n="carte.p1.badge">Le plus utilisé</span>
             <h3 data-i18n="carte.p1.t">Des factures qui se relancent toutes seules</h3>
@@ -682,7 +629,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
           </div>
         </article>
         <article class="carte">
-          <div class="carteImage" data-teinte="orange"><img src="img/icon/cos/caisse.svg" alt=""></div>
+          <div class="carteImage carteCapture" data-teinte="orange"><img class="capture" src="img/landing/carte-caisse.webp" width="720" height="405" loading="lazy" alt="La Caisse : un ticket en cours, les articles du stock" data-i18n-alt="capt.caisse"><img class="carteIcone" src="img/icon/cos/caisse.svg" alt=""></div>
           <div class="carteCorps">
             <h3 data-i18n="carte.p2.t">Une caisse qui parle mobile money</h3>
             <p data-i18n="carte.p2.p">Espèces, Orange Money, Wave et MTN sur le même ticket. Chaque vente déstocke les articles et finit en comptabilité.</p>
@@ -690,7 +637,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
           </div>
         </article>
         <article class="carte">
-          <div class="carteImage" data-teinte="bleu"><img src="img/icon/cos/paie.svg" alt=""></div>
+          <div class="carteImage carteCapture" data-teinte="bleu"><img class="capture" src="img/landing/carte-paie.webp" width="720" height="405" loading="lazy" alt="La Paie : un bulletin calculé avec la CNPS et l'ITS" data-i18n-alt="capt.paie"><img class="carteIcone" src="img/icon/cos/paie.svg" alt=""></div>
           <div class="carteCorps">
             <span class="badge" data-i18n="carte.p3.badge">Côte d'Ivoire</span>
             <h3 data-i18n="carte.p3.t">La paie CNPS et ITS, sans calculatrice</h3>
@@ -699,7 +646,7 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
           </div>
         </article>
         <article class="carte" id="carte-compta">
-          <div class="carteImage" data-teinte="violet"><img src="img/icon/cos/comptabilite.svg" alt=""></div>
+          <div class="carteImage carteCapture" data-teinte="violet"><img class="capture" src="img/landing/carte-compta.webp" width="720" height="405" loading="lazy" alt="La Comptabilité : trésorerie, résultat et TVA à jour" data-i18n-alt="capt.compta"><img class="carteIcone" src="img/icon/cos/comptabilite.svg" alt=""></div>
           <div class="carteCorps">
             <h3 data-i18n="carte.p4.t">La comptabilité SYSCOHADA, déjà tenue</h3>
             <p data-i18n="carte.p4.p">Journaux, grand livre et balance. Les écritures se proposent depuis les factures, la caisse et la paie : inutile de connaître les numéros de compte.</p>
@@ -722,19 +669,10 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
           </ul>
           <a class="btn btn-bleu" href="/?connexion" data-i18n="bureau.cta">Ouvrir mon bureau</a>
         </div>
-        <div class="visuel" aria-hidden="true">
-          <div class="ecran">
-            <div class="ecranBarre"><span data-i18n="mock.titre">CompanyOS — Tableau de bord</span></div>
-            <div class="ecranCorps">
-              <h4 data-i18n="mock.resume">Aujourd'hui</h4>
-              <div class="kpis">
-                <div class="kpi"><small data-i18n="mock.k1">Encaissé</small><b>842 500 F</b></div>
-                <div class="kpi"><small data-i18n="mock.k2">Factures en retard</small><b>3</b></div>
-                <div class="kpi"><small data-i18n="mock.k3">Ruptures de stock</small><b>1</b></div>
-                <div class="kpi"><small data-i18n="mock.k4">Congés à valider</small><b>2</b></div>
-              </div>
-            </div>
-          </div>
+        <div class="visuel">
+          <img class="capture" src="img/landing/bureau.webp" width="1600" height="1000" loading="lazy"
+            alt="Le bureau CompanyOS et son panneau Aujourd'hui : encaissements, factures en retard, stock, congés"
+            data-i18n-alt="capt.bureau">
         </div>
       </article>
     </div>
@@ -861,18 +799,9 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             </ul>
             <a class="btn btn-bleu" href="/?connexion" data-i18n="histoire.cta">Essayer gratuitement</a>
           </div>
-          <div class="histoireVisuel" aria-hidden="true">
-            <div class="miniFenetre">
-              <header data-i18n="zoom1.fenetre">Caisse — Ticket n° 184</header>
-              <div class="corps">
-                <div class="miniLigne"><span data-i18n="zoom1.a1">Riz parfumé 25 kg × 2</span><b>24 000 F</b></div>
-                <div class="miniLigne"><span data-i18n="zoom1.a2">Huile 5 L × 1</span><b>6 500 F</b></div>
-                <div class="miniLigne"><span>Orange Money</span><b>20 000 F</b></div>
-                <div class="miniLigne"><span data-i18n="zoom1.a4">Espèces</span><b>10 500 F</b></div>
-                <div class="miniLigne" data-total="true"><span data-i18n="zoom1.total">Total</span><b>30 500 F</b></div>
-              </div>
-            </div>
-            <div class="puce"><i><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 7.5l-9-5-9 5v9l9 5 9-5z"/><path d="M3 7.5l9 5 9-5M12 12.5v9"/></svg></i><span data-i18n="zoom1.puce">Stock mis à jour<small>Riz 25 kg : reste 14</small></span></div>
+          <div class="histoireVisuel">
+            <img class="capture" src="img/landing/histoire-caisse.webp" width="1000" height="685" loading="lazy" alt="La Caisse : un ticket en cours, les articles du stock" data-i18n-alt="capt.caisse">
+            <div class="puce" aria-hidden="true"><i><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 7.5l-9-5-9 5v9l9 5 9-5z"/><path d="M3 7.5l9 5 9-5M12 12.5v9"/></svg></i><span data-i18n="zoom1.puce">Stock mis à jour<small>Riz 25 kg : reste 14</small></span></div>
           </div>
         </article>
 
@@ -890,17 +819,9 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             </ul>
             <a class="btn btn-bleu" href="/?connexion" data-i18n="histoire.cta">Essayer gratuitement</a>
           </div>
-          <div class="histoireVisuel" data-teinte="sarcelle" aria-hidden="true">
-            <div class="miniFenetre">
-              <header data-i18n="zoom2.fenetre">Paie — Bulletin de mars</header>
-              <div class="corps">
-                <div class="miniLigne"><span data-i18n="zoom2.a1">Salaire brut</span><b>350 000 F</b></div>
-                <div class="miniLigne"><span data-i18n="zoom2.a2">CNPS salarié</span><b>− 21 700 F</b></div>
-                <div class="miniLigne"><span>ITS</span><b>− 14 800 F</b></div>
-                <div class="miniLigne" data-total="true"><span data-i18n="zoom2.total">Net à payer</span><b>313 500 F</b></div>
-              </div>
-            </div>
-            <div class="puce"><i><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"/></svg></i><span data-i18n="zoom2.puce">Écriture proposée<small>661 / 431 / 447 — équilibrée</small></span></div>
+          <div class="histoireVisuel" data-teinte="sarcelle">
+            <img class="capture" src="img/landing/histoire-paie.webp" width="1000" height="685" loading="lazy" alt="La Paie : un bulletin calculé avec la CNPS et l'ITS" data-i18n-alt="capt.paie">
+            <div class="puce" aria-hidden="true"><i><svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"/></svg></i><span data-i18n="zoom2.puce">Écriture proposée<small>661 / 431 / 447 — équilibrée</small></span></div>
           </div>
         </article>
 
@@ -917,16 +838,8 @@ footer { background: var(--gris); color: var(--texte-3); font-size: 11px; }
             </ul>
             <a class="btn btn-bleu" href="/?connexion" data-i18n="histoire.cta">Essayer gratuitement</a>
           </div>
-          <div class="histoireVisuel" aria-hidden="true">
-            <div class="miniFenetre">
-              <header data-i18n="carte.flux.nom">En arrière-plan</header>
-              <div class="corps">
-                <div class="miniLigne"><span data-i18n="carte.flux.l1">Facture FA-0241 générée</span><b>✓</b></div>
-                <div class="miniLigne"><span data-i18n="carte.flux.l2">Stock mis à jour</span><b>✓</b></div>
-                <div class="miniLigne"><span data-i18n="carte.flux.l3">Écriture comptable proposée</span><b>✓</b></div>
-                <div class="miniLigne"><span data-i18n="carte.flux.l4">Gérant notifié</span><b>✓</b></div>
-              </div>
-            </div>
+          <div class="histoireVisuel">
+            <img class="capture" src="img/landing/histoire-editeur.webp" width="1000" height="685" loading="lazy" alt="L'Éditeur de factures : la facture et son aperçu, logo, cachet et signature" data-i18n-alt="capt.editeur">
           </div>
         </article>
       </div>

@@ -70,6 +70,13 @@
       "carte.crm.nom": "CRM", "carte.crm.tempsReel": "· temps réel",
       "carte.crm.prospection": "Prospection", "carte.crm.negociation": "Négociation", "carte.crm.signe": "Signé",
       "carte.fact.nom": "Facturation", "carte.fact.encaisse": "Encaissé ce mois",
+      "capt.hero": "Le bureau CompanyOS : la Facturation ouverte en fenêtre, le panneau Aujourd'hui à droite",
+      "capt.bureau": "Le bureau CompanyOS et son panneau Aujourd'hui : encaissements, factures en retard, stock, congés",
+      "capt.facturation": "La Facturation : factures, états de paiement et relances",
+      "capt.caisse": "La Caisse : un ticket en cours, les articles du stock",
+      "capt.paie": "La Paie : un bulletin calculé avec la CNPS et l'ITS",
+      "capt.compta": "La Comptabilité : trésorerie, résultat et TVA à jour",
+      "capt.editeur": "L'Éditeur de factures : la facture et son aperçu, logo, cachet et signature",
       "carte.flux.nom": "En arrière-plan",
       "carte.flux.l1": "Facture FA-0241 générée", "carte.flux.l2": "Stock mis à jour",
       "carte.flux.l3": "Écriture comptable proposée", "carte.flux.l4": "Gérant notifié",
@@ -264,6 +271,13 @@
       "carte.crm.nom": "CRM", "carte.crm.tempsReel": "· live",
       "carte.crm.prospection": "Prospecting", "carte.crm.negociation": "Negotiation", "carte.crm.signe": "Signed",
       "carte.fact.nom": "Invoicing", "carte.fact.encaisse": "Collected this month",
+      "capt.hero": "The CompanyOS desktop: Invoicing open in a window, the Today panel on the right",
+      "capt.bureau": "The CompanyOS desktop and its Today panel: takings, overdue invoices, stock, leave",
+      "capt.facturation": "Invoicing: invoices, payment status and reminders",
+      "capt.caisse": "Point of sale: a ticket in progress, items from inventory",
+      "capt.paie": "Payroll: a payslip calculated with CNPS and ITS",
+      "capt.compta": "Accounting: cash, profit and VAT, always up to date",
+      "capt.editeur": "The invoice designer: the invoice and its preview, logo, stamp and signature",
       "carte.flux.nom": "In the background",
       "carte.flux.l1": "Invoice FA-0241 generated", "carte.flux.l2": "Inventory updated",
       "carte.flux.l3": "Journal entry drafted", "carte.flux.l4": "Owner notified",
@@ -441,6 +455,10 @@
     document.querySelectorAll("[data-i18n]").forEach(function (el) {
       var cle = el.getAttribute("data-i18n");
       if (dico[cle] !== undefined) el.innerHTML = dico[cle];
+    });
+    document.querySelectorAll("[data-i18n-alt]").forEach(function (el) {
+      var cle = el.getAttribute("data-i18n-alt");
+      if (dico[cle] !== undefined) el.alt = dico[cle];
     });
     document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
       var cle = el.getAttribute("data-i18n-placeholder");
