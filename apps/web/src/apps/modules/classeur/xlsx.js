@@ -32,6 +32,7 @@
 
 import JSZip from "jszip";
 import { estFormule, nomDeFeuilleValide, repereColonne, valeurCalculeeClasseur, versNombre } from "./domaine.js";
+import { depuisExcel, versExcel } from "../tableur/formules.js";
 
 const MAX_LIGNES_IMPORTEES = 10000;
 const MAX_COLONNES_IMPORTEES = 702; // A → ZZ, capacité actuelle du Classeur
@@ -230,12 +231,26 @@ const feuilleXml = (feuille, indexDe, classeur, iFeuille) => {
           if ((valeur === "" || valeur === undefined) && !style && !formuleSource) return "";
           const ref = `${repereColonne(j)}${i + 1}`;
           const attrs = `r="${ref}"${style ? ` s="${style}"` : ""}`;
-          const formuleXml = formuleSource
-            ? `<f>${echapper(formuleSource.slice(1).replace(/;/g, ","))}</f>`
-            : "";
+          // Dans le fichier, une formule s'écrit à l'anglaise (SUM, virgules,
+          // point décimal) : c'est Excel qui la remet en français à
+          // l'affichage. Écrire « SOMME » donnait #NOM? au premier recalcul.
+          // Une formule illisible part sans <f> : sa valeur suffit.
+          const formuleExcel = formuleSource ? versExcel(formuleSource) : null;
+          const formuleXml = formuleExcel ? `<f>${echapper(formuleExcel)}</f>` : "";
           if (valeur === "" || valeur === undefined) return `<c ${attrs}>${formuleXml}</c>`;
           if (cel?.type === "checkbox") {
             return `<c ${attrs} t="b"><v>${String(cel.v).toUpperCase() === "TRUE" ? 1 : 0}</v></c>`;
+          }
+
+          // VRAI / FAUX calculés : de vrais booléens pour Excel.
+          if (formuleXml && (valeur === "VRAI" || valeur === "FAUX")) {
+            return `<c ${attrs} t="b">${formuleXml}<v>${valeur === "VRAI" ? 1 : 0}</v></c>`;
+          }
+          // Une date au format Date : le numéro de série qu'Excel attend.
+          const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valeur));
+          if (iso && cel?.s?.format === "date") {
+            const serie = (Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])) - Date.UTC(1899, 11, 30)) / 86400000;
+            return `<c ${attrs}>${formuleXml}<v>${serie}</v></c>`;
           }
 
           const n = versNombre(valeur);
@@ -675,11 +690,12 @@ export const depuisXlsx = async (blob, titre = "Classeur") => {
         else valeur = stylesDate.has(styleIndex) ? serieVersDate(v) : v;
       }
 
-      // Une formule présente dans le fichier reprend sa forme éditable ;
-      // Excel sépare les arguments par une virgule, nous par un
-      // point-virgule.
+      // Une formule présente dans le fichier reprend sa forme éditable, en
+      // français : noms (SUM → SOMME), points-virgules, virgule décimale.
+      // La traduction passe par le moteur : remplacer naïvement les
+      // virgules abîmait le texte entre guillemets (« "a,b" »).
       const f = premierElementDe(c, "f")?.textContent;
-      if (f) formule = `=${f.replace(/,/g, ";")}`;
+      if (f) formule = depuisExcel(f);
 
       const style = styles.get(styleIndex) || null;
       // Les cellules vides peuvent porter un fond, une bordure ou une

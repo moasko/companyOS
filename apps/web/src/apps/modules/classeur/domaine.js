@@ -26,17 +26,17 @@
 // « =SOMME(A1:A9) ». `s` est facultatif : une cellule sans mise en forme
 // n'a pas de `s` du tout, ce qui garde les classeurs légers.
 //
-// Le moteur de formules n'est pas réécrit : c'est celui du Tableur CSV,
-// importé tel quel. Deux moteurs divergeraient au premier correctif.
+// Le moteur de formules est partagé avec le Tableur CSV (voir
+// tableur/formules.js) : deux moteurs divergeraient au premier correctif.
 // ─────────────────────────────────────────────────────────────────────────
 
 import {
   calculer as calculerBrut,
-  decoderRef,
   estFormule,
   repereColonne,
   versNombre,
 } from "../tableur/domaine.js";
+import { evaluerFormule, ERREURS } from "../tableur/formules.js";
 
 export { estFormule, repereColonne, versNombre };
 
@@ -90,6 +90,13 @@ export const formater = (valeur, format = "auto", devise = "F", decimales = null
     return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString("fr-FR");
   }
 
+  // Une date (saisie au format ISO, ou rendue par AUJOURDHUI, DATE…)
+  // s'affiche à la française, comme dans Excel.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T00:00:00`);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("fr-FR");
+  }
+
   const n = versNombre(s);
   if (n === null) return s;
 
@@ -132,7 +139,12 @@ export const classeurVide = (titre = "Nouveau classeur") => ({
 
 /// La valeur brute d'une cellule, pour le moteur de formules qui ne
 /// connaît que des chaînes.
-const brutes = (cellules) => cellules.map((l) => l.map((c) => c?.v ?? ""));
+/// La grille telle que le moteur de formules la lit. Une formule saisie est
+/// rangée dans `f` avec un `v` vide : sans ce repli, le moteur voyait une
+/// cellule vide — la copie et le calcul rapide de la barre d'état
+/// perdaient toutes les cellules calculées.
+const brutes = (cellules) => cellules.map((l) => l.map((c) =>
+  ((c?.v === "" || c?.v === undefined) && c?.f ? c.f : c?.v ?? "")));
 
 /// Le résultat affiché d'une cellule : formule calculée puis mise en forme.
 export const valeurAffichee = (cellules, l, c, devise) => {
@@ -146,17 +158,20 @@ export const valeurAffichee = (cellules, l, c, devise) => {
 /// La valeur calculée **sans** mise en forme — ce qu'un export doit écrire.
 export const valeurCalculee = (cellules, l, c) => {
   const cel = cellules[l]?.[c];
-  if (!cel || (cel.v === "" && !cel.f)) return "";
-  const valeur = cel.f && cel.v === "" ? cel.f : cel.v;
+  // Une formule saisie laisse `v` vide ou absent selon le chemin : les deux
+  // cas doivent mener à la formule, comme dans `valeurAffichee`.
+  const vide = cel?.v === "" || cel?.v === undefined;
+  if (!cel || (vide && !cel.f)) return "";
+  const valeur = cel.f && vide ? cel.f : cel.v;
   return estFormule(valeur) ? calculerBrut(brutes(cellules), l, c) : valeur;
 };
 
-const REFERENCE_INTERFEUILLE = /(?:'((?:[^']|'')+)'|([A-Za-zÀ-ÿ_][A-Za-z0-9À-ÿ_.]*))!\$?([A-Z]+)\$?(\d+)/gi;
-
-/// Calcule une cellule dans le contexte du classeur entier. Excel stocke
-/// `'Paramètres'!$F$4` dans la formule, alors que l'ancien moteur ne voyait
-/// que la feuille active. Les fonctions non encore comprises conservent
-/// leur résultat Excel mis en cache au lieu d'afficher une erreur trompeuse.
+/// Calcule une cellule dans le contexte du classeur entier : les autres
+/// feuilles (`'Paramètres'!$F$4`, `Ventes!A1:A20`) sont lues directement.
+///
+/// Une formule qu'on ne sait pas calculer (fonction inconnue, syntaxe
+/// d'Excel non prise en charge) garde le résultat qu'Excel avait mis en
+/// cache dans le fichier, au lieu d'afficher une erreur trompeuse.
 export const valeurCalculeeClasseur = (classeur, iFeuille, l, c, visites = new Set()) => {
   const feuille = classeur?.feuilles?.[iFeuille];
   const cel = feuille?.cellules?.[l]?.[c];
@@ -165,26 +180,37 @@ export const valeurCalculeeClasseur = (classeur, iFeuille, l, c, visites = new S
   if (!formule) return cel.v ?? "";
 
   const cle = `${iFeuille}:${l}:${c}`;
-  if (visites.has(cle)) return "#CYCLE";
+  if (visites.has(cle)) return ERREURS.CYCLE;
   visites.add(cle);
   try {
-    let source = formule.replace(REFERENCE_INTERFEUILLE, (_, nomEntreQuotes, nomSimple, colonne, ligne) => {
-      const nom = String(nomEntreQuotes || nomSimple || "").replace(/''/g, "'");
-      const cibleFeuille = classeur.feuilles.findIndex((f) => f.nom.toLocaleLowerCase() === nom.toLocaleLowerCase());
-      const position = decoderRef(`${colonne}${ligne}`);
-      if (cibleFeuille < 0 || !position) return "0";
-      const valeur = valeurCalculeeClasseur(classeur, cibleFeuille, position.l, position.c, visites);
-      const nombre = versNombre(valeur);
-      return nombre === null ? "0" : String(nombre);
+    const indexFeuille = (nom) => {
+      if (!nom) return iFeuille;
+      const cible = nom.toLocaleLowerCase();
+      return classeur.feuilles.findIndex((f) => f.nom.toLocaleLowerCase() === cible);
+    };
+    const resultat = evaluerFormule(formule, {
+      cellule: (nom, rl, rc) => {
+        const i = indexFeuille(nom);
+        if (i < 0) return ERREURS.REF;
+        const cible = classeur.feuilles[i].cellules?.[rl]?.[rc];
+        if (!cible) return "";
+        return cible.f || estFormule(cible.v)
+          ? valeurCalculeeClasseur(classeur, i, rl, rc, visites)
+          : cible.v;
+      },
+      dimensions: (nom) => {
+        const i = indexFeuille(nom);
+        const cellules = i < 0 ? [] : classeur.feuilles[i].cellules || [];
+        return {
+          lignes: cellules.length,
+          colonnes: cellules.reduce((m, ligne) => Math.max(m, ligne?.length || 0), 0),
+        };
+      },
     });
-    source = source.replace(/\$/g, "");
-
-    const corps = brutes(feuille.cellules);
-    corps[l] = [...(corps[l] || [])];
-    corps[l][c] = source;
-    const resultat = calculerBrut(corps, l, c, new Set(), (rl, rc) =>
-      valeurCalculeeClasseur(classeur, iFeuille, rl, rc, visites));
-    if (typeof resultat === "string" && resultat.startsWith("#") && cel.v !== "" && cel.v !== formule) {
+    // Le résultat mis en cache par Excel ne sert que s'il existe : sans
+    // lui, renvoyer `cel.v` affichait une cellule vide au lieu de l'erreur.
+    if ((resultat === ERREURS.NOM || resultat === ERREURS.SYNTAXE)
+      && cel.v !== undefined && cel.v !== null && cel.v !== "" && cel.v !== formule) {
       return cel.v;
     }
     return resultat;
@@ -503,7 +529,9 @@ export const collerTSV = (cellules, texte, l0, c0) => {
 // Statistiques de sélection — la barre d'état d'un tableur
 // ---------------------------------------------------------------------------
 
-export const resume = (cellules, plage) => {
+/// `valeurDe` permet au classeur de fournir son propre calcul (références à
+/// d'autres feuilles comprises) ; par défaut, la feuille seule.
+export const resume = (cellules, plage, valeurDe = (i, j) => valeurCalculee(cellules, i, j)) => {
   const { l1, c1, l2, c2 } = normaliser(plage);
   const nombres = [];
   let remplies = 0;
@@ -511,8 +539,11 @@ export const resume = (cellules, plage) => {
   for (let i = l1; i <= l2; i += 1) {
     for (let j = c1; j <= c2; j += 1) {
       total += 1;
-      const v = valeurCalculee(cellules, i, j);
-      if (String(v ?? "") !== "") remplies += 1;
+      const v = valeurDe(i, j);
+      // Une cellule vide n'est pas un zéro : `Number("")` vaut 0, et la
+      // compter faussait la moyenne. Excel l'ignore, nous aussi.
+      if (String(v ?? "").trim() === "") continue;
+      remplies += 1;
       const n = versNombre(v);
       if (n !== null) nombres.push(n);
     }
