@@ -1,0 +1,206 @@
+// « Ouvrir depuis le Cloud » — voir ChoisirFichier.jsx.
+//
+// Posé dans une boîte « nue » : couleurs des jetons de la boîte (--cosm-*),
+// le thème sombre suit sans rien ajouter.
+
+.cfBoite {
+  display: flex;
+  flex-direction: column;
+  width: 720px;
+  max-width: 94vw;
+  height: 540px;
+  max-height: 82vh;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--cosm-text);
+
+  button { font: inherit; color: inherit; }
+
+  .cfTete {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--cosm-line);
+    color: var(--cosm-accent);
+
+    b { color: var(--cosm-text); font-size: 14px; font-weight: 600; }
+  }
+
+  .cfFermer {
+    margin-left: auto;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--cosm-muted);
+    cursor: pointer;
+
+    &:hover { background: rgb(127 127 127 / 14%); color: var(--cosm-text); }
+  }
+
+  .cfBarre {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--cosm-line);
+  }
+
+  .cfChemin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+    color: var(--cosm-muted);
+
+    button {
+      border: 0;
+      background: none;
+      padding: 3px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      color: var(--cosm-muted);
+
+      &:hover { background: rgb(127 127 127 / 12%); color: var(--cosm-text); }
+      &[data-dernier="true"] { color: var(--cosm-text); font-weight: 600; }
+    }
+  }
+
+  .cfRecherche {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 230px;
+    max-width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--cosm-line);
+    border-radius: 7px;
+    color: var(--cosm-muted);
+
+    &:focus-within { border-color: var(--cosm-accent); }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font: inherit;
+      color: var(--cosm-text);
+    }
+  }
+
+  .cfListe {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 14px 16px;
+  }
+
+  .cfGrille {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 10px;
+  }
+
+  .cfCase {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px 9px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: none;
+    cursor: pointer;
+    text-align: center;
+    min-width: 0;
+
+    &:hover { background: rgb(127 127 127 / 9%); }
+    &:focus-visible { outline: 2px solid var(--cosm-accent); outline-offset: 1px; }
+    &[data-actif="true"] {
+      border-color: var(--cosm-accent);
+      background: color-mix(in srgb, var(--cosm-accent) 10%, transparent);
+    }
+
+    small { color: var(--cosm-muted); font-size: 11px; }
+  }
+
+  .cfVignette {
+    display: grid;
+    place-items: center;
+    width: 76px;
+    height: 66px;
+
+    .thumbBox,
+    .thumbIcone { width: 64px; height: 64px; }
+    .thumbBox img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  }
+
+  .cfNom {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .cfCoche {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--cosm-accent);
+    color: #fff;
+  }
+
+  .cfVide {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    color: var(--cosm-muted);
+
+    &[data-erreur] { color: var(--cosm-danger); }
+  }
+
+  .cfPied {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border-top: 1px solid var(--cosm-line);
+
+    > span { flex: 1; color: var(--cosm-muted); font-size: 12px; }
+  }
+
+  .cfBouton {
+    padding: 7px 14px;
+    border: 1px solid var(--cosm-line);
+    border-radius: 7px;
+    background: none;
+    cursor: pointer;
+
+    &:hover { background: rgb(127 127 127 / 10%); }
+    &:disabled { opacity: 0.5; cursor: default; }
+  }
+
+  .cfPrincipal {
+    border-color: var(--cosm-accent);
+    background: var(--cosm-accent);
+    color: #fff;
+
+    &:hover:not(:disabled) { filter: brightness(1.08); background: var(--cosm-accent); }
+  }
+}

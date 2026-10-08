@@ -23,7 +23,7 @@
 //     sans TVA : la Facturation la compte comme n'importe quelle ligne.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { plusJours, prochainNumero, today, totalLigne, totaux } from "@companyos/shared/facturation";
+import { etatPaiement, plusJours, prochainNumero, today, totalLigne, totaux } from "@companyos/shared/facturation";
 
 export { today };
 
@@ -279,27 +279,58 @@ export const numeroSuivant = (documents = [], date = today()) =>
 
 // ---- Vérifications ---------------------------------------------------------------
 
-/// Ce qui empêche d'émettre la facture, en phrases à montrer telles quelles.
-export const problemes = (f) => {
+/// Ce qui empêche d'émettre la facture, champ par champ : `champ` désigne
+/// la zone du formulaire à signaler (et vers laquelle défiler), `message`
+/// est la phrase à montrer telle quelle.
+export const verifier = (f) => {
   const out = [];
+  const ajouter = (champ, message) => out.push({ champ, message });
   if (!f.clientId && !String(f.clientNom || f.clientEntreprise || "").trim()) {
-    out.push("Choisissez le client à facturer.");
+    ajouter("client", "Choisissez le client à facturer.");
   }
   const lignes = f.lignes.filter((l) => String(l.designation || "").trim());
-  if (!lignes.length) out.push("Ajoutez au moins un article.");
+  if (!lignes.length) ajouter("articles", "Ajoutez au moins un article.");
   if (f.lignes.some((l) => String(l.designation || "").trim() && !(Number(l.qte) > 0))) {
-    out.push("Chaque article doit avoir une quantité positive.");
+    ajouter("articles", "Chaque article doit avoir une quantité positive.");
   }
-  if (!f.numero) out.push("Donnez un numéro à la facture.");
-  if (f.echeance && f.date && f.echeance < f.date) out.push("L'échéance précède la date de facture.");
+  if (f.lignes.some((l) => !String(l.designation || "").trim() && Number(l.pu) > 0)) {
+    ajouter("articles", "Un article chiffré n'a pas de nom.");
+  }
+  if (!String(f.numero || "").trim()) ajouter("numero", "Donnez un numéro à la facture.");
+  if (!f.date) ajouter("date", "Indiquez la date de la facture.");
+  if (f.echeance && f.date && f.echeance < f.date) ajouter("echeance", "L'échéance précède la date de facture.");
   if (f.mode === "fractionne") {
     const somme = f.echeancier.reduce((s, e) => s + (Number(e.pourcentage) || 0), 0);
-    if (Math.round(somme * 100) !== 10000) out.push(`Les échéances totalisent ${somme} % au lieu de 100 %.`);
+    if (Math.round(somme * 100) !== 10000) ajouter("echeancier", `Les échéances totalisent ${somme} % au lieu de 100 %.`);
   }
   if (f.mode === "recurrente" && f.recurrence.fin && f.recurrence.fin < f.date) {
-    out.push("La fin de la récurrence précède la première facture.");
+    ajouter("recurrence", "La fin de la récurrence précède la première facture.");
+  }
+  if (f.envoi === "immediat" && f.clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.clientEmail)) {
+    ajouter("client", "L'adresse e-mail du client n'est pas valide.");
   }
   return out;
+};
+
+/// Les mêmes, en phrases seules.
+export const problemes = (f) => verifier(f).map((p) => p.message);
+
+/// Ce que le client doit déjà : factures émises non soldées, dont celles
+/// en retard. La facture en cours d'édition (`sauf`) n'est pas comptée.
+export const situationClient = (clientId, documents = [], reglements = [], sauf = null, maintenant = today()) => {
+  if (!clientId) return null;
+  let nb = 0;
+  let reste = 0;
+  let retard = 0;
+  for (const d of documents) {
+    if (d.id === sauf || d.data?.type !== "facture" || d.data?.clientId !== clientId) continue;
+    const etat = etatPaiement(d, reglements, maintenant);
+    if (etat.id !== "impayee" && etat.id !== "retard" && etat.id !== "partielle") continue;
+    nb += 1;
+    reste += etat.reste || 0;
+    if (etat.id === "retard" || (etat.id === "partielle" && d.data.echeance < maintenant)) retard += 1;
+  }
+  return { nb, reste, retard };
 };
 
 // ---------------------------------------------------------------------------

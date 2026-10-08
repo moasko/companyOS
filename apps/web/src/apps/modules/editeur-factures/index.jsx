@@ -7,10 +7,17 @@ import { modal } from "../../modalRequest";
 import { composerCourriel } from "../../courrielRequest";
 import { choisirClient, choisirProduit } from "../../referentiel";
 import { accesDonnees } from "../../donnees";
-import { ensureRootFolder } from "../../cloud";
+import { ensureRootFolder, saveAs } from "../../cloud";
 import { ouvrirFenetre } from "../../windows";
+import { referentiel } from "../../referentiel";
+import { choisirFichierCloud } from "../../ChoisirFichier";
+import { ouvrirParametres } from "../../parametresRequest";
+import { chargerSignatures, useEntreprise } from "../../entreprise";
+import { FicheEntreprise } from "../../entreprise/FicheEntreprise";
+import { imageSignature } from "../signature/domaine";
 import { ID_EDITEUR, prendreDemande, surDemande } from "../../editeurFacturesRequest";
 import { montantDans } from "../../../utils/monnaie";
+import { etatPaiement } from "@companyos/shared/facturation";
 import {
   CONDITIONS,
   FREQUENCES,
@@ -25,14 +32,16 @@ import {
   initiales,
   ligneVide,
   numeroSuivant,
-  problemes,
   recurrencesDues,
+  situationClient,
   today,
+  verifier,
   versFacturation,
 } from "./domaine";
 import { MODELES, PALETTE, couleurDe } from "./modeles";
 import { Apercu } from "./Apercu";
 import { factureEnPdf } from "./pdf";
+import { imagesPdf } from "./images";
 import "./editeur.scss";
 
 // ---------------------------------------------------------------------------
@@ -45,8 +54,18 @@ import "./editeur.scss";
 // Les factures sont rangées dans la Facturation (voir domaine.js) : elle en
 // assure le suivi — règlements, relances, état de paiement —, le panneau
 // « Aujourd'hui » du bureau les compte, le CRM les montre sur la fiche du
-// client. L'éditeur, lui, garde seulement le profil de l'entreprise
-// (`emetteur`) et les factures récurrentes (`recurrences`).
+// client. L'éditeur, lui, garde seulement ses réglages par défaut
+// (`emetteur` : modèle, couleur, conditions…) et les factures récurrentes
+// (`recurrences`).
+//
+// Il ne réinvente rien de ce que l'OS sait déjà faire :
+//   • l'identité de l'entreprise vient de la fiche partagée (Paramètres ›
+//     Fiche de l'entreprise) — logo, cachet, NCC, RIB, signataire ;
+//   • la signature manuscrite vient de l'application Signature ;
+//   • les pièces jointes et le PDF passent par le Cloud (gestionnaire de
+//     fichiers) ;
+//   • clients du CRM, articles et niveaux de stock du Stock, règlements de
+//     la Facturation pour la situation du client.
 // ---------------------------------------------------------------------------
 
 export const manifest = {
@@ -54,12 +73,20 @@ export const manifest = {
   slug: "editeur-factures",
   name: "Éditeur de factures",
   icon: "editeur-factures",
-  version: "1.0.0",
+  version: "1.1.0",
   nouveautes: [
+    { version: "1.1.0", texte: "Fiche de l'entreprise partagée, signature et cachet sur le PDF, pièces jointes du Cloud, vérifications en direct et raccourcis clavier." },
     { version: "1.0.0", texte: "Six modèles, aperçu en direct, paiement fractionné, factures récurrentes et envoi au client en PDF." },
   ],
   capacites: {
-    lit: ["crm:clients", "stock:articles", "facturation:factures", "facturation:reglements"],
+    lit: [
+      "crm:clients",
+      "stock:articles",
+      "facturation:factures",
+      "facturation:reglements",
+      "entreprise:profil",
+      "signature:signatures",
+    ],
     ecrit: ["facturation:factures"],
   },
   action: "EDITEURFACTURESAPP",
@@ -97,42 +124,45 @@ const lireBrouillon = (cle) => {
   }
 };
 
-/// Réduit une image (logo, signature) avant de la ranger : une fiche ne
-/// dépasse pas 64 Ko, et un logo n'a pas besoin de plus de 240 pixels.
-const reduireImage = (fichier, taille = 240) =>
-  new Promise((resolve, reject) => {
-    const lecteur = new FileReader();
-    lecteur.onerror = () => reject(new Error("Lecture de l'image impossible."));
-    lecteur.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Ce fichier n'est pas une image lisible."));
-      img.onload = () => {
-        const echelle = Math.min(1, taille / Math.max(img.width, img.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * echelle);
-        canvas.height = Math.round(img.height * echelle);
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/png"));
-      };
-      img.src = lecteur.result;
-    };
-    lecteur.readAsDataURL(fichier);
-  });
+/// Les champs d'identité qu'un ancien profil de l'éditeur gardait, avant
+/// que la fiche de l'entreprise ne soit partagée : proposés en repli.
+const IDENTITE_ANCIENNE = [
+  "nom", "adresse", "ville", "pays", "email", "telephone", "ncc", "rccm",
+  "banque", "titulaire", "iban", "mobileOperateur", "mobileNumero", "signataire", "mentions", "logo",
+];
+
+const estMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || "");
+const MOD = estMac ? "⌘" : "Ctrl";
 
 // ---------------------------------------------------------------------------
 // Petits composants de formulaire, à l'image de la maquette : l'étiquette
 // en petit au-dessus de la valeur, dans un même cadre.
 // ---------------------------------------------------------------------------
 
-const Champ = ({ label, icone, children, action }) => (
-  <label className="efChamp">
+const Champ = ({ label, icone, children, action, erreur, champ }) => (
+  <label className="efChamp" data-erreur={!!erreur || undefined} data-champ={champ}>
     <span className="efChampLabel">{label}</span>
     <span className="efChampValeur">
       {children}
       {action}
       {icone ? <Icon fafa={icone} width={13} /> : null}
     </span>
+    {erreur ? <span className="efChampErreur" role="alert">{erreur}</span> : null}
   </label>
+);
+
+/// Un champ numérique qui ne change pas de valeur quand on fait défiler la
+/// page par-dessus, et dont le contenu se sélectionne à l'entrée.
+const Nombre = (props) => (
+  <input
+    type="number"
+    inputMode="decimal"
+    step="any"
+    min="0"
+    onWheel={(e) => e.currentTarget.blur()}
+    onFocus={(e) => e.currentTarget.select()}
+    {...props}
+  />
 );
 
 const Menu = ({ ouvert, fermer, children, className = "" }) => {
@@ -157,15 +187,60 @@ const Menu = ({ ouvert, fermer, children, className = "" }) => {
   );
 };
 
-const EntreeMenu = ({ icone, children, onClick, aide, desactive }) => (
+const EntreeMenu = ({ icone, children, onClick, aide, desactive, raccourci }) => (
   <button type="button" role="menuitem" className="efMenuEntree" disabled={desactive} onClick={onClick}>
     {icone ? <Icon fafa={icone} width={13} /> : <span />}
     <span>
       {children}
       {aide ? <small>{aide}</small> : null}
     </span>
+    {raccourci ? <kbd>{raccourci}</kbd> : null}
   </button>
 );
+
+/// Un volet latéral : boîte de dialogue au sens de l'accessibilité, qui
+/// prend le focus à l'ouverture et se ferme avec Échap.
+const Volet = ({ titre, onFermer, children, large = false, actions = null }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const premier = ref.current?.querySelector("input, select, textarea, button:not(.efFermerVolet)");
+    (premier || ref.current)?.focus();
+  }, []);
+
+  // Échap ferme le volet même quand le focus est retombé sur la page (un
+  // bouton qui vient de se désactiver le rend au document) — mais jamais
+  // par-dessus une boîte de dialogue ouverte.
+  const fermerRef = useRef(onFermer);
+  fermerRef.current = onFermer;
+  useEffect(() => {
+    const surTouche = (e) => {
+      if (e.key !== "Escape" || document.querySelector(".cosModalBack")) return;
+      if (e.target === document.body || ref.current?.contains(e.target)) fermerRef.current();
+    };
+    document.addEventListener("keydown", surTouche);
+    return () => document.removeEventListener("keydown", surTouche);
+  }, []);
+  return (
+    <aside
+      ref={ref}
+      className="efPanneau"
+      data-large={large || undefined}
+      role="dialog"
+      aria-modal="true"
+      aria-label={titre}
+      tabIndex={-1}
+    >
+      <div className="efPanneauTete">
+        <h3>{titre}</h3>
+        {actions}
+        <button type="button" className="efIconeBouton efFermerVolet" aria-label="Fermer" onClick={onFermer}>
+          <Icon fafa="faXmark" width={12} />
+        </button>
+      </div>
+      <div className="efPanneauCorps cosScroll">{children}</div>
+    </aside>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // L'application
@@ -176,13 +251,17 @@ function EditeurFactures() {
   const session = useSelector((state) => state.session);
   const ouvert = !!wnapp && !wnapp.hide && session.status === "authenticated";
   const cle = cleBrouillon(session.tenant?.id);
+  const estAdmin = ["OWNER", "ADMIN"].includes(session.user?.role);
 
   const [facture, setFacture] = useState(() => factureVide());
   const [ficheId, setFicheId] = useState(null);
   const [ficheOrigine, setFicheOrigine] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [reglements, setReglements] = useState([]);
   const [emetteur, setEmetteur] = useState(null);
   const [recurrences, setRecurrences] = useState([]);
+  const [signatures, setSignatures] = useState([]);
+  const [stocks, setStocks] = useState({});
   const [charge, setCharge] = useState(false);
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState(null);
@@ -190,35 +269,68 @@ function EditeurFactures() {
   const [panneau, setPanneau] = useState(null);
   const [pleinEcran, setPleinEcran] = useState(false);
   const [echelle, setEchelle] = useState(0.6);
+  const [modifie, setModifie] = useState(false);
+  const [tentative, setTentative] = useState(false);
+  const [brouillonLocal, setBrouillonLocal] = useState(null);
+  const [vue, setVue] = useState("formulaire");
+  const [recherche, setRecherche] = useState("");
 
+  const coquille = useRef(null);
   const zoneApercu = useRef(null);
   const pageRef = useRef(null);
   const glisse = useRef(null);
-  const modifieRef = useRef(false);
+  const aFocaliser = useRef(null);
 
+  const { entreprise } = useEntreprise(ouvert);
+
+  /// Réglages par défaut de l'éditeur (modèle, couleur, conditions…).
   const profil = useMemo(
     () => emetteur?.data || { nom: session.tenant?.name || "" },
     [emetteur, session.tenant?.name],
   );
 
+  /// L'identité qu'avait l'ancien profil de l'éditeur : proposée pour
+  /// préremplir la fiche partagée tant qu'elle n'existe pas.
+  const repliIdentite = useMemo(() => {
+    const d = emetteur?.data;
+    if (!d) return null;
+    const garde = Object.fromEntries(IDENTITE_ANCIENNE.filter((k) => d[k]).map((k) => [k, d[k]]));
+    return Object.keys(garde).length > 1 ? garde : null;
+  }, [emetteur]);
+
+  /// L'émetteur tel qu'il paraît sur la facture : la fiche de l'entreprise,
+  /// sa signature dessinée dans l'application Signature.
+  const emetteurDoc = useMemo(() => {
+    const base = { nom: session.tenant?.name || "", ...(entreprise || repliIdentite || {}) };
+    const signature = signatures.find((x) => x.id === base.signatureId);
+    return {
+      ...base,
+      signatureImage: signature ? imageSignature(signature.data) : emetteur?.data?.signatureImage || "",
+    };
+  }, [entreprise, repliIdentite, signatures, session.tenant?.name, emetteur]);
+
   const minuteurMessage = useRef(null);
-  const flash = (texte, ton = "ok") => {
-    setMessage({ texte, ton });
+  const flash = (texte, ton = "ok", action = null) => {
+    setMessage({ texte, ton, action });
     window.clearTimeout(minuteurMessage.current);
-    minuteurMessage.current = window.setTimeout(() => setMessage(null), ton === "erreur" ? 12000 : 7000);
+    minuteurMessage.current = window.setTimeout(() => setMessage(null), ton === "erreur" ? 12000 : action ? 9000 : 6000);
   };
 
   // ---- Chargement ---------------------------------------------------------
 
   const charger = useCallback(async () => {
-    const [docs, profils, recs] = await Promise.all([
+    const [docs, regs, profils, recs, sigs] = await Promise.all([
       donnees.lire("facturation", "factures").catch(() => []),
+      donnees.lire("facturation", "reglements").catch(() => []),
       donnees.lire("emetteur").catch(() => []),
       donnees.lire("recurrences").catch(() => []),
+      chargerSignatures(),
     ]);
     setDocuments(docs);
+    setReglements(regs);
     setEmetteur(profils[0] || null);
     setRecurrences(recs);
+    setSignatures(sigs);
     return { docs, profil: profils[0] || null };
   }, []);
 
@@ -227,9 +339,19 @@ function EditeurFactures() {
     setFacture(depuisFacturation(fiche.data, reglages));
     setFicheId(fiche.id);
     setFicheOrigine(fiche);
-    modifieRef.current = false;
+    setModifie(false);
+    setTentative(false);
     setPanneau(null);
   }, []);
+
+  /// Changer de facture alors que celle-ci a des modifications : on demande.
+  const confirmerAbandon = async () =>
+    !modifie || modal.confirm({
+      title: "Abandonner les modifications ?",
+      message: `Les changements apportés à ${facture.numero || "cette facture"} ne sont pas enregistrés.`,
+      confirmLabel: "Abandonner",
+      danger: true,
+    });
 
   const traiterDemande = useCallback(async (demande, docs, reglages) => {
     if (!demande) return false;
@@ -253,6 +375,7 @@ function EditeurFactures() {
       });
       setFicheId(null);
       setFicheOrigine(null);
+      setModifie(true);
       return true;
     }
     return false;
@@ -271,6 +394,8 @@ function EditeurFactures() {
         setFacture(brouillon.facture);
         setFicheId(brouillon.ficheId || null);
         setFicheOrigine(brouillon.ficheOrigine || null);
+        setModifie(!!brouillon.modifie);
+        if (brouillon.modifie) setBrouillonLocal(brouillon.le || null);
         return;
       }
       const base = factureVide(reglages);
@@ -278,47 +403,96 @@ function EditeurFactures() {
     }).catch((e) => flash(e.message, "erreur"));
   }, [ouvert, charge, charger, traiterDemande, cle]);
 
-  useEffect(() => surDemande((d) => { traiterDemande(d, null, profil); }), [traiterDemande, profil]);
+  // Une demande venue d'une autre app (la Facturation, le CRM) alors que
+  // la fenêtre est ouverte : on ne jette pas un travail en cours sans le dire.
+  const confirmerAbandonRef = useRef(confirmerAbandon);
+  confirmerAbandonRef.current = confirmerAbandon;
+  useEffect(() => surDemande(async (d) => {
+    if (await confirmerAbandonRef.current()) traiterDemande(d, null, profil);
+  }), [traiterDemande, profil]);
 
-  // Sauvegarde du travail en cours, une demi-seconde après la dernière frappe.
+  // Sauvegarde du travail en cours sur ce poste, une demi-seconde après la
+  // dernière frappe.
   useEffect(() => {
     if (!charge) return undefined;
     const t = window.setTimeout(() => {
       try {
-        localStorage.setItem(cle, JSON.stringify({ facture, ficheId, ficheOrigine }));
+        const le = new Date().toISOString();
+        localStorage.setItem(cle, JSON.stringify({ facture, ficheId, ficheOrigine, modifie, le }));
+        if (modifie) setBrouillonLocal(le);
       } catch {
         /* stockage plein ou interdit : le travail reste à l'écran */
       }
     }, 500);
     return () => window.clearTimeout(t);
-  }, [facture, ficheId, ficheOrigine, charge, cle]);
+  }, [facture, ficheId, ficheOrigine, modifie, charge, cle]);
 
   // L'aperçu suit la largeur de sa colonne.
   useEffect(() => {
     const zone = zoneApercu.current;
     if (!zone) return undefined;
-    const mesurer = () => setEchelle(Math.min(1, (zone.clientWidth - 56) / LARGEUR_PAGE));
+    const mesurer = () => setEchelle(Math.max(0.2, Math.min(1, (zone.clientWidth - 56) / LARGEUR_PAGE)));
     mesurer();
     const obs = new ResizeObserver(mesurer);
     obs.observe(zone);
     return () => obs.disconnect();
   }, [ouvert]);
 
+  // Niveau de stock des articles venus du catalogue.
+  const articlesSuivis = facture.lignes.map((l) => l.articleId).filter(Boolean).join(",");
+  useEffect(() => {
+    if (!ouvert || !articlesSuivis) return;
+    const manquants = articlesSuivis.split(",").filter((id) => !(id in stocks));
+    if (!manquants.length) return;
+    Promise.all(manquants.map((id) => referentiel.stockDe(id).catch(() => null)))
+      .then((niveaux) => setStocks((s) => ({ ...s, ...Object.fromEntries(manquants.map((id, i) => [id, niveaux[i]])) })));
+  }, [ouvert, articlesSuivis, stocks]);
+
+  // Une ligne ajoutée prend le focus : on tape son nom aussitôt.
+  useEffect(() => {
+    if (!aFocaliser.current) return;
+    const champ = coquille.current?.querySelector(`[data-ligne="${aFocaliser.current}"] .efNom`);
+    aFocaliser.current = null;
+    champ?.focus();
+  });
+
   // ---- Modifications ----------------------------------------------------------
 
   const maj = (patch) => {
-    modifieRef.current = true;
+    setModifie(true);
     setFacture((f) => ({ ...f, ...(typeof patch === "function" ? patch(f) : patch) }));
   };
 
   const majLigne = (id, patch) =>
     maj((f) => ({ lignes: f.lignes.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
 
-  const retirerLigne = (id) =>
+  const retirerLigne = (id) => {
+    const index = facture.lignes.findIndex((l) => l.id === id);
+    const ligne = facture.lignes[index];
     maj((f) => ({ lignes: f.lignes.length > 1 ? f.lignes.filter((l) => l.id !== id) : [ligneVide()] }));
+    if (ligne && (String(ligne.designation || "").trim() || Number(ligne.pu))) {
+      flash(`« ${ligne.designation || "Article"} » retiré.`, "info", {
+        libelle: "Annuler",
+        faire: () => maj((f) => {
+          const lignes = f.lignes.filter((l) => String(l.designation || "").trim() || Number(l.pu));
+          lignes.splice(Math.min(index, lignes.length), 0, ligne);
+          return { lignes };
+        }),
+      });
+    }
+  };
+
+  const dupliquerLigne = (id) =>
+    maj((f) => {
+      const i = f.lignes.findIndex((l) => l.id === id);
+      const copie = { ...f.lignes[i], id: idLigne() };
+      aFocaliser.current = copie.id;
+      return { lignes: [...f.lignes.slice(0, i + 1), copie, ...f.lignes.slice(i + 1)] };
+    });
 
   const deplacerLigne = (de, vers) =>
     maj((f) => {
+      if (vers < 0 || vers >= f.lignes.length) return {};
       const lignes = [...f.lignes];
       const [l] = lignes.splice(de, 1);
       lignes.splice(vers, 0, l);
@@ -360,7 +534,9 @@ function EditeurFactures() {
       }));
       return;
     }
-    maj((f) => ({ lignes: [...f.lignes, ligneVide()] }));
+    const ligne = ligneVide();
+    aFocaliser.current = ligne.id;
+    maj((f) => ({ lignes: [...f.lignes, ligne] }));
   };
 
   const changerConditions = (conditions) =>
@@ -374,41 +550,66 @@ function EditeurFactures() {
 
   const genererNumero = () => maj((f) => ({ numero: numeroSuivant(documents, f.date) }));
 
-  const reinitialiser = async () => {
-    const ok = !modifieRef.current || await modal.confirm({
-      title: "Repartir d'une facture vierge ?",
-      message: "Les modifications non enregistrées seront perdues.",
-      confirmLabel: "Réinitialiser",
-      danger: true,
-    });
-    if (!ok) return;
+  const nouvelle = async () => {
+    setMenu(null);
+    if (!(await confirmerAbandon())) return;
     const base = factureVide(profil);
     setFacture({ ...base, numero: numeroSuivant(documents, base.date) });
     setFicheId(null);
     setFicheOrigine(null);
-    modifieRef.current = false;
+    setModifie(false);
+    setTentative(false);
+    setBrouillonLocal(null);
     try { localStorage.removeItem(cle); } catch { /* rien à faire */ }
+  };
+
+  // ---- Pièces jointes (Cloud) -------------------------------------------------
+
+  const joindre = async () => {
     setMenu(null);
+    const noeuds = await choisirFichierCloud({ titre: "Joindre des fichiers du Cloud", plusieurs: true });
+    if (!noeuds) return;
+    maj((f) => {
+      const deja = new Set((f.pieces || []).map((p) => p.id));
+      return { pieces: [...(f.pieces || []), ...noeuds.filter((n) => !deja.has(n.id)).map((n) => ({ id: n.id, nom: n.name }))] };
+    });
+  };
+
+  // ---- Vérifications ------------------------------------------------------------
+
+  const verifications = useMemo(() => verifier(facture), [facture]);
+  const erreurDe = (champ) => (tentative ? verifications.find((v) => v.champ === champ)?.message : undefined);
+
+  /// Amène l'utilisateur au premier point à corriger.
+  const allerAuProbleme = (liste = verifications) => {
+    setVue("formulaire");
+    const champ = liste[0]?.champ;
+    if (!champ) return;
+    window.requestAnimationFrame(() => {
+      const zone = coquille.current?.querySelector(`[data-champ="${champ}"]`);
+      zone?.scrollIntoView({ block: "center", behavior: "smooth" });
+      (zone?.matches("button, input, select") ? zone : zone?.querySelector("input, select, textarea, button"))?.focus({ preventScroll: true });
+    });
   };
 
   // ---- Enregistrement et envoi ----------------------------------------------
 
   const enregistrer = async ({ envoi = facture.envoi } = {}) => {
     setMenu(null);
-    const liste = problemes(facture);
+    if (occupe) return null;
+    const liste = verifier({ ...facture, envoi });
     if (liste.length) {
-      modal.alert({ title: "La facture n'est pas prête", message: liste.join("\n"), tone: "info" });
+      setTentative(true);
+      flash(liste.length > 1 ? `${liste.length} points à corriger avant d'enregistrer.` : liste[0].message, "erreur");
+      allerAuProbleme(liste);
       return null;
     }
     // Deux factures ne portent jamais le même numéro : la comptabilité le
     // refuserait, et le client paierait l'une pour l'autre.
     const doublon = documents.find((d) => d.id !== ficheId && d.data?.type === "facture" && d.data?.numero === facture.numero);
     if (doublon) {
-      modal.alert({
-        title: `Le numéro ${facture.numero} est déjà pris`,
-        message: "Cliquez sur « Générer » pour prendre le numéro suivant de la séquence.",
-        tone: "info",
-      });
+      flash(`Le numéro ${facture.numero} est déjà pris.`, "erreur", { libelle: "Prendre le suivant", faire: genererNumero });
+      allerAuProbleme([{ champ: "numero" }]);
       return null;
     }
 
@@ -439,13 +640,18 @@ function EditeurFactures() {
 
       setFicheId(fiche.id);
       setFicheOrigine(fiche);
-      modifieRef.current = false;
+      setModifie(false);
+      setTentative(false);
+      setBrouillonLocal(null);
       await charger();
 
       if (envoi === "immediat") {
-        await envoyerAuClient(fiche);
+        await envoyerAuClient();
       } else {
-        flash(`Facture ${facture.numero} enregistrée${statut === "brouillon" ? " en brouillon" : ""} — elle est suivie dans la Facturation.`);
+        flash(`Facture ${facture.numero} enregistrée${statut === "brouillon" ? " en brouillon" : ""} — elle est suivie dans la Facturation.`, "ok", {
+          libelle: "Ouvrir la Facturation",
+          faire: () => ouvrirFenetre("facturation"),
+        });
       }
       return fiche;
     } catch (e) {
@@ -456,33 +662,56 @@ function EditeurFactures() {
     }
   };
 
-  /// Le PDF dans le modèle choisi, rangé dans le dossier Facturation du
-  /// cloud, puis un courriel prérempli dans le Courrier : l'utilisateur
+  /// Le PDF dans le modèle choisi, logo, cachet et signature compris.
+  const fabriquerPdf = async () => factureEnPdf(facture, emetteurDoc, await imagesPdf(facture, emetteurDoc));
+
+  /// Le PDF rangé dans le dossier Facturation du cloud, puis un courriel
+  /// prérempli dans le Courrier, pièces jointes comprises : l'utilisateur
   /// relit avant d'envoyer, une app n'écrit jamais dans son dos.
   const envoyerAuClient = async () => {
-    const blob = factureEnPdf(facture, profil);
+    const blob = await fabriquerPdf();
     const dossier = await ensureRootFolder("Facturation");
     const noeud = await api.uploadFile(new File([blob], `${facture.numero}.pdf`, { type: "application/pdf" }), dossier);
     const total = montantDans(chiffres(facture).total, facture.devise);
+    const signataire = emetteurDoc.signataire || session.user?.name || "";
     composerCourriel({
       a: facture.clientEmail || "",
-      sujet: `Facture ${facture.numero} — ${profil.nom || session.tenant?.name || ""}`.trim(),
+      sujet: `Facture ${facture.numero} — ${emetteurDoc.nom || session.tenant?.name || ""}`.trim(),
       texte:
         `Bonjour${facture.clientNom ? ` ${facture.clientNom}` : ""},\n\n` +
         `Veuillez trouver ci-joint notre facture ${facture.numero} d'un montant de ${total}, ` +
         `à régler avant le ${new Date(`${facture.echeance}T00:00:00`).toLocaleDateString("fr-FR")}.\n\n` +
-        `${facture.notes ? `${facture.notes}\n\n` : ""}Cordialement,\n${session.user?.name || ""}\n${profil.nom || ""}`,
-      pieces: noeud?.id ? [{ id: noeud.id, nom: noeud.name || `${facture.numero}.pdf` }] : [],
+        `${facture.notes ? `${facture.notes}\n\n` : ""}Cordialement,\n${signataire}` +
+        `${emetteurDoc.fonctionSignataire ? `\n${emetteurDoc.fonctionSignataire}` : ""}\n${emetteurDoc.nom || ""}` +
+        `${emetteurDoc.telephone ? `\n${emetteurDoc.telephone}` : ""}`,
+      pieces: [
+        ...(noeud?.id ? [{ id: noeud.id, nom: noeud.name || `${facture.numero}.pdf` }] : []),
+        ...(facture.pieces || []),
+      ],
     });
-    flash(`Facture ${facture.numero} enregistrée et prête à partir : vérifiez le courriel, puis envoyez.`);
+    flash(`Facture ${facture.numero} prête à partir : relisez le courriel dans le Courrier, puis envoyez.`);
   };
 
-  const telechargerPdf = () => {
+  const telechargerPdf = async () => {
     setMenu(null);
-    const url = URL.createObjectURL(factureEnPdf(facture, profil));
-    const a = Object.assign(document.createElement("a"), { href: url, download: `${facture.numero || "facture"}.pdf` });
-    a.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+    try {
+      const url = URL.createObjectURL(await fabriquerPdf());
+      const a = Object.assign(document.createElement("a"), { href: url, download: `${facture.numero || "facture"}.pdf` });
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      flash(e.message, "erreur");
+    }
+  };
+
+  const pdfDansCloud = async () => {
+    setMenu(null);
+    try {
+      const noeud = await saveAs(await fabriquerPdf(), `${facture.numero || "facture"}.pdf`, { folder: "Facturation" });
+      if (noeud) flash(`PDF enregistré dans le Cloud : ${noeud.name}.`);
+    } catch (e) {
+      flash(e.message, "erreur");
+    }
   };
 
   /// Imprime la page telle qu'elle s'affiche, et elle seule.
@@ -520,8 +749,44 @@ function EditeurFactures() {
     }));
     setFicheId(null);
     setFicheOrigine(null);
-    modifieRef.current = true;
+    setModifie(true);
     flash("Copie prête : c'est une nouvelle facture, avec son propre numéro.");
+  };
+
+  // ---- Raccourcis clavier ---------------------------------------------------------
+
+  const surTouche = (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.key === "Escape") {
+      if (pleinEcran) { setPleinEcran(false); return; }
+      if (panneau) { setPanneau(null); return; }
+    }
+    if (mod && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      // Ctrl+S range sans rien envoyer : une nouvelle facture en
+      // brouillon, une facture existante dans son état actuel.
+      enregistrer({ envoi: ficheOrigine?.data?.statut === "envoye" ? "envoyee" : "brouillon" });
+    } else if (mod && e.key === "Enter") {
+      e.preventDefault();
+      enregistrer();
+    } else if (mod && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      imprimer();
+    } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      // Réordonner au clavier la ligne où l'on se trouve.
+      const ligne = e.target.closest?.("[data-ligne]");
+      if (!ligne) return;
+      e.preventDefault();
+      const i = facture.lignes.findIndex((l) => l.id === ligne.dataset.ligne);
+      deplacerLigne(i, i + (e.key === "ArrowUp" ? -1 : 1));
+      aFocaliserChamp(ligne.dataset.ligne, e.target.getAttribute("aria-label"));
+    }
+  };
+
+  const aFocaliserChamp = (idLigneCible, label) => {
+    window.requestAnimationFrame(() => {
+      coquille.current?.querySelector(`[data-ligne="${idLigneCible}"] [aria-label="${label}"]`)?.focus();
+    });
   };
 
   // ---- Factures récurrentes ---------------------------------------------------
@@ -580,41 +845,7 @@ function EditeurFactures() {
     await charger();
   };
 
-  // ---- Profil de l'entreprise ---------------------------------------------------
-
-  const [profilEdite, setProfilEdite] = useState(null);
-  const ouvrirProfil = () => {
-    setMenu(null);
-    setProfilEdite({ pays: "Côte d'Ivoire", ...profil, nom: profil.nom || session.tenant?.name || "" });
-    setPanneau("profil");
-  };
-
-  const enregistrerProfil = async () => {
-    setOccupe(true);
-    try {
-      if (emetteur) await donnees.modifier("emetteur", emetteur.id, profilEdite);
-      else await donnees.creer("emetteur", profilEdite);
-      await charger();
-      setPanneau(null);
-      flash("Profil de l'entreprise enregistré : il s'applique à toutes vos factures.");
-    } catch (e) {
-      flash(e.message, "erreur");
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  const chargerImage = (champ) => async (e) => {
-    const fichier = e.target.files?.[0];
-    e.target.value = "";
-    if (!fichier) return;
-    try {
-      const image = await reduireImage(fichier, champ === "logo" ? 240 : 320);
-      setProfilEdite((p) => ({ ...p, [champ]: image }));
-    } catch (err) {
-      flash(err.message, "erreur");
-    }
-  };
+  // ---- Design par défaut -------------------------------------------------------
 
   const enregistrerDesignParDefaut = async () => {
     const suite = { ...profil, modele: facture.modele, couleur: facture.couleur };
@@ -626,6 +857,11 @@ function EditeurFactures() {
     } catch (e) {
       flash(e.message, "erreur");
     }
+  };
+
+  const ouvrirFicheEntreprise = () => {
+    setMenu(null);
+    setPanneau("profil");
   };
 
   // ---- Rendu ----------------------------------------------------------------------
@@ -642,44 +878,81 @@ function EditeurFactures() {
   const factures = documents
     .filter((d) => d.data?.type === "facture")
     .sort((a, b) => String(b.data.date).localeCompare(String(a.data.date)));
-  const [recherche, setRecherche] = useState("");
   const facturesVisibles = factures.filter((d) => {
     const q = recherche.trim().toLowerCase();
     if (!q) return true;
     return [d.data.numero, d.data.clientEntreprise, d.data.clientNom].some((v) => String(v || "").toLowerCase().includes(q));
   });
+  const situation = situationClient(facture.clientId, documents, reglements, ficheId);
+  const statutFiche = ficheOrigine?.data?.statut;
+  const etatFiche = ficheOrigine ? etatPaiement(ficheOrigine, reglements) : null;
+  const manquesEntreprise = [
+    !emetteurDoc.adresse && "l'adresse",
+    !emetteurDoc.ncc && "le NCC",
+    !emetteurDoc.logo && "le logo",
+  ].filter(Boolean);
 
   if (!ouvert) return <ModuleWindow manifest={manifest} className="efApp" />;
 
   return (
     <ModuleWindow manifest={manifest} className="efApp">
-      <div className="efShell">
+      <div className="efShell" ref={coquille} onKeyDown={surTouche} data-vue={vue}>
         {/* ------------------------------------------------ En-tête */}
         <header className="efEntete">
           <div className="efEnteteTitre">
-            <h1>{ficheId ? `Modifier la facture ${facture.numero}` : "Créer une facture"}</h1>
-            <p>Créez et personnalisez des factures professionnelles pour vos clients.</p>
+            <h1>{ficheId ? `Facture ${facture.numero}` : "Créer une facture"}</h1>
+            <p className="efEtat" aria-live="polite">
+              {ficheId ? (
+                <span className="efPuce" data-ton={etatFiche?.ton || "idle"}>
+                  {statutFiche === "brouillon" ? "Brouillon" : etatFiche?.label || "Enregistrée"}
+                </span>
+              ) : (
+                <span className="efPuce" data-ton="idle">Nouvelle</span>
+              )}
+              <span>
+                {modifie
+                  ? brouillonLocal
+                    ? "Modifications gardées sur cet appareil, pas encore enregistrées"
+                    : "Modifications non enregistrées"
+                  : ficheId
+                    ? "Enregistrée dans la Facturation"
+                    : "Créez et personnalisez des factures professionnelles pour vos clients."}
+              </span>
+            </p>
           </div>
           <div className="efEnteteActions">
+            {verifications.length && (tentative || modifie) ? (
+              <button type="button" className="efVerif" data-ton="attention" onClick={() => { setTentative(true); allerAuProbleme(); }}>
+                <Icon fafa="faListCheck" width={12} />
+                <span>{verifications.length} point{verifications.length > 1 ? "s" : ""} à compléter</span>
+              </button>
+            ) : !verifications.length ? (
+              <span className="efVerif" data-ton="ok">
+                <Icon fafa="faCircleCheck" width={12} />
+                <span>Prête</span>
+              </span>
+            ) : null}
+
             <div className="efGroupeBoutons">
               <button type="button" className="efBouton" onClick={() => setPleinEcran(true)}>
                 <Icon fafa="faEye" width={13} />
                 <span>Aperçu</span>
               </button>
-              <button type="button" className="efBouton" data-actif={panneau === "design"} onClick={() => setPanneau(panneau === "design" ? null : "design")}>
+              <button type="button" className="efBouton" data-actif={panneau === "design"} aria-pressed={panneau === "design"} onClick={() => setPanneau(panneau === "design" ? null : "design")}>
                 <Icon fafa="faPenToSquare" width={13} />
                 <span>Modifier le design</span>
               </button>
             </div>
 
             <div className="efSplit">
-              <button type="button" className="efPrincipal" disabled={occupe} onClick={() => enregistrer()}>
+              <button type="button" className="efPrincipal" disabled={occupe} onClick={() => enregistrer()} title={`${MOD}+Entrée`}>
                 {occupe ? "Enregistrement…" : libelleEnregistrer}
               </button>
               <button
                 type="button"
                 className="efPrincipal efPrincipalFleche"
                 aria-label="Autres façons d'enregistrer"
+                aria-haspopup="menu"
                 aria-expanded={menu === "enregistrer"}
                 onClick={() => setMenu(menu === "enregistrer" ? null : "enregistrer")}
               >
@@ -692,12 +965,15 @@ function EditeurFactures() {
                 <EntreeMenu icone="faCircleCheck" onClick={() => enregistrer({ envoi: "envoyee" })} aide="Remise en main propre ou par un autre canal">
                   Enregistrer comme envoyée
                 </EntreeMenu>
-                <EntreeMenu icone="faFloppyDisk" onClick={() => enregistrer({ envoi: "brouillon" })}>
+                <EntreeMenu icone="faFloppyDisk" onClick={() => enregistrer({ envoi: "brouillon" })} raccourci={`${MOD}+S`}>
                   Enregistrer en brouillon
                 </EntreeMenu>
                 <hr />
                 <EntreeMenu icone="faFilePdf" onClick={telechargerPdf}>Télécharger le PDF</EntreeMenu>
-                <EntreeMenu icone="faPrint" onClick={imprimer}>Imprimer</EntreeMenu>
+                <EntreeMenu icone="faCloudArrowUp" onClick={pdfDansCloud} aide="Choisir le dossier dans le gestionnaire de fichiers">
+                  Enregistrer le PDF dans le Cloud…
+                </EntreeMenu>
+                <EntreeMenu icone="faPrint" onClick={imprimer} raccourci={`${MOD}+P`}>Imprimer</EntreeMenu>
                 <EntreeMenu icone="faClone" onClick={dupliquer}>Dupliquer en nouvelle facture</EntreeMenu>
               </Menu>
             </div>
@@ -707,6 +983,7 @@ function EditeurFactures() {
                 type="button"
                 className="efBouton efCarre"
                 aria-label="Plus d'actions"
+                aria-haspopup="menu"
                 aria-expanded={menu === "plus"}
                 onClick={() => setMenu(menu === "plus" ? null : "plus")}
               >
@@ -714,7 +991,7 @@ function EditeurFactures() {
                 {dues.length ? <span className="efPastille">{dues.length}</span> : null}
               </button>
               <Menu ouvert={menu === "plus"} fermer={() => setMenu(null)} className="efMenuDroite">
-                <EntreeMenu icone="faFileCirclePlus" onClick={reinitialiser}>Nouvelle facture</EntreeMenu>
+                <EntreeMenu icone="faFileCirclePlus" onClick={nouvelle}>Nouvelle facture</EntreeMenu>
                 <EntreeMenu icone="faFolderOpen" onClick={() => { setMenu(null); setRecherche(""); setPanneau("ouvrir"); }}>
                   Ouvrir une facture existante
                 </EntreeMenu>
@@ -725,12 +1002,15 @@ function EditeurFactures() {
                 >
                   Factures récurrentes
                 </EntreeMenu>
-                <EntreeMenu icone="faBuilding" onClick={ouvrirProfil} aide="Logo, adresse, NCC, coordonnées bancaires">
-                  Profil de l'entreprise
+                <EntreeMenu icone="faIdCard" onClick={ouvrirFicheEntreprise} aide="Logo, cachet, signature, NCC, coordonnées bancaires">
+                  Fiche de l'entreprise
                 </EntreeMenu>
                 <hr />
                 <EntreeMenu icone="faFileInvoice" onClick={() => { setMenu(null); ouvrirFenetre("facturation"); }} aide="Règlements, relances, état de paiement">
                   Ouvrir la Facturation
+                </EntreeMenu>
+                <EntreeMenu icone="faKeyboard" onClick={() => { setMenu(null); setPanneau("raccourcis"); }}>
+                  Raccourcis clavier
                 </EntreeMenu>
               </Menu>
             </div>
@@ -738,10 +1018,15 @@ function EditeurFactures() {
         </header>
 
         {message ? (
-          <div className="efMessage" data-ton={message.ton} role="status">
-            <Icon fafa={message.ton === "erreur" ? "faCircleExclamation" : "faCircleCheck"} width={13} />
+          <div className="efMessage" data-ton={message.ton} role={message.ton === "erreur" ? "alert" : "status"}>
+            <Icon fafa={message.ton === "erreur" ? "faCircleExclamation" : message.ton === "info" ? "faCircleInfo" : "faCircleCheck"} width={13} />
             <span>{message.texte}</span>
-            <button type="button" aria-label="Fermer" onClick={() => setMessage(null)}><Icon fafa="faXmark" width={11} /></button>
+            {message.action ? (
+              <button type="button" className="efLien" onClick={() => { message.action.faire(); setMessage(null); }}>
+                {message.action.libelle}
+              </button>
+            ) : null}
+            <button type="button" aria-label="Fermer le message" onClick={() => setMessage(null)}><Icon fafa="faXmark" width={11} /></button>
           </div>
         ) : null}
 
@@ -753,48 +1038,80 @@ function EditeurFactures() {
           </div>
         ) : null}
 
+        {!entreprise && charge ? (
+          <div className="efMessage" data-ton="info">
+            <Icon fafa="faIdCard" width={13} />
+            <span>
+              {estAdmin
+                ? "Complétez la fiche de l'entreprise : logo, adresse, NCC et RIB figureront sur toutes vos factures."
+                : "La fiche de l'entreprise n'est pas encore remplie : demandez-le à un administrateur."}
+            </span>
+            {estAdmin ? <button type="button" className="efLien" onClick={ouvrirFicheEntreprise}>Compléter</button> : null}
+          </div>
+        ) : null}
+
+        {/* Bascule Formulaire / Aperçu, quand la fenêtre est trop étroite pour les deux. */}
+        <div className="efBascule2" role="tablist" aria-label="Affichage">
+          <button type="button" role="tab" aria-selected={vue === "formulaire"} onClick={() => setVue("formulaire")}>
+            <Icon fafa="faPenToSquare" width={12} /> Formulaire
+          </button>
+          <button type="button" role="tab" aria-selected={vue === "apercu"} onClick={() => setVue("apercu")}>
+            <Icon fafa="faEye" width={12} /> Aperçu
+          </button>
+        </div>
+
         <div className="efCorps">
           {/* ------------------------------------------------ Formulaire */}
           <div className="efFormulaire cosScroll">
-            <section className="efSection">
-              <h2>Informations client</h2>
+            <section className="efSection" aria-labelledby="ef-t-client">
+              <h2 id="ef-t-client">Informations client</h2>
               <div className="efGrille2">
-                <button type="button" className="efClient" onClick={choisirLeClient}>
-                  {facture.clientNom || facture.clientEntreprise ? (
-                    <>
-                      <span className="efAvatar" style={{ background: couleurDe(facture) }}>
-                        {initiales(facture.clientEntreprise || facture.clientNom)}
-                      </span>
-                      <span className="efClientTexte">
-                        <b>{facture.clientEntreprise || facture.clientNom}</b>
-                        <small>{facture.clientEmail || facture.clientNom || "Sans adresse e-mail"}</small>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="efAvatar efAvatarVide"><Icon fafa="faUserPlus" width={13} /></span>
-                      <span className="efClientTexte">
-                        <b>Choisir un client</b>
-                        <small>Depuis le fichier clients du CRM</small>
-                      </span>
-                    </>
-                  )}
-                  <Icon fafa="faChevronDown" width={11} />
-                </button>
+                <div className="efClientBloc" data-champ="client">
+                  <button type="button" className="efClient" data-erreur={!!erreurDe("client") || undefined} onClick={choisirLeClient} aria-describedby={erreurDe("client") ? "ef-err-client" : undefined}>
+                    {facture.clientNom || facture.clientEntreprise ? (
+                      <>
+                        <span className="efAvatar" style={{ background: couleurDe(facture) }}>
+                          {initiales(facture.clientEntreprise || facture.clientNom)}
+                        </span>
+                        <span className="efClientTexte">
+                          <b>{facture.clientEntreprise || facture.clientNom}</b>
+                          <small>{facture.clientEmail || facture.clientNom || "Sans adresse e-mail"}</small>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="efAvatar efAvatarVide"><Icon fafa="faUserPlus" width={13} /></span>
+                        <span className="efClientTexte">
+                          <b>Choisir un client</b>
+                          <small>Depuis le fichier clients du CRM</small>
+                        </span>
+                      </>
+                    )}
+                    <Icon fafa="faChevronDown" width={11} />
+                  </button>
+                  {erreurDe("client") ? <span className="efChampErreur" id="ef-err-client" role="alert">{erreurDe("client")}</span> : null}
+                  {situation?.nb ? (
+                    <span className="efSituation" data-ton={situation.retard ? "retard" : "info"}>
+                      <Icon fafa={situation.retard ? "faTriangleExclamation" : "faCircleInfo"} width={11} />
+                      {situation.nb} facture{situation.nb > 1 ? "s" : ""} non soldée{situation.nb > 1 ? "s" : ""} · {argent(situation.reste)}
+                      {situation.retard ? ` · ${situation.retard} en retard` : ""}
+                    </span>
+                  ) : null}
+                </div>
                 <Champ label="Modèle de facture" icone="faChevronDown">
-                  <select value={facture.modele} onChange={(e) => maj({ modele: e.target.value })}>
+                  <select value={facture.modele} onChange={(e) => maj({ modele: e.target.value, couleur: "" })}>
                     {MODELES.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
                   </select>
                 </Champ>
               </div>
 
-              <div className="efSegments" role="tablist" aria-label="Type de facturation">
+              <div className="efSegments" role="radiogroup" aria-label="Type de facturation">
                 {ONGLETS_MODE.map((o) => (
                   <button
                     type="button"
-                    role="tab"
+                    role="radio"
                     key={o.id}
-                    aria-selected={facture.mode === o.id}
+                    aria-checked={facture.mode === o.id}
                     onClick={() => maj({ mode: o.id })}
                   >
                     <Icon fafa={o.icone} width={13} />
@@ -804,7 +1121,7 @@ function EditeurFactures() {
               </div>
 
               {facture.mode === "fractionne" ? (
-                <div className="efBloc">
+                <div className="efBloc" data-champ="echeancier" data-erreur={!!erreurDe("echeancier") || undefined}>
                   <div className="efBlocTete">
                     <b>Échéancier</b>
                     <span data-ok={Math.round(sommeEcheancier * 100) === 10000}>{sommeEcheancier} % sur 100 %</span>
@@ -812,28 +1129,26 @@ function EditeurFactures() {
                   {facture.echeancier.map((e, i) => (
                     <div key={e.id} className="efEcheanceLigne">
                       <input
-                        aria-label="Libellé de l'échéance"
+                        aria-label={`Libellé de l'échéance ${i + 1}`}
                         value={e.libelle}
                         placeholder={`Échéance ${i + 1}`}
                         onChange={(ev) => majEcheance(e.id, { libelle: ev.target.value })}
                       />
                       <span className="efSuffixe">
-                        <input
-                          type="number"
-                          min="0"
+                        <Nombre
                           max="100"
-                          aria-label="Pourcentage"
+                          aria-label={`Pourcentage de l'échéance ${i + 1}`}
                           value={e.pourcentage}
                           onChange={(ev) => majEcheance(e.id, { pourcentage: ev.target.value })}
                         />
                         %
                       </span>
-                      <input type="date" aria-label="Date de l'échéance" value={e.date} onChange={(ev) => majEcheance(e.id, { date: ev.target.value })} />
+                      <input type="date" aria-label={`Date de l'échéance ${i + 1}`} value={e.date} onChange={(ev) => majEcheance(e.id, { date: ev.target.value })} />
                       <b>{argent((c.total * (Number(e.pourcentage) || 0)) / 100)}</b>
                       <button
                         type="button"
                         className="efIconeBouton"
-                        aria-label="Retirer l'échéance"
+                        aria-label={`Retirer l'échéance ${i + 1}`}
                         disabled={facture.echeancier.length <= 2}
                         onClick={() => maj((f) => ({ echeancier: f.echeancier.filter((x) => x.id !== e.id) }))}
                       >
@@ -841,15 +1156,31 @@ function EditeurFactures() {
                       </button>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    className="efLien"
-                    onClick={() => maj((f) => ({
-                      echeancier: [...f.echeancier, { id: idLigne(), libelle: "", pourcentage: Math.max(0, 100 - sommeEcheancier), date: f.echeance }],
-                    }))}
-                  >
-                    + Ajouter une échéance
-                  </button>
+                  <div className="efBlocPied">
+                    <button
+                      type="button"
+                      className="efLien"
+                      onClick={() => maj((f) => ({
+                        echeancier: [...f.echeancier, { id: idLigne(), libelle: "", pourcentage: Math.max(0, 100 - sommeEcheancier), date: f.echeance }],
+                      }))}
+                    >
+                      + Ajouter une échéance
+                    </button>
+                    {Math.round(sommeEcheancier * 100) !== 10000 ? (
+                      <button
+                        type="button"
+                        className="efLien"
+                        onClick={() => maj((f) => {
+                          const n = f.echeancier.length;
+                          const part = Math.floor((100 / n) * 100) / 100;
+                          return { echeancier: f.echeancier.map((e, i) => ({ ...e, pourcentage: i === n - 1 ? Math.round((100 - part * (n - 1)) * 100) / 100 : part })) };
+                        })}
+                      >
+                        Répartir à parts égales
+                      </button>
+                    ) : null}
+                  </div>
+                  {erreurDe("echeancier") ? <span className="efChampErreur" role="alert">{erreurDe("echeancier")}</span> : null}
                 </div>
               ) : null}
 
@@ -864,7 +1195,7 @@ function EditeurFactures() {
                         {FREQUENCES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
                       </select>
                     </Champ>
-                    <Champ label="Jusqu'au (facultatif)" icone="faCalendar">
+                    <Champ label="Jusqu'au (facultatif)" icone="faCalendar" champ="recurrence" erreur={erreurDe("recurrence")}>
                       <input
                         type="date"
                         value={facture.recurrence.fin}
@@ -874,28 +1205,32 @@ function EditeurFactures() {
                   </div>
                   <div className="efAide">
                     <Icon fafa="faCircleInfo" width={12} />
-                    Cette facture est la première de la série. Les suivantes sont préparées en brouillon
-                    à chaque échéance, à relire avant envoi — prochaine le{" "}
-                    {new Date(`${dateSuivante(facture.date, facture.recurrence.frequence)}T00:00:00`).toLocaleDateString("fr-FR")}.
+                    <span>
+                      Cette facture est la première de la série. Les suivantes sont préparées en brouillon
+                      à chaque échéance, à relire avant envoi — prochaine le{" "}
+                      {new Date(`${dateSuivante(facture.date, facture.recurrence.frequence)}T00:00:00`).toLocaleDateString("fr-FR")}.
+                    </span>
                   </div>
                 </div>
               ) : null}
             </section>
 
-            <section className="efSection">
-              <h2>Détails de facturation</h2>
+            <section className="efSection" aria-labelledby="ef-t-details">
+              <h2 id="ef-t-details">Détails de facturation</h2>
               <div className="efGrille2">
                 <Champ
                   label="Numéro de facture"
+                  champ="numero"
+                  erreur={erreurDe("numero")}
                   action={<button type="button" className="efGenerer" onClick={genererNumero}>Générer</button>}
                 >
-                  <input value={facture.numero} onChange={(e) => maj({ numero: e.target.value })} />
+                  <input value={facture.numero} onChange={(e) => maj({ numero: e.target.value })} spellCheck={false} />
                 </Champ>
-                <Champ label="Date de facture" icone="faCalendar">
+                <Champ label="Date de facture" icone="faCalendar" champ="date" erreur={erreurDe("date")}>
                   <input type="date" value={facture.date} onChange={(e) => changerDate(e.target.value)} />
                 </Champ>
-                <Champ label="Échéance" icone="faCalendar">
-                  <input type="date" value={facture.echeance} onChange={(e) => maj({ echeance: e.target.value, conditions: "" })} />
+                <Champ label="Échéance" icone="faCalendar" champ="echeance" erreur={erreurDe("echeance")}>
+                  <input type="date" value={facture.echeance} min={facture.date} onChange={(e) => maj({ echeance: e.target.value, conditions: "" })} />
                 </Champ>
                 <Champ label="Conditions de paiement" icone="faChevronDown">
                   <select value={facture.conditions} onChange={(e) => changerConditions(e.target.value)}>
@@ -906,22 +1241,30 @@ function EditeurFactures() {
               </div>
             </section>
 
-            <section className="efSection">
-              <h2>Articles de la facture</h2>
-              <div className="efArticles">
-                <div className="efArticlesTete">
-                  <span>Article</span>
-                  <span>Quantité</span>
-                  <span>Prix unitaire</span>
-                  <span>Taxe</span>
-                  <span>Montant</span>
+            <section className="efSection" aria-labelledby="ef-t-articles">
+              <h2 id="ef-t-articles">
+                Articles de la facture
+                <small>{facture.lignes.filter((l) => String(l.designation || "").trim()).length || ""}</small>
+              </h2>
+              <div className="efArticles" data-champ="articles" data-erreur={!!erreurDe("articles") || undefined} role="table" aria-label="Articles">
+                <div className="efArticlesTete" role="row">
+                  <span role="columnheader">Article</span>
+                  <span role="columnheader">Quantité</span>
+                  <span role="columnheader">Prix unitaire</span>
+                  <span role="columnheader">Taxe</span>
+                  <span role="columnheader">Montant</span>
                 </div>
                 {facture.lignes.map((l, i) => {
                   const tuile = l.articleId ? { couleur: "#0F766E", icone: "faBox" } : TUILES[i % TUILES.length];
+                  const stock = l.articleId ? stocks[l.articleId] : null;
+                  const auDela = stock !== null && stock !== undefined && stock > 0 && Number(l.qte) > stock;
+                  const sansNom = tentative && !String(l.designation || "").trim() && Number(l.pu) > 0;
                   return (
                     <div
                       key={l.id}
                       className="efArticle"
+                      role="row"
+                      data-ligne={l.id}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
                         if (glisse.current !== null && glisse.current !== i) deplacerLigne(glisse.current, i);
@@ -931,7 +1274,7 @@ function EditeurFactures() {
                       <span
                         className="efPoignee"
                         draggable
-                        title="Glisser pour réordonner"
+                        title="Glisser pour réordonner (ou Alt + ↑ ↓)"
                         onDragStart={() => { glisse.current = i; }}
                       >
                         <Icon fafa="faGripVertical" width={10} />
@@ -943,9 +1286,17 @@ function EditeurFactures() {
                         <input
                           className="efNom"
                           aria-label="Nom de l'article"
+                          aria-invalid={sansNom || undefined}
                           placeholder="Nom de l'article"
                           value={l.designation}
                           onChange={(e) => majLigne(l.id, { designation: e.target.value })}
+                          onKeyDown={(e) => {
+                            // Entrée sur la dernière ligne : une nouvelle ligne, comme dans un tableur.
+                            if (e.key === "Enter" && i === facture.lignes.length - 1 && String(l.designation || "").trim()) {
+                              e.preventDefault();
+                              ajouterArticle("libre");
+                            }
+                          }}
                         />
                         <input
                           className="efDescription"
@@ -954,30 +1305,27 @@ function EditeurFactures() {
                           value={l.description || ""}
                           onChange={(e) => majLigne(l.id, { description: e.target.value })}
                         />
+                        {stock !== null && stock !== undefined && stock > 0 ? (
+                          <span className="efStock" data-alerte={auDela || undefined}>
+                            <Icon fafa={auDela ? "faTriangleExclamation" : "faBoxOpen"} width={10} />
+                            {auDela ? `Seulement ${stock} en stock` : `${stock} en stock`}
+                          </span>
+                        ) : null}
                       </span>
-                      <input
+                      <Nombre
                         className="efPilule"
-                        type="number"
-                        min="0"
-                        step="any"
                         aria-label="Quantité"
                         value={l.qte}
                         onChange={(e) => majLigne(l.id, { qte: e.target.value })}
                       />
-                      <input
+                      <Nombre
                         className="efPilule"
-                        type="number"
-                        min="0"
-                        step="any"
                         aria-label="Prix unitaire"
                         value={l.pu}
                         onChange={(e) => majLigne(l.id, { pu: e.target.value })}
                       />
                       <span className="efPilule efPiluleSuffixe">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
+                        <Nombre
                           aria-label="Taux de taxe"
                           value={l.tva}
                           onChange={(e) => majLigne(l.id, { tva: e.target.value })}
@@ -985,20 +1333,26 @@ function EditeurFactures() {
                         %
                       </span>
                       <b className="efMontant">{argent((Number(l.qte) || 0) * (Number(l.pu) || 0))}</b>
-                      <button type="button" className="efIconeBouton efRetirer" aria-label="Retirer l'article" onClick={() => retirerLigne(l.id)}>
-                        <Icon fafa="faXmark" width={11} />
-                      </button>
+                      <span className="efLigneActions">
+                        <button type="button" className="efIconeBouton" aria-label="Dupliquer l'article" title="Dupliquer" onClick={() => dupliquerLigne(l.id)}>
+                          <Icon fafa="faCopy" width={10} />
+                        </button>
+                        <button type="button" className="efIconeBouton efRetirer" aria-label="Retirer l'article" title="Retirer" onClick={() => retirerLigne(l.id)}>
+                          <Icon fafa="faXmark" width={11} />
+                        </button>
+                      </span>
                     </div>
                   );
                 })}
               </div>
+              {erreurDe("articles") ? <span className="efChampErreur" role="alert">{erreurDe("articles")}</span> : null}
               <div className="efAjouterZone">
-                <button type="button" className="efAjouter" onClick={() => setMenu(menu === "article" ? null : "article")}>
+                <button type="button" className="efAjouter" aria-haspopup="menu" aria-expanded={menu === "article"} onClick={() => setMenu(menu === "article" ? null : "article")}>
                   <Icon fafa="faPlus" width={12} />
                   <span>Ajouter un article</span>
                 </button>
                 <Menu ouvert={menu === "article"} fermer={() => setMenu(null)} className="efMenuCentre">
-                  <EntreeMenu icone="faBoxesStacked" onClick={() => ajouterArticle("catalogue")} aide="Désignation, prix et TVA repris du Stock">
+                  <EntreeMenu icone="faBoxesStacked" onClick={() => ajouterArticle("catalogue")} aide="Désignation, prix, TVA et stock repris du Stock">
                     Depuis le catalogue
                   </EntreeMenu>
                   <EntreeMenu icone="faPen" onClick={() => ajouterArticle("libre")} aide="Une prestation, un service, un article ponctuel">
@@ -1008,8 +1362,8 @@ function EditeurFactures() {
               </div>
             </section>
 
-            <section className="efSection">
-              <h2>Paramètres de paiement</h2>
+            <section className="efSection" aria-labelledby="ef-t-paiement">
+              <h2 id="ef-t-paiement">Paramètres de paiement</h2>
               <div className="efGrille2">
                 <Champ label="Mode d'envoi" icone="faChevronDown">
                   <select value={facture.envoi} onChange={(e) => maj({ envoi: e.target.value })}>
@@ -1024,15 +1378,18 @@ function EditeurFactures() {
               </div>
               <div className="efAvis">
                 <Icon fafa="faCircleExclamation" width={13} />
-                <span>{mode.aide}</span>
+                <span>
+                  {mode.aide}
+                  {facture.envoi === "immediat" && !facture.clientEmail ? " Ce client n'a pas d'adresse e-mail : vous la saisirez dans le Courrier." : ""}
+                </span>
               </div>
 
               <div className="efGrille3">
                 <Champ label="Remise (%)">
-                  <input type="number" min="0" max="100" step="any" value={facture.remise} onChange={(e) => maj({ remise: e.target.value })} />
+                  <Nombre max="100" value={facture.remise} onChange={(e) => maj({ remise: e.target.value })} />
                 </Champ>
                 <Champ label={`Livraison (${facture.devise === "XOF" ? "F" : facture.devise})`}>
-                  <input type="number" min="0" step="any" value={facture.livraison} onChange={(e) => maj({ livraison: e.target.value })} />
+                  <Nombre value={facture.livraison} onChange={(e) => maj({ livraison: e.target.value })} />
                 </Champ>
                 <Champ label="Devise" icone="faChevronDown">
                   <select value={facture.devise} onChange={(e) => maj({ devise: e.target.value })}>
@@ -1046,21 +1403,63 @@ function EditeurFactures() {
                 <textarea rows={2} value={facture.notes} onChange={(e) => maj({ notes: e.target.value })} />
               </Champ>
 
-              <div className="efPiedFormulaire">
-                <span className="efTotalRappel">Total : <b>{argent(c.total)}</b></span>
-                <button type="button" className="efBouton" onClick={reinitialiser}>
-                  <Icon fafa="faRotateLeft" width={12} />
-                  <span>Réinitialiser</span>
+              <div className="efPieces">
+                <div className="efPiecesTete">
+                  <b>Pièces jointes</b>
+                  <small>Envoyées avec la facture : bon de commande, contrat, devis signé…</small>
+                </div>
+                {(facture.pieces || []).length ? (
+                  <ul>
+                    {facture.pieces.map((p) => (
+                      <li key={p.id}>
+                        <Icon fafa="faPaperclip" width={11} />
+                        <span title={p.nom}>{p.nom}</span>
+                        <button
+                          type="button"
+                          className="efIconeBouton"
+                          aria-label={`Retirer ${p.nom}`}
+                          onClick={() => maj((f) => ({ pieces: f.pieces.filter((x) => x.id !== p.id) }))}
+                        >
+                          <Icon fafa="faXmark" width={10} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <button type="button" className="efBouton" onClick={joindre}>
+                  <Icon fafa="faCloud" width={12} />
+                  <span>Joindre depuis le Cloud</span>
                 </button>
               </div>
             </section>
+
+            <div className="efPiedFormulaire">
+              <div className="efTotalRappel">
+                <span>Total TTC</span>
+                <b>{argent(c.total)}</b>
+                {Number(facture.remise) ? <small>dont remise −{argent(c.remise)}</small> : null}
+              </div>
+              <button type="button" className="efBouton" onClick={nouvelle}>
+                <Icon fafa="faRotateLeft" width={12} />
+                <span>Réinitialiser</span>
+              </button>
+              <button type="button" className="efPrincipal" disabled={occupe} onClick={() => enregistrer()}>
+                {occupe ? "Enregistrement…" : libelleEnregistrer}
+              </button>
+            </div>
           </div>
 
           {/* ------------------------------------------------ Aperçu */}
           <div className="efApercuZone cosScroll" ref={zoneApercu}>
+            {manquesEntreprise.length && estAdmin ? (
+              <button type="button" className="efApercuConseil" onClick={ouvrirFicheEntreprise}>
+                <Icon fafa="faWandMagicSparkles" width={11} />
+                <span>Ajoutez {manquesEntreprise.join(", ")} à la fiche de l'entreprise</span>
+              </button>
+            ) : null}
             <div className="efApercuCadre" style={{ width: LARGEUR_PAGE * echelle, height: HAUTEUR_PAGE * echelle }}>
               <div style={{ transform: `scale(${echelle})`, transformOrigin: "top left" }}>
-                <Apercu ref={pageRef} facture={facture} emetteur={profil} />
+                <Apercu ref={pageRef} facture={facture} emetteur={emetteurDoc} />
               </div>
             </div>
           </div>
@@ -1070,233 +1469,201 @@ function EditeurFactures() {
         {panneau ? <div className="efVoile" onMouseDown={() => setPanneau(null)} /> : null}
 
         {panneau === "design" ? (
-          <aside className="efPanneau" aria-label="Design de la facture">
-            <div className="efPanneauTete">
-              <h3>Design de la facture</h3>
-              <button type="button" className="efIconeBouton" aria-label="Fermer" onClick={() => setPanneau(null)}><Icon fafa="faXmark" width={12} /></button>
-            </div>
-            <div className="efPanneauCorps cosScroll">
-              <h4>Modèle</h4>
-              <div className="efModeles">
-                {MODELES.map((m) => (
-                  <button
-                    type="button"
-                    key={m.id}
-                    className="efModele"
-                    aria-pressed={facture.modele === m.id}
-                    onClick={() => maj({ modele: m.id, couleur: "" })}
-                  >
-                    <span className="efVignette">
-                      <span style={{ transform: "scale(0.16)", transformOrigin: "top left" }}>
-                        <Apercu facture={{ ...facture, modele: m.id, couleur: facture.modele === m.id ? facture.couleur : "" }} emetteur={profil} />
-                      </span>
+          <Volet titre="Design de la facture" onFermer={() => setPanneau(null)}>
+            <h4>Modèle</h4>
+            <div className="efModeles" role="radiogroup" aria-label="Modèle">
+              {MODELES.map((m) => (
+                <button
+                  type="button"
+                  key={m.id}
+                  role="radio"
+                  className="efModele"
+                  aria-checked={facture.modele === m.id}
+                  onClick={() => maj({ modele: m.id, couleur: "" })}
+                >
+                  <span className="efVignette">
+                    <span style={{ transform: "scale(0.16)", transformOrigin: "top left" }}>
+                      <Apercu facture={{ ...facture, modele: m.id, couleur: facture.modele === m.id ? facture.couleur : "" }} emetteur={emetteurDoc} />
                     </span>
-                    <b>{m.nom}</b>
-                    <small>{m.description}</small>
-                  </button>
-                ))}
-              </div>
-
-              <h4>Couleur</h4>
-              <div className="efPalette">
-                {PALETTE.map((p) => (
-                  <button
-                    type="button"
-                    key={p}
-                    className="efPastilleCouleur"
-                    style={{ background: p }}
-                    aria-label={`Couleur ${p}`}
-                    aria-pressed={couleurDe(facture).toLowerCase() === p.toLowerCase()}
-                    onClick={() => maj({ couleur: p })}
-                  />
-                ))}
-                <label className="efPastilleCouleur efCouleurLibre" title="Couleur personnalisée">
-                  <Icon fafa="faEyeDropper" width={11} />
-                  <input type="color" value={couleurDe(facture)} onChange={(e) => maj({ couleur: e.target.value })} />
-                </label>
-              </div>
-
-              <h4>Afficher</h4>
-              {[
-                ["afficherLogo", "Le logo de l'entreprise"],
-                ["afficherSignature", "La signature"],
-                ["montantEnLettres", "Le montant total en lettres"],
-              ].map(([champ, libelle]) => (
-                <label key={champ} className="efBascule">
-                  <input type="checkbox" checked={facture[champ] !== false} onChange={(e) => maj({ [champ]: e.target.checked })} />
-                  <span>{libelle}</span>
-                </label>
-              ))}
-
-              <button type="button" className="efBouton efLarge" onClick={enregistrerDesignParDefaut}>
-                <Icon fafa="faStar" width={12} />
-                <span>Utiliser ce design par défaut</span>
-              </button>
-              {!profil.logo || !profil.adresse ? (
-                <div className="efAide">
-                  <Icon fafa="faCircleInfo" width={12} />
-                  <span>
-                    Ajoutez votre logo, votre adresse et vos coordonnées de paiement dans le{" "}
-                    <button type="button" className="efLien" onClick={ouvrirProfil}>profil de l'entreprise</button>.
                   </span>
-                </div>
-              ) : null}
+                  <b>{m.nom}</b>
+                  <small>{m.description}</small>
+                </button>
+              ))}
             </div>
-          </aside>
+
+            <h4>Couleur</h4>
+            <div className="efPalette" role="radiogroup" aria-label="Couleur">
+              {PALETTE.map((p) => (
+                <button
+                  type="button"
+                  key={p}
+                  role="radio"
+                  className="efPastilleCouleur"
+                  style={{ background: p }}
+                  aria-label={`Couleur ${p}`}
+                  aria-checked={couleurDe(facture).toLowerCase() === p.toLowerCase()}
+                  onClick={() => maj({ couleur: p })}
+                />
+              ))}
+              <label className="efPastilleCouleur efCouleurLibre" title="Couleur personnalisée">
+                <Icon fafa="faEyeDropper" width={11} />
+                <input type="color" aria-label="Couleur personnalisée" value={couleurDe(facture)} onChange={(e) => maj({ couleur: e.target.value })} />
+              </label>
+            </div>
+
+            <h4>Afficher</h4>
+            {[
+              ["afficherLogo", "Le logo de l'entreprise"],
+              ["afficherSignature", "La signature et le cachet"],
+              ["montantEnLettres", "Le montant total en lettres"],
+            ].map(([champ, libelle]) => (
+              <label key={champ} className="efBascule">
+                <input type="checkbox" checked={facture[champ] !== false} onChange={(e) => maj({ [champ]: e.target.checked })} />
+                <span>{libelle}</span>
+              </label>
+            ))}
+
+            <button type="button" className="efBouton efLarge" onClick={enregistrerDesignParDefaut}>
+              <Icon fafa="faStar" width={12} />
+              <span>Utiliser ce design par défaut</span>
+            </button>
+            {manquesEntreprise.length ? (
+              <div className="efAide">
+                <Icon fafa="faCircleInfo" width={12} />
+                <span>
+                  Logo, cachet, signature et coordonnées viennent de la{" "}
+                  <button type="button" className="efLien" onClick={ouvrirFicheEntreprise}>fiche de l'entreprise</button>.
+                </span>
+              </div>
+            ) : null}
+          </Volet>
         ) : null}
 
-        {panneau === "profil" && profilEdite ? (
-          <aside className="efPanneau" aria-label="Profil de l'entreprise">
-            <div className="efPanneauTete">
-              <h3>Profil de l'entreprise</h3>
-              <button type="button" className="efIconeBouton" aria-label="Fermer" onClick={() => setPanneau(null)}><Icon fafa="faXmark" width={12} /></button>
-            </div>
-            <div className="efPanneauCorps cosScroll">
-              <div className="efLogoZone">
-                {profilEdite.logo ? <img src={profilEdite.logo} alt="Logo" /> : <span className="efLogoVide">{initiales(profilEdite.nom)}</span>}
-                <div>
-                  <label className="efBouton">
-                    <Icon fafa="faImage" width={12} />
-                    <span>{profilEdite.logo ? "Changer le logo" : "Ajouter un logo"}</span>
-                    <input type="file" accept="image/*" hidden onChange={chargerImage("logo")} />
-                  </label>
-                  {profilEdite.logo ? (
-                    <button type="button" className="efLien" onClick={() => setProfilEdite((p) => ({ ...p, logo: "" }))}>Retirer</button>
-                  ) : null}
-                </div>
-              </div>
-              {[
-                ["nom", "Raison sociale"],
-                ["adresse", "Adresse"],
-                ["ville", "Ville"],
-                ["pays", "Pays"],
-                ["email", "E-mail"],
-                ["telephone", "Téléphone"],
-                ["ncc", "NCC (compte contribuable)"],
-                ["rccm", "RCCM"],
-              ].map(([champ, libelle]) => (
-                <Champ key={champ} label={libelle}>
-                  <input value={profilEdite[champ] || ""} onChange={(e) => setProfilEdite((p) => ({ ...p, [champ]: e.target.value }))} />
-                </Champ>
-              ))}
-              <h4>Paiement</h4>
-              {[
-                ["banque", "Banque"],
-                ["titulaire", "Titulaire du compte"],
-                ["iban", "RIB / IBAN"],
-                ["mobileOperateur", "Opérateur Mobile Money (Orange, MTN, Wave…)"],
-                ["mobileNumero", "Numéro Mobile Money"],
-              ].map(([champ, libelle]) => (
-                <Champ key={champ} label={libelle}>
-                  <input value={profilEdite[champ] || ""} onChange={(e) => setProfilEdite((p) => ({ ...p, [champ]: e.target.value }))} />
-                </Champ>
-              ))}
-              <h4>Signature et mentions</h4>
-              <Champ label="Nom du signataire">
-                <input value={profilEdite.signataire || ""} onChange={(e) => setProfilEdite((p) => ({ ...p, signataire: e.target.value }))} />
-              </Champ>
-              <div className="efLogoZone">
-                {profilEdite.signatureImage ? <img src={profilEdite.signatureImage} alt="Signature" /> : null}
-                <label className="efBouton">
-                  <Icon fafa="faSignature" width={12} />
-                  <span>{profilEdite.signatureImage ? "Changer la signature" : "Image de signature (facultative)"}</span>
-                  <input type="file" accept="image/*" hidden onChange={chargerImage("signatureImage")} />
-                </label>
-                {profilEdite.signatureImage ? (
-                  <button type="button" className="efLien" onClick={() => setProfilEdite((p) => ({ ...p, signatureImage: "" }))}>Retirer</button>
-                ) : null}
-              </div>
-              <Champ label="Mentions en pied de page">
-                <textarea rows={2} value={profilEdite.mentions || ""} placeholder="Capital, régime fiscal, pénalités de retard…" onChange={(e) => setProfilEdite((p) => ({ ...p, mentions: e.target.value }))} />
-              </Champ>
-              <button type="button" className="efPrincipal efLarge" disabled={occupe} onClick={enregistrerProfil}>
-                Enregistrer le profil
+        {panneau === "profil" ? (
+          <Volet
+            titre="Fiche de l'entreprise"
+            large
+            onFermer={() => setPanneau(null)}
+            actions={(
+              <button type="button" className="efLien" onClick={() => { setPanneau(null); ouvrirParametres("entreprise"); }}>
+                Ouvrir dans les Paramètres
               </button>
-            </div>
-          </aside>
+            )}
+          >
+            <p className="efAideTexte">
+              Partagée par toutes les applications de l'espace : ce que vous changez ici apparaît
+              aussi sur les devis, les bons de commande et dans les Paramètres.
+            </p>
+            <FicheEntreprise
+              compact
+              repli={repliIdentite}
+              onEnregistre={() => {
+                chargerSignatures().then(setSignatures);
+                flash("Fiche de l'entreprise enregistrée : l'aperçu est à jour.");
+              }}
+            />
+          </Volet>
         ) : null}
 
         {panneau === "ouvrir" ? (
-          <aside className="efPanneau" aria-label="Ouvrir une facture">
-            <div className="efPanneauTete">
-              <h3>Ouvrir une facture</h3>
-              <button type="button" className="efIconeBouton" aria-label="Fermer" onClick={() => setPanneau(null)}><Icon fafa="faXmark" width={12} /></button>
-            </div>
-            <div className="efPanneauCorps cosScroll">
-              <Champ label="Rechercher" icone="faMagnifyingGlass">
-                <input autoFocus value={recherche} placeholder="Numéro ou client" onChange={(e) => setRecherche(e.target.value)} />
-              </Champ>
-              {facturesVisibles.length ? facturesVisibles.slice(0, 80).map((d) => (
-                <button type="button" key={d.id} className="efListeLigne" data-actif={d.id === ficheId} onClick={() => ouvrirFiche(d, profil)}>
+          <Volet titre="Ouvrir une facture" onFermer={() => setPanneau(null)}>
+            <Champ label="Rechercher" icone="faMagnifyingGlass">
+              <input value={recherche} placeholder="Numéro ou client" onChange={(e) => setRecherche(e.target.value)} />
+            </Champ>
+            {facturesVisibles.length ? facturesVisibles.slice(0, 80).map((d) => {
+              const etat = etatPaiement(d, reglements);
+              return (
+                <button
+                  type="button"
+                  key={d.id}
+                  className="efListeLigne"
+                  data-actif={d.id === ficheId}
+                  onClick={async () => { if (d.id === ficheId || await confirmerAbandon()) ouvrirFiche(d, profil); }}
+                >
                   <span>
                     <b>{d.data.numero}</b>
                     <small>{d.data.clientEntreprise || d.data.clientNom || "—"} · {new Date(`${d.data.date}T00:00:00`).toLocaleDateString("fr-FR")}</small>
                   </span>
-                  <span className="efListeMontant">{montantDans(chiffres(depuisFacturation(d.data)).total, d.data.devise)}</span>
+                  <span className="efListeDroite">
+                    <span className="efListeMontant">{montantDans(chiffres(depuisFacturation(d.data)).total, d.data.devise)}</span>
+                    <span className="efPuce" data-ton={etat.ton}>{etat.label}</span>
+                  </span>
                 </button>
-              )) : <p className="efAide">Aucune facture{recherche ? " ne correspond" : " pour l'instant"}.</p>}
-            </div>
-          </aside>
+              );
+            }) : <p className="efAideTexte">Aucune facture{recherche ? " ne correspond" : " pour l'instant"}.</p>}
+          </Volet>
         ) : null}
 
         {panneau === "recurrences" ? (
-          <aside className="efPanneau" aria-label="Factures récurrentes">
-            <div className="efPanneauTete">
-              <h3>Factures récurrentes</h3>
-              <button type="button" className="efIconeBouton" aria-label="Fermer" onClick={() => setPanneau(null)}><Icon fafa="faXmark" width={12} /></button>
-            </div>
-            <div className="efPanneauCorps cosScroll">
-              {dues.length ? (
-                <button type="button" className="efPrincipal efLarge" disabled={occupe} onClick={() => genererRecurrentes()}>
-                  Préparer les {dues.length} facture{dues.length > 1 ? "s" : ""} du jour
-                </button>
-              ) : null}
-              {recurrences.length ? recurrences.map((r) => {
-                const due = dues.some((x) => x.id === r.id);
-                return (
-                  <div key={r.id} className="efRecurrence" data-inactif={r.data.actif === false}>
-                    <div>
-                      <b>{r.data.client || "Client"}</b>
-                      <small>
-                        {montantDans(r.data.total, r.data.devise)} · {FREQUENCES.find((x) => x.id === r.data.frequence)?.label.toLowerCase()}
-                        {r.data.actif === false ? " · suspendue" : ` · prochaine le ${new Date(`${r.data.prochaine}T00:00:00`).toLocaleDateString("fr-FR")}`}
-                      </small>
-                      {due && r.data.actif !== false ? <span className="efBadge">À préparer</span> : null}
-                    </div>
-                    <div className="efRecurrenceActions">
-                      {due && r.data.actif !== false ? (
-                        <button type="button" className="efBouton" disabled={occupe} onClick={() => genererRecurrentes([r])}>Préparer</button>
-                      ) : null}
-                      <button type="button" className="efIconeBouton" title={r.data.actif === false ? "Reprendre" : "Suspendre"} onClick={() => basculerRecurrence(r)}>
-                        <Icon fafa={r.data.actif === false ? "faPlay" : "faPause"} width={11} />
-                      </button>
-                      <button type="button" className="efIconeBouton" title="Arrêter" onClick={() => supprimerRecurrence(r)}>
-                        <Icon fafa="faTrashCan" width={11} />
-                      </button>
-                    </div>
+          <Volet titre="Factures récurrentes" onFermer={() => setPanneau(null)}>
+            {dues.length ? (
+              <button type="button" className="efPrincipal efLarge" disabled={occupe} onClick={() => genererRecurrentes()}>
+                Préparer les {dues.length} facture{dues.length > 1 ? "s" : ""} du jour
+              </button>
+            ) : null}
+            {recurrences.length ? recurrences.map((r) => {
+              const due = dues.some((x) => x.id === r.id);
+              return (
+                <div key={r.id} className="efRecurrence" data-inactif={r.data.actif === false}>
+                  <div>
+                    <b>{r.data.client || "Client"}</b>
+                    <small>
+                      {montantDans(r.data.total, r.data.devise)} · {FREQUENCES.find((x) => x.id === r.data.frequence)?.label.toLowerCase()}
+                      {r.data.actif === false ? " · suspendue" : ` · prochaine le ${new Date(`${r.data.prochaine}T00:00:00`).toLocaleDateString("fr-FR")}`}
+                    </small>
+                    {due && r.data.actif !== false ? <span className="efBadge">À préparer</span> : null}
                   </div>
-                );
-              }) : (
-                <div className="efAide">
-                  <Icon fafa="faCircleInfo" width={12} />
-                  <span>Aucune facture récurrente. Choisissez « Facture récurrente » au-dessus du formulaire : la première facture arme la série.</span>
+                  <div className="efRecurrenceActions">
+                    {due && r.data.actif !== false ? (
+                      <button type="button" className="efBouton" disabled={occupe} onClick={() => genererRecurrentes([r])}>Préparer</button>
+                    ) : null}
+                    <button type="button" className="efIconeBouton" aria-label={r.data.actif === false ? "Reprendre" : "Suspendre"} title={r.data.actif === false ? "Reprendre" : "Suspendre"} onClick={() => basculerRecurrence(r)}>
+                      <Icon fafa={r.data.actif === false ? "faPlay" : "faPause"} width={11} />
+                    </button>
+                    <button type="button" className="efIconeBouton" aria-label="Arrêter" title="Arrêter" onClick={() => supprimerRecurrence(r)}>
+                      <Icon fafa="faTrashCan" width={11} />
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          </aside>
+              );
+            }) : (
+              <div className="efAide">
+                <Icon fafa="faCircleInfo" width={12} />
+                <span>Aucune facture récurrente. Choisissez « Facture récurrente » au-dessus du formulaire : la première facture arme la série.</span>
+              </div>
+            )}
+          </Volet>
+        ) : null}
+
+        {panneau === "raccourcis" ? (
+          <Volet titre="Raccourcis clavier" onFermer={() => setPanneau(null)}>
+            <dl className="efRaccourcis">
+              {[
+                [`${MOD} + Entrée`, libelleEnregistrer],
+                [`${MOD} + S`, "Enregistrer sans envoyer"],
+                [`${MOD} + P`, "Imprimer la facture"],
+                ["Alt + ↑ / ↓", "Déplacer l'article où se trouve le curseur"],
+                ["Entrée", "Sur le nom du dernier article : ajouter une ligne"],
+                ["Échap", "Fermer le volet ou l'aperçu"],
+              ].map(([k, v]) => (
+                <div key={k}><dt><kbd>{k}</kbd></dt><dd>{v}</dd></div>
+              ))}
+            </dl>
+          </Volet>
         ) : null}
 
         {pleinEcran ? (
-          <div className="efPleinEcran" role="dialog" aria-label="Aperçu de la facture">
+          <div className="efPleinEcran" role="dialog" aria-modal="true" aria-label="Aperçu de la facture">
             <div className="efPleinEcranBarre">
               <span>Aperçu · {facture.numero}</span>
               <span className="efEspace" />
               <button type="button" className="efBouton" onClick={telechargerPdf}><Icon fafa="faFilePdf" width={12} /><span>PDF</span></button>
               <button type="button" className="efBouton" onClick={imprimer}><Icon fafa="faPrint" width={12} /><span>Imprimer</span></button>
-              <button type="button" className="efBouton efCarre" aria-label="Fermer l'aperçu" onClick={() => setPleinEcran(false)}><Icon fafa="faXmark" width={13} /></button>
+              <button type="button" className="efBouton efCarre" aria-label="Fermer l'aperçu" autoFocus onClick={() => setPleinEcran(false)}><Icon fafa="faXmark" width={13} /></button>
             </div>
             <div className="efPleinEcranPage cosScroll">
-              <Apercu facture={facture} emetteur={profil} />
+              <Apercu facture={facture} emetteur={emetteurDoc} />
             </div>
           </div>
         ) : null}

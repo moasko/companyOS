@@ -61,14 +61,7 @@ const svgVersPng = (svg, largeur, hauteur, echelle = 3) =>
     img.src = url;
   });
 
-const apercuDe = (record) => {
-  const d = record.data;
-  const svg = D.svgDe(d.traits, d.largeur, d.hauteur, {
-    couleur: D.couleurEncre(d.encre),
-    epaisseur: d.epaisseur,
-  });
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-};
+const apercuDe = (record) => D.imageSignature(record.data);
 
 function SignatureApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id]);

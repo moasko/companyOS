@@ -122,3 +122,16 @@ export const nomFichier = (nom, ext = "png") =>
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")}.${ext}`;
+
+/// Le SVG d'une signature enregistrée (la `data` d'une fiche
+/// `signature/signatures`). Sert à toute application qui signe : une
+/// facture, un devis, un contrat.
+export const svgSignature = (data) =>
+  svgDe(data.traits || [], data.largeur || 1, data.hauteur || 1, {
+    couleur: couleurEncre(data.encre),
+    epaisseur: data.epaisseur,
+  });
+
+/// …et son image, prête pour un `<img src>`.
+export const imageSignature = (data) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(svgSignature(data))}`;

@@ -54,8 +54,15 @@ const COLLECTIONS_MOTEUR = new Set([
   "relances/relances",
 ]);
 
+/// Collections **de référence**, communes à toutes les applications : la
+/// fiche de l'entreprise (raison sociale, NCC, RIB…) part sur chaque
+/// facture. Un membre la lit ; seul un administrateur la change — un RIB
+/// modifié en douce, c'est le paiement d'un client détourné.
+const COLLECTIONS_REFERENCE = new Set(["entreprise/profil"]);
+
 const exigeAdmin = (names) =>
-  COLLECTIONS_MOTEUR.has(`${names.module}/${names.collection}`);
+  COLLECTIONS_MOTEUR.has(`${names.module}/${names.collection}`) ||
+  COLLECTIONS_REFERENCE.has(`${names.module}/${names.collection}`);
 
 /// Réponse commune à toute opération refusée par la règle d'accès.
 const refuserAcces = (reply, names) =>
