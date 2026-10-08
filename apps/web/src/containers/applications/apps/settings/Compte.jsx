@@ -15,6 +15,7 @@ export const SectionCompte = ({
   mdp,
   setMdp,
   changerMotDePasse,
+  deconnecterAutresAppareils,
 }) => (
   <section className="setSection" data-hidden={section !== "compte"}>
     <h2>Compte</h2>
@@ -111,6 +112,19 @@ export const SectionCompte = ({
       onClick={changerMotDePasse}
     >
       Modifier le mot de passe
+    </div>
+
+    <div className="setSubTitle">Sessions</div>
+    <p className="setHint">
+      Un poste partagé resté ouvert, un téléphone perdu : fermez toutes vos
+      sessions ailleurs. Changer de mot de passe le fait aussi.
+    </p>
+    <div
+      className="setBtnGhost handcr"
+      data-off={busy}
+      onClick={deconnecterAutresAppareils}
+    >
+      Déconnecter mes autres appareils
     </div>
   </section>
 );

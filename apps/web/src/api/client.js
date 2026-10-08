@@ -65,6 +65,9 @@ export const api = {
   setMemberRole: (id, role) =>
     request(`/auth/members/${id}/role`, { method: "PUT", body: { role } }),
   removeMember: (id) => request(`/auth/members/${id}`, { method: "DELETE" }),
+  /// Ferme toutes les sessions d'un membre, sans le retirer de l'espace.
+  deconnecterMembre: (id) =>
+    request(`/auth/members/${id}/deconnexion`, { method: "POST" }),
 
   // Invitations : une adresse, un rôle, un code à transmettre.
   invitations: () => request("/auth/invitations"),
@@ -74,8 +77,23 @@ export const api = {
   /// Rejoindre un espace avec un code — la personne n'a pas encore de compte.
   join: (code, name, password) =>
     request("/auth/join", { method: "POST", body: { code, name, password } }),
-  updatePassword: (current, next) =>
-    request("/auth/password", { method: "PUT", body: { current, next } }),
+  /// Changer de mot de passe ferme les sessions des autres appareils : le
+  /// serveur renvoie un jeton neuf pour celle-ci, à conserver aussitôt —
+  /// l'ancien est déjà refusé.
+  updatePassword: async (current, next) => {
+    const reponse = await request("/auth/password", {
+      method: "PUT",
+      body: { current, next },
+    });
+    if (reponse?.token) setToken(reponse.token);
+    return reponse;
+  },
+  /// « Déconnecter mes autres appareils » — même mécanique.
+  revoquerSessions: async () => {
+    const reponse = await request("/auth/sessions/revoquer", { method: "POST" });
+    if (reponse?.token) setToken(reponse.token);
+    return reponse;
+  },
   updateProfile: (name) => request("/auth/profile", { method: "PUT", body: { name } }),
   /// `avatar` : une data URL déjà redimensionnée, ou null pour revenir aux
   /// initiales. Voir src/apps/image.js.
@@ -132,6 +150,10 @@ export const api = {
   /// Les membres d'un espace, vus par l'exploitant. Ni mot de passe ni
   /// empreinte : savoir qui compose l'espace, pas se faire passer pour eux.
   plateformeMembres: (tenantId) => request(`/plateforme/espaces/${tenantId}/membres`),
+  plateformeDeconnexion: (tenantId, userId) =>
+    request(`/plateforme/espaces/${tenantId}/membres/${userId}/deconnexion`, {
+      method: "POST",
+    }),
   plateformeRoleMembre: (tenantId, userId, role) =>
     request(`/plateforme/espaces/${tenantId}/membres/${userId}/role`, {
       method: "PUT",

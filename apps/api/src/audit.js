@@ -16,14 +16,24 @@ import { prisma } from "./db.js";
 /// Écrit une entrée. Ne lève jamais : si le journal tombe, l'action de
 /// l'utilisateur a déjà eu lieu et la faire échouer après coup serait pire
 /// que de perdre une ligne. L'échec part dans les logs du serveur.
-export const journaliser = async (request, action, cible = null, details = null) => {
+///
+/// `options.tenantId` écrit la ligne dans un **autre** espace que celui de
+/// l'auteur : c'est le cas de l'exploitant, dont les gestes (formule, rôle,
+/// suspension) concernent un client qui doit pouvoir les relire chez lui.
+export const journaliser = async (
+  request,
+  action,
+  cible = null,
+  details = null,
+  options = {},
+) => {
   const user = request.user;
   if (!user) return;
 
   try {
     await prisma.auditEvent.create({
       data: {
-        tenantId: user.tenantId,
+        tenantId: options.tenantId || user.tenantId,
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
@@ -53,10 +63,11 @@ export const journaliserPour = async (request, user, action, cible = null, detai
     details,
   );
 
-/// Derrière un reverse proxy, `request.ip` est celui du proxy. On lit
-/// l'en-tête standard quand il est là, en ne gardant que le premier saut.
-const adresse = (request) => {
-  const suivi = request.headers?.["x-forwarded-for"];
-  if (typeof suivi === "string" && suivi.length) return suivi.split(",")[0].trim();
-  return request.ip || null;
-};
+/// L'adresse du client, telle que Fastify l'a établie.
+///
+/// Ce module lisait autrefois `X-Forwarded-For` lui-même, en prenant le
+/// premier saut : c'est la valeur que **le client** choisit, puisqu'il peut
+/// envoyer l'en-tête à la main. N'importe qui inscrivait donc l'adresse de
+/// son choix au journal. `request.ip` applique le réglage `trustProxy` de
+/// `index.js`, qui ne croit que le nombre de proxies déclaré.
+const adresse = (request) => request.ip || null;

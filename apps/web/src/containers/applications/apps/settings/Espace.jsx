@@ -16,6 +16,7 @@ export const SectionEspace = ({
   membres,
   changerRole,
   retirerMembre,
+  deconnecterMembre,
   invitations,
   mailInvite,
   setMailInvite,
@@ -105,6 +106,17 @@ export const SectionEspace = ({
             ) : (
               <span className="setBadge">{ROLES[m.role]}</span>
             )}
+
+            {peutGerer && !moi ? (
+              <span title="Déconnecter de tous ses appareils">
+                <Icon
+                  className="setRetirer"
+                  fafa="faRightFromBracket"
+                  width={12}
+                  onClick={() => deconnecterMembre(m)}
+                />
+              </span>
+            ) : null}
 
             {peutGerer && !moi ? (
               <Icon

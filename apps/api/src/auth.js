@@ -7,10 +7,56 @@ export const hashPassword = (plain) => bcrypt.hash(plain, 12);
 
 export const verifyPassword = (plain, hash) => bcrypt.compare(plain, hash);
 
+/// Le jeton porte la **version de session** du compte (`ver`).
+///
+/// Un JWT ne se révoque pas : signé pour sept jours, il reste valable sept
+/// jours, même après un changement de mot de passe. Le compte garde donc un
+/// compteur, recopié dans chaque jeton ; l'incrémenter rend caducs, d'un
+/// coup, tous les jetons émis avant — sur tous les appareils.
 export const signToken = (user) =>
-  jwt.sign({ sub: user.id, tenantId: user.tenantId, role: user.role }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
+  jwt.sign(
+    {
+      sub: user.id,
+      tenantId: user.tenantId,
+      role: user.role,
+      ver: user.sessionVersion ?? 0,
+    },
+    env.jwtSecret,
+    { expiresIn: env.jwtExpiresIn },
+  );
+
+/// Ferme toutes les sessions ouvertes d'un compte. Renvoie le compte à jour,
+/// de quoi signer un jeton neuf pour la session qui a fait la demande.
+export const revoquerSessions = (userId) =>
+  prisma.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
   });
+
+/// Une adresse e-mail telle qu'on la stocke et qu'on la compare.
+///
+/// Sans cette forme unique, `Vous@x.fr` et `vous@x.fr` étaient deux comptes
+/// distincts pour la base — alors que le contrôle d'exploitant, lui, passait
+/// tout en minuscules : il suffisait de s'inscrire avec la bonne adresse
+/// écrite en majuscules pour ouvrir la console de la plateforme.
+export const normaliserEmail = (email) => String(email ?? "").trim().toLowerCase();
+
+/// Le compte qui porte cette adresse, quelle que soit sa casse.
+///
+/// La forme normalisée d'abord — le cas de tous les comptes créés depuis la
+/// normalisation ; la recherche insensible ensuite, pour les comptes plus
+/// anciens enregistrés avec des majuscules.
+export const compteParEmail = async (email, options = {}) => {
+  const adresse = normaliserEmail(email);
+  return (
+    (await prisma.user.findUnique({ where: { email: adresse }, ...options })) ||
+    (await prisma.user.findFirst({
+      where: { email: { equals: adresse, mode: "insensitive" } },
+      orderBy: { createdAt: "asc" },
+      ...options,
+    }))
+  );
+};
 
 /// Identifiant du compte porté par le jeton de la requête, ou `null`.
 ///
@@ -55,6 +101,15 @@ export const authenticate = async (request, reply) => {
     return reply.code(401).send({ error: "Compte introuvable" });
   }
 
+  // Un jeton émis avant la dernière révocation (mot de passe changé,
+  // « déconnecter tous mes appareils », intervention de l'exploitant) ne
+  // vaut plus rien. Les jetons d'avant l'introduction du compteur n'ont pas
+  // de `ver` : ils comptent pour 0 et restent valides jusqu'à la première
+  // révocation, ce qui évite de déconnecter tout le monde au déploiement.
+  if ((payload.ver ?? 0) !== (user.sessionVersion ?? 0)) {
+    return reply.code(401).send({ error: "Session expirée. Reconnectez-vous." });
+  }
+
   // Espace suspendu : la porte est fermée pour tout le monde, y compris
   // pour son propriétaire.
   //
@@ -80,8 +135,24 @@ export const authenticate = async (request, reply) => {
 
 /// L'exploitant du SaaS, reconnu à son adresse déclarée dans
 /// l'environnement. On ne devient pas exploitant depuis l'application.
+///
+/// La comparaison est **exacte** : l'adresse stockée doit être déjà en
+/// minuscules et figurer telle quelle dans la liste (elle-même passée en
+/// minuscules par `env.js`). Un ancien compte `VOUS@…` créé à côté du vrai
+/// `vous@…` n'hérite donc de rien.
 export const estExploitant = (email) =>
-  !!email && env.plateformeAdmins.includes(String(email).toLowerCase());
+  typeof email === "string" &&
+  email === email.toLowerCase() &&
+  env.plateformeAdmins.includes(email);
+
+/// Préhandler de la console Plateforme. À placer après `authenticate`.
+export const exigerExploitant = async (request, reply) => {
+  if (!estExploitant(request.user?.email)) {
+    return reply
+      .code(403)
+      .send({ error: "Cette console est réservée à l'exploitant de la plateforme." });
+  }
+};
 
 /// Hiérarchie des rôles. Un rang plus élevé peut tout ce que peut le rang
 /// en dessous : inutile d'énumérer les combinaisons.
