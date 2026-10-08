@@ -17,6 +17,7 @@ import {
   valeurAffichee,
   valeurCalculeeClasseur,
   optionsValidation,
+  resume,
 } from "../src/apps/modules/classeur/domaine.js";
 import { versXlsx } from "../src/apps/modules/classeur/xlsx.js";
 
@@ -173,4 +174,20 @@ test("l’export Excel conserve les fusions, validations et métadonnées Compan
   assert.match(xml, /<autoFilter ref="A1:A3"\/>/);
   assert.equal(meta.feuilles[0].objets[0].id, "objet-1");
   assert.equal(meta.feuilles[0].cellules.find((c) => c.l === 1 && c.c === 1).type, "checkbox");
+});
+
+test("la barre d'état ignore les cellules vides, comme Excel", () => {
+  const cellules = grille([["10"], [""], ["20"], ["texte"]]);
+  const r = resume(cellules, { l: 0, c: 0, l2: 3, c2: 0 });
+  assert.equal(r.remplies, 3);
+  assert.equal(r.n, 2);
+  assert.equal(r.somme, 30);
+  assert.equal(r.moyenne, 15);
+});
+
+test("une formule sans valeur stockée est bien calculée (barre d'état, export)", () => {
+  const cellules = [[{ v: "2" }, { v: "3" }, { f: "=A1*B1" }]];
+  const r = resume(cellules, { l: 0, c: 0, l2: 0, c2: 2 });
+  assert.equal(r.remplies, 3);
+  assert.equal(r.somme, 11);
 });

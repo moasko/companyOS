@@ -37,7 +37,6 @@ import { saveAs } from "../../cloud";
 import { subscribeVisionneuse } from "../../openRequest";
 import { notifier } from "../../notifications";
 import { Contenu, useChargement } from "../../chargement";
-import { Bouton, Vide } from "../../ui";
 import { useDevise, useLangue, useTraduction } from "../../../utils/intl";
 import * as D from "./domaine";
 import { depuisXlsx, versXlsx } from "./xlsx";
@@ -280,6 +279,30 @@ const TEXTES = {
     formatMonnaie: "Format monétaire",
     formatPourcent: "Format pourcentage",
     formatNombre: "Format numérique",
+    // Disposition façon Excel
+    fichier: "Fichier",
+    classeurVierge: "Classeur vierge",
+    ouvrirExcel: "Ouvrir un fichier Excel",
+    ouvrirExcelMenu: "Ouvrir un fichier Excel (.xlsx, .xls)…",
+    exporterMenu: "Exporter une copie (.xlsx)…",
+    imprimer: "Imprimer…",
+    rienAImprimer: "La feuille est vide : il n'y a rien à imprimer.",
+    recents: "Récents",
+    aucunRecent: "Aucun classeur pour l'instant. Ce que vous créez ici est rangé dans l'espace de travail, et s'exporte en vrai fichier Excel quand vous voulez.",
+    bonjour: "Bonjour",
+    fermer: "Fermer",
+    feuillesN: "{n} feuille(s)",
+    etatEnregistrement: "Enregistrement…",
+    etatNonEnregistre: "Non enregistré",
+    etatModifie: "Modifications non enregistrées",
+    etatEnregistre: "Enregistré",
+    etatEnregistreDetail: "Enregistré dans l'espace de travail",
+    etatMoyenne: "Moyenne",
+    etatNombre: "Nombre",
+    etatSomme: "Somme",
+    zoomArriere: "Zoom arrière",
+    zoomAvant: "Zoom avant",
+    zoom100: "Revenir à 100 %",
   },
   en: {
     verrou: "Sign in to open a workbook.",
@@ -383,6 +406,29 @@ const TEXTES = {
     formatMonnaie: "Currency format",
     formatPourcent: "Percentage format",
     formatNombre: "Number format",
+    fichier: "File",
+    classeurVierge: "Blank workbook",
+    ouvrirExcel: "Open an Excel file",
+    ouvrirExcelMenu: "Open an Excel file (.xlsx, .xls)…",
+    exporterMenu: "Export a copy (.xlsx)…",
+    imprimer: "Print…",
+    rienAImprimer: "The sheet is empty: there is nothing to print.",
+    recents: "Recent",
+    aucunRecent: "No workbook yet. What you create here is kept in the workspace, and exports to a real Excel file whenever you want.",
+    bonjour: "Hello",
+    fermer: "Close",
+    feuillesN: "{n} sheet(s)",
+    etatEnregistrement: "Saving…",
+    etatNonEnregistre: "Not saved",
+    etatModifie: "Unsaved changes",
+    etatEnregistre: "Saved",
+    etatEnregistreDetail: "Saved in the workspace",
+    etatMoyenne: "Average",
+    etatNombre: "Count",
+    etatSomme: "Sum",
+    zoomArriere: "Zoom out",
+    zoomAvant: "Zoom in",
+    zoom100: "Back to 100%",
   },
 };
 
@@ -392,6 +438,78 @@ const COULEURS = [
 const FONDS = [
   "", "FCE8E6", "FEF7E0", "E6F4EA", "E8F0FE", "F3E8FD", "F1F3F4", "FFF3CD",
 ];
+
+const ONGLETS_RUBAN = ["accueil", "insertion", "formules", "donnees", "revision", "affichage"];
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 200;
+
+/// Le menu Fichier, comme dans Excel et dans le Traitement de texte : tout
+/// ce qui concerne le classeur en tant que fichier, dans une liste qu'on
+/// referme d'un clic ou d'Échap.
+function MenuFichier({ t, actions }) {
+  const [ouvertMenu, setOuvertMenu] = useState(false);
+  const racine = useRef(null);
+
+  useEffect(() => {
+    if (!ouvertMenu) return undefined;
+    const fermer = (e) => {
+      if (e.type === "keydown" ? e.key === "Escape" : !racine.current?.contains(e.target)) {
+        setOuvertMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", fermer);
+    document.addEventListener("keydown", fermer);
+    return () => {
+      document.removeEventListener("mousedown", fermer);
+      document.removeEventListener("keydown", fermer);
+    };
+  }, [ouvertMenu]);
+
+  const entrees = [
+    { icone: "faFileCirclePlus", libelle: t("nouveau"), action: actions.nouveau },
+    { icone: "faFolderOpen", libelle: t("ouvrirExcelMenu"), action: actions.ouvrir },
+    { icone: "faFolder", libelle: t("mesClasseurs"), action: actions.classeurs },
+    null,
+    { icone: "faFloppyDisk", libelle: t("enregistrer"), raccourci: "Ctrl+S", action: actions.enregistrer },
+    { icone: "faFileExport", libelle: t("exporterMenu"), action: actions.exporter },
+    { icone: "faPrint", libelle: t("imprimer"), raccourci: "Ctrl+P", action: actions.imprimer },
+  ];
+
+  return (
+    <div className="clsFichier" ref={racine}>
+      <button
+        type="button"
+        className="clsOngletRuban clsOngletFichier"
+        aria-haspopup="menu"
+        aria-expanded={ouvertMenu}
+        onClick={() => setOuvertMenu((v) => !v)}
+      >
+        {t("fichier")}
+      </button>
+      {ouvertMenu ? (
+        <div className="clsMenuFichier" role="menu">
+          {entrees.map((e, i) =>
+            e ? (
+              <button
+                key={e.libelle}
+                type="button"
+                role="menuitem"
+                disabled={!e.action}
+                onClick={() => { setOuvertMenu(false); e.action?.(); }}
+              >
+                <Icon fafa={e.icone} width={13} />
+                <span>{e.libelle}</span>
+                {e.raccourci ? <kbd>{e.raccourci}</kbd> : null}
+              </button>
+            ) : (
+              <hr key={`sep-${i}`} />
+            ),
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function ClasseurApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id]);
@@ -423,7 +541,8 @@ function ClasseurApp() {
   const [recopie, setRecopie] = useState(null);
   const [occupe, setOccupe] = useState(false);
   const [ruban, setRuban] = useState("accueil");
-  const [voletVisible, setVoletVisible] = useState(true);
+  // Le tiroir « Mes classeurs » ne prend aucune largeur tant qu'on travaille.
+  const [voletVisible, setVoletVisible] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [objetSelectionne, setObjetSelectionne] = useState(null);
   const [objetInteraction, setObjetInteraction] = useState(null);
@@ -836,7 +955,6 @@ function ClasseurApp() {
         const k = e.key.toLowerCase();
         const raccourcis = {
           z: faireAnnuler, y: faireRetablir, c: copier, x: couper, v: coller,
-          s: enregistrer,
           b: () => styler({ gras: true }, true),
           i: () => styler({ italique: true }, true),
           u: () => styler({ souligne: true }, true),
@@ -874,7 +992,7 @@ function ClasseurApp() {
       }
     },
     [classeur, edition, sel, cellules, nbL, nbC, deplacer, copier, couper, coller, appliquer, styler,
-     faireAnnuler, faireRetablir, enregistrer],
+     faireAnnuler, faireRetablir],
   );
 
   const validerEdition = (valeur, avancer) => {
@@ -1085,7 +1203,12 @@ function ClasseurApp() {
     ...geometrieColonnes.visibles,
   ];
 
-  const resume = useMemo(() => (cellules.length ? D.resume(cellules, sel) : null), [cellules, sel]);
+  const resume = useMemo(
+    () => (cellules.length
+      ? D.resume(cellules, sel, (l, c) => D.valeurCalculeeClasseur(classeur, iFeuille, l, c))
+      : null),
+    [cellules, sel, classeur, iFeuille],
+  );
   const celluleActive = cellules[sel.l]?.[sel.c];
   const sourceCelluleActive = celluleActive?.f || celluleActive?.v || "";
 
@@ -1551,6 +1674,100 @@ function ClasseurApp() {
     return gauche * (zoom / 100);
   };
 
+  // ---- Impression -----------------------------------------------------------
+
+  /// Imprime la feuille active, et elle seule : la grille à l'écran est
+  /// virtualisée (seules les lignes visibles existent), on reconstruit donc
+  /// un tableau propre à partir des données, sur la plage réellement remplie.
+  const imprimer = () => {
+    const actuel = classeurRef.current;
+    const f = actuel?.feuilles[iFeuille];
+    if (!f) return;
+    const lignes = f.cellules || [];
+    let derL = -1;
+    let derC = -1;
+    lignes.forEach((ligne, l) => (ligne || []).forEach((cel, c) => {
+      if (cel && ((cel.v !== "" && cel.v != null) || cel.f || cel.s?.couleurFond)) {
+        derL = Math.max(derL, l);
+        derC = Math.max(derC, c);
+      }
+    }));
+    if (derL < 0) {
+      modal.alert({ title: t("imprimer").replace("…", ""), message: t("rienAImprimer") });
+      return;
+    }
+    const echapper = (x) => String(x ?? "").replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[ch]);
+    const fusions = f.fusions || [];
+    const masquees = new Set(f.lignesMasquees || []);
+    let corps = "";
+    for (let l = 0; l <= derL; l += 1) {
+      if (masquees.has(l)) continue;
+      let ligneHtml = "";
+      for (let c = 0; c <= derC; c += 1) {
+        const fusion = fusions.find((x) => l >= x.l1 && l <= x.l2 && c >= x.c1 && c <= x.c2);
+        if (fusion && (l !== fusion.l1 || c !== fusion.c1)) continue;
+        const st = lignes[l]?.[c]?.s || {};
+        const brute = D.valeurCalculeeClasseur(actuel, iFeuille, l, c);
+        const nombre = brute !== "" && brute != null && Number.isFinite(Number(brute));
+        const decor = [st.souligne && "underline", st.barre && "line-through"].filter(Boolean).join(" ");
+        const style = [
+          st.gras && "font-weight:700",
+          st.italique && "font-style:italic",
+          decor && `text-decoration:${decor}`,
+          (st.align || (nombre ? "right" : "")) && `text-align:${st.align || "right"}`,
+          st.couleurTexte && `color:#${st.couleurTexte}`,
+          st.couleurFond && `background:#${st.couleurFond}`,
+          st.taille && `font-size:${Number(st.taille)}pt`,
+          st.police && `font-family:${String(st.police).replace(/[^\w -]/g, "")},Arial,sans-serif`,
+          st.wrap && "white-space:normal",
+          f.largeurs?.[c] && `min-width:${Number(f.largeurs[c])}px`,
+        ].filter(Boolean).join(";");
+        const etendue = fusion ? ` colspan="${fusion.c2 - fusion.c1 + 1}" rowspan="${fusion.l2 - fusion.l1 + 1}"` : "";
+        ligneHtml += `<td${etendue}${style ? ` style="${style}"` : ""}>${echapper(D.valeurAfficheeClasseur(actuel, iFeuille, l, c, devise))}</td>`;
+      }
+      corps += `<tr>${ligneHtml}</tr>`;
+    }
+    const titre = `${echapper(actuel.titre)} — ${echapper(f.nom)}`;
+    const cadre = document.createElement("iframe");
+    cadre.setAttribute("aria-hidden", "true");
+    Object.assign(cadre.style, { position: "fixed", width: "0", height: "0", border: "0" });
+    document.body.appendChild(cadre);
+    const doc = cadre.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${titre}</title><style>
+      @page { margin: 12mm; }
+      body { margin: 0; color: #000; font: 10pt Calibri, Carlito, Arial, sans-serif; }
+      h1 { margin: 0 0 8pt; font-size: 11pt; font-weight: 600; }
+      table { border-collapse: collapse; }
+      td { padding: 2pt 5pt; border: 0.5pt solid #bfbfbf; white-space: nowrap; vertical-align: bottom; }
+      tr { break-inside: avoid; }
+    </style></head><body><h1>${titre}</h1><table>${corps}</table></body></html>`);
+    doc.close();
+    setTimeout(() => {
+      cadre.contentWindow.focus();
+      cadre.contentWindow.print();
+      setTimeout(() => cadre.remove(), 1000);
+    }, 250);
+  };
+
+  /// Ctrl+S et Ctrl+P, d'où que vienne la frappe dans la fenêtre — grille,
+  /// barre de formule ou titre. Écouté sur la fenêtre du classeur et non sur
+  /// tout le document : un Ctrl+S tapé dans une autre application ne doit
+  /// pas enregistrer ce classeur-ci.
+  const raccourcisFenetre = (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || !classeurRef.current) return;
+    const k = e.key.toLowerCase();
+    if (k === "s") {
+      e.preventDefault();
+      enregistrer();
+    } else if (k === "p") {
+      e.preventDefault();
+      imprimer();
+    }
+  };
+
   // ---- Rendu ---------------------------------------------------------------
 
   if (!ouvert) {
@@ -1561,9 +1778,34 @@ function ClasseurApp() {
     );
   }
 
+  /// L'état d'enregistrement, en un mot, collé au titre — comme dans Excel.
+  const etatDoc = occupe
+    ? { texte: t("etatEnregistrement"), ton: "neutre" }
+    : modifie
+      ? { texte: fiche ? t("etatModifie") : t("etatNonEnregistre"), ton: "modifie" }
+      : { texte: t("etatEnregistre"), ton: "ok", detail: t("etatEnregistreDetail") };
+
+  const actionsFichier = {
+    nouveau,
+    ouvrir: () => fichierRef.current?.click(),
+    classeurs: () => setVoletVisible(true),
+    enregistrer: classeur ? enregistrer : null,
+    exporter: classeur ? exporter : null,
+    imprimer: classeur ? imprimer : null,
+  };
+
+  /// Les classeurs du plus récent au plus ancien : les « Récents » d'Excel.
+  const recents = [...liste].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+  const quandModifie = (iso) =>
+    iso
+      ? new Date(iso).toLocaleDateString(langue === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "short", year: "numeric" })
+      : "";
+  const prenom = (session.user?.name || "").split(" ")[0];
+  const reglerZoom = (valeur) => setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(valeur / 10) * 10)));
+
   return (
     <ModuleWindow manifest={manifest} className="clsApp">
-      <div className="clsShell" data-volet={voletVisible}>
+      <div className="clsShell" onKeyDown={raccourcisFenetre}>
         <input
           ref={fichierRef}
           type="file"
@@ -1579,26 +1821,33 @@ function ClasseurApp() {
           onChange={(e) => { insererImage(e.target.files?.[0]); e.target.value = ""; }}
         />
 
-        <aside className="clsLateral cosScroll">
+        {/* Le tiroir des classeurs, ouvert depuis Fichier → Mes classeurs :
+            il glisse au-dessus de la feuille au lieu de lui voler sa largeur. */}
+        <aside className="clsLateral cosScroll" data-ouvert={voletVisible} aria-hidden={!voletVisible}>
           <div className="clsLateralTete">
             <b>{t("mesClasseurs")}</b>
+            <button type="button" className="clsIcone" title={t("fermer")} onClick={() => setVoletVisible(false)}>
+              <Icon fafa="faAnglesLeft" width={12} />
+            </button>
           </div>
-          <Bouton icone="faFileCirclePlus" onClick={nouveau}>{t("nouveau")}</Bouton>
-          <Bouton variante="secondaire" icone="faFileImport" off={occupe} onClick={() => fichierRef.current?.click()}>
-            {t("importer")}
-          </Bouton>
-          <Contenu etat={etat} vide={false} lignes={3}>
+          <Contenu
+            etat={etat}
+            vide={!liste.length}
+            lignes={3}
+            rendreVide={() => <p className="clsLateralVide">{t("aucunAide")}</p>}
+          >
             <ul className="clsListe">
-              {liste.map((rec) => (
+              {recents.map((rec) => (
                 <li
                   key={rec.id}
                   data-actif={fiche?.id === rec.id}
-                  onClick={() => ouvrirFiche(rec)}
+                  onClick={() => { setVoletVisible(false); ouvrirFiche(rec); }}
                 >
                   <Icon fafa="faTableCells" width={12} />
                   <span>{rec.data.titre}</span>
                   <span
                     className="clsSuppr handcr"
+                    title={t("supprimer")}
                     onClick={(e) => { e.stopPropagation(); supprimer(rec); }}
                   >
                     <Icon fafa="faXmark" width={10} />
@@ -1609,28 +1858,88 @@ function ClasseurApp() {
           </Contenu>
         </aside>
 
-        <div className="clsCentre">
+        <div className="clsCentre" onMouseDown={() => { if (voletVisible) setVoletVisible(false); }}>
           {!classeur ? (
-            <Vide icone="faTableCells" titre={t("aucun")} aide={t("aucunAide")}>
-              <Bouton icone="faFileCirclePlus" onClick={nouveau}>{t("nouveau")}</Bouton>
-            </Vide>
+            // L'accueil d'Excel : créer, ouvrir, reprendre un classeur récent.
+            <div className="clsAccueil cosScroll">
+              <div className="clsAccueilCorps">
+                <h2>{t("bonjour")}{prenom ? `, ${prenom}` : ""}</h2>
+
+                <div className="clsAccueilNouveau">
+                  <button type="button" className="clsTuile" onClick={nouveau}>
+                    <span className="clsTuileFeuille clsTuileVierge" aria-hidden="true">
+                      <Icon fafa="faPlus" width={16} />
+                    </span>
+                    <span>{t("classeurVierge")}</span>
+                  </button>
+                  <button type="button" className="clsTuile" disabled={occupe} onClick={() => fichierRef.current?.click()}>
+                    <span className="clsTuileFeuille clsTuileOuvrir" aria-hidden="true">
+                      <Icon fafa="faFolderOpen" width={18} />
+                    </span>
+                    <span>{t("ouvrirExcel")}</span>
+                  </button>
+                </div>
+
+                <div className="clsAccueilSection">{t("recents")}</div>
+                <Contenu
+                  etat={etat}
+                  vide={!recents.length}
+                  lignes={4}
+                  rendreVide={() => <p className="clsAccueilVide">{t("aucunRecent")}</p>}
+                >
+                  <div className="clsRecents" role="list">
+                    {recents.map((rec) => (
+                      <div key={rec.id} role="listitem" className="clsRecent">
+                        <button type="button" className="clsRecentOuvrir" onClick={() => ouvrirFiche(rec)}>
+                          <Icon fafa="faTableCells" width={14} />
+                          <span className="clsRecentNom">{rec.data.titre}</span>
+                          <span className="clsRecentInfo">{t("feuillesN", { n: rec.data.feuilles?.length || 1 })}</span>
+                          <span className="clsRecentDate">{quandModifie(rec.updatedAt)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="clsRecentSuppr"
+                          title={t("supprimer")}
+                          aria-label={`${t("supprimer")} « ${rec.data.titre} »`}
+                          onClick={() => supprimer(rec)}
+                        >
+                          <Icon fafa="faTrashCan" width={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Contenu>
+              </div>
+            </div>
           ) : (
             <>
+              {/* Une seule ligne d'en-tête : Fichier et les onglets, le titre
+                  avec son état, Enregistrer. */}
               <header className="clsEntete">
-                <div className="clsDocBar">
-                  <button
-                    type="button"
-                    className="clsIcone clsVoletBtn"
-                    title={voletVisible ? t("masquerClasseurs") : t("afficherClasseurs")}
-                    onClick={() => setVoletVisible((visible) => !visible)}
-                  >
-                    <Icon fafa="faBars" width={12} />
-                  </button>
-                  <span className="clsDocIcon"><Icon fafa="faTableCells" width={13} /></span>
+                <div className="clsOngletsRuban" role="tablist" aria-label="Ruban du classeur">
+                  <MenuFichier t={t} actions={actionsFichier} />
+                  {ONGLETS_RUBAN.map((onglet) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      key={onglet}
+                      className="clsOngletRuban"
+                      aria-selected={ruban === onglet}
+                      onClick={() => setRuban(onglet)}
+                    >
+                      {t(onglet)}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="clsTitreZone">
                   <input
                     className="clsTitre"
                     value={classeur.titre}
+                    // La largeur suit le nom : l'état reste collé au titre.
+                    size={Math.min(40, Math.max(8, (classeur.titre || "").length + 1))}
                     aria-label={t("titreClasseur")}
+                    title={t("renommer")}
                     onFocus={() => setHistorique((h) => D.empiler(h, classeurRef.current))}
                     onChange={(e) => {
                       const suivant = { ...classeurRef.current, titre: e.target.value };
@@ -1638,178 +1947,177 @@ function ClasseurApp() {
                       setClasseur(suivant);
                       setModifie(suivant !== etatEnregistreRef.current);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "Escape") {
+                        e.preventDefault();
+                        grilleRef.current?.focus();
+                      }
+                    }}
                   />
-                  {modifie ? <span className="clsModifiePill">{t("modifie")}</span> : null}
-                  <span className="clsEspace" />
-                  <button className="clsIcone clsActionTexte" title={t("exporter")} disabled={occupe} onClick={exporter}>
-                    <Icon fafa="faFileExport" width={12} /><span>{t("exporter")}</span>
-                  </button>
-                  <Bouton icone="faFloppyDisk" off={occupe || !modifie} onClick={enregistrer}>{t("enregistrer")}</Bouton>
+                  <span className="clsEtatDoc" data-ton={etatDoc.ton} title={etatDoc.detail}>
+                    {etatDoc.texte}
+                  </span>
                 </div>
 
-                <nav className="clsRubanTabs" aria-label="Ruban du classeur">
-                  {["accueil", "insertion", "formules", "donnees", "revision", "affichage"].map((onglet) => (
-                    <button
-                      type="button"
-                      key={onglet}
-                      data-actif={ruban === onglet}
-                      onClick={() => setRuban(onglet)}
-                    >
-                      {t(onglet)}
-                    </button>
-                  ))}
-                </nav>
-
-                <div className="clsBarre" data-ruban={ruban}>
-                  {ruban === "accueil" ? (
-                    <>
-                      <div className="clsGroupe">
-                        <button className="clsIcone" title={t("annuler")} disabled={!historique.passe.length} onClick={faireAnnuler}><Icon fafa="faRotateLeft" width={12} /></button>
-                        <button className="clsIcone" title={t("retablir")} disabled={!historique.futur.length} onClick={faireRetablir}><Icon fafa="faRotateRight" width={12} /></button>
-                        <button className="clsIcone" title={t("copierN", { n: 1 })} onClick={copier}><Icon fafa="faCopy" width={12} /></button>
-                        <button className="clsIcone" title={t("collerIci")} onClick={coller}><Icon fafa="faPaste" width={12} /></button>
-                      </div>
-                      <div className="clsGroupe">
-                        <select
-                          className="clsRubanSelect clsPolice"
-                          value={celluleActive?.s?.police || "Arial"}
-                          aria-label="Police"
-                          onChange={(e) => styler({ police: e.target.value })}
-                        >
-                          <option>Arial</option>
-                          <option>Calibri</option>
-                          <option>Georgia</option>
-                          <option>Verdana</option>
-                          <option>Courier New</option>
-                        </select>
-                        <select
-                          className="clsRubanSelect clsTaillePolice"
-                          value={celluleActive?.s?.taille || 12}
-                          aria-label="Taille de police"
-                          onChange={(e) => styler({ taille: Number(e.target.value) })}
-                        >
-                          {[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32].map((taille) => <option key={taille}>{taille}</option>)}
-                        </select>
-                        <button className="clsIcone" title={t("augmenterPolice")} onClick={() => styler({ taille: Math.min(72, Number(celluleActive?.s?.taille || 12) + 1) })}>A<sup>+</sup></button>
-                        <button className="clsIcone" title={t("reduirePolice")} onClick={() => styler({ taille: Math.max(6, Number(celluleActive?.s?.taille || 12) - 1) })}>A<sup>−</sup></button>
-                        <button className="clsIcone" data-on={celluleActive?.s?.gras} title={t("gras")} onClick={() => styler({ gras: true }, true)}><b>B</b></button>
-                        <button className="clsIcone" data-on={celluleActive?.s?.italique} title={t("italique")} onClick={() => styler({ italique: true }, true)}><i>I</i></button>
-                        <button className="clsIcone" data-on={celluleActive?.s?.souligne} title={t("souligne")} onClick={() => styler({ souligne: true }, true)}><u>U</u></button>
-                        <button className="clsIcone" data-on={celluleActive?.s?.barre} title={t("barre")} onClick={() => styler({ barre: true }, true)}><s>ab</s></button>
-                      </div>
-                      <div className="clsGroupe">
-                        <button className="clsIcone" title={t("alignGauche")} onClick={() => styler({ align: "" })}><Icon fafa="faAlignLeft" width={12} /></button>
-                        <button className="clsIcone" title={t("alignCentre")} onClick={() => styler({ align: "center" })}><Icon fafa="faAlignCenter" width={12} /></button>
-                        <button className="clsIcone" title={t("alignDroite")} onClick={() => styler({ align: "right" })}><Icon fafa="faAlignRight" width={12} /></button>
-                        <button className="clsIcone" data-on={celluleActive?.s?.wrap} title={t("renvoyerLigne")} onClick={() => styler({ wrap: true }, true)}><Icon fafa="faArrowTurnDown" width={12} /></button>
-                        <button className="clsIcone" title={langue === "en" ? "All borders" : "Toutes les bordures"} onClick={() => styler({ bordure: "all" })}><Icon fafa="faBorderAll" width={12} /></button>
-                        <button className="clsIcone" title={langue === "en" ? "Merge cells" : "Fusionner les cellules"} onClick={fusionnerSelection}><Icon fafa="faObjectGroup" width={12} /></button>
-                        <button className="clsIcone" title={langue === "en" ? "Unmerge cells" : "Défusionner"} onClick={defusionnerSelection}><Icon fafa="faObjectUngroup" width={12} /></button>
-                      </div>
-                      <div className="clsGroupe">
-                        <button className="clsIcone" title={t("couleurTexte")} onClick={menuCouleur("couleurTexte")}><Icon fafa="faPalette" width={12} /></button>
-                        <button className="clsIcone" title={t("couleurFond")} onClick={menuCouleur("couleurFond")}><Icon fafa="faFillDrip" width={12} /></button>
-                        <button className="clsIcone" title={t("formatMonnaie")} onClick={() => styler({ format: "monnaie" })}>{devise}</button>
-                        <button className="clsIcone" title={t("formatPourcent")} onClick={() => styler({ format: "pourcent" })}>%</button>
-                        <button className="clsIcone" title={t("formatNombre")} onClick={() => styler({ format: "nombre" })}>.00</button>
-                        <button className="clsIcone clsLarge" title={t("format")} onClick={menuFormat}>
-                          <Icon fafa="faHashtag" width={11} />
-                          <span>{(D.FORMATS.find((f) => f.id === (celluleActive?.s?.format || "auto")) || D.FORMATS[0]).nom[langue] || "Auto"}</span>
-                        </button>
-                      </div>
-                      <div className="clsGroupe">
-                        <button className="clsIcone" title={t("effacerStyle")} onClick={() => styler({
-                          gras: false, italique: false, souligne: false, barre: false,
-                          align: "", format: "auto", couleurTexte: "", couleurFond: "",
-                          police: "", taille: 0, wrap: false,
-                        })}><Icon fafa="faEraser" width={12} /></button>
-                      </div>
-                    </>
-                  ) : null}
-                  {ruban === "insertion" ? (
-                    <>
-                      <button className="clsRibbonAction" onClick={insererTableauCroise}><Icon fafa="faTableList" width={15} /><span>Tableau croisé</span></button>
-                      <button className="clsRibbonAction" onClick={insererTableau}><Icon fafa="faTableCells" width={15} /><span>Tableau</span></button>
-                      <button className="clsRibbonAction" onClick={insererFormulaire}><Icon fafa="faWpforms" width={15} /><span>Formulaire</span></button>
-                      <button className="clsRibbonAction" onClick={() => imageRef.current?.click()}><Icon fafa="faImage" width={15} /><span>Image</span></button>
-                      <button className="clsRibbonAction" onClick={() => insererTexte("forme")}><Icon fafa="faShapes" width={15} /><span>Forme</span></button>
-                      <button className="clsRibbonAction" onClick={insererCase}><Icon fafa="faSquareCheck" width={15} /><span>Case à cocher</span></button>
-                      <div className="clsGroupe clsGraphiques">
-                        <button className="clsRibbonAction" onClick={() => insererGraphique("colonnes")}><Icon fafa="faChartColumn" width={15} /><span>Colonnes</span></button>
-                        <button className="clsRibbonAction" onClick={() => insererGraphique("courbe")}><Icon fafa="faChartLine" width={15} /><span>Courbe</span></button>
-                        <button className="clsRibbonAction" onClick={() => insererGraphique("secteurs")}><Icon fafa="faChartPie" width={15} /><span>Secteurs</span></button>
-                      </div>
-                      <button className="clsRibbonAction" onClick={insererLien}><Icon fafa="faLink" width={15} /><span>Lien</span></button>
-                      <button className="clsRibbonAction" onClick={insererCommentaire}><Icon fafa="faCommentMedical" width={15} /><span>Commentaire</span></button>
-                      <button className="clsRibbonAction" onClick={() => insererTexte("texte")}><Icon fafa="faFont" width={15} /><span>Zone de texte</span></button>
-                      <button
-                        className="clsRibbonAction clsActionDanger"
-                        disabled={!objetSelectionne && !celluleActive?.type && !celluleActive?.href && !celluleActive?.commentaire && !celluleActive?.objet}
-                        onClick={supprimerInsertion}
-                      ><Icon fafa="faTrashCan" width={15} /><span>Supprimer l’insertion</span></button>
-                    </>
-                  ) : null}
-                  {ruban === "donnees" ? (
-                    <>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.sommeAutomatique(cellules, sel))}><Icon fafa="faSigma" width={15} /><span>{t("sommeAuto")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.trierPlage(cellules, sel, "asc"))}><Icon fafa="faArrowDownAZ" width={15} /><span>{t("triCroissant")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.trierPlage(cellules, sel, "desc"))}><Icon fafa="faArrowDownZA" width={15} /><span>{t("triDecroissant")}</span></button>
-                      <button className="clsRibbonAction" onClick={rechercherCellule}><Icon fafa="faMagnifyingGlass" width={15} /><span>{t("rechercher")}</span></button>
-                      <button className="clsRibbonAction" onClick={remplacerCellules}><Icon fafa="faRightLeft" width={15} /><span>{t("remplacer")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.remplirVersLeBas(cellules, sel))}><Icon fafa="faArrowDown" width={15} /><span>{t("remplirBas")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.vider(cellules, sel))}><Icon fafa="faEraser" width={15} /><span>{t("vider")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.retirerDoublonsPlage(cellules, sel))}><Icon fafa="faClone" width={15} /><span>{t("retirerDoublons")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.surlignerDoublons(cellules, sel))}><Icon fafa="faHighlighter" width={15} /><span>{t("surlignerDoublons")}</span></button>
-                      <button className="clsRibbonAction" onClick={appliquerValidationListe}><Icon fafa="faListCheck" width={15} /><span>{langue === "en" ? "Data validation" : "Validation"}</span></button>
-                      <button className="clsRibbonAction" onClick={ajouterRegleConditionnelle}><Icon fafa="faWandMagicSparkles" width={15} /><span>{langue === "en" ? "Conditional format" : "Format conditionnel"}</span></button>
-                      <button className="clsRibbonAction" onClick={filtrerSelection}><Icon fafa="faFilter" width={15} /><span>{langue === "en" ? "Filter" : "Filtrer"}</span></button>
-                      <button className="clsRibbonAction" disabled={!feuille.filtres?.length} onClick={retirerFiltres}><Icon fafa="faFilterCircleXmark" width={15} /><span>{langue === "en" ? "Clear filters" : "Effacer les filtres"}</span></button>
-                      <button className="clsRibbonAction" onClick={() => fichierRef.current?.click()}><Icon fafa="faFileImport" width={15} /><span>{t("importer")}</span></button>
-                    </>
-                  ) : null}
-                  {ruban === "formules" ? (
-                    <>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.sommeAutomatique(cellules, sel))}><Icon fafa="faSigma" width={15} /><span>{t("sommeAuto")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "MOYENNE"))}><span className="clsFonctionSigle">x̄</span><span>{t("moyenneAuto")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "NB"))}><span className="clsFonctionSigle">#</span><span>{t("nombreAuto")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "MIN"))}><span className="clsFonctionSigle">↓</span><span>{t("minimumAuto")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "MAX"))}><span className="clsFonctionSigle">↑</span><span>{t("maximumAuto")}</span></button>
-                      {D.FORMATS.filter((format) => format.id !== "auto").map((format) => (
-                        <button key={format.id} className="clsRibbonAction" onClick={() => styler({ format: format.id })}>
-                          <Icon fafa="faFunction" width={14} /><span>{format.nom[langue] || format.nom.fr}</span>
-                        </button>
-                      ))}
-                    </>
-                  ) : null}
-                  {ruban === "revision" ? (
-                    <>
-                      <button className="clsRibbonAction" onClick={rechercherCellule}><Icon fafa="faMagnifyingGlass" width={15} /><span>{t("rechercher")}</span></button>
-                      <button className="clsRibbonAction" onClick={remplacerCellules}><Icon fafa="faRightLeft" width={15} /><span>{t("remplacer")}</span></button>
-                      <button className="clsRibbonAction" onClick={copier}><Icon fafa="faCopy" width={15} /><span>{t("copierN", { n: (Math.abs(sel.l2 - sel.l) + 1) * (Math.abs(sel.c2 - sel.c) + 1) })}</span></button>
-                    </>
-                  ) : null}
-                  {ruban === "affichage" ? (
-                    <>
-                      <button className="clsRibbonAction" onClick={() => setVoletVisible((visible) => !visible)}><Icon fafa="faTableColumns" width={15} /><span>{voletVisible ? t("masquerClasseurs") : t("afficherClasseurs")}</span></button>
-                      <button className="clsRibbonAction" data-on={feuille.figees?.lignes > 0} onClick={() => figer("ligne")}><Icon fafa="faGripLines" width={15} /><span>{t("figerLigne")}</span></button>
-                      <button className="clsRibbonAction" data-on={feuille.figees?.colonnes > 0} onClick={() => figer("colonne")}><Icon fafa="faGripLinesVertical" width={15} /><span>{t("figerColonne")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => appliquer(null, { figees: { lignes: sel.l, colonnes: sel.c } })}><Icon fafa="faThumbtack" width={15} /><span>{t("figerSelection")}</span></button>
-                      <button className="clsRibbonAction" onClick={() => figer("aucun")}><Icon fafa="faUnlock" width={15} /><span>{t("libererVolets")}</span></button>
-                      <button className="clsRibbonAction" onClick={masquerLignesSelectionnees}><Icon fafa="faEyeSlash" width={15} /><span>{langue === "en" ? "Hide rows" : "Masquer les lignes"}</span></button>
-                      <button className="clsRibbonAction" disabled={!feuille.lignesMasquees?.length} onClick={afficherToutesLesLignes}><Icon fafa="faEye" width={15} /><span>{langue === "en" ? "Show all rows" : "Afficher les lignes"}</span></button>
-                      <div className="clsZoom" aria-label={t("zoom")}>
-                        <button type="button" onClick={() => setZoom((valeur) => Math.max(70, valeur - 10))}>−</button>
-                        <button type="button" onClick={() => setZoom(100)}>{zoom}%</button>
-                        <button type="button" onClick={() => setZoom((valeur) => Math.min(150, valeur + 10))}>+</button>
-                      </div>
-                    </>
-                  ) : null}
+                <div className="clsEnteteActions">
+                  <button
+                    type="button"
+                    className="clsBoutonEnregistrer"
+                    title={`${t("enregistrer")} (Ctrl+S)`}
+                    disabled={occupe || !modifie}
+                    onClick={enregistrer}
+                  >
+                    <Icon fafa="faFloppyDisk" width={12} />
+                    <span>{t("enregistrer")}</span>
+                  </button>
                 </div>
               </header>
 
+              <div className="clsBarre" data-ruban={ruban}>
+                {ruban === "accueil" ? (
+                  <>
+                    <div className="clsGroupe">
+                      <button className="clsIcone" title={t("annuler")} disabled={!historique.passe.length} onClick={faireAnnuler}><Icon fafa="faRotateLeft" width={12} /></button>
+                      <button className="clsIcone" title={t("retablir")} disabled={!historique.futur.length} onClick={faireRetablir}><Icon fafa="faRotateRight" width={12} /></button>
+                      <button className="clsIcone" title={t("copierN", { n: 1 })} data-secondaire="1" onClick={copier}><Icon fafa="faCopy" width={12} /></button>
+                      <button className="clsIcone" title={t("collerIci")} data-secondaire="1" onClick={coller}><Icon fafa="faPaste" width={12} /></button>
+                    </div>
+                    <div className="clsGroupe">
+                      <select
+                        className="clsRubanSelect clsPolice"
+                        value={celluleActive?.s?.police || "Arial"}
+                        aria-label="Police"
+                        onChange={(e) => styler({ police: e.target.value })}
+                      >
+                        <option>Arial</option>
+                        <option>Calibri</option>
+                        <option>Georgia</option>
+                        <option>Verdana</option>
+                        <option>Courier New</option>
+                      </select>
+                      <select
+                        className="clsRubanSelect clsTaillePolice"
+                        value={String(celluleActive?.s?.taille || 12)}
+                        aria-label="Taille de police"
+                        onChange={(e) => styler({ taille: Number(e.target.value) })}
+                      >
+                        {[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32].map((taille) => <option key={taille}>{taille}</option>)}
+                      </select>
+                      <button className="clsIcone" title={t("augmenterPolice")} data-secondaire="1" onClick={() => styler({ taille: Math.min(72, Number(celluleActive?.s?.taille || 12) + 1) })}>A<sup>+</sup></button>
+                      <button className="clsIcone" title={t("reduirePolice")} data-secondaire="1" onClick={() => styler({ taille: Math.max(6, Number(celluleActive?.s?.taille || 12) - 1) })}>A<sup>−</sup></button>
+                      <button className="clsIcone" data-on={celluleActive?.s?.gras} title={t("gras")} onClick={() => styler({ gras: true }, true)}><b>B</b></button>
+                      <button className="clsIcone" data-on={celluleActive?.s?.italique} title={t("italique")} onClick={() => styler({ italique: true }, true)}><i>I</i></button>
+                      <button className="clsIcone" data-on={celluleActive?.s?.souligne} title={t("souligne")} onClick={() => styler({ souligne: true }, true)}><u>U</u></button>
+                      <button className="clsIcone" data-on={celluleActive?.s?.barre} title={t("barre")} data-secondaire="1" onClick={() => styler({ barre: true }, true)}><s>ab</s></button>
+                    </div>
+                    <div className="clsGroupe">
+                      <button className="clsIcone" title={t("alignGauche")} onClick={() => styler({ align: "" })}><Icon fafa="faAlignLeft" width={12} /></button>
+                      <button className="clsIcone" title={t("alignCentre")} onClick={() => styler({ align: "center" })}><Icon fafa="faAlignCenter" width={12} /></button>
+                      <button className="clsIcone" title={t("alignDroite")} onClick={() => styler({ align: "right" })}><Icon fafa="faAlignRight" width={12} /></button>
+                      <button className="clsIcone" data-on={celluleActive?.s?.wrap} title={t("renvoyerLigne")} data-secondaire="2" onClick={() => styler({ wrap: true }, true)}><Icon fafa="faArrowTurnDown" width={12} /></button>
+                      <button className="clsIcone" title={langue === "en" ? "All borders" : "Toutes les bordures"} data-secondaire="2" onClick={() => styler({ bordure: "all" })}><Icon fafa="faBorderAll" width={12} /></button>
+                      <button className="clsIcone" title={langue === "en" ? "Merge cells" : "Fusionner les cellules"} data-secondaire="2" onClick={fusionnerSelection}><Icon fafa="faObjectGroup" width={12} /></button>
+                      <button className="clsIcone" title={langue === "en" ? "Unmerge cells" : "Défusionner"} data-secondaire="1" onClick={defusionnerSelection}><Icon fafa="faObjectUngroup" width={12} /></button>
+                    </div>
+                    <div className="clsGroupe">
+                      <button className="clsIcone" title={t("couleurTexte")} onClick={menuCouleur("couleurTexte")}><Icon fafa="faPalette" width={12} /></button>
+                      <button className="clsIcone" title={t("couleurFond")} onClick={menuCouleur("couleurFond")}><Icon fafa="faFillDrip" width={12} /></button>
+                      <button className="clsIcone" title={t("formatMonnaie")} onClick={() => styler({ format: "monnaie" })}>{devise}</button>
+                      <button className="clsIcone" title={t("formatPourcent")} data-secondaire="2" onClick={() => styler({ format: "pourcent" })}>%</button>
+                      <button className="clsIcone" title={t("formatNombre")} data-secondaire="1" onClick={() => styler({ format: "nombre" })}>.00</button>
+                      <button className="clsIcone clsLarge" title={t("format")} onClick={menuFormat}>
+                        <Icon fafa="faHashtag" width={11} />
+                        <span>{(D.FORMATS.find((f) => f.id === (celluleActive?.s?.format || "auto")) || D.FORMATS[0]).nom[langue] || "Auto"}</span>
+                      </button>
+                    </div>
+                    <div className="clsGroupe" data-secondaire="1">
+                      <button className="clsIcone" title={t("effacerStyle")} onClick={() => styler({
+                        gras: false, italique: false, souligne: false, barre: false,
+                        align: "", format: "auto", couleurTexte: "", couleurFond: "",
+                        police: "", taille: 0, wrap: false,
+                      })}><Icon fafa="faEraser" width={12} /></button>
+                    </div>
+                  </>
+                ) : null}
+                {ruban === "insertion" ? (
+                  <>
+                    <button title="Tableau croisé" className="clsRibbonAction" onClick={insererTableauCroise}><Icon fafa="faTableList" width={15} /><span>Tableau croisé</span></button>
+                    <button title="Tableau" className="clsRibbonAction" onClick={insererTableau}><Icon fafa="faTableCells" width={15} /><span>Tableau</span></button>
+                    <button title="Formulaire" className="clsRibbonAction" onClick={insererFormulaire}><Icon fafa="faRectangleList" width={15} /><span>Formulaire</span></button>
+                    <button title="Image" className="clsRibbonAction" onClick={() => imageRef.current?.click()}><Icon fafa="faImage" width={15} /><span>Image</span></button>
+                    <button title="Forme" className="clsRibbonAction" onClick={() => insererTexte("forme")}><Icon fafa="faShapes" width={15} /><span>Forme</span></button>
+                    <button title="Case à cocher" className="clsRibbonAction" onClick={insererCase}><Icon fafa="faSquareCheck" width={15} /><span>Case à cocher</span></button>
+                    <div className="clsGroupe clsGraphiques">
+                      <button title="Colonnes" className="clsRibbonAction" onClick={() => insererGraphique("colonnes")}><Icon fafa="faChartColumn" width={15} /><span>Colonnes</span></button>
+                      <button title="Courbe" className="clsRibbonAction" onClick={() => insererGraphique("courbe")}><Icon fafa="faChartLine" width={15} /><span>Courbe</span></button>
+                      <button title="Secteurs" className="clsRibbonAction" onClick={() => insererGraphique("secteurs")}><Icon fafa="faChartPie" width={15} /><span>Secteurs</span></button>
+                    </div>
+                    <button title="Lien" className="clsRibbonAction" onClick={insererLien}><Icon fafa="faLink" width={15} /><span>Lien</span></button>
+                    <button title="Commentaire" className="clsRibbonAction" onClick={insererCommentaire}><Icon fafa="faCommentMedical" width={15} /><span>Commentaire</span></button>
+                    <button title="Zone de texte" className="clsRibbonAction" onClick={() => insererTexte("texte")}><Icon fafa="faFont" width={15} /><span>Zone de texte</span></button>
+                    <button
+                      title="Supprimer l’insertion"
+                      className="clsRibbonAction clsActionDanger"
+                      disabled={!objetSelectionne && !celluleActive?.type && !celluleActive?.href && !celluleActive?.commentaire && !celluleActive?.objet}
+                      onClick={supprimerInsertion}
+                    ><Icon fafa="faTrashCan" width={15} /><span>Supprimer l’insertion</span></button>
+                  </>
+                ) : null}
+                {ruban === "donnees" ? (
+                  <>
+                    <button title={t("sommeAuto")} className="clsRibbonAction" onClick={() => appliquer(D.sommeAutomatique(cellules, sel))}><span className="clsFonctionSigle">Σ</span><span>{t("sommeAuto")}</span></button>
+                    <button title={t("triCroissant")} className="clsRibbonAction" onClick={() => appliquer(D.trierPlage(cellules, sel, "asc"))}><Icon fafa="faArrowDownAZ" width={15} /><span>{t("triCroissant")}</span></button>
+                    <button title={t("triDecroissant")} className="clsRibbonAction" onClick={() => appliquer(D.trierPlage(cellules, sel, "desc"))}><Icon fafa="faArrowDownZA" width={15} /><span>{t("triDecroissant")}</span></button>
+                    <button title={t("rechercher")} className="clsRibbonAction" onClick={rechercherCellule}><Icon fafa="faMagnifyingGlass" width={15} /><span>{t("rechercher")}</span></button>
+                    <button title={t("remplacer")} className="clsRibbonAction" onClick={remplacerCellules}><Icon fafa="faRightLeft" width={15} /><span>{t("remplacer")}</span></button>
+                    <button title={t("remplirBas")} className="clsRibbonAction" onClick={() => appliquer(D.remplirVersLeBas(cellules, sel))}><Icon fafa="faArrowDown" width={15} /><span>{t("remplirBas")}</span></button>
+                    <button title={t("vider")} className="clsRibbonAction" onClick={() => appliquer(D.vider(cellules, sel))}><Icon fafa="faEraser" width={15} /><span>{t("vider")}</span></button>
+                    <button title={t("retirerDoublons")} className="clsRibbonAction" onClick={() => appliquer(D.retirerDoublonsPlage(cellules, sel))}><Icon fafa="faClone" width={15} /><span>{t("retirerDoublons")}</span></button>
+                    <button title={t("surlignerDoublons")} className="clsRibbonAction" onClick={() => appliquer(D.surlignerDoublons(cellules, sel))}><Icon fafa="faHighlighter" width={15} /><span>{t("surlignerDoublons")}</span></button>
+                    <button title={langue === "en" ? "Data validation" : "Validation"} className="clsRibbonAction" onClick={appliquerValidationListe}><Icon fafa="faListCheck" width={15} /><span>{langue === "en" ? "Data validation" : "Validation"}</span></button>
+                    <button title={langue === "en" ? "Conditional format" : "Format conditionnel"} className="clsRibbonAction" onClick={ajouterRegleConditionnelle}><Icon fafa="faWandMagicSparkles" width={15} /><span>{langue === "en" ? "Conditional format" : "Format conditionnel"}</span></button>
+                    <button title={langue === "en" ? "Filter" : "Filtrer"} className="clsRibbonAction" onClick={filtrerSelection}><Icon fafa="faFilter" width={15} /><span>{langue === "en" ? "Filter" : "Filtrer"}</span></button>
+                    <button title={langue === "en" ? "Clear filters" : "Effacer les filtres"} className="clsRibbonAction" disabled={!feuille.filtres?.length} onClick={retirerFiltres}><Icon fafa="faFilterCircleXmark" width={15} /><span>{langue === "en" ? "Clear filters" : "Effacer les filtres"}</span></button>
+                    <button title={t("importer")} className="clsRibbonAction" onClick={() => fichierRef.current?.click()}><Icon fafa="faFileImport" width={15} /><span>{t("importer")}</span></button>
+                  </>
+                ) : null}
+                {ruban === "formules" ? (
+                  <>
+                    <button title={t("sommeAuto")} className="clsRibbonAction" onClick={() => appliquer(D.sommeAutomatique(cellules, sel))}><span className="clsFonctionSigle">Σ</span><span>{t("sommeAuto")}</span></button>
+                    <button title={t("moyenneAuto")} className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "MOYENNE"))}><span className="clsFonctionSigle">x̄</span><span>{t("moyenneAuto")}</span></button>
+                    <button title={t("nombreAuto")} className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "NB"))}><span className="clsFonctionSigle">#</span><span>{t("nombreAuto")}</span></button>
+                    <button title={t("minimumAuto")} className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "MIN"))}><span className="clsFonctionSigle">↓</span><span>{t("minimumAuto")}</span></button>
+                    <button title={t("maximumAuto")} className="clsRibbonAction" onClick={() => appliquer(D.agregatAutomatique(cellules, sel, "MAX"))}><span className="clsFonctionSigle">↑</span><span>{t("maximumAuto")}</span></button>
+                    {D.FORMATS.filter((format) => format.id !== "auto").map((format) => (
+                      <button key={format.id} className="clsRibbonAction" onClick={() => styler({ format: format.id })}>
+                        <Icon fafa="faHashtag" width={13} /><span>{format.nom[langue] || format.nom.fr}</span>
+                      </button>
+                    ))}
+                  </>
+                ) : null}
+                {ruban === "revision" ? (
+                  <>
+                    <button title={t("rechercher")} className="clsRibbonAction" onClick={rechercherCellule}><Icon fafa="faMagnifyingGlass" width={15} /><span>{t("rechercher")}</span></button>
+                    <button title={t("remplacer")} className="clsRibbonAction" onClick={remplacerCellules}><Icon fafa="faRightLeft" width={15} /><span>{t("remplacer")}</span></button>
+                    <button title={t("copierN", { n: (Math.abs(sel.l2 - sel.l) + 1) * (Math.abs(sel.c2 - sel.c) + 1) })} className="clsRibbonAction" onClick={copier}><Icon fafa="faCopy" width={15} /><span>{t("copierN", { n: (Math.abs(sel.l2 - sel.l) + 1) * (Math.abs(sel.c2 - sel.c) + 1) })}</span></button>
+                  </>
+                ) : null}
+                {ruban === "affichage" ? (
+                  <>
+                    <button title={t("mesClasseurs")} className="clsRibbonAction" onClick={() => setVoletVisible(true)}><Icon fafa="faFolderOpen" width={15} /><span>{t("mesClasseurs")}</span></button>
+                    <button title={t("figerLigne")} className="clsRibbonAction" data-on={feuille.figees?.lignes > 0} onClick={() => figer("ligne")}><Icon fafa="faGripLines" width={15} /><span>{t("figerLigne")}</span></button>
+                    <button title={t("figerColonne")} className="clsRibbonAction" data-on={feuille.figees?.colonnes > 0} onClick={() => figer("colonne")}><Icon fafa="faGripLinesVertical" width={15} /><span>{t("figerColonne")}</span></button>
+                    <button title={t("figerSelection")} className="clsRibbonAction" onClick={() => appliquer(null, { figees: { lignes: sel.l, colonnes: sel.c } })}><Icon fafa="faThumbtack" width={15} /><span>{t("figerSelection")}</span></button>
+                    <button title={t("libererVolets")} className="clsRibbonAction" onClick={() => figer("aucun")}><Icon fafa="faUnlock" width={15} /><span>{t("libererVolets")}</span></button>
+                    <button title={langue === "en" ? "Hide rows" : "Masquer les lignes"} className="clsRibbonAction" onClick={masquerLignesSelectionnees}><Icon fafa="faEyeSlash" width={15} /><span>{langue === "en" ? "Hide rows" : "Masquer les lignes"}</span></button>
+                    <button title={langue === "en" ? "Show all rows" : "Afficher les lignes"} className="clsRibbonAction" disabled={!feuille.lignesMasquees?.length} onClick={afficherToutesLesLignes}><Icon fafa="faEye" width={15} /><span>{langue === "en" ? "Show all rows" : "Afficher les lignes"}</span></button>
+                  </>
+                ) : null}
+              </div>
+
               <div className="clsFormule">
                 <span className="clsRef">{D.repereColonne(sel.c)}{sel.l + 1}</span>
-                <Icon fafa="faFunction" width={11} />
+                <span className="clsFx" aria-hidden="true">fx</span>
                 <input
                   key={`${iFeuille}:${sel.l}:${sel.c}:${sourceCelluleActive}`}
                   defaultValue={sourceCelluleActive}
@@ -2247,12 +2555,17 @@ function ClasseurApp() {
                                     autoFocus
                                     defaultValue={edition.valeur}
                                     onFocus={(e) => {
-                                      const champ = e.currentTarget;
-                                      const fin = champ.value.length;
                                       // Un double-clic/F2 sert à poursuivre la saisie :
                                       // sélectionner tout le texte ferait disparaître
                                       // l'ancienne valeur à la première touche.
-                                      requestAnimationFrame(() => champ.setSelectionRange(fin, fin));
+                                      //
+                                      // Le curseur est placé tout de suite, et non à
+                                      // l'image suivante : sinon les lettres tapées
+                                      // entre-temps (saisie rapide, lecteur de codes-
+                                      // barres) étaient suivies d'un retour du curseur
+                                      // en arrière — « Riz » devenait « Rzi ».
+                                      const champ = e.currentTarget;
+                                      champ.setSelectionRange(champ.value.length, champ.value.length);
                                     }}
                                     onBlur={(e) => validerEdition(e.target.value, false)}
                                     onKeyDown={(e) => {
@@ -2318,41 +2631,66 @@ function ClasseurApp() {
                 </table>
               </div>
 
-              <div className="clsOnglets">
-                {classeur.feuilles.map((f, i) => (
+              {/* Barre d'état d'Excel : les feuilles à gauche, le calcul rapide de
+                  la sélection et le zoom à droite. */}
+              <footer className="clsBarreEtat">
+                <div className="clsOnglets">
+                  {classeur.feuilles.map((f, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="clsOnglet"
+                      data-actif={i === iFeuille}
+                      onClick={() => { setIFeuille(i); setSel({ l: 0, c: 0, l2: 0, c2: 0 }); }}
+                      onContextMenu={menuFeuille(i)}
+                    >
+                      {f.nom}
+                    </button>
+                  ))}
                   <button
-                    key={i}
-                    className="clsOnglet"
-                    data-actif={i === iFeuille}
-                    onClick={() => { setIFeuille(i); setSel({ l: 0, c: 0, l2: 0, c2: 0 }); }}
-                    onContextMenu={menuFeuille(i)}
+                    type="button"
+                    className="clsOnglet clsPlus"
+                    title={t("nouvelleFeuille")}
+                    aria-label={t("nouvelleFeuille")}
+                    onClick={() => {
+                      majClasseur({ feuilles: [...classeur.feuilles, D.feuilleVide(D.nomLibre(classeur.feuilles))] });
+                      setIFeuille(classeur.feuilles.length);
+                    }}
                   >
-                    {f.nom}
+                    <Icon fafa="faPlus" width={10} />
                   </button>
-                ))}
-                <button
-                  className="clsOnglet clsPlus"
-                  title={t("nouvelleFeuille")}
-                  onClick={() => {
-                    majClasseur({ feuilles: [...classeur.feuilles, D.feuilleVide(D.nomLibre(classeur.feuilles))] });
-                    setIFeuille(classeur.feuilles.length);
-                  }}
-                >
-                  <Icon fafa="faPlus" width={10} />
-                </button>
+                </div>
                 <span className="clsEspace" />
-                <span className="clsEtat">
-                  {t("cellule")} {D.repereColonne(sel.c)}{sel.l + 1}
-                  {resume?.n ? (
-                    <>
-                      {" · "}<b>{t("somme")} {resume.somme.toLocaleString("fr-FR")}</b>
-                      {" · "}{t("moyenne")} {(Math.round(resume.moyenne * 100) / 100).toLocaleString("fr-FR")}
-                      {" · "}{t("nbCellules", { n: resume.total })}
-                    </>
-                  ) : null}
-                  {modifie ? <em className="clsModifie"> · {t("modifie")}</em> : null}
-                </span>
-              </div>
+                {/* Comme Excel : « Nombre » compte les cellules remplies ;
+                    moyenne et somme n'apparaissent qu'avec des nombres. */}
+                {resume?.remplies ? (
+                  <span className="clsResume">
+                    {resume.n ? <span>{t("etatMoyenne")} : {(Math.round(resume.moyenne * 100) / 100).toLocaleString("fr-FR")}</span> : null}
+                    <span>{t("etatNombre")} : {resume.remplies}</span>
+                    {resume.n ? <span>{t("etatSomme")} : <b>{resume.somme.toLocaleString("fr-FR")}</b></span> : null}
+                  </span>
+                ) : null}
+                <div className="clsZoom" aria-label={t("zoom")}>
+                  <button type="button" title={t("zoomArriere")} onClick={() => reglerZoom(zoom - 10)}>
+                    <Icon fafa="faMinus" width={9} />
+                  </button>
+                  <input
+                    type="range"
+                    min={ZOOM_MIN}
+                    max={ZOOM_MAX}
+                    step={10}
+                    value={zoom}
+                    aria-label={t("zoom")}
+                    onChange={(e) => reglerZoom(Number(e.target.value))}
+                  />
+                  <button type="button" title={t("zoomAvant")} onClick={() => reglerZoom(zoom + 10)}>
+                    <Icon fafa="faPlus" width={9} />
+                  </button>
+                  <button type="button" className="clsZoomValeur" title={t("zoom100")} onClick={() => setZoom(100)}>
+                    {zoom} %
+                  </button>
+                </div>
+              </footer>
             </>
           )}
         </div>

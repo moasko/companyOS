@@ -132,7 +132,12 @@ export const classeurVide = (titre = "Nouveau classeur") => ({
 
 /// La valeur brute d'une cellule, pour le moteur de formules qui ne
 /// connaît que des chaînes.
-const brutes = (cellules) => cellules.map((l) => l.map((c) => c?.v ?? ""));
+/// La grille telle que le moteur de formules la lit. Une formule saisie est
+/// rangée dans `f` avec un `v` vide : sans ce repli, le moteur voyait une
+/// cellule vide — la copie et le calcul rapide de la barre d'état
+/// perdaient toutes les cellules calculées.
+const brutes = (cellules) => cellules.map((l) => l.map((c) =>
+  ((c?.v === "" || c?.v === undefined) && c?.f ? c.f : c?.v ?? "")));
 
 /// Le résultat affiché d'une cellule : formule calculée puis mise en forme.
 export const valeurAffichee = (cellules, l, c, devise) => {
@@ -146,8 +151,11 @@ export const valeurAffichee = (cellules, l, c, devise) => {
 /// La valeur calculée **sans** mise en forme — ce qu'un export doit écrire.
 export const valeurCalculee = (cellules, l, c) => {
   const cel = cellules[l]?.[c];
-  if (!cel || (cel.v === "" && !cel.f)) return "";
-  const valeur = cel.f && cel.v === "" ? cel.f : cel.v;
+  // Une formule saisie laisse `v` vide ou absent selon le chemin : les deux
+  // cas doivent mener à la formule, comme dans `valeurAffichee`.
+  const vide = cel?.v === "" || cel?.v === undefined;
+  if (!cel || (vide && !cel.f)) return "";
+  const valeur = cel.f && vide ? cel.f : cel.v;
   return estFormule(valeur) ? calculerBrut(brutes(cellules), l, c) : valeur;
 };
 
@@ -503,7 +511,9 @@ export const collerTSV = (cellules, texte, l0, c0) => {
 // Statistiques de sélection — la barre d'état d'un tableur
 // ---------------------------------------------------------------------------
 
-export const resume = (cellules, plage) => {
+/// `valeurDe` permet au classeur de fournir son propre calcul (références à
+/// d'autres feuilles comprises) ; par défaut, la feuille seule.
+export const resume = (cellules, plage, valeurDe = (i, j) => valeurCalculee(cellules, i, j)) => {
   const { l1, c1, l2, c2 } = normaliser(plage);
   const nombres = [];
   let remplies = 0;
@@ -511,8 +521,11 @@ export const resume = (cellules, plage) => {
   for (let i = l1; i <= l2; i += 1) {
     for (let j = c1; j <= c2; j += 1) {
       total += 1;
-      const v = valeurCalculee(cellules, i, j);
-      if (String(v ?? "") !== "") remplies += 1;
+      const v = valeurDe(i, j);
+      // Une cellule vide n'est pas un zéro : `Number("")` vaut 0, et la
+      // compter faussait la moyenne. Excel l'ignore, nous aussi.
+      if (String(v ?? "").trim() === "") continue;
+      remplies += 1;
       const n = versNombre(v);
       if (n !== null) nombres.push(n);
     }
