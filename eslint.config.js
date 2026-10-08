@@ -70,7 +70,13 @@ export default [
   // L'API et le paquet partagé
   // ------------------------------------------------------------------
   {
-    files: ["apps/api/**/*.js", "apps/mcp/**/*.js", "packages/shared/**/*.js"],
+    files: [
+      "apps/api/**/*.js",
+      "apps/mcp/**/*.js",
+      "packages/shared/**/*.js",
+      // Les bancs d'essai tournent sous Node, comme le serveur.
+      "experiments/**/*.{js,mjs}",
+    ],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: "module",

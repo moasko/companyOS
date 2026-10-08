@@ -12,6 +12,22 @@ export const signToken = (user) =>
     expiresIn: env.jwtExpiresIn,
   });
 
+/// Identifiant du compte porté par le jeton de la requête, ou `null`.
+///
+/// Sert à la limitation de débit, qui s'exécute en `onRequest` — donc
+/// **avant** `authenticate` : `request.user` n'y existe pas encore. La
+/// signature est vérifiée (un HMAC, sans accès à la base) : un jeton forgé
+/// ne permet pas de se faire compter sous l'identité d'un autre.
+export const idDuJeton = (request) => {
+  const [scheme, token] = (request.headers.authorization || "").split(" ");
+  if (scheme !== "Bearer" || !token) return null;
+  try {
+    return jwt.verify(token, env.jwtSecret).sub || null;
+  } catch {
+    return null;
+  }
+};
+
 /// Préhandler Fastify : exige un Bearer token valide et attache
 /// request.user + request.tenantId, sur lesquels toutes les requêtes
 /// de données doivent être filtrées.

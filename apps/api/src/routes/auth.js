@@ -51,15 +51,19 @@ const slugify = (value) =>
 /// Le plafond des routes qui gardent un secret : mot de passe pour la
 /// connexion, code pour l'invitation. Il s'ajoute au plafond global déclaré
 /// dans `index.js`, qui lui ne sert qu'à écrêter l'abus grossier.
+///
+/// Compté par IP, jamais par compte : sinon un jeton valide — celui d'un
+/// espace créé pour l'occasion — ouvrirait un compteur neuf, et autant de
+/// comptes que d'essais de mot de passe ou de code d'invitation.
 const LIMITE_SENSIBLE = {
-  rateLimit: { max: 8, timeWindow: "15 minutes" },
+  rateLimit: { max: 8, timeWindow: "15 minutes", keyGenerator: (request) => request.ip },
 };
 
 /// Créer un espace est plus coûteux qu'une simple écriture — une
 /// transaction, un hachage bcrypt, des dossiers, un catalogue — et chaque
 /// espace créé consomme un quota de stockage offert.
 const LIMITE_INSCRIPTION = {
-  rateLimit: { max: 5, timeWindow: "1 hour" },
+  rateLimit: { max: 5, timeWindow: "1 hour", keyGenerator: (request) => request.ip },
 };
 
 export default async function authRoutes(app) {

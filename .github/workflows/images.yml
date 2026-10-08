@@ -86,7 +86,7 @@ jobs:
           # changer impose de reconstruire. Réglable sans toucher au code
           # via une variable de dépôt (Settings → Variables).
           build-args: |
-            VITE_API_URL=${{ vars.VITE_API_URL || 'http://companyos-apps-companyos-occsws-fcfac4-187-77-163-41.sslip.io' }}
+            VITE_API_URL=${{ vars.VITE_API_URL || 'https://api.companyos.fr' }}
             NODE_HEAP_MO=6144
           # Le cache du runner : une reconstruction ne refait pas
           # `npm ci` ni les couches inchangées.

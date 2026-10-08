@@ -8,7 +8,7 @@ export const TYPES = [
     id: "url",
     label: "URL",
     icon: "faLink",
-    fields: [{ key: "url", label: "URL", placeholder: "https://companyos.app/dashboard" }],
+    fields: [{ key: "url", label: "URL", placeholder: "https://app.companyos.fr" }],
     build: (v) => v.url || "",
     preview: (v) => v.url,
   },

@@ -5,6 +5,7 @@ import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "./env.js";
 import { prisma } from "./db.js";
+import { idDuJeton } from "./auth.js";
 import authRoutes from "./routes/auth.js";
 import appRoutes from "./routes/apps.js";
 import fileRoutes from "./routes/files.js";
@@ -65,7 +66,15 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
   // La clé est l'IP, sauf pour une requête authentifiée : deux personnes
   // derrière le même NAT d'entreprise ne doivent pas se gêner.
-  keyGenerator: (request) => request.user?.id || request.ip,
+  //
+  // Le compte se lit dans le jeton et non dans `request.user` : ce plugin
+  // passe en `onRequest`, avant `authenticate`, et `request.user` y valait
+  // toujours `undefined` — toute une entreprise partageait alors un seul
+  // compteur, celui de son IP.
+  keyGenerator: (request) => {
+    const id = idDuJeton(request);
+    return id ? `compte:${id}` : request.ip;
+  },
   addHeaders: { "retry-after": true },
   // `statusCode: 429` est **obligatoire** ici. Sans lui, @fastify/rate-limit
   // lève l'objet renvoyé comme une erreur ordinaire, que le gestionnaire de
