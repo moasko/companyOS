@@ -63,7 +63,11 @@ jobs:
       # `validate` relit le schéma ; `format --check` attrape les schémas
       # modifiés à la main et jamais reformatés, qui produisent ensuite des
       # diffs illisibles.
+      # `validate` exige que DATABASE_URL existe, pas qu'elle mène quelque
+      # part : une valeur factice suffit.
       - run: npx prisma validate --schema apps/api/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci@localhost:5432/ci
       - run: npx prisma format --check --schema apps/api/prisma/schema.prisma
       # Chaque module du serveur doit au moins s'analyser. Sans base de
       # données, on ne peut pas le démarrer en CI — mais une erreur de

@@ -32,7 +32,7 @@
     "fastify": "^5.2.1",
     "ipaddr.js": "^2.5.0",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^10.0.16",
     "sanitize-html": "^2.14.0",
     "zod": "^3.24.1"
   },
