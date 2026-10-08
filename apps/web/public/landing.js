@@ -4,13 +4,68 @@
   /* ---- Dictionnaires ---- */
   var I18N = {
     fr: {
+      "passer": "Passer directement au contenu principal",
+      "annonce.texte": "Nouveau : le panneau « Aujourd'hui » rassemble l'encaissé du jour, les factures en retard et les congés à valider.",
+      "annonce.lien": "En savoir plus",
+      "nav.entreprises": "Pour les entreprises", "nav.securite": "Sécurité",
+      "heros.surtitre": "Le système d'exploitation des PME",
+      "heros.tarifs": "Voir les formules pour les entreprises",
+      "rac.facturation": "Découvrir la Facturation", "rac.caisse": "Découvrir la Caisse",
+      "rac.paie": "Découvrir la Paie", "rac.compta": "Découvrir la Comptabilité",
+      "rac.toutes": "Toutes les applications", "rac.entreprise": "Formules pour votre entreprise",
+      "chaine.cta": "En savoir plus",
+      "recherche.titre": "Trouvez l'application qu'il vous faut, en une phrase",
+      "recherche.label": "Que voulez-vous gérer ?",
+      "recherche.placeholder": "Que voulez-vous gérer ? Ex. : mes salaires, ma boutique…",
+      "recherche.p1": "Je vends en boutique", "recherche.p2": "J'ai des salariés",
+      "recherche.p3": "Je facture mes clients", "recherche.p4": "Je rédige des documents",
+      "recherche.trouve": "{n} application(s) pour vous — <a href=\"#apps\">les voir</a>",
+      "recherche.rien": "Aucune application ne correspond. <a href=\"#apps\">Voir toutes les applications</a>",
+      "carte.p1.badge": "Le plus utilisé",
+      "carte.p1.t": "Des factures qui se relancent toutes seules",
+      "carte.p1.p": "Devis, factures, avoirs et règlements. Une facture en retard part en relance au bon moment, et chaque paiement met le tableau de bord à jour.",
+      "carte.p1.cta": "Commencer à facturer",
+      "carte.p2.t": "Une caisse qui parle mobile money",
+      "carte.p2.p": "Espèces, Orange Money, Wave et MTN sur le même ticket. Chaque vente déstocke les articles et finit en comptabilité.",
+      "carte.p2.cta": "Découvrir la Caisse",
+      "carte.p3.badge": "Côte d'Ivoire",
+      "carte.p3.t": "La paie CNPS et ITS, sans calculatrice",
+      "carte.p3.p": "Bulletins conformes aux barèmes ivoiriens, prêts à imprimer, et l'écriture de paie proposée en un clic.",
+      "carte.p3.cta": "Découvrir la Paie",
+      "carte.p4.t": "La comptabilité SYSCOHADA, déjà tenue",
+      "carte.p4.p": "Journaux, grand livre et balance. Les écritures se proposent depuis les factures, la caisse et la paie : inutile de connaître les numéros de compte.",
+      "carte.p4.cta": "Essayer gratuitement",
+      "bureau.badge": "Nouveau",
+      "bureau.l1": "Le panneau « Aujourd'hui » : ce qui est rentré, ce qui coince",
+      "bureau.l2": "Plusieurs applications côte à côte, comme sur un ordinateur",
+      "bureau.l3": "Sur téléphone, un écran d'accueil et une application à la fois",
+      "bureau.cta": "Ouvrir mon bureau",
+      "app.projets.n": "Projets", "app.classeur.n": "Classeur", "app.analyse.n": "Analyse",
+      "app.navigateur.n": "Navigateur", "app.blocnotes.n": "Bloc-notes", "app.calculatrice.n": "Calculatrice",
+      "app.qrcode.n": "Codes QR", "app.boutique.n": "Boutique", "app.parametres.n": "Paramètres",
+      "point.1.cta": "En savoir plus", "point.2.cta": "Voir les applications",
+      "point.3.cta": "Découvrir les accès", "point.4.cta": "Trouver la bonne formule",
+      "histoire.cta": "Essayer gratuitement",
+      "zoom3.titre": "Une facture émise, <em>tout le reste suit</em>",
+      "garde.6.t": "Sauvegardé chaque jour",
+      "garde.6.p": "La base est sauvegardée tous les jours, chaque copie est relue avant d'être déclarée bonne, et peut être envoyée hors du serveur.",
+      "faq.tout": "Tout développer", "faq.replier": "Tout réduire",
+      "final.sous": "Créez votre espace en deux minutes. La formule Découverte est gratuite, sans carte bancaire.",
+      "final.tarifs": "Comparer les formules",
+      "pied.c1": "Applications", "pied.c2": "Le bureau", "pied.c3": "Entreprises", "pied.c4": "Confiance", "pied.c5": "Assistance",
+      "pied.l.bureau": "Découvrir le bureau", "pied.l.boutique": "La Boutique d'applications",
+      "pied.l.aujourdhui": "Le panneau « Aujourd'hui »", "pied.l.mobile": "Sur téléphone",
+      "pied.l.formules": "Formules et tarifs", "pied.l.ici": "Pensé pour la Côte d'Ivoire", "pied.l.demarrer": "Bien démarrer",
+      "pied.l.securite": "Sécurité", "pied.l.sauvegardes": "Sauvegardes", "pied.l.hebergement": "Hébergement chez vous",
+      "pied.l.faq": "Questions fréquentes", "pied.l.confidentialite": "Confidentialité", "pied.l.conditions": "Conditions d'utilisation",
+      "pied.langue": "Français (Côte d'Ivoire)",
       "meta.titre": "CompanyOS — Le système d'exploitation de votre entreprise",
       "nav.bureau": "Le bureau", "nav.apps": "Applications", "nav.decouvrir": "Découvrir",
       "nav.tarifs": "Tarifs", "nav.faq": "Questions",
       "actions.connexion": "Se connecter", "actions.creer": "Créer mon espace",
       "heros.titre": "Pilotez toute votre entreprise <em>depuis un seul écran</em>",
       "heros.argument": "Facturation, caisse, stock, paie CNPS, comptabilité SYSCOHADA, courrier, campagnes : des applications qui se parlent, pensées pour les entreprises ivoiriennes.",
-      "heros.essayer": "Essayer gratuitement →", "heros.voirApps": "Voir les applications",
+      "heros.essayer": "Essayer gratuitement", "heros.voirApps": "Voir les applications",
       "heros.note": "Formule Découverte gratuite · sans carte bancaire",
       "carte.crm.nom": "CRM", "carte.crm.tempsReel": "· temps réel",
       "carte.crm.prospection": "Prospection", "carte.crm.negociation": "Négociation", "carte.crm.signe": "Signé",
@@ -21,8 +76,8 @@
       "bandeau": "Fini le cahier, les fichiers Excel éparpillés et les tickets perdus : <b>une facture émise met le stock à jour, propose son écriture comptable et se relance toute seule.</b>",
       "bureau.avant": "Un vrai bureau", "bureau.titre": "Voici votre bureau d'entreprise",
       "bureau.sous": "Des fenêtres, des icônes, une barre des tâches : vous savez déjà l'utiliser. Aucune formation, le premier réflexe est le bon.",
-      "mock.titre": "CompanyOS — Tableau de bord", "mock.resume": "Résumé du jour",
-      "mock.k1": "Encaissé", "mock.k2": "Factures en attente", "mock.k3": "Ruptures de stock", "mock.k4": "Congés à valider",
+      "mock.titre": "CompanyOS — Tableau de bord", "mock.resume": "Aujourd'hui",
+      "mock.k1": "Encaissé", "mock.k2": "Factures en retard", "mock.k3": "Ruptures de stock", "mock.k4": "Congés à valider",
       "puce.reglee": "Facture FA-0241 réglée<small>+250 000 F · stock mis à jour</small>",
       "puce.relance": "Relance envoyée<small>Facture FA-0227 · 8 jours de retard</small>",
       "puce.bulletin": "Bulletin de paie prêt<small>Écriture comptable proposée</small>",
@@ -34,7 +89,7 @@
       "evidence.3.p": "Une vente devient une facture, qui ajuste un stock, qui nourrit la comptabilité. Tout est déjà relié.",
       "apps.avant": "La suite", "apps.titre": "Une application par besoin. Toutes incluses.",
       "apps.sous": "Quelque chose à gérer ? Il y a une application pour ça. Vous l'installez en un clic depuis la Boutique, et elle connaît déjà les autres : le CRM nourrit les campagnes, les RH alimentent la paie, tout finit en comptabilité.",
-      "apps.cta": "Ouvrir la Boutique →",
+      "apps.cta": "Ouvrir la Boutique",
       "apps.note": "Aucune n'est facturée à part : elles sont toutes comprises dans l'abonnement.",
       "app.facturation.n": "Facturation", "app.facturation.d": "Devis, factures, règlements, relances automatiques",
       "app.caisse.n": "Caisse", "app.caisse.d": "Point de vente tactile, espèces et mobile money",
@@ -140,16 +195,71 @@
       "faq.6.r": "Oui : plan comptable SYSCOHADA révisé, journaux, grand livre et balance. Et vous n'avez pas besoin de connaître les numéros de compte — les écritures se proposent toutes seules depuis les factures, la caisse et la paie.",
       "final.titre": "Votre entreprise mérite mieux qu'un cahier.",
       "final.cta": "Créer mon espace gratuit",
-      "pied.gauche": "© CompanyOS — le système d'exploitation des PME."
+      "pied.gauche": "© CompanyOS 2026"
     },
     en: {
+      "passer": "Skip to main content",
+      "annonce.texte": "New: the “Today” panel brings together today's takings, overdue invoices and leave to approve.",
+      "annonce.lien": "Learn more",
+      "nav.entreprises": "For business", "nav.securite": "Security",
+      "heros.surtitre": "The operating system for SMBs",
+      "heros.tarifs": "See plans for business",
+      "rac.facturation": "Explore Invoicing", "rac.caisse": "Explore Point of sale",
+      "rac.paie": "Explore Payroll", "rac.compta": "Explore Accounting",
+      "rac.toutes": "All applications", "rac.entreprise": "Plans for your business",
+      "chaine.cta": "Learn more",
+      "recherche.titre": "Find the application you need, in one sentence",
+      "recherche.label": "What do you want to manage?",
+      "recherche.placeholder": "What do you want to manage? E.g. salaries, my shop…",
+      "recherche.p1": "I sell in a shop", "recherche.p2": "I have employees",
+      "recherche.p3": "I invoice customers", "recherche.p4": "I write documents",
+      "recherche.trouve": "{n} application(s) for you — <a href=\"#apps\">see them</a>",
+      "recherche.rien": "No application matches. <a href=\"#apps\">See all applications</a>",
+      "carte.p1.badge": "Most popular",
+      "carte.p1.t": "Invoices that chase payment on their own",
+      "carte.p1.p": "Quotes, invoices, credit notes and payments. An overdue invoice sends its reminder at the right time, and every payment updates the dashboard.",
+      "carte.p1.cta": "Start invoicing",
+      "carte.p2.t": "A register that speaks mobile money",
+      "carte.p2.p": "Cash, Orange Money, Wave and MTN on the same receipt. Every sale deducts stock and lands in accounting.",
+      "carte.p2.cta": "Explore Point of sale",
+      "carte.p3.badge": "Côte d'Ivoire",
+      "carte.p3.t": "CNPS and ITS payroll, no calculator needed",
+      "carte.p3.p": "Payslips that follow Ivorian scales, ready to print, and the payroll entry drafted in one click.",
+      "carte.p3.cta": "Explore Payroll",
+      "carte.p4.t": "SYSCOHADA accounting, already kept",
+      "carte.p4.p": "Journals, general ledger and trial balance. Entries are drafted from invoices, the register and payroll: no need to know account numbers.",
+      "carte.p4.cta": "Try it for free",
+      "bureau.badge": "New",
+      "bureau.l1": "The “Today” panel: what came in, what's stuck",
+      "bureau.l2": "Several applications side by side, like on a computer",
+      "bureau.l3": "On a phone, a home screen and one app at a time",
+      "bureau.cta": "Open my desktop",
+      "app.projets.n": "Projects", "app.classeur.n": "Spreadsheet", "app.analyse.n": "Analytics",
+      "app.navigateur.n": "Browser", "app.blocnotes.n": "Notepad", "app.calculatrice.n": "Calculator",
+      "app.qrcode.n": "QR codes", "app.boutique.n": "Store", "app.parametres.n": "Settings",
+      "point.1.cta": "Learn more", "point.2.cta": "See the applications",
+      "point.3.cta": "Explore access rights", "point.4.cta": "Find the right plan",
+      "histoire.cta": "Try it for free",
+      "zoom3.titre": "One invoice issued, <em>everything else follows</em>",
+      "garde.6.t": "Backed up every day",
+      "garde.6.p": "The database is backed up daily, every copy is verified before it is marked good, and it can be sent off the server.",
+      "faq.tout": "Expand all", "faq.replier": "Collapse all",
+      "final.sous": "Create your workspace in two minutes. The Discovery plan is free, no credit card required.",
+      "final.tarifs": "Compare plans",
+      "pied.c1": "Applications", "pied.c2": "The desktop", "pied.c3": "Business", "pied.c4": "Trust", "pied.c5": "Support",
+      "pied.l.bureau": "Explore the desktop", "pied.l.boutique": "The application Store",
+      "pied.l.aujourdhui": "The “Today” panel", "pied.l.mobile": "On your phone",
+      "pied.l.formules": "Plans and pricing", "pied.l.ici": "Built for Côte d'Ivoire", "pied.l.demarrer": "Getting started",
+      "pied.l.securite": "Security", "pied.l.sauvegardes": "Backups", "pied.l.hebergement": "Host it yourself",
+      "pied.l.faq": "FAQ", "pied.l.confidentialite": "Privacy", "pied.l.conditions": "Terms of use",
+      "pied.langue": "English",
       "meta.titre": "CompanyOS — The operating system for your business",
       "nav.bureau": "The desktop", "nav.apps": "Applications", "nav.decouvrir": "Discover",
       "nav.tarifs": "Pricing", "nav.faq": "FAQ",
       "actions.connexion": "Sign in", "actions.creer": "Create my workspace",
       "heros.titre": "Run your whole business <em>from a single screen</em>",
       "heros.argument": "Invoicing, point of sale, inventory, CNPS payroll, SYSCOHADA accounting, mail, campaigns: applications that talk to each other, built for Ivorian businesses.",
-      "heros.essayer": "Try it for free →", "heros.voirApps": "See the applications",
+      "heros.essayer": "Try it for free", "heros.voirApps": "See the applications",
       "heros.note": "Free Discovery plan · no credit card required",
       "carte.crm.nom": "CRM", "carte.crm.tempsReel": "· live",
       "carte.crm.prospection": "Prospecting", "carte.crm.negociation": "Negotiation", "carte.crm.signe": "Signed",
@@ -160,8 +270,8 @@
       "bandeau": "No more paper ledgers, scattered Excel files and lost receipts: <b>an issued invoice updates the stock, drafts its journal entry and chases payment on its own.</b>",
       "bureau.avant": "A real desktop", "bureau.titre": "Meet your company desktop",
       "bureau.sous": "Windows, icons, a taskbar: you already know how to use it. No training needed — your first instinct is the right one.",
-      "mock.titre": "CompanyOS — Dashboard", "mock.resume": "Today at a glance",
-      "mock.k1": "Collected", "mock.k2": "Invoices pending", "mock.k3": "Stock-outs", "mock.k4": "Leave to approve",
+      "mock.titre": "CompanyOS — Dashboard", "mock.resume": "Today",
+      "mock.k1": "Collected", "mock.k2": "Overdue invoices", "mock.k3": "Stock-outs", "mock.k4": "Leave to approve",
       "puce.reglee": "Invoice FA-0241 paid<small>+250,000 F · stock updated</small>",
       "puce.relance": "Reminder sent<small>Invoice FA-0227 · 8 days overdue</small>",
       "puce.bulletin": "Payslip ready<small>Journal entry drafted</small>",
@@ -173,7 +283,7 @@
       "evidence.3.p": "A sale becomes an invoice, which adjusts the stock, which feeds the books. Everything is already connected.",
       "apps.avant": "The suite", "apps.titre": "One application per need. All included.",
       "apps.sous": "Something to manage? There is an app for it. You install it in one click from the Store, and it already knows the others: the CRM feeds the campaigns, HR feeds payroll, and everything lands in accounting.",
-      "apps.cta": "Open the Store →",
+      "apps.cta": "Open the Store",
       "apps.note": "None is billed separately: they are all included in the subscription.",
       "app.facturation.n": "Invoicing", "app.facturation.d": "Quotes, invoices, payments, automatic reminders",
       "app.caisse.n": "Point of sale", "app.caisse.d": "Touch-friendly register, cash and mobile money",
@@ -279,7 +389,7 @@
       "faq.6.r": "Yes: the revised SYSCOHADA chart of accounts, journals, general ledger and trial balance. And you don't need to know account numbers — entries are drafted automatically from invoices, the register and payroll.",
       "final.titre": "Your business deserves better than a notebook.",
       "final.cta": "Create my free workspace",
-      "pied.gauche": "© CompanyOS — the operating system for SMBs."
+      "pied.gauche": "© CompanyOS 2026"
     }
   };
 
@@ -332,6 +442,11 @@
       var cle = el.getAttribute("data-i18n");
       if (dico[cle] !== undefined) el.innerHTML = dico[cle];
     });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
+      var cle = el.getAttribute("data-i18n-placeholder");
+      if (dico[cle] !== undefined) el.placeholder = dico[cle];
+    });
+    majToutDevelopper();
     document.querySelectorAll("[data-prix]").forEach(function (el) {
       var montant = Number(el.getAttribute("data-prix"));
       if (montant > 0) el.textContent = formatePrix(montant, etat.devise, etat.langue);
@@ -360,6 +475,128 @@
     applique();
   });
 
+  function texte(cle) {
+    var dico = I18N[etat.langue] || I18N.fr;
+    return dico[cle] !== undefined ? dico[cle] : I18N.fr[cle];
+  }
+
+  /* ---- Menu des petits écrans ---- */
+  var boutonMenu = document.getElementById("menuMobile");
+  var nav = document.getElementById("navPrincipale");
+  boutonMenu.addEventListener("click", function () {
+    var ouvert = nav.getAttribute("data-ouvert") === "true";
+    nav.setAttribute("data-ouvert", String(!ouvert));
+    boutonMenu.setAttribute("aria-expanded", String(!ouvert));
+  });
+  nav.addEventListener("click", function (e) {
+    if (e.target.closest("a")) {
+      nav.setAttribute("data-ouvert", "false");
+      boutonMenu.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  /* ---- « Trouvez l'application » ----
+     Une recherche par mots-clés, sans serveur : chaque tuile porte ses
+     mots (data-mots). La grille des applications ne garde que celles qui
+     correspondent, et la phrase sous le champ dit combien. */
+  var grille = document.getElementById("grilleApps");
+  var tuiles = grille.querySelectorAll(".tuileApp");
+  var champ = document.getElementById("champRecherche");
+  var resultat = document.getElementById("resultatRecherche");
+
+  function sansAccents(t) {
+    return String(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+  /* Quelques synonymes anglais, pour que la recherche marche dans les deux langues. */
+  var SYNONYMES = {
+    shop: "boutique", sell: "vendre", salary: "salaire", payroll: "paie",
+    employee: "salaries", employees: "salaries", invoice: "factures", invoices: "factures",
+    customer: "client", customers: "client", stock: "stock", inventory: "stock",
+    accounting: "comptabilite", document: "documents", write: "rediger", leave: "conges",
+    expenses: "frais", email: "email", calendar: "agenda", project: "projets"
+  };
+  /* Les mots qui ne disent rien du besoin : « des » trouvait « Codes QR ». */
+  var VIDES = ["avec", "dans", "pour", "mais", "mes", "mon", "nos", "notre", "votre", "vos", "leur",
+    "this", "that", "with", "have", "what", "want", "manage", "gerer", "veux", "voudrais", "faire"];
+  function cherche(requete) {
+    var mots = sansAccents(requete).split(/[^a-z0-9-]+/)
+      .filter(function (m) { return m.length > 3 && VIDES.indexOf(m) === -1; })
+      .map(function (m) { return SYNONYMES[m] || m; });
+    var n = 0;
+    tuiles.forEach(function (t) {
+      var cible = sansAccents((t.getAttribute("data-mots") || "") + " " + t.textContent);
+      var ok = !mots.length || mots.some(function (m) {
+        var racine = m.length > 5 ? m.slice(0, -1) : m;
+        return cible.indexOf(racine) !== -1;
+      });
+      t.setAttribute("data-masque", String(!ok));
+      if (ok) n++;
+    });
+    grille.setAttribute("data-filtre", String(mots.length > 0));
+    if (!mots.length) { resultat.innerHTML = ""; return; }
+    if (!n) {
+      tuiles.forEach(function (t) { t.setAttribute("data-masque", "false"); });
+      grille.setAttribute("data-filtre", "false");
+      resultat.innerHTML = texte("recherche.rien");
+      return;
+    }
+    resultat.innerHTML = texte("recherche.trouve").replace("{n}", n);
+  }
+  document.getElementById("formRecherche").addEventListener("submit", function (e) {
+    e.preventDefault();
+    cherche(champ.value);
+    if (champ.value.trim()) document.getElementById("apps").scrollIntoView();
+  });
+  champ.addEventListener("input", function () { cherche(champ.value); });
+  document.querySelectorAll(".puces button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      champ.value = b.textContent;
+      cherche(b.getAttribute("data-requete") + " " + b.textContent);
+      document.getElementById("apps").scrollIntoView();
+    });
+  });
+
+  /* ---- Carrousel d'histoires ---- */
+  var piste = document.getElementById("piste");
+  var histoires = piste.querySelectorAll(".histoire");
+  var points = document.querySelectorAll("#histPoints i");
+  var prec = document.getElementById("histPrec");
+  var suiv = document.getElementById("histSuiv");
+  function indexCourant() {
+    var pas = histoires[1] ? histoires[1].offsetLeft - histoires[0].offsetLeft : 1;
+    return Math.round(piste.scrollLeft / pas);
+  }
+  function majCarrousel() {
+    var i = indexCourant();
+    points.forEach(function (p, j) { p.setAttribute("data-actif", String(i === j)); });
+    prec.disabled = i <= 0;
+    suiv.disabled = i >= histoires.length - 1;
+  }
+  function allerA(i) {
+    i = Math.max(0, Math.min(histoires.length - 1, i));
+    piste.scrollTo({ left: histoires[i].offsetLeft - histoires[0].offsetLeft, behavior: "smooth" });
+  }
+  prec.addEventListener("click", function () { allerA(indexCourant() - 1); });
+  suiv.addEventListener("click", function () { allerA(indexCourant() + 1); });
+  piste.addEventListener("scroll", function () { window.requestAnimationFrame(majCarrousel); }, { passive: true });
+  majCarrousel();
+
+  /* ---- FAQ : tout développer / tout réduire ---- */
+  var toutDev = document.getElementById("toutDevelopper");
+  var details = document.querySelectorAll(".faq details");
+  function toutOuvert() {
+    return Array.prototype.every.call(details, function (d) { return d.open; });
+  }
+  function majToutDevelopper() {
+    toutDev.textContent = texte(toutOuvert() ? "faq.replier" : "faq.tout");
+  }
+  toutDev.addEventListener("click", function () {
+    var ouvrir = !toutOuvert();
+    details.forEach(function (d) { d.open = ouvrir; });
+    majToutDevelopper();
+  });
+  details.forEach(function (d) { d.addEventListener("toggle", majToutDevelopper); });
+
   applique();
 
   /* ---- Apparition au défilement ----
@@ -367,8 +604,8 @@
      IntersectionObserver, ou si le visiteur réduit les animations, tout
      est simplement affiché. */
   var aAnimer = document.querySelectorAll(
-    ".bandeau p, .enTete, .enTete-centre, .enTeteApps, .grilleApps, .mock, .evidence, " +
-    ".deroule, .etape, .zoom, .point, .chiffre, .garde, .tarif, .faq, .final .cadre"
+    ".raccourcis li, .bandeNoire .grille > *, .recherche .bloc, .carte, .enTete, .grilleApps, " +
+    ".carrousel, .etape, .chiffre, .garde, .tarif, .faq, .final .bloc"
   );
   var reduit = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if ("IntersectionObserver" in window && !reduit) {
