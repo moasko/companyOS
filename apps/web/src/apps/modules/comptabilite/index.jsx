@@ -55,6 +55,7 @@ import {
   ecriturePaiement as ecriturePaiementAchat,
 } from "../achats/domaine";
 import { ecritureDeBulletin } from "../paie/domaine";
+import { ecritureInventaire } from "../stock/regles";
 import { ecritureDeNote } from "../frais/domaine";
 import * as D from "./domaine";
 import { journalDe, prochainNumero } from "./journaux";
@@ -132,6 +133,7 @@ function ComptabiliteApp() {
     releves: [],
     lettrages: [],
     clientsCrm: [],
+    inventaires: [],
     reglages: null,
   });
   const [periode, setPeriode] = useState(() => D.exercice(new Date().getFullYear()));
@@ -140,7 +142,7 @@ function ComptabiliteApp() {
 
   const charger = useCallback(async () => {
     const liste = (m, c) => api.records.list(m, c).catch(() => []);
-    const [e, f, r, g, tk, af, ap, four, bul, sal, ndf, rel, let_, crm] = await Promise.all([
+    const [e, f, r, g, tk, af, ap, four, bul, sal, ndf, rel, let_, crm, inv] = await Promise.all([
       api.records.list(manifest.slug, "ecritures"),
       // Chaque application peut ne pas être installée : la comptabilité
       // reste utilisable, simplement sans la reprise correspondante.
@@ -157,6 +159,7 @@ function ComptabiliteApp() {
       liste(manifest.slug, "releves"),
       liste(manifest.slug, "lettrages"),
       liste("crm", "clients"),
+      liste("stock", "inventaires"),
     ]);
     setDonnees({
       ecritures: e,
@@ -170,6 +173,7 @@ function ComptabiliteApp() {
       releves: rel,
       lettrages: let_,
       clientsCrm: crm,
+      inventaires: inv,
     });
   }, []);
   const etat = useChargement(ouvert, charger);
@@ -189,7 +193,7 @@ function ComptabiliteApp() {
     return () => window.removeEventListener("companyos:lien", aller);
   }, []);
 
-  const { ecritures, documents, reglements, tickets, achats, paie, notesFrais, reglages, releves, lettrages } = donnees;
+  const { ecritures, documents, reglements, tickets, achats, paie, notesFrais, reglages, releves, lettrages, inventaires } = donnees;
 
   // ---- Dérivations --------------------------------------------------------
 
@@ -223,6 +227,11 @@ function ComptabiliteApp() {
           const sal = paie.salaries.find((x) => x.data.matricule === bul.data.matricule);
           return { journal: "OD", source: "Paie", ...ecritureDeBulletin(bul.data.calcul, sal?.data || {}, bul.data.mois) };
         }),
+      // Les écarts d'un inventaire validé du Stock : perte ou excédent,
+      // valorisé au prix moyen pondéré (6031 / 311).
+      ...inventaires
+        .filter((i) => i.data.statut === "valide" && i.data.valeurEcart)
+        .map((i) => ecritureInventaire(i.data, i.id, i.data.valeurEcart)),
     ].filter(Boolean);
     return D.ecrituresSuggerees({
       documents,
@@ -233,7 +242,7 @@ function ComptabiliteApp() {
       ecritures,
       totauxDe: totaux,
     });
-  }, [documents, reglements, tickets, achats, paie, notesFrais, ecritures]);
+  }, [documents, reglements, tickets, achats, paie, notesFrais, ecritures, inventaires]);
 
   // Période et axe voyagent ensemble : c'est le contexte d'observation, et
   // toutes les restitutions le respectent sans le savoir (voir lignesDe).
