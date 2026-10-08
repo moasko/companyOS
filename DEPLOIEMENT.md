@@ -128,10 +128,27 @@ d'envoi (SPF + DKIM) pour ne pas finir en indésirable.
   sur `/landing.html`. Pour changer de domaine, modifiez les deux `map` en
   tête de `apps/web/nginx.conf`.
 - **Console Plateforme** : l'application « Plateforme » montre tous les
-  espaces clients (formules, membres, stockage, revenu mensuel) et change
-  une formule en un clic. Elle n'obéit qu'aux comptes listés dans
-  `PLATFORM_ADMINS` (variable d'environnement, emails séparés par des
-  virgules) — quiconque d'autre voit une porte fermée.
+  espaces clients (formules, membres, stockage, revenu mensuel), change
+  une formule, suspend un espace ou déconnecte un compte compromis. Elle
+  n'obéit qu'aux comptes listés dans `PLATFORM_ADMINS` (emails séparés par
+  des virgules) — quiconque d'autre voit une porte fermée. Chaque geste est
+  inscrit à votre journal **et** à celui de l'espace concerné.
+
+### Créer le compte exploitant
+
+L'application refuse toute inscription — ou invitation acceptée — sur une
+adresse de `PLATFORM_ADMINS` : rien n'y prouve qu'on possède l'adresse, et
+elle suffit à ouvrir la console. Le compte se crée donc sur le serveur,
+dans le terminal du conteneur `api` (Dokploy → service → **Terminal**) :
+
+```bash
+node src/exploitant.js vous@companyos.fr --nom "Votre nom" --entreprise "CompanyOS"
+```
+
+La commande affiche un mot de passe à usage unique : connectez-vous avec,
+puis changez-le dans Paramètres → Compte. Relancée sur un compte existant,
+elle remplace son mot de passe et ferme toutes ses sessions — c'est la
+procédure de reprise en cas de mot de passe perdu.
 
 ## 8. Données et sauvegardes
 

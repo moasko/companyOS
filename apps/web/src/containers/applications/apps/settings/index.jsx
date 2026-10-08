@@ -364,6 +364,24 @@ export const Settings = () => {
     }
   };
 
+  const deconnecterMembre = async (membre) => {
+    const ok = await modal.confirm({
+      title: "Déconnecter le membre",
+      message: `Déconnecter ${membre.name} de tous ses appareils ?`,
+      detail:
+        "Ses sessions ouvertes sont fermées immédiatement. Son compte, son rôle et ses données restent : il pourra se reconnecter avec son mot de passe.",
+      confirmLabel: "Déconnecter",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deconnecterMembre(membre.id);
+      flash(`${membre.name} a été déconnecté de tous ses appareils`);
+    } catch (err) {
+      flash(err.message);
+    }
+  };
+
   // ---- Apparence personnalisée -------------------------------------------
 
   const importerUnFond = async (e) => {
@@ -561,7 +579,27 @@ export const Settings = () => {
     try {
       await api.updatePassword(mdp.current, mdp.next);
       setMdp({ current: "", next: "", confirm: "" });
-      flash("Mot de passe modifié");
+      flash("Mot de passe modifié — vos autres appareils ont été déconnectés");
+    } catch (err) {
+      flash(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deconnecterAutresAppareils = async () => {
+    const ok = await modal.confirm({
+      title: "Déconnecter mes autres appareils",
+      message: "Fermer toutes vos sessions ouvertes ailleurs ?",
+      detail:
+        "Ordinateurs, téléphones, navigateurs oubliés : tous devront se reconnecter. Cette fenêtre reste ouverte.",
+      confirmLabel: "Déconnecter",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.revoquerSessions();
+      flash("Vos autres appareils ont été déconnectés");
     } catch (err) {
       flash(err.message);
     } finally {
@@ -709,6 +747,7 @@ export const Settings = () => {
                 mdp={mdp}
                 setMdp={setMdp}
                 changerMotDePasse={changerMotDePasse}
+                deconnecterAutresAppareils={deconnecterAutresAppareils}
               />
 
               {/* ---------- Espace de travail ---------- */}
@@ -725,6 +764,7 @@ export const Settings = () => {
                 membres={membres}
                 changerRole={changerRole}
                 retirerMembre={retirerMembre}
+                deconnecterMembre={deconnecterMembre}
                 invitations={invitations}
                 mailInvite={mailInvite}
                 setMailInvite={setMailInvite}

@@ -58,23 +58,23 @@ model Invitation {
 /// Le journal est en écriture seule. Aucune route ne le modifie ni ne le
 /// supprime : un journal qu'on peut nettoyer ne prouve rien.
 model AuditEvent {
-  id       String @id @default(cuid())
-  tenantId String
+  id        String   @id @default(cuid())
+  tenantId  String
   /// Auteur. Conservé même si le compte est supprimé — d'où le nom et
   /// l'adresse recopiés ici plutôt qu'une relation : « membre retiré par
   /// un compte qui n'existe plus » n'aiderait personne.
-  userId   String?
+  userId    String?
   userName  String
   userEmail String
   /// Verbe technique, ex. "membre.role", "fichier.corbeille", "app.install".
-  action   String
+  action    String
   /// Ce sur quoi l'action porte, tel qu'on l'affiche : un nom de fichier,
   /// une adresse e-mail, un nom d'application.
-  cible    String?
+  cible     String?
   /// Contexte utile à la relecture : ancien et nouveau rôle, taille,
   /// dossier parent… Volontairement libre.
-  details  Json?
-  ip       String?
+  details   Json?
+  ip        String?
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -90,23 +90,23 @@ model AuditEvent {
 /// tâche », « la facture 042 est réglée », « votre quota est à 90 % » sont
 /// la même chose vue d'ici.
 model Notification {
-  id       String @id @default(cuid())
-  tenantId String
+  id        String   @id @default(cuid())
+  tenantId  String
   /// Destinataire. Toujours renseigné : une notification sans personne à
   /// qui parler n'a pas lieu d'exister.
-  userId   String
+  userId    String
   /// Auteur. Vide pour ce qu'émet le système lui-même.
-  auteurId   String?
-  auteurNom  String?
+  auteurId  String?
+  auteurNom String?
   /// Module émetteur, ex. "projets" — sert à filtrer et à choisir l'icône.
-  source   String
-  titre    String
-  message  String?
+  source    String
+  titre     String
+  message   String?
   /// Où aller quand on clique : { app: "projets", params: { carte: "…" } }.
   /// Le shell sait ouvrir une app par son identifiant ; le reste est libre
   /// et relu par l'application elle-même.
-  lien     Json?
-  lu       Boolean  @default(false)
+  lien      Json?
+  lu        Boolean  @default(false)
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -132,15 +132,15 @@ enum AppKind {
 
 /// Un espace de travail. Créé à l'inscription, porte le quota et l'abonnement.
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  plan      Plan     @default(FREE)
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  plan            Plan      @default(FREE)
   /// Quota de stockage alloué, en octets.
-  quota     BigInt
+  quota           BigInt
   /// Octets réellement consommés. Tenu à jour dans la même transaction
   /// que la création / suppression de fichiers.
-  usedBytes BigInt   @default(0)
+  usedBytes       BigInt    @default(0)
   /// Où atterrissent les fichiers de cet espace.
   ///
   /// « plateforme » — là où l'exploitant a décidé, c'est-à-dire le cas de
@@ -148,10 +148,10 @@ model Tenant {
   /// elle-même : son compte Amazon, son Cloudflare R2, ou le NAS de ses
   /// bureaux sous MinIO. Une entreprise qui l'exige peut ainsi garder ses
   /// documents chez elle sans quitter le service.
-  stockage   String  @default("plateforme")
+  stockage        String    @default("plateforme")
   /// La configuration correspondante. La clé secrète y est chiffrée, comme
   /// celle de la plateforme — elle ne ressort jamais en clair.
-  stockageS3 Json?
+  stockageS3      Json?
   /// Espace suspendu : ses membres ne peuvent plus se connecter ni agir.
   ///
   /// C'est le seul levier de l'exploitant face à un client qui ne paie plus
@@ -162,14 +162,14 @@ model Tenant {
   /// telles quelles à la levée : une suspension est une porte fermée, pas
   /// un effacement. C'est ce qui la rend utilisable sans crainte — on peut
   /// suspendre d'abord et discuter ensuite.
-  suspendu   Boolean  @default(false)
-  suspenduLe DateTime?
+  suspendu        Boolean   @default(false)
+  suspenduLe      DateTime?
   /// Montré à l'utilisateur qui tente de se connecter : « suspendu » sans
   /// motif transforme un litige commercial en incident technique, et fait
   /// perdre du temps aux deux parties.
   motifSuspension String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   users         User[]
   nodes         FsNode[]
@@ -185,23 +185,26 @@ model Tenant {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  tenantId     String
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role     @default(MEMBER)
+  id             String   @id @default(cuid())
+  tenantId       String
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           Role     @default(MEMBER)
   /// Photo de profil, en data URL (image/jpeg redimensionnée à 256 px par le
   /// navigateur avant l'envoi, ~20 Ko). Stockée ici plutôt que dans le
   /// stockage objet parce qu'elle est lue partout, en liste, et qu'une
   /// balise <img> ne sait pas présenter un jeton d'authentification.
   /// Vide = avatar aux initiales, calculé à l'affichage.
-  avatar       String?
+  avatar         String?
   /// État personnel du shell synchronisé entre les appareils : disposition
   /// du bureau, fenêtres, thème et préférences régionales. Jamais de secret.
-  preferences  Json     @default("{}")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  preferences    Json     @default("{}")
+  /// Version des sessions, recopiée dans chaque jeton. L'incrémenter
+  /// déconnecte d'un coup tous les appareils du compte — voir `signToken`.
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nodes         FsNode[]
@@ -283,18 +286,18 @@ model Installation {
 /// migration : elle choisit son couple module/collection et écrit.
 /// Quand un module mûrit, on le sort vers de vraies tables typées.
 model Record {
-  id         String   @id @default(cuid())
-  tenantId   String
+  id          String   @id @default(cuid())
+  tenantId    String
   /// Qui a saisi la fiche. Ne change jamais.
-  userId     String
+  userId      String
   /// Qui l'a touchée en dernier. Sans cela, « saisi par Awa » reste vrai
   /// des mois après que quelqu'un d'autre a tout réécrit.
   updatedById String?
-  module     String
-  collection String
-  data       Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  module      String
+  collection  String
+  data        Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -305,15 +308,15 @@ model Record {
 /// Arborescence de fichiers. Les octets vivent dans le stockage objet,
 /// cette table ne porte que les métadonnées et la clé de stockage.
 model FsNode {
-  id        String   @id @default(cuid())
-  tenantId  String
-  ownerId   String
-  parentId  String?
-  name      String
-  type      NodeType
+  id         String    @id @default(cuid())
+  tenantId   String
+  ownerId    String
+  parentId   String?
+  name       String
+  type       NodeType
   /// Taille en octets. 0 pour un dossier.
-  size      BigInt   @default(0)
-  mimeType  String?
+  size       BigInt    @default(0)
+  mimeType   String?
   /// Clé dans le stockage objet. null pour un dossier.
   storageKey String?
   /// **Où** vivent les octets : « local », « s3 »…
@@ -323,16 +326,16 @@ model FsNode {
   /// les anciens restent sur le disque et continuent d'être lus là-bas.
   /// Aucune migration à mener, aucun fichier à perdre — et revenir en
   /// arrière est tout aussi anodin.
-  storage   String   @default("local")
+  storage    String    @default("local")
   /// Mise à la corbeille. null = élément vivant. Les octets restent
   /// stockés et comptés dans le quota tant que la corbeille n'est pas vidée.
-  deletedAt DateTime?
+  deletedAt  DateTime?
   /// Id de l'élément qui a été supprimé — le même pour tout un sous-arbre
   /// mis à la corbeille d'un coup. La corbeille n'affiche que les entrées
   /// où `trashId = id`, et restaurer l'une d'elles restaure le groupe entier.
-  trashId   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  trashId    String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)

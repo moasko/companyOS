@@ -4,12 +4,16 @@ import { prisma, serialize } from "../db.js";
 import { env } from "../env.js";
 import {
   authenticate,
+  compteParEmail,
   estExploitant,
   exigerRole,
   hashPassword,
+  normaliserEmail,
+  revoquerSessions,
   signToken,
   verifyPassword,
 } from "../auth.js";
+import { creerEspace } from "../espaces.js";
 import { journaliser, journaliserPour } from "../audit.js";
 import { formuleDe } from "../formules.js";
 import { envoyerMail, mailInvitation } from "../mail.js";
@@ -39,14 +43,23 @@ const profil = (u) => ({
   avatar: u.avatar || null,
 });
 
-const slugify = (value) =>
-  value
-    // NFD sépare les accents en diacritiques, que l'on retire ensuite.
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+/// Adresse d'un exploitant de la plateforme : aucun compte ne se crée
+/// dessus depuis l'application.
+///
+/// Rien ne vérifie qu'une personne qui s'inscrit, ou qui accepte une
+/// invitation, possède vraiment l'adresse saisie. Or l'adresse est tout ce
+/// qui fait un exploitant : tant que son compte n'existait pas, le premier
+/// venu pouvait le créer — ou se faire inviter dessus par un espace monté
+/// pour l'occasion — et recevait la console de toute la plateforme. Ces
+/// comptes-là se créent sur le serveur, avec `npm run exploitant`.
+const adresseReservee = (request, email) => {
+  if (!estExploitant(email)) return false;
+  request.log.warn(
+    { email },
+    "création de compte refusée sur une adresse d'exploitant (PLATFORM_ADMINS)",
+  );
+  return true;
+};
 
 /// Le plafond des routes qui gardent un secret : mot de passe pour la
 /// connexion, code pour l'invitation. Il s'ajoute au plafond global déclaré
@@ -77,52 +90,20 @@ export default async function authRoutes(app) {
         .code(400)
         .send({ error: "Données invalides", details: parsed.error.flatten() });
     }
-    const { company, name, email, password } = parsed.data;
+    const { company, name, password } = parsed.data;
+    const email = normaliserEmail(parsed.data.email);
 
-    if (await prisma.user.findUnique({ where: { email } })) {
+    // Même réponse pour une adresse réservée que pour une adresse prise :
+    // inutile d'indiquer à un inconnu quelles adresses ouvrent la console.
+    if ((await compteParEmail(email)) || adresseReservee(request, email)) {
       return reply.code(409).send({ error: "Cette adresse e-mail est déjà utilisée" });
     }
 
-    let slug = slugify(company);
-    if (await prisma.tenant.findUnique({ where: { slug } })) {
-      slug = `${slug}-${Math.random().toString(36).slice(2, 7)}`;
-    }
-
-    const passwordHash = await hashPassword(password);
-
-    const { user, tenant } = await prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        data: { name: company, slug, quota: env.defaultTenantQuota },
-      });
-
-      const user = await tx.user.create({
-        data: { tenantId: tenant.id, email, name, passwordHash, role: "OWNER" },
-      });
-
-      // Dossiers de départ de l'espace utilisateur.
-      await tx.fsNode.createMany({
-        data: ["Documents", "Images", "Partagé"].map((folder) => ({
-          tenantId: tenant.id,
-          ownerId: user.id,
-          parentId: null,
-          name: folder,
-          type: "FOLDER",
-        })),
-      });
-
-      // Les apps du socle sont installées d'office.
-      const coreApps = await tx.app.findMany({ where: { isCore: true } });
-      if (coreApps.length) {
-        await tx.installation.createMany({
-          data: coreApps.map((a) => ({
-            tenantId: tenant.id,
-            userId: user.id,
-            appId: a.id,
-          })),
-        });
-      }
-
-      return { user, tenant };
+    const { user, tenant } = await creerEspace({
+      company,
+      name,
+      email,
+      passwordHash: await hashPassword(password),
     });
 
     await journaliserPour(
@@ -158,10 +139,7 @@ export default async function authRoutes(app) {
     }
     const { email, password } = parsed.data;
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { tenant: true },
-    });
+    const user = await compteParEmail(email, { include: { tenant: true } });
     // Message identique dans les deux cas : ne pas révéler quels e-mails existent.
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       return reply.code(401).send({ error: "Identifiants incorrects" });
@@ -211,14 +189,27 @@ export default async function authRoutes(app) {
       return reply.code(401).send({ error: "Mot de passe actuel incorrect" });
     }
 
+    // Changer de mot de passe, c'est souvent réagir à un doute : les
+    // sessions ouvertes ailleurs — un poste partagé, un téléphone perdu, un
+    // jeton volé — sont fermées dans le même geste. Celle qui fait la
+    // demande reçoit un jeton neuf et reste connectée.
     await prisma.user.update({
       where: { id: request.user.id },
       data: { passwordHash: await hashPassword(parsed.data.next) },
     });
+    const compte = await revoquerSessions(request.user.id);
 
     await journaliser(request, "compte.motdepasse");
 
-    return { ok: true };
+    return { ok: true, token: signToken(compte) };
+  });
+
+  /// « Déconnecter tous mes appareils » : ferme toutes les sessions du
+  /// compte, sauf celle qui fait la demande, qui reçoit un jeton neuf.
+  app.post("/sessions/revoquer", { preHandler: authenticate }, async (request) => {
+    const compte = await revoquerSessions(request.user.id);
+    await journaliser(request, "compte.sessions.revocation");
+    return { ok: true, token: signToken(compte) };
   });
 
   /// Renommer son profil.
@@ -435,6 +426,38 @@ export default async function authRoutes(app) {
     },
   );
 
+  /// Déconnecter un membre de tous ses appareils, sans le retirer.
+  ///
+  /// Pour un poste partagé resté ouvert, un téléphone perdu, un départ en
+  /// cours de préavis : l'accès se ferme tout de suite, les données et le
+  /// rôle restent. Mêmes règles que pour les rôles — on ne vise pas un
+  /// propriétaire sans l'être soi-même.
+  app.post(
+    "/members/:id/deconnexion",
+    { preHandler: [authenticate, exigerRole("ADMIN")] },
+    async (request, reply) => {
+      const cible = await prisma.user.findFirst({
+        where: { id: request.params.id, tenantId: request.tenantId },
+      });
+      if (!cible) return reply.code(404).send({ error: "Membre introuvable" });
+
+      if (cible.role === "OWNER" && request.user.role !== "OWNER") {
+        return reply
+          .code(403)
+          .send({ error: "Seul le propriétaire peut déconnecter un propriétaire." });
+      }
+
+      const compte = await revoquerSessions(cible.id);
+      await journaliser(request, "membre.deconnexion", cible.email, { nom: cible.name });
+
+      // Se viser soi-même revient à « déconnecter mes autres appareils » :
+      // la session qui a fait la demande reçoit de quoi continuer.
+      return cible.id === request.user.id
+        ? { ok: true, token: signToken(compte) }
+        : { ok: true };
+    },
+  );
+
   // -------------------------------------------------------------------------
   // Invitations
   // -------------------------------------------------------------------------
@@ -611,7 +634,11 @@ export default async function authRoutes(app) {
       return reply.code(400).send({ error: "Code d'invitation invalide ou expiré." });
     }
 
-    if (await prisma.user.findUnique({ where: { email: invitation.email } })) {
+    if (adresseReservee(request, normaliserEmail(invitation.email))) {
+      return reply.code(400).send({ error: "Code d'invitation invalide ou expiré." });
+    }
+
+    if (await compteParEmail(invitation.email)) {
       return reply.code(409).send({
         error: "Un compte existe déjà avec cette adresse. Connectez-vous.",
       });

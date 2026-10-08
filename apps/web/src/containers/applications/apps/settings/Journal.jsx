@@ -17,6 +17,14 @@ const ACTIONS = {
   "compte.renommage": ["a changé son nom", "faPen"],
   "compte.photo": ["a changé sa photo", "faCamera"],
   "compte.photo.retrait": ["a retiré sa photo", "faCamera"],
+  "compte.sessions.revocation": ["a déconnecté ses autres appareils", "faRightFromBracket"],
+  "membre.deconnexion": ["a déconnecté de tous ses appareils", "faRightFromBracket"],
+  "plateforme.formule": ["(plateforme) a changé la formule de", "faCreditCard"],
+  "plateforme.role": ["(plateforme) a changé le rôle de", "faUserShield"],
+  "plateforme.suspension": ["(plateforme) a suspendu", "faBan"],
+  "plateforme.reprise": ["(plateforme) a levé la suspension de", "faCircleCheck"],
+  "plateforme.deconnexion": ["(plateforme) a déconnecté", "faRightFromBracket"],
+  "plateforme.stockage": ["(plateforme) a changé le stockage :", "faHardDrive"],
   "invitation.envoi": ["a invité", "faEnvelope"],
   "invitation.annulation": ["a annulé l'invitation de", "faXmark"],
   "membre.arrivee": ["a rejoint l'espace", "faUserPlus"],
@@ -42,7 +50,10 @@ const ACTIONS = {
 /// une entrée sans détails reste parfaitement lisible.
 const contexte = (e) => {
   const d = e.details || {};
-  if (e.action === "membre.role") return `${d.avant} → ${d.apres}`;
+  if (e.action === "membre.role" || e.action === "plateforme.role")
+    return `${d.avant} → ${d.apres}`;
+  if (e.action === "plateforme.formule") return `${d.de} → ${d.vers}`;
+  if (e.action === "plateforme.suspension" && d.motif) return `motif : ${d.motif}`;
   if (e.action === "membre.retrait") return `${d.nom || ""} (${d.role || ""})`;
   if (e.action === "invitation.envoi") return ROLES[d.role] || d.role;
   if (e.action === "fichier.import" && d.octets) return formatBytes(d.octets);

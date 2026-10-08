@@ -247,6 +247,29 @@ function PlateformeApp() {
     }
   };
 
+  /// Fermer toutes les sessions d'un membre — le geste du support face à
+  /// un compte compromis. Rôle et données restent intacts.
+  const deconnecterMembre = async (tenantId, membre) => {
+    const ok = await modal.confirm({
+      title: "Déconnecter ce compte ?",
+      message: `${membre.name} sera déconnecté de tous ses appareils.`,
+      detail:
+        "Son rôle et ses données ne changent pas ; il pourra se reconnecter avec son mot de passe. L'action est inscrite au journal de son espace.",
+      confirmLabel: "Déconnecter",
+      danger: true,
+    });
+    if (!ok) return;
+    setOccupe(true);
+    try {
+      await api.plateformeDeconnexion(tenantId, membre.id);
+      modal.alert({ title: "Compte déconnecté", message: `${membre.name} devra se reconnecter.` });
+    } catch (e) {
+      modal.alert({ title: "Déconnexion refusée", message: e.message, tone: "error" });
+    } finally {
+      setOccupe(false);
+    }
+  };
+
   /// Suspendre un espace, ou lever sa suspension.
   ///
   /// La suspension demande un motif : il est montré à l'utilisateur qui
@@ -368,6 +391,7 @@ function PlateformeApp() {
                         membres={membres}
                         onVoirMembres={basculerMembres}
                         onChangerRoleMembre={changerRoleMembre}
+                        onDeconnecterMembre={deconnecterMembre}
                         onBasculerSuspension={basculerSuspension}
                       />
                     ) : null}
@@ -517,7 +541,7 @@ const Espaces = ({
   // manipule doit lui arriver en propriété. Les avoir seulement déclarés
   // au-dessus ne suffit pas — et `?.` ne protège pas d'un identifiant qui
   // n'existe pas, il lève un ReferenceError et emporte l'écran entier.
-  membres, onVoirMembres, onChangerRoleMembre, onBasculerSuspension,
+  membres, onVoirMembres, onChangerRoleMembre, onDeconnecterMembre, onBasculerSuspension,
 }) => (
   <>
     <header className="pltTete">
@@ -685,6 +709,16 @@ const Espaces = ({
                                   <option value="ADMIN">Administrateur</option>
                                   <option value="MEMBER">Membre</option>
                                 </select>
+                                <button
+                                  type="button"
+                                  className="pltDeconnecter"
+                                  disabled={occupe}
+                                  title={`Déconnecter ${m.name} de tous ses appareils`}
+                                  aria-label={`Déconnecter ${m.name} de tous ses appareils`}
+                                  onClick={() => onDeconnecterMembre(e.id, m)}
+                                >
+                                  <Icon fafa="faRightFromBracket" width={11} />
+                                </button>
                               </li>
                             ))}
                           </ul>

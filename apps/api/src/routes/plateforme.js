@@ -16,19 +16,23 @@
 
 import { z } from "zod";
 import { prisma, serialize } from "../db.js";
-import { authenticate } from "../auth.js";
+import { authenticate, exigerExploitant, revoquerSessions } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { env } from "../env.js";
 import { FORMULES, formuleDe } from "../formules.js";
 import { chargerConfig, enregistrerConfig, testerConfig } from "../storage.js";
 import { masquer } from "../chiffrement.js";
 
-const exigerExploitant = async (request, reply) => {
-  const email = request.user?.email?.toLowerCase();
-  if (!email || !env.plateformeAdmins.includes(email)) {
-    return reply
-      .code(403)
-      .send({ error: "Cette console est réservée à l'exploitant de la plateforme." });
+/// Journalise un geste de l'exploitant **deux fois** : chez lui, comme
+/// toujours, et dans l'espace concerné.
+///
+/// Un client dont la formule change, dont un membre est promu ou dont
+/// l'espace est suspendu doit pouvoir le lire dans son propre journal —
+/// sans quoi une intervention de la plateforme ressemble, vue de chez lui,
+/// à une modification que personne n'a faite.
+const tracer = async (request, tenantId, action, cible, details) => {
+  await journaliser(request, action, cible, details);
+  if (tenantId && tenantId !== request.tenantId) {
+    await journaliser(request, action, cible, details, { tenantId });
   }
 };
 
@@ -96,7 +100,7 @@ export default async function plateformeRoutes(app) {
       data: { plan: cible.id, quota: BigInt(cible.quota) },
     });
 
-    await journaliser(request, "plateforme.formule", tenant.name, {
+    await tracer(request, tenant.id, "plateforme.formule", tenant.name, {
       de: formuleDe(tenant.plan).nom,
       vers: cible.nom,
     });
@@ -207,12 +211,33 @@ export default async function plateformeRoutes(app) {
       select: { id: true, name: true, email: true, role: true },
     });
 
-    await journaliser(request, "plateforme.role", membre.email, {
+    await tracer(request, membre.tenantId, "plateforme.role", membre.email, {
       avant: membre.role,
       apres: parsed.data.role,
     });
 
     return serialize(maj);
+  });
+
+  /// Fermer toutes les sessions d'un membre, depuis la console.
+  ///
+  /// Le geste du support face à un compte compromis — « on m'a volé mon
+  /// téléphone », « un ancien salarié utilise encore mon poste » : tous les
+  /// appareils du compte sont déconnectés sur-le-champ, sans toucher à ses
+  /// données ni à son rôle. Le mot de passe reste à changer par la personne.
+  app.post("/espaces/:id/membres/:userId/deconnexion", async (request, reply) => {
+    const membre = await prisma.user.findFirst({
+      where: { id: request.params.userId, tenantId: request.params.id },
+      select: { id: true, email: true, tenantId: true },
+    });
+    if (!membre) {
+      return reply.code(404).send({ error: "Ce membre n'appartient pas à cet espace." });
+    }
+
+    await revoquerSessions(membre.id);
+    await tracer(request, membre.tenantId, "plateforme.deconnexion", membre.email);
+
+    return { ok: true };
   });
 
   /// Suspendre un espace, ou lever sa suspension.
@@ -263,8 +288,9 @@ export default async function plateformeRoutes(app) {
       },
     });
 
-    await journaliser(
+    await tracer(
       request,
+      espace.id,
       parsed.data.suspendu ? "plateforme.suspension" : "plateforme.reprise",
       espace.name,
       { motif: parsed.data.motif || null },
