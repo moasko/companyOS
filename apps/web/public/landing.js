@@ -32,7 +32,7 @@
       "evidence.2.p": "Un bureau, des icônes, un menu démarrer, une barre des tâches. Quiconque a touché un ordinateur s'y retrouve.",
       "evidence.3.t": "Rien n'est isolé. Tout se parle.",
       "evidence.3.p": "Une vente devient une facture, qui ajuste un stock, qui nourrit la comptabilité. Tout est déjà relié.",
-      "apps.avant": "La suite", "apps.titre": "Une application par besoin. Trente en tout.",
+      "apps.avant": "La suite", "apps.titre": "Une application par besoin. Toutes incluses.",
       "apps.sous": "Quelque chose à gérer ? Il y a une application pour ça. Vous l'installez en un clic depuis la Boutique, et elle connaît déjà les autres : le CRM nourrit les campagnes, les RH alimentent la paie, tout finit en comptabilité.",
       "apps.cta": "Ouvrir la Boutique →",
       "apps.note": "Aucune n'est facturée à part : elles sont toutes comprises dans l'abonnement.",
@@ -171,7 +171,7 @@
       "evidence.2.p": "A desktop, icons, a start menu, a taskbar. Anyone who has touched a computer feels at home.",
       "evidence.3.t": "Nothing is isolated. Everything talks.",
       "evidence.3.p": "A sale becomes an invoice, which adjusts the stock, which feeds the books. Everything is already connected.",
-      "apps.avant": "The suite", "apps.titre": "One application per need. Thirty in all.",
+      "apps.avant": "The suite", "apps.titre": "One application per need. All included.",
       "apps.sous": "Something to manage? There is an app for it. You install it in one click from the Store, and it already knows the others: the CRM feeds the campaigns, HR feeds payroll, and everything lands in accounting.",
       "apps.cta": "Open the Store →",
       "apps.note": "None is billed separately: they are all included in the subscription.",
@@ -307,12 +307,15 @@
     }
     return "fr";
   }
+  /* Le franc CFA par défaut : c'est la monnaie de facturation et celle du
+     public visé. L'euro pour un visiteur d'Europe ; le dollar seulement à
+     la demande — l'afficher d'office à quiconque n'a pas un fuseau
+     africain montrait des prix en $ à la moitié des visiteurs ivoiriens
+     dont le navigateur était réglé en UTC. */
   function detecteDevise() {
     var fuseau = "";
     try { fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
-    if (fuseau.indexOf("Africa/") === 0) return "XOF";
     if (fuseau.indexOf("Europe/") === 0) return "EUR";
-    if (fuseau) return "USD";
     return "XOF";
   }
 
@@ -358,4 +361,28 @@
   });
 
   applique();
+
+  /* ---- Apparition au défilement ----
+     Les blocs entrent doucement quand ils arrivent à l'écran. Sans
+     IntersectionObserver, ou si le visiteur réduit les animations, tout
+     est simplement affiché. */
+  var aAnimer = document.querySelectorAll(
+    ".bandeau p, .enTete, .enTete-centre, .enTeteApps, .grilleApps, .mock, .evidence, " +
+    ".deroule, .etape, .zoom, .point, .chiffre, .garde, .tarif, .faq, .final .cadre"
+  );
+  var reduit = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if ("IntersectionObserver" in window && !reduit) {
+    var observateur = new IntersectionObserver(function (entrees) {
+      entrees.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.classList.add("visible");
+          observateur.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    aAnimer.forEach(function (el) {
+      el.classList.add("apparait");
+      observateur.observe(el);
+    });
+  }
 })();
