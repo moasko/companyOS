@@ -111,6 +111,9 @@ volontaire. N'y mettez donc jamais de secret ni de contenu de fichier.
 | Isolation multi-tenant | filtrage systématique, vérifié sur les 11 fichiers de routes |
 | Mots de passe | bcrypt, 12 tours |
 | Rôles | `exigerRole`, hiérarchie MEMBER < ADMIN < OWNER |
+| Accès par application | règle par installation (`src/acces.js`), appliquée dans `routes/records.js` ; Paie et RH réservées aux administrateurs par défaut ; annuaire des salariés sans données sensibles pour les autres apps |
+| Sessions | `sessionVersion` dans le jeton : révocation au changement de mot de passe, « déconnecter mes appareils », déconnexion par un admin ou l'exploitant |
+| Compte exploitant | aucune création depuis l'application sur une adresse de `PLATFORM_ADMINS` ; adresses normalisées |
 | Limitation de débit | globale + serrée sur login, join, register, envoi, web |
 | En-têtes | helmet côté API, CSP et HSTS côté nginx |
 | SSRF | classement IP par `ipaddr.js`, IP validée **épinglée** à la connexion, revalidation à chaque redirection |
@@ -121,15 +124,16 @@ volontaire. N'y mettez donc jamais de secret ni de contenu de fichier.
 
 ## Ce qui reste ouvert
 
-- **Le jeton de session est en `localStorage`, valable 7 jours, sans
-  révocation.** Aucune XSS n'est exploitable aujourd'hui dans le shell,
-  mais l'application analyse des fichiers utilisateur (docx, pptx, pdf)
+- **Le jeton de session est en `localStorage`, valable 7 jours.** Il est
+  désormais révocable (`sessionVersion`), mais une XSS pourrait encore le
+  lire : l'application analyse des fichiers utilisateur (docx, pptx, pdf)
   avec des bibliothèques tierces, dans l'origine du front. La vraie réponse
-  est un cookie `HttpOnly` avec protection CSRF ; à défaut, un jeton court
-  avec rafraîchissement et une colonne `tokenVersion` vérifiée par
-  `authenticate` — ce qui invaliderait aussi les jetons au changement de
-  mot de passe, ce qui n'est pas le cas aujourd'hui.
-- **Montée de formule en libre-service**, sans vérification de paiement.
+  reste un cookie `HttpOnly` avec protection CSRF.
+- **Les fichiers du cloud ne suivent pas les règles d'accès des
+  applications** : un bulletin exporté en PDF dans un dossier partagé est
+  lisible par tout l'espace.
+- **Montée de formule en libre-service**, réglée sur facture : aucune
+  facture d'abonnement n'est générée ni suivie automatiquement.
 - **Le pilote S3 assemble l'objet en mémoire** ; la limite d'import a été
   abaissée en attendant l'envoi par tranches.
 - **Désinscription de campagne en GET** : les proxys d'analyse de liens

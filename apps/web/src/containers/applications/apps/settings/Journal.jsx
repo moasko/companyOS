@@ -33,6 +33,7 @@ const ACTIONS = {
   "app.installation": ["a installé", "faDownload"],
   "app.desinstallation": ["a désinstallé", "faTrash"],
   "app.miseajour": ["a mis à jour", "faCircleArrowUp"],
+  "app.acces": ["a changé l'accès à", "faUserLock"],
   "studio.creation": ["a créé l'application", "faWandMagicSparkles"],
   "studio.modification": ["a modifié l'application", "faWandMagicSparkles"],
   "studio.suppression": ["a supprimé l'application", "faTrash"],
@@ -53,6 +54,10 @@ const contexte = (e) => {
   if (e.action === "membre.role" || e.action === "plateforme.role")
     return `${d.avant} → ${d.apres}`;
   if (e.action === "plateforme.formule") return `${d.de} → ${d.vers}`;
+  if (e.action === "app.acces") {
+    const MODES = { membres: "tous les membres", admins: "administrateurs", selection: "personnes choisies" };
+    return `${MODES[d.avant] || d.avant} → ${MODES[d.apres] || d.apres}`;
+  }
   if (e.action === "plateforme.suspension" && d.motif) return `motif : ${d.motif}`;
   if (e.action === "membre.retrait") return `${d.nom || ""} (${d.role || ""})`;
   if (e.action === "invitation.envoi") return ROLES[d.role] || d.role;

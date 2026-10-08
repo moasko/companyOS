@@ -458,16 +458,50 @@
     overflow: hidden;
   }
 
-  .setAppRow {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 13px;
+  // Une application = une ligne, et dessous, au besoin, le choix des
+  // personnes qui y ont accès. La bordure sépare les applications.
+  .setAppBloc {
     border-bottom: 1px solid var(--set-line);
 
     &:last-child {
       border-bottom: none;
     }
+  }
+
+  .setAccesChoix {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 4px 12px;
+    padding: 4px 13px 12px 47px;
+
+    .setHint {
+      margin: 0;
+    }
+  }
+
+  .setAccesMembre {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    font-size: 0.74em;
+    cursor: pointer;
+
+    em {
+      font-style: normal;
+      color: var(--set-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .setAppRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 13px;
 
     &:hover {
       background: var(--set-panel);

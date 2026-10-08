@@ -178,6 +178,10 @@ export const api = {
   appliquerMiseAJour: (slug, version) =>
     request(`/apps/${slug}/install`, { method: "PUT", body: { version } }),
   uninstallApp: (slug) => request(`/apps/${slug}/install`, { method: "DELETE" }),
+  /// Qui peut ouvrir une application : `{ mode: "membres" | "admins" |
+  /// "selection", membres?: [userId] }`. Réservé aux administrateurs.
+  setAppAccess: (slug, acces) =>
+    request(`/apps/${slug}/acces`, { method: "PUT", body: acces }),
 
   // Applications créées dans le Studio, propres à l'espace de travail.
   myApps: () => request("/apps/mine"),
