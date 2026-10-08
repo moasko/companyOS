@@ -341,7 +341,7 @@ function PlateformeApp() {
             <Vide
               icone="faLock"
               titre="Console réservée à l'exploitant"
-              aide="Cette fenêtre montre tous les espaces clients du SaaS. Seuls les comptes listés dans PLATFORM_ADMINS, côté serveur, peuvent l'ouvrir."
+              aide={`Cette fenêtre montre tous les espaces clients du SaaS. Seuls les comptes listés dans PLATFORM_ADMINS, côté serveur, peuvent l'ouvrir — être administrateur de son espace ne suffit pas. Vous êtes connecté avec ${session.user?.email || "un compte inconnu"} : cette adresse doit figurer, exactement, dans PLATFORM_ADMINS.`}
             />
           </div>
         ) : (
