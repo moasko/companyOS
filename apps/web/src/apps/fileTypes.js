@@ -116,18 +116,6 @@ const FAMILLES = [
     mime: /^text\/|^application\/(json|xml|javascript|x-sh|x-httpd-php|toml|yaml)$/,
     extensions: EXTENSIONS,
   },
-  {
-    genre: "objet3d",
-    label: "Modèle 3D",
-    app: "objet3d",
-    action: "OBJET3D",
-    icone: "objet3d",
-    // `model/*` est le type officiel (glTF, STL…), mais la plupart des
-    // serveurs — le nôtre compris — renvoient `application/octet-stream`
-    // pour ces fichiers : l'extension fait le vrai travail ici.
-    mime: /^model\//,
-    extensions: ["glb", "gltf", "obj", "stl", "fbx", "ply", "dae"],
-  },
 ];
 
 const extension = (nom = "") => {

@@ -2,10 +2,7 @@ import icons from "./apps";
 
 // Disposition par défaut du shell. Les modules installés depuis la Boutique
 // viennent s'ajouter au bureau dynamiquement (voir src/apps/sync.js).
-//
-// Le Terminal n'y figure plus : un commerçant qui découvre son bureau n'a
-// rien à faire d'une invite de commande, et elle intimide plus qu'elle ne
-// sert. Il reste à un clic — menu Démarrer, clic droit sur le bureau.
+
 var { taskbar, desktop, pinned, recent } = {
   taskbar: (localStorage.getItem("taskbar") &&
     JSON.parse(localStorage.getItem("taskbar"))) || [
