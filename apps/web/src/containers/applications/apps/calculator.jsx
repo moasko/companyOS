@@ -141,6 +141,7 @@ export const Calculator = () => {
     <div
       className="calcApp floatTab dpShad"
       data-size={wnapp.size}
+      data-cascade={wnapp.cascade || 0}
       id={wnapp.icon + "App"}
       data-max={wnapp.max}
       style={{

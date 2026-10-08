@@ -593,6 +593,7 @@ export const Explorer = () => {
     <div
       className="msfiles floatTab dpShad"
       data-size={wnapp.size}
+      data-cascade={wnapp.cascade || 0}
       data-max={wnapp.max}
       style={{
         ...(wnapp.size == "cstm" ? wnapp.dim : null),

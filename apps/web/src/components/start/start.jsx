@@ -11,6 +11,19 @@ import { resynchroniserNotifications } from "../../apps/notifications";
 import { creerTraducteur, useLangue, useTraduction } from "../../utils/intl";
 import { useNomApp } from "../../utils/nomsApps";
 import { CommandCenter } from "./CommandCenter";
+import { modulesSysteme } from "../../apps/registry";
+import { cleApp } from "../../reducers/apps";
+import icones from "../../utils/apps";
+
+/// Les applications du socle qui restent épinglées après les apps métier.
+const SOCLE_EPINGLE = ["Explorateur de fichiers", "Paramètres", "Boutique"];
+/// Les fenêtres du shell lui-même (Paramètres, Explorateur, Calculatrice…) :
+/// elles ne sont pas des « applications installées ».
+const NOMS_SHELL = new Set(icones.map((a) => a.name));
+/// Les visionneuses (photos, PDF, vidéo…) : montées pour ouvrir les
+/// fichiers, jamais proposées comme des applications.
+const IDS_SYSTEME = new Set(modulesSysteme.map(cleApp));
+const MAX_EPINGLEES = 18;
 
 const TEXTES = {
   fr: {
@@ -28,7 +41,10 @@ const TEXTES = {
     arreter: "Arrêter",
     epinglees: "Épinglées",
     toutesLesApps: "Toutes les apps",
-    recommande: "Recommandé",
+    recommande: "Récents",
+    aucunRecent: "Les applications que vous ouvrez apparaîtront ici.",
+    ouverteRecemment: "Ouverte récemment",
+    ouverteMaintenant: "Ouverte",
     plus: "Plus",
     retour: "Retour",
     rechercher: "Rechercher",
@@ -59,7 +75,10 @@ const TEXTES = {
     arreter: "Shut down",
     epinglees: "Pinned",
     toutesLesApps: "All apps",
-    recommande: "Recommended",
+    recommande: "Recent",
+    aucunRecent: "Apps you open will show up here.",
+    ouverteRecemment: "Recently opened",
+    ouverteMaintenant: "Open",
     plus: "More",
     retour: "Back",
     rechercher: "Search",
@@ -77,17 +96,6 @@ const TEXTES = {
   },
 };
 const tStatique = creerTraducteur(TEXTES);
-
-/// « Ajouté récemment », « il y a 5 min »… à partir d'un nombre de minutes.
-/// Calculé à chaque affichage : l'ancienne version écrasait le nombre par
-/// son libellé dans le store, ce qui figeait l'affichage pour la session.
-const libelleUtilisation = (minutes) => {
-  if (minutes == null) return "";
-  if (minutes < 0) return tStatique("ajoutRecent");
-  if (minutes < 10) return tStatique("instant");
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h`;
-};
 
 export const StartMenu = () => {
   const { align } = useSelector((state) => state.taskbar);
@@ -109,19 +117,41 @@ export const StartMenu = () => {
   const langue = useLangue();
 
   const start = useMemo(() => {
+    const fenetres = Object.entries(appsBrutes)
+      .filter(([id, app]) => id !== "hz" && app?.action)
+      .map(([, app]) => app);
+    const parNom = (a, b) => nomApp(a).localeCompare(nomApp(b), langue);
+
+    // Épinglées : les applications **installées** de l'espace d'abord — la
+    // Facturation, les Congés, les RH —, puis l'Explorateur, les Paramètres
+    // et la Boutique. La liste figée d'origine épinglait la Calculatrice et
+    // le Gestionnaire de tâches, et aucune des applications pour lesquelles
+    // on paie l'abonnement.
+    const metier = fenetres
+      .filter((a) => !IDS_SYSTEME.has(a.id) && !NOMS_SHELL.has(a.name))
+      .sort(parNom);
+    const socle = SOCLE_EPINGLE.map((nom) => fenetres.find((a) => a.name === nom)).filter(
+      Boolean,
+    );
+    const epinglees = [...metier, ...socle].slice(0, MAX_EPINGLEES);
     // Cases vides pour compléter la dernière rangée de six.
-    const manquantes = (6 - (menu.pnApps.length % 6)) % 6;
+    const manquantes = (6 - (epinglees.length % 6)) % 6;
     const pnApps = [
-      ...menu.pnApps,
+      ...epinglees,
       ...Array.from({ length: manquantes }, () => ({ empty: true })),
     ];
 
-    const rcApps = menu.rcApps.map((app) => ({
-      ...app,
-      // Calculé à l'affichage, jamais écrit : le nombre de minutes reste
-      // intact et le libellé se met à jour tout seul.
-      derniereUtilisation: libelleUtilisation(app.lastUsed),
-    }));
+    // Récents : les fenêtres réellement ouvertes pendant la session, de la
+    // plus récente à la plus ancienne. « Recommandé » recopiait jusqu'ici
+    // la liste épinglée, mot pour mot.
+    const rcApps = fenetres
+      .filter((a) => a.ouvert && !IDS_SYSTEME.has(a.id))
+      .sort((a, b) => b.ouvert - a.ouvert)
+      .slice(0, 6)
+      .map((app) => ({
+        ...app,
+        derniereUtilisation: app.hide ? tStatique("ouverteRecemment") : tStatique("ouverteMaintenant"),
+      }));
 
     // Le classement suit le nom **affiché** : en anglais, « Leave » se
     // range à L, pas au C de « Congés ». La langue est donc une
@@ -285,6 +315,16 @@ export const StartMenu = () => {
     if (!start.hide && !start.menu) setCentreCle((cle) => cle + 1);
   }, [start.hide, start.menu]);
 
+  // Échap referme le menu, comme partout ailleurs.
+  useEffect(() => {
+    if (start.hide) return undefined;
+    const fermer = (event) => {
+      if (event.key === "Escape") dispatch({ type: "STARTHID" });
+    };
+    window.addEventListener("keydown", fermer);
+    return () => window.removeEventListener("keydown", fermer);
+  }, [start.hide, dispatch]);
+
   const userName = useSelector((state) => state.setting.person.name);
   // La photo vient de la session, pas des réglages : elle appartient au
   // compte et suit la personne d'un poste à l'autre.
@@ -342,6 +382,9 @@ export const StartMenu = () => {
                   </div>
                 </div>
                 <div className="reApps">
+                  {!start.rcApps.length ? (
+                    <div className="reVide">{t("aucunRecent")}</div>
+                  ) : null}
                   {start.rcApps.slice(0, 6).map((app, i) => {
                     return app.name ? (
                       <div

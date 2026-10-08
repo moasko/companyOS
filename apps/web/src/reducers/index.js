@@ -37,15 +37,18 @@ const rootReducer = (state, action) => {
   if (action.type !== "PREFERENCES_RESTORE") return next;
   const p = action.payload || {};
   const windows = { ...next.apps };
+  // Des fenêtres de la session précédente, on ne reprend que la
+  // **géométrie** : une fenêtre redimensionnée se rouvrira à la même taille.
+  // On ne les rouvre pas : restaurer `hide` faisait réapparaître, à chaque
+  // connexion, tout ce qui était ouvert la veille — souvent en plein écran —
+  // et l'utilisateur n'arrivait jamais sur son bureau. Windows et macOS ne
+  // le font pas non plus par défaut.
   for (const [id, saved] of Object.entries(p.windows || {})) {
     if (!windows[id] || !saved || typeof saved !== "object") continue;
     windows[id] = {
       ...windows[id],
-      ...Object.fromEntries(
-        ["size", "hide", "max", "z", "dim", "ouvert"]
-          .filter((key) => saved[key] !== undefined)
-          .map((key) => [key, saved[key]]),
-      ),
+      ...(saved.dim !== undefined ? { dim: saved.dim } : {}),
+      ...(saved.size === "cstm" ? { size: "cstm" } : {}),
     };
   }
   return {

@@ -130,7 +130,16 @@ const appliquerMode = (state, cle, mode, action) => {
 
   // La fenêtre vient de s'ouvrir : elle prend le rang suivant, et le garde
   // jusqu'à sa fermeture. C'est lui que la barre des tâches trie.
-  if (etaitCachee && !obj.hide) obj.ouvert = ordreOuverture++;
+  if (etaitCachee && !obj.hide) {
+    obj.ouvert = ordreOuverture++;
+    // Cascade : chaque fenêtre ouverte se décale un peu de celles déjà à
+    // l'écran, comme sous Windows. Elles s'empilaient jusqu'ici exactement
+    // au même endroit, et la dernière cachait entièrement les autres.
+    const visibles = Object.entries(state).filter(
+      ([id, f]) => id !== cle && f && typeof f === "object" && f.hide === false,
+    ).length;
+    obj.cascade = visibles % 6;
+  }
 
   tmpState[cle] = obj;
   return tmpState;

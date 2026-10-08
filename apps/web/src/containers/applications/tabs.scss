@@ -262,3 +262,15 @@
     border: none;
   }
 }
+
+// Cascade des fenêtres ouvertes en taille normale (voir reducers/apps.js).
+// `translate` se compose avec les `transform` des animations d'ouverture et
+// de réduction, sans les écraser. Une fenêtre redimensionnée à la main
+// (« cstm ») ou agrandie garde sa position.
+.floatTab[data-size="mini"] {
+  &[data-cascade="1"] { translate: 28px 28px; }
+  &[data-cascade="2"] { translate: 56px 56px; }
+  &[data-cascade="3"] { translate: 84px 84px; }
+  &[data-cascade="4"] { translate: 112px 112px; }
+  &[data-cascade="5"] { translate: 140px 140px; }
+}
