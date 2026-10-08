@@ -71,6 +71,32 @@ export const verifierJeton = (jeton) => {
 
 const baseApi = () => env.apiPublique || `http://localhost:${env.port}`;
 
+/// Le logo de l'espace, servi aux boîtes de réception : une image en
+/// `data:` est bloquée par la plupart des clients mail, il lui faut une
+/// adresse. Signée, comme le reste : on ne lit pas le logo d'un espace en
+/// devinant son identifiant.
+export const signatureLogo = (tenantId) => signer(`logo.${tenantId}`);
+const urlLogo = (tenantId) => `${baseApi()}/api/campagnes/logo?e=${tenantId}&s=${signatureLogo(tenantId)}`;
+
+/// La fiche de l'entreprise (Paramètres › Fiche de l'entreprise).
+export const ficheEntreprise = async (tenantId) => {
+  const fiche = await prisma.record.findFirst({
+    where: { tenantId, module: "entreprise", collection: "profil" },
+    orderBy: { createdAt: "asc" },
+  });
+  return fiche?.data || {};
+};
+
+/// Le pied légal d'un message commercial : qui écrit, d'où, sous quel
+/// identifiant fiscal.
+export const piedDe = (e = {}, nom = "") =>
+  [
+    e.nom || nom,
+    [e.adresse, e.ville].filter(Boolean).join(", "),
+    e.ncc ? `NCC ${e.ncc}` : "",
+    e.telephone || "",
+  ].filter(Boolean).join(" · ");
+
 const liens = (tenantId, campagneId, clientId) => {
   const jeton = jetonSuivi(tenantId, campagneId, clientId);
   return {
@@ -227,6 +253,8 @@ const avancerCampagne = async (fiche) => {
   if (reste <= 0) return 0;
 
   const expediteur = de || `${tenant.name} <${smtpUser || "no-reply@localhost"}>`;
+  const entreprise = await ficheEntreprise(tenantId);
+  const nomEntreprise = entreprise.nom || tenant.name;
   const servables = await destinatairesServables(tenantId, c.destinataires);
   const enAttente = servables.slice(0, Math.min(LOT, reste));
   let partis = 0;
@@ -243,7 +271,7 @@ const avancerCampagne = async (fiche) => {
   }
 
   for (const dest of enAttente) {
-    const variables = variablesPour(dest, tenant.name);
+    const variables = variablesPour(dest, nomEntreprise);
     const suivi = liens(tenantId, fiche.id, dest.clientId);
     const sujet = appliquerModele(c.sujet, variables);
     const corps = appliquerModele(c.texte, variables);
@@ -253,14 +281,16 @@ const avancerCampagne = async (fiche) => {
     const texte =
       corps +
       (c.cta?.url ? `\n\n${c.cta.label || c.cta.url} : ${c.cta.url}` : "") +
-      `\n\n—\nPour ne plus recevoir ces messages de ${tenant.name} :\n${suivi.desinscription}`;
+      `\n\n—\n${piedDe(entreprise, tenant.name)}\nPour ne plus recevoir ces messages de ${nomEntreprise} :\n${suivi.desinscription}`;
     const html = htmlDe(
       { ...c, texte: corps },
       {
-        entreprise: tenant.name,
+        entreprise: nomEntreprise,
         lienCta: c.cta?.url ? suivi.clic : "",
         lienDesinscription: suivi.desinscription,
         pixel: suivi.pixel,
+        logo: entreprise.logo ? urlLogo(tenantId) : "",
+        pied: piedDe(entreprise, tenant.name),
       },
     );
 
@@ -273,6 +303,9 @@ const avancerCampagne = async (fiche) => {
     });
     dest.statut = resultat.envoye ? "envoye" : "echec";
     dest.erreur = resultat.erreur || null;
+    // L'heure d'envoi de chacun : la règle « pas plus d'une campagne par
+    // semaine » et la courbe des ouvertures s'en servent.
+    if (resultat.envoye) dest.envoyeLe = new Date().toISOString();
     if (resultat.envoye) partis += 1;
 
     // La pause qui fait la différence entre un expéditeur et un spammeur.
