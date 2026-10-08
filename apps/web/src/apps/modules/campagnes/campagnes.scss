@@ -1,31 +1,47 @@
 // Campagnes — voir index.jsx.
 //
-// Trois écrans : la liste des campagnes en cartes, l'éditeur en quatre
-// étapes numérotées, le détail avec ses chiffres. L'état d'une campagne
-// se lit par une étiquette de couleur — jamais par une bordure latérale.
+// Trois écrans : le tableau de bord, l'éditeur en trois étapes (Audience,
+// Message, Envoi) et le rapport. L'état d'une campagne se lit par une
+// étiquette de couleur doublée d'un libellé — jamais par la couleur seule.
+// Les mises en page passent en une colonne quand la fenêtre rétrécit
+// (requêtes de conteneur).
 
 .cmpApp {
-  --cm-bg: #ffffff;
-  --cm-panel: #f7f8fa;
-  --cm-line: #e3e6eb;
-  --cm-text: #1f2733;
-  --cm-muted: #6b7684;
-  --cm-accent: #e8590c; // l'orange du marketing — le porte-voix
-  --cm-accent-soft: #fdeee3;
-  --cm-ok: #047857;
-  --cm-danger: #c0392b;
-  --cm-attente: #b45309;
+  --cm-fond: #f6f7f9;
+  --cm-carte: #ffffff;
+  --cm-ligne: #e5e7eb;
+  --cm-ligne-douce: #f0f1f3;
+  --cm-texte: #111827;
+  --cm-doux: #4b5563;
+  --cm-sombre: #18181b;
+  --cm-sur-sombre: #ffffff;
+  --cm-accent: #c2410c;
+  --cm-accent-texte: #9a3412;
+  --cm-accent-fond: #fff7ed;
+  --cm-accent-bord: #fed7aa;
+  --cm-ok: #15803d;
+  --cm-ok-texte: #166534;
+  --cm-ok-fond: #dcfce7;
+  --cm-info-texte: #1e40af;
+  --cm-info-fond: #dbeafe;
+  --cm-attention: #d97706;
+  --cm-erreur: #b91c1c;
+  --cm-erreur-fond: #fef2f2;
+  --cm-neutre: #6b7280;
+  --cm-survol: rgb(0 0 0 / 4%);
+  --cm-piste: #eef0f3;
 
-  background: var(--cm-bg);
-  color: var(--cm-text);
+  background: var(--cm-fond);
+  color: var(--cm-texte);
+  container-type: inline-size;
 
   &.floatTab[data-size="mini"] {
-    width: 76%;
-    height: 82%;
-    top: 8%;
-    left: 12%;
-    min-width: 820px;
-    min-height: 540px;
+    width: 86%;
+    height: 86%;
+    top: 6%;
+    left: 7%;
+    min-width: min(860px, 96%);
+    min-height: min(560px, 90%);
   }
 
   .cmpVerrou {
@@ -34,432 +50,1192 @@
     justify-content: center;
     flex-grow: 1;
     font-size: 0.84em;
-    color: var(--cm-muted);
-  }
-
-  .cmpShell {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-    min-height: 0;
-  }
-
-  .cmpAide {
-    font-size: 0.74em;
-    line-height: 1.5;
-    color: var(--cm-muted);
-    margin: 2px 0 0;
-    max-width: 66ch;
-  }
-
-  // ---- Liste --------------------------------------------------------------
-
-  .cmpListe {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 18px 22px;
-  }
-
-  .cmpTete {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 16px;
-
-    h2 {
-      margin: 0;
-      font-size: 1.1em;
-    }
-  }
-
-  .cmpCarte {
-    padding: 13px 16px;
-    margin-bottom: 9px;
-    border: 1px solid var(--cm-line);
-    border-radius: 11px;
-    background: var(--cm-bg);
-
-    &:hover {
-      border-color: var(--cm-accent);
-      background: color-mix(in srgb, var(--cm-accent) 3%, var(--cm-bg));
-    }
-  }
-
-  .cmpCarteHaut {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .cmpCarteNom {
-    font-size: 0.86em;
-    font-weight: 700;
-  }
-
-  .cmpCarteSujet {
-    margin-top: 2px;
-    font-size: 0.76em;
-    color: var(--cm-accent);
-  }
-
-  .cmpCarteBas {
-    margin-top: 5px;
-    font-size: 0.7em;
-    color: var(--cm-muted);
-  }
-
-  .cmpEtat {
-    flex-shrink: 0;
-    padding: 3px 11px;
-    border-radius: 100px;
-    font-size: 0.68em;
-    font-weight: 600;
-    background: color-mix(in srgb, var(--cm-muted) 14%, transparent);
-    color: var(--cm-muted);
-
-    &[data-ton="ok"] {
-      background: color-mix(in srgb, var(--cm-ok) 13%, transparent);
-      color: var(--cm-ok);
-    }
-
-    &[data-ton="actif"] {
-      background: var(--cm-accent-soft);
-      color: var(--cm-accent);
-    }
-
-    &[data-ton="attente"] {
-      background: color-mix(in srgb, var(--cm-attente) 14%, transparent);
-      color: var(--cm-attente);
-    }
-  }
-
-  .cmpBarre {
-    height: 5px;
-    margin-top: 9px;
-    border-radius: 100px;
-    background: color-mix(in srgb, var(--cm-muted) 16%, transparent);
-    overflow: hidden;
-  }
-
-  .cmpBarreGrande {
-    height: 8px;
-    margin: 0 22px 6px;
-  }
-
-  .cmpBarreFait {
-    height: 100%;
-    border-radius: 100px;
-    background: var(--cm-accent);
-    transition: width 600ms ease;
-  }
-
-  // ---- Éditeur ------------------------------------------------------------
-
-  .cmpEditeur,
-  .cmpDetail {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding-bottom: 22px;
-  }
-
-  .cmpBarreHaut {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 18px;
-    border-bottom: 1px solid var(--cm-line);
-    background: var(--cm-bg);
-    position: sticky;
-    top: 0;
-    z-index: 2;
-  }
-
-  .cmpBarreTitre {
-    flex-grow: 1;
-    font-size: 0.92em;
-    font-weight: 700;
-  }
-
-  .cmpSection {
-    padding: 16px 22px 4px;
-    max-width: 680px;
-
-    h3 {
-      margin: 0 0 10px;
-      font-size: 0.8em;
-      font-weight: 700;
-      color: var(--cm-accent);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    input,
-    select,
-    textarea {
-      box-sizing: border-box;
-      width: 100%;
-      padding: 8px 11px;
-      border: 1px solid var(--cm-line);
-      border-radius: 8px;
-      background: var(--cm-bg);
-      color: var(--cm-text);
-      font-family: inherit;
-      font-size: 0.83em;
-
-      &:focus {
-        outline: none;
-        border-color: var(--cm-accent);
-      }
-    }
-
-    textarea {
-      resize: vertical;
-      line-height: 1.55;
-    }
-  }
-
-  .cmpFiltres {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .cmpAudience {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    margin-top: 12px;
-    padding: 10px 14px;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--cm-ok) 9%, transparent);
-    color: var(--cm-ok);
-    font-size: 0.78em;
-    font-weight: 600;
-
-    .uicon {
-      display: flex;
-    }
-
-    &[data-vide="true"] {
-      background: color-mix(in srgb, var(--cm-attente) 10%, transparent);
-      color: var(--cm-attente);
-    }
-  }
-
-  .cmpCtaGrille {
-    display: grid;
-    grid-template-columns: 1fr 1.4fr 88px;
-    gap: 12px;
-    margin-top: 6px;
-
-    input[type="color"] {
-      padding: 3px;
-      height: 37px;
-      cursor: pointer;
-    }
-  }
-
-  .cmpApercu {
-    border: 1px solid var(--cm-line);
-    border-radius: 11px;
-    overflow: hidden;
-    background: var(--cm-panel);
-  }
-
-  .cmpApercuSujet {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 9px 14px;
-    border-bottom: 1px solid var(--cm-line);
-    font-size: 0.8em;
-    font-weight: 600;
-
-    .uicon {
-      display: flex;
-      color: var(--cm-accent);
-    }
-  }
-
-  .cmpApercu iframe {
-    display: block;
-    width: 100%;
-    height: 430px;
-    border: none;
-    background: #f2f4f7;
-  }
-
-  .cmpChiffres {
-    // Sept tuiles : quatre puis trois, sans casser les petites fenêtres.
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  }
-
-  .cmpChiffre[data-ton="accent"] b {
-    color: var(--cm-accent);
-  }
-
-  .cmpDestBadges {
-    display: flex;
-    gap: 5px;
-    flex-shrink: 0;
-  }
-
-  .cmpBadge {
-    padding: 1px 8px;
-    border-radius: 100px;
-    font-size: 0.85em;
-    background: color-mix(in srgb, var(--cm-accent) 13%, transparent);
-    color: var(--cm-accent);
-
-    &[data-fort="true"] {
-      background: var(--cm-accent);
-      color: #fff;
-    }
-
-    &[data-negatif="true"] {
-      background: color-mix(in srgb, var(--cm-danger) 13%, transparent);
-      color: var(--cm-danger);
-    }
-  }
-
-  .cmpMessageOutils {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-
-  .cmpEnvoi {
-    max-width: 300px;
-  }
-
-  .cmpActions {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    flex-wrap: wrap;
-    margin-top: 14px;
-  }
-
-  // ---- Détail -------------------------------------------------------------
-
-  .cmpChiffres {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    padding: 16px 22px;
-    max-width: 680px;
-  }
-
-  .cmpChiffre {
-    padding: 12px 14px;
-    border: 1px solid var(--cm-line);
-    border-radius: 10px;
-    text-align: center;
-
-    b {
-      display: block;
-      font-size: 1.35em;
-      font-variant-numeric: tabular-nums;
-    }
-
-    span {
-      font-size: 0.68em;
-      color: var(--cm-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    &[data-ton="ok"] b {
-      color: var(--cm-ok);
-    }
-
-    &[data-ton="erreur"] b {
-      color: var(--cm-danger);
-    }
-  }
-
-  .cmpMessageLu {
-    padding: 13px 16px;
-    border: 1px solid var(--cm-line);
-    border-radius: 10px;
-    background: var(--cm-panel);
-  }
-
-  .cmpMessageSujet {
-    font-size: 0.84em;
-    font-weight: 700;
-    margin-bottom: 8px;
-  }
-
-  .cmpMessageTexte {
-    font-size: 0.78em;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    color: var(--cm-muted);
-  }
-
-  .cmpDest {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .cmpDestLigne {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 7px 10px;
-    border-radius: 7px;
-    font-size: 0.76em;
-
-    &:nth-child(odd) {
-      background: var(--cm-panel);
-    }
-
-    &[data-statut="echec"] .cmpDestEtat {
-      color: var(--cm-danger);
-    }
-
-    &[data-statut="envoye"] .cmpDestEtat {
-      color: var(--cm-ok);
-    }
-  }
-
-  .cmpDestNom {
-    width: 220px;
-    flex-shrink: 0;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .cmpDestEmail {
-    flex-grow: 1;
-    color: var(--cm-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .cmpDestEtat {
-    display: flex;
-    color: var(--cm-muted);
+    color: var(--cm-doux);
   }
 }
 
 body[data-theme="dark"] .cmpApp {
-  --cm-bg: #1f2226;
-  --cm-panel: #17191d;
-  --cm-line: #33383f;
-  --cm-text: #e6e8ea;
-  --cm-muted: #9aa2ad;
-  --cm-accent: #f2915c;
-  --cm-accent-soft: #3a2415;
-  --cm-ok: #34d399;
-  --cm-danger: #f87171;
-  --cm-attente: #d9a15c;
+  --cm-fond: #17181c;
+  --cm-carte: #22242a;
+  --cm-ligne: #34373f;
+  --cm-ligne-douce: #2b2e35;
+  --cm-texte: #eceef2;
+  --cm-doux: #a1a8b3;
+  --cm-sombre: #f4f4f5;
+  --cm-sur-sombre: #18181b;
+  --cm-accent: #ea580c;
+  --cm-accent-texte: #fdba74;
+  --cm-accent-fond: #3a2617;
+  --cm-accent-bord: #7c2d12;
+  --cm-ok: #22c55e;
+  --cm-ok-texte: #86efac;
+  --cm-ok-fond: #14321f;
+  --cm-info-texte: #93c5fd;
+  --cm-info-fond: #1e2a44;
+  --cm-erreur: #fca5a5;
+  --cm-erreur-fond: #3b1d1d;
+  --cm-survol: rgb(255 255 255 / 6%);
+  --cm-piste: #2f323a;
+}
+
+.cmpApp .cmpShell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  font-size: 14px;
+
+  button { font: inherit; color: inherit; }
+  input, select, textarea { font: inherit; color: var(--cm-texte); }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible { outline: 2px solid var(--cm-sombre); outline-offset: 2px; }
+}
+
+.cmpApp .cmpPage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cmpApp .cmpConteneur {
+  box-sizing: border-box;
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+// ---- Boutons -----------------------------------------------------------------------
+
+.cmpApp {
+  .cmpPrincipal,
+  .cmpSecondaire,
+  .cmpAction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:disabled { opacity: 0.5; cursor: default; }
+  }
+
+  .cmpPrincipal { border: 0; background: var(--cm-sombre); color: var(--cm-sur-sombre) !important; }
+  .cmpSecondaire {
+    border: 1px solid var(--cm-ligne);
+    background: var(--cm-carte);
+    &:hover:not(:disabled) { background: var(--cm-survol); }
+  }
+  .cmpAction {
+    height: 46px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--cm-accent);
+    color: #ffffff !important;
+    font-weight: 650;
+    &:hover:not(:disabled) { filter: brightness(1.06); }
+  }
+
+  .cmpIcone {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--cm-doux) !important;
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:hover:not(:disabled) { background: var(--cm-survol); color: var(--cm-texte) !important; }
+    &:disabled { opacity: 0.4; }
+  }
+
+  .cmpLien {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cm-accent-texte) !important;
+    font-weight: 600;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    &:hover { text-decoration: underline; }
+  }
+
+  .cmpDoux { color: var(--cm-doux); }
+  .cmpNum { font-variant-numeric: tabular-nums; }
+  .cmpMasque { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+
+// ---- En-tête du tableau de bord ---------------------------------------------------
+
+.cmpApp .cmpTete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+
+  h1 { margin: 0; font-size: 25px; font-weight: 650; letter-spacing: -0.01em; }
+  p { margin: 4px 0 0; color: var(--cm-doux); }
+}
+
+.cmpApp .cmpTeteActions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.cmpApp .cmpRecherche {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  min-width: 230px;
+  padding: 0 12px;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 10px;
+  background: var(--cm-carte);
+  color: var(--cm-doux);
+
+  .uicon { display: flex; }
+  &:focus-within { border-color: var(--cm-sombre); }
+  input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; }
+}
+
+.cmpApp .cmpBandeau {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--cm-survol);
+  color: var(--cm-doux);
+  font-size: 13px;
+  line-height: 1.45;
+
+  .uicon { display: flex; flex-shrink: 0; }
+  &[data-ton="info"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+  &[data-ton="accent"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
+  &[data-ton="ok"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+}
+
+.cmpApp .cmpEditeur > .cmpBandeau { margin: 12px 28px 0; }
+
+// ---- Indicateurs ---------------------------------------------------------------------
+
+.cmpApp .cmpKpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cmpApp .cmpKpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 14px;
+  background: var(--cm-carte);
+  min-width: 0;
+
+  > span:first-child { color: var(--cm-doux); font-size: 12.5px; }
+  > b { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  small { color: var(--cm-doux); font-size: 12px; }
+}
+
+.cmpApp .cmpKpiValeur {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+
+  b { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  em { font-style: normal; font-weight: 600; color: var(--cm-doux); }
+}
+
+// ---- Colonnes et cartes ----------------------------------------------------------------
+
+.cmpApp .cmpColonnes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.cmpApp .cmpConteneur.cmpColonnes { flex-direction: row; }
+
+.cmpApp .cmpPrincipale,
+.cmpApp .cmpListe {
+  flex: 999 1 600px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cmpApp .cmpCote {
+  flex: 1 1 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cmpApp .cmpCoteLarge { flex: 1 1 460px; }
+
+.cmpApp .cmpCarte {
+  border: 1px solid var(--cm-ligne);
+  border-radius: 14px;
+  background: var(--cm-carte);
+  overflow: hidden;
+}
+
+.cmpApp .cmpListe { gap: 0; }
+
+.cmpApp .cmpBloc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  overflow: visible;
+
+  h2 { margin: 0; font-size: 15px; font-weight: 650; }
+}
+
+.cmpApp .cmpBlocTete {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  h2 { margin: 0; font-size: 16px; font-weight: 650; }
+  p { margin: 0; color: var(--cm-doux); font-size: 13px; }
+}
+
+.cmpApp .cmpBlocTete.cmpBlocTeteLigne,
+.cmpApp .cmpBlocTeteLigne {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  h2 { margin: 0; font-size: 15px; font-weight: 650; }
+}
+
+.cmpApp .cmpTitreCote { margin: 0; font-size: 14px; font-weight: 650; }
+
+.cmpApp .cmpCarteTete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--cm-ligne-douce);
+}
+
+.cmpApp .cmpCartePied {
+  padding: 11px 16px;
+  color: var(--cm-doux);
+  font-size: 12.5px;
+}
+
+.cmpApp .cmpOnglets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--cm-piste);
+
+  button {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cm-doux) !important;
+    cursor: pointer;
+
+    span { margin-left: 5px; font-weight: 400; }
+    &[aria-selected="true"] { background: var(--cm-carte); color: var(--cm-texte) !important; box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+  }
+}
+
+// ---- Tableaux ---------------------------------------------------------------------------
+
+.cmpApp .cmpTableau { overflow-x: auto; }
+
+.cmpApp .cmpLigne {
+  display: grid;
+  grid-template-columns: minmax(220px, 2.4fr) 130px 90px minmax(140px, 1.2fr) 86px 76px 40px;
+  gap: 12px;
+  align-items: center;
+  min-width: 820px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--cm-ligne-douce);
+
+  &:hover:not(.cmpLigneTete) { background: var(--cm-survol); }
+}
+
+.cmpApp .cmpLigneTete {
+  color: var(--cm-doux);
+  font-size: 12px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.cmpApp .cmpLigneOuvrir {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cmpApp .cmpPastille {
+  flex: none;
+  width: 8px;
+  height: 34px;
+  border-radius: 4px;
+  background: var(--cm-neutre);
+}
+
+.cmpApp .cmpLigne[data-statut="terminee"] .cmpPastille { background: var(--cm-ok); }
+.cmpApp .cmpLigne[data-statut="envoi"] .cmpPastille { background: var(--cm-accent); }
+.cmpApp .cmpLigne[data-statut="programmee"] .cmpPastille { background: #1d4ed8; }
+.cmpApp .cmpLigne[data-statut="brouillon"] .cmpPastille { background: #9ca3af; }
+
+.cmpApp .cmpLigneNom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  b { font-weight: 600; }
+  small { color: var(--cm-doux); font-size: 12.5px; }
+}
+
+.cmpApp .cmpStatut {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--cm-piste);
+  color: var(--cm-doux);
+
+  &[data-ton="ok"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+  &[data-ton="actif"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
+  &[data-ton="attente"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+}
+
+.cmpApp .cmpEnvoi {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+
+  small { font-size: 12.5px; color: var(--cm-doux); }
+}
+
+.cmpApp .cmpJauge {
+  display: block;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--cm-piste);
+  overflow: hidden;
+
+  > span { display: block; height: 100%; border-radius: 99px; background: var(--cm-accent); }
+  &[data-neutre] > span { background: var(--cm-neutre); }
+}
+
+.cmpApp .cmpJaugeHaute { height: 8px; border-radius: 4px; > span { border-radius: 4px; } }
+
+.cmpApp .cmpVideLigne { padding: 22px 16px; color: var(--cm-doux); text-align: center; }
+
+.cmpApp .cmpVide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--cm-doux);
+
+  > .uicon { color: var(--cm-accent); }
+  b { color: var(--cm-texte); font-size: 15px; }
+  span { max-width: 420px; }
+  .cmpPrincipal { margin-top: 8px; }
+}
+
+// Menu d'actions d'une ligne.
+.cmpApp .cmpMenuZone { position: relative; display: inline-flex; justify-content: flex-end; }
+
+.cmpApp .cmpMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 10px;
+  background: var(--cm-carte);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 16%);
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+
+    .uicon { display: flex; color: var(--cm-doux); }
+    &:hover { background: var(--cm-survol); }
+    &[data-danger] { color: var(--cm-erreur) !important; .uicon { color: inherit; } }
+  }
+}
+
+// ---- Côté du tableau de bord : santé, à faire -------------------------------------
+
+.cmpApp .cmpEmpile {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--cm-piste);
+
+  span { display: block; height: 100%; min-width: 0; }
+}
+
+.cmpApp [data-ton="ok"]:is(span, i) { background: var(--cm-ok); }
+.cmpApp [data-ton="attention"]:is(span, i) { background: var(--cm-attention); }
+.cmpApp [data-ton="neutre"]:is(span, i) { background: var(--cm-neutre); }
+
+.cmpApp .cmpLegende {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+
+  li { display: flex; align-items: center; gap: 8px; }
+  i { width: 9px; height: 9px; border-radius: 3px; }
+  b { margin-left: auto; font-variant-numeric: tabular-nums; }
+}
+
+.cmpApp .cmpAFaire {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--cm-piste);
+  font-size: 13px;
+
+  > .uicon { display: flex; margin-top: 2px; flex-shrink: 0; color: var(--cm-doux); }
+  > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  b { font-weight: 600; }
+  small { color: var(--cm-doux); line-height: 1.45; }
+
+  &[data-ton="accent"] { background: var(--cm-accent-fond); > .uicon { color: var(--cm-accent); } }
+  &[data-ton="erreur"] { background: var(--cm-erreur-fond); > .uicon { color: var(--cm-erreur); } }
+}
+
+.cmpApp .cmpLiens { display: flex; gap: 14px; }
+
+// ---- Barre de l'éditeur et du rapport ----------------------------------------------
+
+.cmpApp .cmpEditeur {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.cmpApp .cmpBarre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 12px 28px;
+  background: var(--cm-carte);
+  border-bottom: 1px solid var(--cm-ligne);
+}
+
+.cmpApp .cmpRetour {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-weight: 600;
+  color: var(--cm-doux) !important;
+  cursor: pointer;
+
+  .uicon { display: flex; }
+  &:hover { background: var(--cm-survol); color: var(--cm-texte) !important; }
+}
+
+.cmpApp .cmpSep { width: 1px; height: 22px; background: var(--cm-ligne); }
+
+.cmpApp .cmpNomInterne {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+
+  span { font-size: 11px; color: var(--cm-doux); }
+  input {
+    width: 240px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px dashed transparent;
+    outline: none;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 650;
+
+    &:hover, &:focus { border-bottom-color: var(--cm-ligne); }
+    &[aria-invalid]::placeholder { color: var(--cm-accent-texte); }
+  }
+}
+
+.cmpApp .cmpEtapes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+}
+
+.cmpApp .cmpEtapeTrait { width: 22px; height: 2px; background: var(--cm-ligne); }
+
+.cmpApp .cmpEtape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px 0 8px;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 99px;
+  background: var(--cm-carte);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cm-doux) !important;
+  cursor: pointer;
+
+  > b {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--cm-piste);
+    font-size: 11.5px;
+    .uicon { display: flex; }
+  }
+  small { font-weight: 400; }
+
+  &[data-etat="actif"] {
+    border-color: var(--cm-sombre);
+    background: var(--cm-sombre);
+    color: var(--cm-sur-sombre) !important;
+    > b { background: var(--cm-sur-sombre); color: var(--cm-sombre); }
+  }
+  &[data-etat="fait"] {
+    border-color: transparent;
+    background: var(--cm-ok-fond);
+    color: var(--cm-ok-texte) !important;
+    > b { background: var(--cm-ok-texte); color: var(--cm-ok-fond); }
+  }
+}
+
+.cmpApp .cmpBarreActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.cmpApp .cmpRapportTitre {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  min-width: 0;
+
+  > span { display: flex; align-items: center; gap: 10px; }
+  b { font-size: 17px; font-weight: 650; }
+  small { color: var(--cm-doux); font-size: 12.5px; }
+}
+
+// ---- Audience ---------------------------------------------------------------------------
+
+.cmpApp .cmpCriteres {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px 14px;
+  align-items: center;
+}
+
+.cmpApp .cmpCritere { font-size: 13px; font-weight: 600; color: var(--cm-doux); }
+
+.cmpApp .cmpChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cmpApp .cmpChip {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 99px;
+  background: var(--cm-carte);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover { background: var(--cm-survol); }
+  &[aria-checked="true"],
+  &[aria-pressed="true"] {
+    border-color: var(--cm-sombre);
+    background: var(--cm-sombre);
+    color: var(--cm-sur-sombre) !important;
+    font-weight: 600;
+  }
+}
+
+.cmpApp .cmpJeton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--cm-accent-bord);
+  border-radius: 99px;
+  background: var(--cm-accent-fond);
+  color: var(--cm-accent-texte);
+  font-size: 13px;
+  font-weight: 600;
+
+  button {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: inherit !important;
+    cursor: pointer;
+    .uicon { display: flex; }
+    &:hover { background: rgb(0 0 0 / 6%); }
+  }
+}
+
+.cmpApp .cmpAjouter {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px dashed var(--cm-ligne);
+  border-radius: 99px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--cm-doux);
+  cursor: pointer;
+}
+
+.cmpApp .cmpCase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+
+  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cm-sombre); }
+  select { height: 32px; padding: 0 8px; border: 1px solid var(--cm-ligne); border-radius: 8px; background: var(--cm-carte); }
+  small { color: var(--cm-doux); }
+}
+
+.cmpApp .cmpLigneDest {
+  grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1.6fr) 110px minmax(0, 1.2fr);
+  min-width: 640px;
+
+  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cm-sombre); }
+  &[data-inactif] > :not(input) { opacity: 0.55; }
+}
+
+.cmpApp .cmpPersonne { display: flex; align-items: center; gap: 10px; min-width: 0; b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+
+.cmpApp .cmpAvatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--cm-piste);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.cmpApp .cmpLigneDest > span,
+.cmpApp .cmpLigneDest > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+// Le grand chiffre de l'audience.
+.cmpApp .cmpAudience {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--cm-sombre);
+  color: var(--cm-sur-sombre);
+
+  > span { font-size: 12.5px; opacity: 0.8; }
+  p { margin: 0; display: flex; align-items: baseline; gap: 8px; opacity: 0.9; }
+  p b { font-size: 44px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; opacity: 1; }
+  ul { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; font-size: 13px; opacity: 0.9; }
+  li { display: flex; justify-content: space-between; gap: 10px; }
+  small { font-size: 12.5px; line-height: 1.5; opacity: 0.8; }
+}
+
+.cmpApp .cmpVerifs {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--cm-doux);
+
+  li { display: flex; align-items: center; gap: 10px; }
+  li > span:first-child {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    box-sizing: border-box;
+    border: 1.5px dashed var(--cm-neutre);
+    border-radius: 50%;
+    .uicon { display: flex; }
+  }
+  li[data-ok] { color: var(--cm-texte); }
+  li[data-ok] > span:first-child { border: 0; background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+  small { margin-left: auto; font-size: 11.5px; }
+}
+
+.cmpApp .cmpCote > .cmpAction { width: 100%; }
+
+// ---- Message ---------------------------------------------------------------------------
+
+.cmpApp .cmpBoutons { display: flex; flex-wrap: wrap; gap: 8px; .cmpSecondaire { height: 34px; font-size: 13px; } }
+
+.cmpApp .cmpChamp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  > span {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--cm-texte);
+
+    small { font-weight: 400; color: var(--cm-doux); }
+    small[data-ton="ok"] { color: var(--cm-ok-texte); }
+    small[data-ton="attention"] { color: var(--cm-accent-texte); }
+  }
+
+  input {
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 10px;
+    background: var(--cm-carte);
+    outline: none;
+
+    &:focus { border-color: var(--cm-sombre); box-shadow: 0 0 0 3px rgb(24 24 27 / 8%); }
+  }
+
+  &[data-erreur] input { border-color: var(--cm-erreur); }
+}
+
+.cmpApp .cmpRedaction {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 10px;
+  overflow: hidden;
+
+  &:focus-within { border-color: var(--cm-sombre); }
+
+  textarea {
+    min-height: 200px;
+    padding: 12px 14px;
+    border: 0;
+    outline: none;
+    background: var(--cm-carte);
+    line-height: 1.6;
+    resize: vertical;
+  }
+}
+
+.cmpApp .cmpInserer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cm-ligne-douce);
+  background: var(--cm-fond);
+
+  > span { color: var(--cm-doux); font-size: 12.5px; margin-right: 2px; }
+  button {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--cm-accent-bord);
+    border-radius: 99px;
+    background: var(--cm-accent-fond);
+    color: var(--cm-accent-texte) !important;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+.cmpApp .cmpGrille2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+.cmpApp .cmpCouleurs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+
+  > span:first-child { font-size: 12.5px; font-weight: 600; }
+  [role="radiogroup"] { display: flex; align-items: center; gap: 8px; }
+  [role="radio"] {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--cm-carte);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--cm-ligne);
+    cursor: pointer;
+    &[aria-checked="true"] { box-shadow: 0 0 0 2px var(--cm-sombre); }
+  }
+}
+
+.cmpApp .cmpCouleurLibre {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px dashed var(--cm-ligne);
+  border-radius: 50%;
+  color: var(--cm-doux);
+  cursor: pointer;
+
+  .uicon { display: flex; }
+  input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+}
+
+.cmpApp .cmpFiche {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--cm-accent-texte);
+
+  .uicon { display: flex; }
+  &[data-ok] { color: var(--cm-ok-texte); }
+}
+
+.cmpApp .cmpBas {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cm-ligne-douce);
+}
+
+// ---- Envoi ----------------------------------------------------------------------------
+
+.cmpApp .cmpMoments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 14px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 12px;
+    background: var(--cm-carte);
+    text-align: left;
+    cursor: pointer;
+
+    b { font-weight: 650; }
+    small { color: var(--cm-doux); font-size: 12.5px; }
+    &[aria-checked="true"] { border: 2px solid var(--cm-sombre); padding: 13px; }
+  }
+}
+
+.cmpApp .cmpCreneaux {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+
+  input {
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 99px;
+    background: var(--cm-carte);
+  }
+}
+
+.cmpApp .cmpTest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+
+  .cmpChamp { flex: 1 1 260px; }
+  .cmpSecondaire { height: 42px; }
+}
+
+.cmpApp .cmpLancement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cm-ligne-douce);
+
+  > span { flex: 1 1 260px; color: var(--cm-doux); font-size: 13px; line-height: 1.5; }
+  em { font-style: normal; color: var(--cm-accent-texte); }
+}
+
+// ---- Aperçu du mail --------------------------------------------------------------------
+
+.cmpApp .cmpApercu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cmpApp .cmpBoite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--cm-ligne);
+  border-radius: 12px;
+  background: var(--cm-carte);
+
+  .cmpAvatar { width: 36px; height: 36px; background: var(--cm-accent); color: #ffffff; }
+}
+
+.cmpApp .cmpBoiteTexte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+
+  > span { display: flex; justify-content: space-between; gap: 8px; }
+  b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  > b { font-weight: 600; }
+  small { color: var(--cm-doux); font-size: 12.5px; }
+}
+
+.cmpApp .cmpCadre {
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--cm-piste);
+
+  iframe {
+    display: block;
+    width: 100%;
+    height: 520px;
+    margin: 0 auto;
+    border: 0;
+    border-radius: 10px;
+    background: #f2f4f7;
+    transition: width 0.2s;
+  }
+}
+
+.cmpApp .cmpApercu[data-appareil="mobile"] .cmpCadre iframe {
+  width: 375px;
+  max-width: 100%;
+  height: 640px;
+  border: 8px solid #18181b;
+  border-radius: 28px;
+}
+
+// ---- Rapport ------------------------------------------------------------------------------
+
+.cmpApp .cmpProgression {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--cm-piste);
+  overflow: hidden;
+
+  span { display: block; height: 100%; background: var(--cm-accent); transition: width 0.4s; }
+}
+
+.cmpApp .cmpCourbe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+
+  figcaption { color: var(--cm-doux); font-size: 12px; }
+}
+
+.cmpApp .cmpCourbeZone {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  height: 200px;
+}
+
+.cmpApp .cmpAxe {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 2px;
+  color: var(--cm-doux);
+  font-size: 11px;
+}
+
+.cmpApp .cmpBarres {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-bottom: 1px solid var(--cm-ligne);
+  background:
+    linear-gradient(var(--cm-ligne-douce), var(--cm-ligne-douce)) 0 0 / 100% 1px no-repeat,
+    linear-gradient(var(--cm-ligne-douce), var(--cm-ligne-douce)) 0 50% / 100% 1px no-repeat;
+}
+
+// Chaque barre a une zone de survol de toute la hauteur : on vise la
+// colonne, pas un trait de deux pixels.
+.cmpApp .cmpBarreH {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  cursor: default;
+
+  > span {
+    display: block;
+    width: 100%;
+    min-height: 2px;
+    border-radius: 4px 4px 0 0;
+    background: var(--cm-accent);
+    &[data-vide] { min-height: 0; }
+  }
+  &:hover > span { filter: brightness(1.15); }
+  &:hover { background: var(--cm-survol); }
+}
+
+.cmpApp .cmpGraduations {
+  display: flex;
+  justify-content: space-between;
+  margin-left: 42px;
+  color: var(--cm-doux);
+  font-size: 11px;
+}
+
+.cmpApp .cmpMessageLu {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--cm-doux);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cmpApp .cmpLigneRapport {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) 110px minmax(0, 1.6fr) 100px;
+  min-width: 760px;
+
+  > b, > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  > b { font-weight: 600; }
+}
+
+.cmpApp .cmpActivite {
+  font-size: 12.5px;
+  color: var(--cm-doux);
+
+  &[data-ton="ok"] { color: var(--cm-texte); }
+  &[data-ton="fort"] { color: var(--cm-ok-texte); font-weight: 600; }
+  &[data-ton="erreur"] { color: var(--cm-erreur); }
+}
+
+// ---- Fenêtre étroite ---------------------------------------------------------------------
+
+@container (max-width: 1100px) {
+  .cmpApp .cmpKpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cmpApp .cmpEtapes { order: 5; width: 100%; justify-content: center; }
+}
+
+@container (max-width: 720px) {
+  .cmpApp .cmpConteneur { padding: 16px; }
+  .cmpApp .cmpBarre { padding: 10px 16px; }
+  .cmpApp .cmpKpis { grid-template-columns: minmax(0, 1fr); }
+  .cmpApp .cmpCriteres { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .cmpApp .cmpCritere { margin-top: 8px; }
+  .cmpApp .cmpGrille2,
+  .cmpApp .cmpMoments { grid-template-columns: minmax(0, 1fr); }
+  .cmpApp .cmpEtape small,
+  .cmpApp .cmpEtapeTrait { display: none; }
+  .cmpApp .cmpNomInterne input { width: 160px; }
+  .cmpApp .cmpRecherche { min-width: 0; flex: 1; }
 }

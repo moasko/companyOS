@@ -6,7 +6,7 @@
 // forger sans le secret du serveur, et il ne désigne qu'une seule fiche.
 
 import { prisma } from "../db.js";
-import { marquerDestinataire, urlCtaDe, verifierJeton } from "../campagnes.js";
+import { ficheEntreprise, marquerDestinataire, signatureLogo, urlCtaDe, verifierJeton } from "../campagnes.js";
 
 // Un GIF d'un pixel transparent — le plus petit accusé de lecture du
 // monde, celui que tous les outils d'emailing utilisent.
@@ -24,6 +24,20 @@ export default async function campagnesRoutes(app) {
   /// Le pixel d'ouverture. Toujours répondre l'image, jeton valide ou
   /// non : un pixel qui casse, c'est une image cassée dans le mail du
   /// client.
+  /// Le logo de l'espace, pour l'en-tête des messages. Signé : voir
+  /// signatureLogo.
+  app.get("/logo", async (request, reply) => {
+    const { e, s: sig } = request.query || {};
+    if (!e || sig !== signatureLogo(String(e))) return reply.code(404).send();
+    const logo = String((await ficheEntreprise(String(e))).logo || "");
+    const m = /^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/.exec(logo);
+    if (!m) return reply.code(404).send();
+    reply
+      .type(m[1])
+      .header("Cache-Control", "public, max-age=86400")
+      .send(Buffer.from(m[2], "base64"));
+  });
+
   app.get("/ouverture", async (request, reply) => {
     const infos = verifierJeton(request.query?.jeton || "");
     if (infos) await marquerDestinataire(infos, "ouvert").catch(() => {});
