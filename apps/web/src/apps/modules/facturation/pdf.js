@@ -322,3 +322,7 @@ export const invoiceToPdf = ({ facture, totaux, emetteur, statutLabel, typeLabel
 
   return new Blob([buildPdf(page)], { type: "application/pdf" });
 };
+
+/// Les primitives du PDF, pour les modules qui composent leurs propres
+/// pages (l'Éditeur de factures et ses modèles) sans recopier le moteur.
+export { Page, textWidth, clip };

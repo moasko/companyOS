@@ -32,6 +32,7 @@ export const ICONES_COS = new Set([
   "projets",
   "stock",
   "facturation",
+  "editeur-factures",
   "crm",
   "rh",
   "paie",

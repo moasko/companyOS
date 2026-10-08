@@ -1,0 +1,1350 @@
+// Éditeur de factures — l'interface (fidèle à la maquette) et les six
+// modèles de la page.
+//
+// L'interface suit le thème de l'OS (jetons --app-*) ; la page de la
+// facture, elle, reste toujours blanche : c'est un document.
+
+.efApp {
+  container-type: inline-size;
+
+  &.floatTab[data-size="mini"] {
+    width: 90%;
+    height: 88%;
+    top: 5%;
+    left: 5%;
+    min-width: min(860px, 96%);
+    min-height: min(560px, 90%);
+  }
+}
+
+.moduleWin.efApp {
+  --ef-fond: #f6f7f9;
+  --ef-carte: #ffffff;
+  --ef-ligne: #e5e7eb;
+  --ef-texte: #111827;
+  --ef-doux: #6b7280;
+  --ef-sombre: #18181b;
+  --ef-orange: #c2410c;
+  --ef-orange-fond: #fff4ea;
+  --ef-survol: rgb(0 0 0 / 4%);
+}
+
+body[data-theme="dark"] .moduleWin.efApp {
+  --ef-fond: #17181c;
+  --ef-carte: #22242a;
+  --ef-ligne: #34373f;
+  --ef-texte: #eceef2;
+  --ef-doux: #9ca3af;
+  --ef-sombre: #f4f4f5;
+  --ef-orange: #fb923c;
+  --ef-orange-fond: #3a2617;
+  --ef-survol: rgb(255 255 255 / 6%);
+}
+
+.efApp .efShell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--ef-carte);
+  color: var(--ef-texte);
+  font-size: 13px;
+
+  button { font: inherit; color: inherit; }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: var(--ef-texte);
+  }
+}
+
+// ---- En-tête ------------------------------------------------------------------
+
+.efApp .efEntete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ef-ligne);
+
+  h1 { margin: 0; font-size: 15px; font-weight: 700; }
+  p { margin: 2px 0 0; color: var(--ef-doux); font-size: 11.5px; }
+}
+
+.efApp .efEnteteTitre { min-width: 0; }
+
+.efApp .efEnteteActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.efApp .efGroupeBoutons {
+  display: flex;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 8px;
+  overflow: hidden;
+
+  .efBouton { border: 0; border-radius: 0; }
+  .efBouton + .efBouton { border-left: 1px solid var(--ef-ligne); }
+  .efBouton:not([data-actif="true"]) + .efBouton:not([data-actif="true"]) { color: var(--ef-doux); }
+}
+
+.efApp .efBouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 8px;
+  background: var(--ef-carte);
+  font-weight: 600;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  .uicon { display: flex; }
+  &:hover:not(:disabled) { background: var(--ef-survol); }
+  &[data-actif="true"] { background: var(--ef-survol); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.efApp .efCarre { width: 32px; padding: 0; position: relative; }
+
+.efApp .efLarge { width: 100%; margin-top: 12px; }
+
+.efApp .efSplit {
+  position: relative;
+  display: flex;
+}
+
+.efApp .efPrincipal {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ef-sombre);
+  color: var(--ef-carte) !important;
+  font-weight: 600;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { opacity: 0.9; }
+  &:disabled { opacity: 0.55; cursor: default; }
+}
+
+.efApp .efSplit .efPrincipal:first-child { border-radius: 8px 0 0 8px; }
+
+.efApp .efPrincipalFleche {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+  border-left: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 0 8px 8px 0;
+
+  .uicon { display: flex; }
+}
+
+.efApp .efPlusZone { position: relative; }
+
+.efApp .efPastille {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--ef-orange);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+// ---- Menus ----------------------------------------------------------------------
+
+.efApp .efMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 60;
+  min-width: 280px;
+  padding: 6px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-carte);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 16%);
+
+  hr { margin: 5px 4px; border: 0; border-top: 1px solid var(--ef-ligne); }
+}
+
+.efApp .efMenuDroite { right: 0; }
+.efApp .efMenuCentre { left: 50%; transform: translateX(-50%); }
+
+.efApp .efMenuEntree {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  .uicon { display: flex; margin-top: 2px; color: var(--ef-doux); }
+  small { display: block; margin-top: 2px; color: var(--ef-doux); font-size: 11px; }
+  &:hover:not(:disabled) { background: var(--ef-survol); }
+  &:disabled { opacity: 0.45; }
+}
+
+// ---- Messages ----------------------------------------------------------------------
+
+.efApp .efMessage {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 10px 16px 0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #16a34a 10%, var(--ef-carte));
+  color: color-mix(in srgb, #16a34a 75%, var(--ef-texte));
+  font-size: 12.5px;
+
+  .uicon { display: flex; }
+  span { flex: 1; }
+
+  > button:last-child:not(.efLien) {
+    border: 0;
+    background: none;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+
+  &[data-ton="erreur"] {
+    background: color-mix(in srgb, #dc2626 10%, var(--ef-carte));
+    color: color-mix(in srgb, #dc2626 80%, var(--ef-texte));
+  }
+
+  &[data-ton="info"] {
+    background: var(--ef-orange-fond);
+    color: var(--ef-orange);
+  }
+}
+
+.efApp .efLien {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ef-orange) !important;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { text-decoration: underline; }
+}
+
+// ---- Corps : formulaire et aperçu ---------------------------------------------------
+
+.efApp .efCorps {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.efApp .efFormulaire {
+  overflow-y: auto;
+  border-right: 1px solid var(--ef-ligne);
+}
+
+.efApp .efSection {
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid var(--ef-ligne);
+
+  h2 {
+    margin: 0 0 10px;
+    color: var(--ef-doux);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+}
+
+.efApp .efGrille2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.efApp .efGrille3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 10px;
+}
+
+// Un champ de la maquette : l'étiquette en petit, la valeur dessous.
+.efApp .efChamp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 11px 8px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-carte);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  cursor: text;
+
+  &:focus-within { border-color: color-mix(in srgb, var(--ef-texte) 45%, var(--ef-ligne)); }
+
+  & + .efChamp { margin-top: 0; }
+}
+
+.efApp .efPanneauCorps .efChamp + .efChamp { margin-top: 8px; }
+
+.efApp .efChampLabel {
+  color: var(--ef-doux);
+  font-size: 11px;
+}
+
+.efApp .efChampValeur {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  input,
+  select,
+  textarea {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+  }
+
+  select {
+    appearance: none;
+    cursor: pointer;
+  }
+
+  textarea { resize: vertical; font-weight: 400; line-height: 1.45; }
+
+  // La flèche des listes : décorative, la liste reste cliquable dessous.
+  > .uicon { display: flex; color: var(--ef-texte); pointer-events: none; }
+
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 22px; cursor: pointer; }
+}
+
+.efApp .efGenerer {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--ef-orange) 35%, transparent);
+  border-radius: 6px;
+  background: var(--ef-orange-fond);
+  color: var(--ef-orange) !important;
+  font-size: 11.5px !important;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { background: color-mix(in srgb, var(--ef-orange) 18%, var(--ef-carte)); }
+}
+
+// ---- Client --------------------------------------------------------------------
+
+.efApp .efClient {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-carte);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  text-align: left;
+  cursor: pointer;
+
+  > .uicon { display: flex; margin-left: auto; }
+  &:hover { border-color: color-mix(in srgb, var(--ef-texte) 35%, var(--ef-ligne)); }
+}
+
+.efApp .efAvatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+
+  .uicon { display: flex; }
+}
+
+.efApp .efAvatarVide { background: var(--ef-survol); color: var(--ef-doux); border: 1px dashed var(--ef-ligne); }
+
+.efApp .efClientTexte {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  b { font-size: 13px; }
+  small { color: var(--ef-doux); font-size: 11.5px; }
+}
+
+// ---- Contrôle segmenté -----------------------------------------------------------
+
+.efApp .efSegments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 10px;
+  padding: 3px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-fond);
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 32px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ef-doux);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:hover { color: var(--ef-texte); }
+
+    &[aria-selected="true"] {
+      background: var(--ef-carte);
+      color: var(--ef-texte);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+    }
+  }
+}
+
+.efApp .efBloc {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-fond);
+}
+
+.efApp .efBlocTete {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+
+  span { color: var(--ef-orange); font-size: 12px; font-weight: 600; }
+  span[data-ok="true"] { color: #16a34a; }
+}
+
+.efApp .efEcheanceLigne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 132px 96px 26px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+
+  > input,
+  .efSuffixe {
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--ef-ligne);
+    border-radius: 7px;
+    background: var(--ef-carte);
+    font-size: 12.5px;
+  }
+
+  > b { text-align: right; font-size: 12.5px; }
+}
+
+.efApp .efSuffixe {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  input { width: 100%; min-width: 0; border: 0; background: transparent; outline: none; text-align: right; }
+}
+
+.efApp .efAide {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: var(--ef-doux);
+  font-size: 12px;
+  line-height: 1.5;
+
+  .uicon { display: flex; margin-top: 2px; }
+}
+
+// ---- Articles --------------------------------------------------------------------
+
+.efApp .efArticles {
+  border-radius: 10px;
+}
+
+.efApp .efArticlesTete,
+.efApp .efArticle {
+  display: grid;
+  grid-template-columns: 16px 32px minmax(0, 1fr) 64px 104px 76px 96px 22px;
+  align-items: center;
+  gap: 8px;
+}
+
+.efApp .efArticlesTete {
+  padding: 8px 10px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-fond);
+  color: var(--ef-doux);
+  font-size: 11.5px;
+
+  span:first-child { grid-column: 1 / 4; padding-left: 40px; }
+  span { text-align: center; }
+  span:nth-child(5) { text-align: right; }
+}
+
+.efApp .efArticle {
+  padding: 8px 10px;
+  border-radius: 8px;
+
+  &:hover { background: var(--ef-survol); }
+  &:hover .efRetirer { opacity: 1; }
+}
+
+.efApp .efPoignee {
+  display: flex;
+  color: var(--ef-doux);
+  cursor: grab;
+  opacity: 0.7;
+}
+
+.efApp .efTuile {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+
+  .uicon { display: flex; }
+}
+
+.efApp .efArticleNom {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  input {
+    min-width: 0;
+    padding: 1px 4px;
+    margin-left: -4px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    outline: none;
+
+    &:hover { border-color: var(--ef-ligne); }
+    &:focus { border-color: color-mix(in srgb, var(--ef-texte) 40%, var(--ef-ligne)); background: var(--ef-carte); }
+  }
+
+  .efNom { font-size: 13px; font-weight: 600; }
+  .efDescription { color: var(--ef-doux); font-size: 11.5px; }
+}
+
+.efApp .efPilule {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 8px;
+  background: var(--ef-carte);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  font-size: 12.5px;
+  text-align: center;
+  outline: none;
+
+  &:focus { border-color: color-mix(in srgb, var(--ef-texte) 45%, var(--ef-ligne)); }
+}
+
+.efApp .efPiluleSuffixe {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+
+  input {
+    width: 36px;
+    border: 0;
+    background: transparent;
+    font-size: 12.5px;
+    text-align: right;
+    outline: none;
+  }
+}
+
+// Les flèches des champs numériques encombrent des cases de cette taille.
+.efApp .efPilule::-webkit-inner-spin-button,
+.efApp .efPilule input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+
+.efApp .efMontant {
+  font-size: 12.5px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.efApp .efIconeBouton {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ef-doux);
+  cursor: pointer;
+
+  .uicon { display: flex; }
+  &:hover:not(:disabled) { background: var(--ef-survol); color: var(--ef-texte); }
+  &:disabled { opacity: 0.3; cursor: default; }
+}
+
+.efApp .efRetirer { opacity: 0; }
+
+.efApp .efAjouterZone { position: relative; margin-top: 8px; }
+
+.efApp .efAjouter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-carte);
+  font-weight: 600;
+  cursor: pointer;
+
+  .uicon { display: flex; }
+  &:hover { background: var(--ef-survol); }
+}
+
+// ---- Paiement ---------------------------------------------------------------------
+
+.efApp .efAvis {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 12.5px;
+
+  .uicon { display: flex; color: var(--ef-orange); }
+}
+
+.efApp .efPiedFormulaire {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.efApp .efTotalRappel { color: var(--ef-doux); b { color: var(--ef-texte); font-size: 14px; } }
+
+// ---- Aperçu ------------------------------------------------------------------------
+
+.efApp .efApercuZone {
+  overflow: auto;
+  padding: 20px 28px;
+  background: var(--ef-fond);
+}
+
+.efApp .efApercuCadre {
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 8%);
+}
+
+// ---- Panneaux latéraux ----------------------------------------------------------------
+
+.efApp .efVoile {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 18%);
+}
+
+.efApp .efPanneau {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 92%);
+  border-left: 1px solid var(--ef-ligne);
+  background: var(--ef-carte);
+  box-shadow: -12px 0 32px rgb(0 0 0 / 14%);
+
+  h4 {
+    margin: 18px 0 8px;
+    color: var(--ef-doux);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}
+
+.efApp .efPanneauTete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ef-ligne);
+
+  h3 { margin: 0; font-size: 14px; }
+}
+
+.efApp .efPanneauCorps {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 20px;
+
+  > h4:first-child { margin-top: 12px; }
+}
+
+.efApp .efModeles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.efApp .efModele {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 10px;
+  background: var(--ef-carte);
+  text-align: left;
+  cursor: pointer;
+
+  b { font-size: 12.5px; }
+  small { color: var(--ef-doux); font-size: 11px; line-height: 1.35; }
+  &:hover { border-color: color-mix(in srgb, var(--ef-texte) 35%, var(--ef-ligne)); }
+  &[aria-pressed="true"] { border-color: var(--ef-texte); box-shadow: 0 0 0 1px var(--ef-texte); }
+}
+
+.efApp .efVignette {
+  display: block;
+  height: 160px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 6%);
+  pointer-events: none;
+
+  > span { display: block; width: 794px; }
+}
+
+.efApp .efPalette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.efApp .efPastilleCouleur {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ef-carte);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--ef-ligne);
+  cursor: pointer;
+
+  &[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ef-texte); }
+}
+
+.efApp .efCouleurLibre {
+  background: conic-gradient(#ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444);
+  color: #fff;
+
+  .uicon { display: flex; }
+  input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+}
+
+.efApp .efBascule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+
+  input { width: 16px; height: 16px; accent-color: var(--ef-sombre); }
+}
+
+.efApp .efLogoZone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+
+  img { max-width: 120px; max-height: 64px; border-radius: 6px; background: #fff; }
+}
+
+.efApp .efLogoVide {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--ef-survol);
+  color: var(--ef-doux);
+  font-weight: 700;
+}
+
+.efApp .efListeLigne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 9px;
+  background: var(--ef-carte);
+  text-align: left;
+  cursor: pointer;
+
+  span { display: flex; flex-direction: column; min-width: 0; }
+  small { color: var(--ef-doux); font-size: 11.5px; }
+  &:hover { background: var(--ef-survol); }
+  &[data-actif="true"] { border-color: var(--ef-texte); }
+}
+
+.efApp .efListeMontant { font-weight: 600; white-space: nowrap; }
+
+.efApp .efRecurrence {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ef-ligne);
+  border-radius: 9px;
+
+  > div:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  small { color: var(--ef-doux); font-size: 11.5px; }
+  &[data-inactif="true"] { opacity: 0.6; }
+}
+
+.efApp .efRecurrenceActions { display: flex; align-items: center; gap: 4px; }
+
+.efApp .efBadge {
+  align-self: flex-start;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: var(--ef-orange-fond);
+  color: var(--ef-orange);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+// ---- Aperçu plein écran ---------------------------------------------------------------
+
+.efApp .efPleinEcran {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--ef-fond) 92%, #000);
+}
+
+.efApp .efPleinEcranBarre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ef-ligne);
+  background: var(--ef-carte);
+  font-weight: 600;
+}
+
+.efApp .efEspace { flex: 1; }
+
+.efApp .efPleinEcranPage {
+  flex: 1;
+  overflow: auto;
+  padding: 28px;
+
+  .efPage { margin: 0 auto; box-shadow: 0 10px 40px rgb(0 0 0 / 18%); }
+}
+
+// ---- Fenêtre étroite ------------------------------------------------------------------
+
+@container (max-width: 1100px) {
+  .efApp .efGroupeBoutons .efBouton span,
+  .efApp .efEnteteTitre p { display: none; }
+}
+
+@container (max-width: 980px) {
+  .efApp .efCorps { grid-template-columns: 1fr; }
+  .efApp .efApercuZone { display: none; }
+  .efApp .efFormulaire { border-right: 0; }
+}
+
+@container (max-width: 640px) {
+  .efApp .efGrille2,
+  .efApp .efGrille3 { grid-template-columns: 1fr; }
+  .efApp .efSegments span { display: none; }
+  .efApp .efArticlesTete { display: none; }
+  .efApp .efArticle { grid-template-columns: 16px minmax(0, 1fr) 56px 90px 22px; }
+  .efApp .efArticle .efTuile,
+  .efApp .efArticle .efPiluleSuffixe,
+  .efApp .efArticle .efMontant { display: none; }
+  .efApp .efPrincipal:first-child { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+}
+
+// =====================================================================================
+// LA PAGE — toujours blanche, six modèles
+// =====================================================================================
+
+.efPage {
+  --ef-encre: #111827;
+  --ef-gris: #6b7280;
+  --ef-filet: #e5e7eb;
+
+  box-sizing: border-box;
+  width: 794px;
+  min-height: 1123px;
+  padding: 52px 56px 40px;
+  background: #fff;
+  color: var(--ef-encre);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+
+  h1, h2, h4, p { margin: 0; }
+  dl, dd { margin: 0; }
+
+  .efLogo {
+    flex: none;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    object-fit: contain;
+  }
+
+  .efLogoInitiales {
+    display: grid;
+    place-items: center;
+    background: var(--ef-accent);
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .efTete {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--ef-filet);
+  }
+
+  .efEmetteur {
+    display: flex;
+    gap: 16px;
+
+    h1 { margin-bottom: 4px; font-size: 21px; font-weight: 600; letter-spacing: -0.01em; }
+    p { color: var(--ef-gris); font-size: 11px; }
+    .efEspace { margin-top: 10px; }
+    .efFiscal { margin-top: 6px; font-weight: 600; color: var(--ef-encre); }
+  }
+
+  .efTitre {
+    text-align: right;
+
+    h2 { font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
+    .efNumero { display: block; margin-top: 2px; color: var(--ef-accent); font-size: 12px; font-weight: 700; }
+  }
+
+  .efEtiquette {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--ef-gris);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .efInfos {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 18px 0 22px;
+  }
+
+  .efFactureA {
+    b { display: block; font-size: 14px; }
+    p { color: var(--ef-gris); font-size: 11px; }
+  }
+
+  .efDates {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 6px 18px;
+    align-self: flex-start;
+
+    div { display: contents; }
+    dt { color: var(--ef-gris); font-size: 11px; }
+    dd { font-size: 11.5px; font-weight: 600; text-align: right; }
+  }
+
+  .efTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+
+    th {
+      padding: 10px 14px;
+      background: var(--ef-encre);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    th:first-child { border-radius: 6px 0 0 0; text-align: left; }
+    th:last-child { border-radius: 0 6px 0 0; }
+    th:nth-child(2) { text-align: center; }
+
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--ef-filet);
+      font-size: 11.5px;
+      text-align: right;
+      vertical-align: top;
+    }
+
+    td:first-child {
+      text-align: left;
+
+      b { display: block; font-size: 12px; }
+      span { display: block; color: var(--ef-gris); font-size: 11px; }
+    }
+
+    td:nth-child(2) { text-align: center; }
+    td:last-child { font-weight: 700; }
+    .efVide td { color: var(--ef-gris); text-align: center; font-style: italic; }
+  }
+
+  .efRecap {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 18px 0 10px;
+  }
+
+  .efRecapGauche { flex: 1; min-width: 0; }
+
+  .efEcheancier {
+    max-width: 330px;
+    padding: 12px 14px;
+    border: 1px solid var(--ef-filet);
+    border-radius: 8px;
+  }
+
+  .efEcheance {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    padding: 4px 0;
+    font-size: 11px;
+
+    span:nth-child(2) { color: var(--ef-gris); }
+  }
+
+  .efRecurrence { margin-top: 10px; color: var(--ef-accent); font-size: 11px; font-weight: 600; }
+
+  .efTotaux {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 7px 40px;
+    align-self: flex-start;
+    min-width: 230px;
+
+    div { display: contents; }
+    dt { color: var(--ef-gris); font-size: 11px; }
+    dd { font-size: 11.5px; font-weight: 700; text-align: right; }
+    .efRemise dd { color: #16a34a; }
+  }
+
+  .efTotal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding: 13px 16px;
+    border-radius: 6px;
+    background: var(--ef-accent-pale);
+
+    span { font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--ef-accent) 70%, var(--ef-encre)); }
+    b { font-size: 19px; }
+  }
+
+  .efLettres {
+    margin-top: 12px;
+    font-size: 11px;
+
+    b { font-weight: 700; }
+  }
+
+  .efPied {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 34px;
+
+    h4 { margin-bottom: 6px; font-size: 11px; }
+    p { color: var(--ef-gris); font-size: 10.5px; }
+  }
+
+  .efSignature {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 18px;
+
+    img { max-width: 170px; max-height: 64px; }
+    b { margin-top: 4px; font-size: 10.5px; }
+  }
+
+  .efSignatureNom {
+    font-family: "Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive;
+    font-size: 30px;
+    line-height: 1.2;
+    color: var(--ef-encre);
+  }
+
+  .efMentions {
+    margin-top: 30px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ef-filet);
+    color: var(--ef-gris);
+    font-size: 9.5px;
+    text-align: center;
+  }
+
+  // ---- Classique : titre centré, tableau quadrillé, empattements -----------------
+
+  &[data-modele="classique"] {
+    font-family: Georgia, "Times New Roman", serif;
+
+    .efTitreCentre {
+      margin-bottom: 26px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--ef-accent);
+      text-align: center;
+
+      h2 { color: var(--ef-accent); font-size: 30px; font-weight: 700; letter-spacing: 0.18em; }
+      span { color: var(--ef-gris); font-size: 12px; }
+    }
+
+    .efTete { border-bottom: 0; padding-bottom: 6px; }
+    .efLogo { border-radius: 6px; }
+    .efLogoInitiales { border-radius: 6px; }
+
+    .efTable {
+      border-collapse: collapse;
+
+      th {
+        border: 1px solid var(--ef-accent);
+        background: var(--ef-accent-doux);
+        color: var(--ef-accent);
+        border-radius: 0 !important;
+      }
+
+      td { border: 1px solid var(--ef-filet); }
+    }
+
+    .efTotal { border: 1px solid var(--ef-accent); border-radius: 0; background: #fff; }
+  }
+
+  // ---- Minimaliste : du blanc et des filets ---------------------------------------
+
+  &[data-modele="minimal"] {
+    padding: 64px 64px 48px;
+
+    .efTitre h2 { font-size: 30px; font-weight: 300; letter-spacing: 0.08em; }
+    .efNumero { color: var(--ef-encre); font-weight: 500; }
+    .efTete { border-bottom: 0; }
+    .efLogo { width: 48px; height: 48px; }
+
+    .efTable {
+      th {
+        border-bottom: 1.5px solid var(--ef-encre);
+        background: none;
+        color: var(--ef-encre);
+        border-radius: 0 !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 9.5px;
+      }
+    }
+
+    .efTotal {
+      padding: 16px 0 0;
+      border-top: 1.5px solid var(--ef-encre);
+      border-radius: 0;
+      background: none;
+
+      span { color: var(--ef-gris); font-weight: 500; }
+      b { font-size: 28px; font-weight: 600; }
+    }
+  }
+
+  // ---- Bandeau : l'en-tête aux couleurs de l'entreprise ---------------------------
+
+  &[data-modele="bandeau"] {
+    padding-top: 0;
+
+    .efBandeau {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 -56px 22px;
+      padding: 30px 56px;
+      background: var(--ef-accent);
+      color: #fff;
+    }
+
+    .efBandeauNom {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 22px;
+      font-weight: 700;
+
+      .efLogo { width: 52px; height: 52px; background: #fff; }
+      .efLogoInitiales { color: var(--ef-accent); }
+    }
+
+    .efBandeauTitre {
+      text-align: right;
+
+      b { display: block; font-size: 22px; letter-spacing: 0.12em; }
+      span { opacity: 0.85; font-size: 12px; }
+    }
+
+    .efTete { padding-bottom: 14px; }
+
+    .efTable th { background: var(--ef-accent); }
+    .efTotal { background: var(--ef-accent); span, b { color: #fff; } }
+  }
+
+  // ---- Élégant : un liseré, une carte arrondie ------------------------------------
+
+  &[data-modele="elegant"] {
+    border-left: 10px solid var(--ef-accent);
+    padding-left: 50px;
+
+    .efTitre h2 { color: var(--ef-accent); font-size: 24px; font-weight: 300; letter-spacing: 0.1em; }
+    .efTete { border-bottom: 0; }
+
+    .efTable th {
+      background: var(--ef-accent-doux);
+      color: var(--ef-accent);
+    }
+
+    .efTotaux {
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: var(--ef-accent-pale);
+    }
+
+    .efTotal {
+      border-radius: 12px;
+      background: var(--ef-accent);
+
+      span, b { color: #fff; }
+    }
+  }
+
+  // ---- Officiel : cadres, identifiants, montant arrêté en lettres -----------------
+
+  &[data-modele="officiel"] {
+    .efTete {
+      padding: 16px 18px;
+      border: 1.5px solid var(--ef-accent);
+      border-radius: 4px;
+    }
+
+    .efLogo, .efLogoInitiales { border-radius: 4px; }
+
+    .efInfos {
+      margin-top: 14px;
+      padding: 14px 18px;
+      border: 1px solid var(--ef-filet);
+      border-radius: 4px;
+    }
+
+    .efTable {
+      border-collapse: collapse;
+
+      th { background: var(--ef-accent); border-radius: 0 !important; }
+      td { border: 1px solid var(--ef-filet); }
+    }
+
+    .efTotal { background: var(--ef-accent); border-radius: 4px; span, b { color: #fff; } }
+
+    .efLettres {
+      padding: 10px 14px;
+      border: 1px dashed var(--ef-accent);
+      border-radius: 4px;
+    }
+  }
+}

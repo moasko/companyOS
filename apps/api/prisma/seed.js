@@ -189,6 +189,15 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "editeur-factures",
+    name: "Éditeur de factures",
+    description:
+      "Créez des factures professionnelles avec aperçu en direct : six modèles, votre logo et vos couleurs, paiement fractionné, factures récurrentes et envoi au client en PDF. Clients du CRM, articles du Stock ; les factures sont suivies dans la Facturation.",
+    icon: "editeur-factures",
+    category: "Gestion",
+    kind: "NATIVE",
+  },
+  {
     slug: "stock",
     name: "Stock",
     description: "Articles, entrées/sorties et inventaire.",
