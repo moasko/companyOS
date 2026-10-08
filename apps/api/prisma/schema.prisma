@@ -267,6 +267,12 @@ model Installation {
   /// Vide pour les installations antérieures à ce champ : elles seront
   /// simplement présentées comme à mettre à jour, ce qui est exact.
   version     String?
+  /// Qui peut ouvrir l'application dans cet espace :
+  /// `{ mode: "membres" | "admins" | "selection", membres?: [userId] }`.
+  /// Vide = la règle par défaut de l'application (voir src/acces.js) —
+  /// la Paie et les RH sont réservées aux administrateurs, le reste est
+  /// ouvert à tous.
+  acces       Json?
   installedAt DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma, serialize } from "../db.js";
 import { authenticate, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
+import { MODES, autoriseSelon, regleDe } from "../acces.js";
 
 // Deux origines d'applications cohabitent :
 //   - le catalogue global (tenantId null), offert à tous les espaces ;
@@ -395,6 +396,11 @@ export default async function appRoutes(app) {
       installations.map((i) => ({
         ...i.app,
         settings: sansSecrets(i.settings),
+        // La règle d'accès et ce qu'elle donne pour cette personne : le
+        // shell n'affiche que ce qu'elle peut ouvrir. Le contrôle qui
+        // compte reste celui des routes de données.
+        acces: regleDe(i.app.slug, i),
+        autorise: autoriseSelon(request.user, regleDe(i.app.slug, i)),
         installedAt: i.installedAt,
         // Ce qui est en place, à distinguer de `version` qui est ce que le
         // catalogue propose. C'est l'écart entre les deux qui fait une
@@ -599,6 +605,79 @@ export default async function appRoutes(app) {
       return reply.send(
         serialize({ ...installation.app, installed: true, installedVersion: version }),
       );
+    },
+  );
+
+  /// Régler qui peut ouvrir une application installée.
+  ///
+  /// `admins` et `selection` laissent toujours passer les administrateurs
+  /// et le propriétaire : la règle restreint les membres, elle n'enferme
+  /// pas ceux qui la règlent.
+  app.put(
+    "/:slug/acces",
+    { preHandler: exigerRole("ADMIN") },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          mode: z.enum(MODES),
+          membres: z.array(z.string().min(1).max(40)).max(500).optional(),
+        })
+        .safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "Règle d'accès invalide." });
+      }
+
+      const target = await findVisibleApp(request.tenantId, request.params.slug);
+      if (!target) return reply.code(404).send({ error: "Application introuvable" });
+      if (target.isCore) {
+        return reply
+          .code(409)
+          .send({ error: "Les applications du socle restent ouvertes à tous." });
+      }
+
+      const installation = await prisma.installation.findUnique({
+        where: { tenantId_appId: { tenantId: request.tenantId, appId: target.id } },
+      });
+      if (!installation) {
+        return reply.code(404).send({ error: "Cette application n'est pas installée." });
+      }
+
+      // Seuls des membres de cet espace peuvent figurer dans la sélection :
+      // un identifiant étranger serait inoffensif, mais illisible au journal.
+      let membres = [];
+      if (parsed.data.mode === "selection") {
+        const demandes = [...new Set(parsed.data.membres || [])];
+        const trouves = await prisma.user.findMany({
+          where: { id: { in: demandes }, tenantId: request.tenantId },
+          select: { id: true, email: true },
+        });
+        membres = trouves.map((u) => u.id);
+        if (membres.length !== demandes.length) {
+          return reply
+            .code(400)
+            .send({ error: "La sélection contient une personne étrangère à l'espace." });
+        }
+      }
+
+      const acces =
+        parsed.data.mode === "selection"
+          ? { mode: "selection", membres }
+          : { mode: parsed.data.mode };
+      const avant = regleDe(target.slug, installation);
+
+      await prisma.installation.update({
+        where: { id: installation.id },
+        data: { acces },
+      });
+
+      await journaliser(request, "app.acces", target.name, {
+        slug: target.slug,
+        avant: avant.mode,
+        apres: acces.mode,
+        membres: membres.length || undefined,
+      });
+
+      return { slug: target.slug, acces };
     },
   );
 

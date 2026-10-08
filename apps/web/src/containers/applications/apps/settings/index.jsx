@@ -472,6 +472,23 @@ export const Settings = () => {
     dispatch({ type: "WALLSET", payload: nom });
   };
 
+  /// Régler qui peut ouvrir une application. Les administrateurs et le
+  /// propriétaire passent toujours : la règle ne concerne que les membres.
+  const changerAcces = async (app, acces) => {
+    if (!peutGerer || busy) return;
+    setBusy(true);
+    try {
+      await api.setAppAccess(app.slug, acces);
+      setInstalled(await api.installedApps());
+      await syncInstalledModules();
+      flash(`Accès à « ${nomApp(app)} » mis à jour`);
+    } catch (err) {
+      flash(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const desinstaller = async (app) => {
     if (app.isCore) return;
     const ok = await modal.confirm({
@@ -723,6 +740,9 @@ export const Settings = () => {
                 busy={busy}
                 dispatch={dispatch}
                 desinstaller={desinstaller}
+                peutGerer={peutGerer}
+                membres={membres}
+                changerAcces={changerAcces}
               />
 
               {/* ---------- Stockage ---------- */}

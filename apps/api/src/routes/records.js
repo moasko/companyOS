@@ -3,6 +3,13 @@ import { prisma, serialize } from "../db.js";
 import { authenticate, auMoins } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { executerAutomatisations } from "../automatisations.js";
+import {
+  accesModule,
+  creationPartagee,
+  enAnnuaire,
+  lecturePartagee,
+  suppressionPartagee,
+} from "../acces.js";
 
 /// CRUD générique des modules métier. Un module range ses données dans
 /// des collections nommées : /api/records/crm/clients, etc.
@@ -49,6 +56,13 @@ const COLLECTIONS_MOTEUR = new Set([
 
 const exigeAdmin = (names) =>
   COLLECTIONS_MOTEUR.has(`${names.module}/${names.collection}`);
+
+/// Réponse commune à toute opération refusée par la règle d'accès.
+const refuserAcces = (reply, names) =>
+  reply.code(403).send({
+    error: `Vous n'avez pas accès à l'application « ${names.module} ». Demandez-le à un administrateur de l'espace.`,
+    acces: false,
+  });
 
 const validateParams = (params, reply) => {
   const module = nameSchema.safeParse(params.module);
@@ -108,13 +122,20 @@ export default async function recordRoutes(app) {
     const names = validateParams(request.params, reply);
     if (!names) return;
 
+    // Sans accès à l'application, seules les collections partagées se
+    // lisent — et la liste des salariés, réduite à son annuaire.
+    const { autorise } = await accesModule(request, names.module);
+    const partage = autorise ? null : lecturePartagee(names);
+    if (!autorise && !partage) return refuserAcces(reply, names);
+
     const records = await prisma.record.findMany({
       where: { tenantId: request.tenantId, ...names },
       orderBy: { createdAt: "desc" },
       take: 500,
     });
 
-    return serialize(await auteurs(request.tenantId, records));
+    const lisibles = partage === "annuaire" ? records.map(enAnnuaire) : records;
+    return serialize(await auteurs(request.tenantId, lisibles));
   });
 
   app.post("/:module/:collection", { bodyLimit: MAX_RECORD_BODY_BYTES }, async (request, reply) => {
@@ -128,6 +149,11 @@ export default async function recordRoutes(app) {
     }
     let data = validateData(request.body, reply, names);
     if (!data) return;
+
+    // Sans accès, on ne dépose qu'une demande (un congé, par exemple), que
+    // quelqu'un qui a accès tranchera.
+    const { autorise } = await accesModule(request, names.module);
+    if (!autorise && !creationPartagee(names, data)) return refuserAcces(reply, names);
 
     const execution = await executerAutomatisations({
       tenantId: request.tenantId,
@@ -174,6 +200,11 @@ export default async function recordRoutes(app) {
     }
     let data = validateData(request.body, reply, names);
     if (!data) return;
+
+    // Modifier, c'est trancher : jamais sans accès à l'application.
+    if (!(await accesModule(request, names.module)).autorise) {
+      return refuserAcces(reply, names);
+    }
 
     const execution = await executerAutomatisations({
       tenantId: request.tenantId,
@@ -235,6 +266,13 @@ export default async function recordRoutes(app) {
     });
     if (!record) {
       return reply.code(404).send({ error: "Enregistrement introuvable" });
+    }
+
+    // Sans accès à l'application, on ne retire que sa propre demande encore
+    // en attente.
+    const { autorise } = await accesModule(request, names.module);
+    if (!autorise && !suppressionPartagee(names, record, request.user)) {
+      return refuserAcces(reply, names);
     }
 
     // Chacun peut défaire sa propre saisie ; effacer celle d'un autre

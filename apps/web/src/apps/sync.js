@@ -92,7 +92,11 @@ export const attachSystemModules = () => {
 export const syncInstalledModules = async () => {
   attachSystemModules();
 
-  const installed = await api.installedApps();
+  // Une application installée mais fermée à cette personne n'apparaît pas
+  // chez elle (voir la règle d'accès, src/acces.js côté API). Le serveur
+  // refuse de toute façon ses données : cacher l'icône évite seulement
+  // d'ouvrir une fenêtre qui ne montrerait qu'un refus.
+  const installed = (await api.installedApps()).filter((a) => a.autorise !== false);
   const installedSlugs = new Set(installed.map((a) => a.slug));
 
   // Modules métier livrés dans le dépôt.
