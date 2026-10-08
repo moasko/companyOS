@@ -114,7 +114,9 @@ function WordApp() {
 
   const [fichiers, setFichiers] = useState([]);
   const [heritage, setHeritage] = useState([]);
-  const [voletReplie, setVoletReplie] = useState(false);
+  // Le volet des documents est un panneau superposé, ouvert depuis
+  // Fichier → Documents : l'accueil liste déjà les récents.
+  const [voletReplie, setVoletReplie] = useState(true);
 
   // ---- Liste des documents ----------------------------------------------
 
@@ -394,20 +396,97 @@ function WordApp() {
     }
   };
 
+  /// Imprimer les pages, et elles seules.
+  ///
+  /// `window.print()` imprimerait l'OS entier — bureau, barre des tâches,
+  /// ruban. Les pages déjà mises en forme par le moteur sont recopiées dans
+  /// un cadre invisible, avec les feuilles de style de la page, et c'est ce
+  /// cadre qu'on imprime : une feuille par page, sans marge ajoutée.
+  const imprimer = () => {
+    const pages = document.querySelector(".wordApp .docx-pages");
+    if (!pages) return;
+    const cadre = document.createElement("iframe");
+    cadre.setAttribute("aria-hidden", "true");
+    Object.assign(cadre.style, { position: "fixed", width: "0", height: "0", border: "0" });
+    document.body.appendChild(cadre);
+    const styles = [...document.querySelectorAll('style, link[rel="stylesheet"]')]
+      .map((n) => n.outerHTML)
+      .join("");
+    const doc = cadre.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${titre}</title>${styles}
+      <style>
+        @page { margin: 0; }
+        html, body { margin: 0; background: #fff; }
+        .docx-pages { display: block !important; transform: none !important; }
+        .docx-page { margin: 0 !important; box-shadow: none !important; break-after: page; filter: none !important; background: #fff !important; }
+        .docx-page-content { filter: none !important; }
+        .docx-selection-overlay, .docx-comment-overlay { display: none !important; }
+      </style></head><body class="docx-editor">${pages.outerHTML}</body></html>`);
+    doc.close();
+    // Laisser les polices et les images se charger avant d'imprimer.
+    setTimeout(() => {
+      cadre.contentWindow.focus();
+      cadre.contentWindow.print();
+      setTimeout(() => cadre.remove(), 1000);
+    }, 400);
+  };
+
   // Ctrl+S — l'habitude est plus forte que n'importe quel bouton.
   useEffect(() => {
     if (!ouvert) return undefined;
     const surTouche = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const touche = e.key.toLowerCase();
+      if (touche === "s") {
         e.preventDefault();
         enregistrerRef.current();
+      } else if (touche === "p" && octetsRef.current) {
+        e.preventDefault();
+        imprimerRef.current();
       }
     };
     window.addEventListener("keydown", surTouche);
     return () => window.removeEventListener("keydown", surTouche);
   }, [ouvert]);
 
+  const imprimerRef = useRef(imprimer);
+  imprimerRef.current = imprimer;
+  const octetsRef = useRef(octets);
+  octetsRef.current = octets;
+
   // ---- Rendu -------------------------------------------------------------
+
+  /// L'état d'enregistrement, en un mot et une couleur — à côté du titre,
+  /// comme « Enregistré » dans Word.
+  const etatDoc = enregistrement
+    ? { texte: "Enregistrement…", ton: "neutre" }
+    : echec
+      ? { texte: "Non enregistré", ton: "echec", detail: echec }
+      : modifie
+        ? { texte: fichier ? "Modifications non enregistrées" : "Non enregistré", ton: "modifie" }
+        : fichier
+          ? { texte: "Enregistré", ton: "ok", detail: "Enregistré dans le cloud, dossier Documents" }
+          : { texte: "Nouveau document", ton: "neutre" };
+
+  const actionsDoc = {
+    nouveau,
+    ouvrir: () => refImport.current?.click(),
+    documents: () => setVoletReplie(false),
+    enregistrer: () => enregistrerRef.current(),
+    telecharger: telechargerCopie,
+    imprimer,
+  };
+
+  /// Les documents du plus récent au plus ancien — l'ordre des « Récents »
+  /// de Word.
+  const recents = [...fichiers].sort(
+    (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0),
+  );
+  const quandModifie = (iso) =>
+    iso
+      ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+      : "";
 
   return (
     <ModuleWindow manifest={manifest} className="wordApp">
@@ -486,103 +565,119 @@ function WordApp() {
             </div>
           </div>
 
-          {voletReplie ? (
-            <div
-              className="wdVoletPoignee handcr"
-              title="Afficher les documents"
-              onClick={() => setVoletReplie(false)}
-            >
-              <Icon fafa="faAnglesRight" width={12} />
-            </div>
-          ) : null}
-
           {/* L'éditeur, ou l'accueil quand rien n'est ouvert */}
-          <div className="wdScene">
+          {/* Un clic dans le document referme le tiroir des documents. */}
+          <div
+            className="wdScene"
+            onMouseDown={() => {
+              if (!voletReplie) setVoletReplie(true);
+            }}
+          >
             <input ref={refImport} className="wdImportCache" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={importerLocal} />
             {octets ? (
-              <>
-                {/* La barre de titre du document est celle de CompanyOS —
-                    pas celle de la bibliothèque : même rangée que partout
-                    ailleurs dans l'OS, titre renommable, état
-                    d'enregistrement lisible. */}
-                <div className="wdBarreDoc">
-                  <Icon fafa="faFileWord" width={13} />
-                  <input
-                    className="wdTitreDoc"
-                    value={titre}
-                    onChange={(e) => setTitre(e.target.value)}
-                    onBlur={(e) => surTitre(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.target.blur();
-                    }}
-                  />
-                  <span
-                    className="wdEtatDoc"
-                    data-modifie={modifie}
-                    data-echec={!!echec}
-                    title={echec || undefined}
-                  >
-                    {enregistrement
-                      ? "Enregistrement…"
-                      : echec
-                        ? "Non enregistré"
-                        : modifie
-                          ? "Modifié"
-                          : fichier
-                            ? "Enregistré dans le cloud"
-                            : "Jamais enregistré"}
-                  </span>
-                  <button className="wdActionDoc" type="button" title="Ouvrir un document DOCX" onClick={() => refImport.current?.click()}>
-                    <Icon fafa="faFolderOpen" width={12} />
-                    Ouvrir
-                  </button>
-                  <button className="wdActionDoc" type="button" title="Télécharger une copie DOCX" onClick={telechargerCopie}>
-                    <Icon fafa="faDownload" width={12} />
-                    Télécharger
-                  </button>
-                  <button className="wdActionDoc wdActionPrimaire" type="button" onClick={() => enregistrerRef.current()} disabled={enregistrement}>
-                    <Icon fafa="faFloppyDisk" width={12} />
-                    Enregistrer
-                  </button>
-                </div>
-                <Suspense
-                  fallback={
-                    <div className="wdPatiente">
-                      <Icon fafa="faFileWord" width={26} />
-                      <p>Chargement de l'éditeur…</p>
-                    </div>
-                  }
-                >
-                  <Editeur
-                    key={cle}
-                    ref={refEditeur}
-                    octets={octets}
-                    sombre={sombre}
-                    surSauvegarde={() => enregistrerRef.current()}
-                    surModification={surModification}
-                    surErreur={(message) => setEchec(message)}
-                  />
-                </Suspense>
-              </>
+              <Suspense
+                fallback={
+                  <div className="wdPatiente">
+                    <Icon fafa="faFileWord" width={26} />
+                    <p>Chargement de l'éditeur…</p>
+                  </div>
+                }
+              >
+                <Editeur
+                  key={cle}
+                  ref={refEditeur}
+                  octets={octets}
+                  sombre={sombre}
+                  document={{
+                    titre,
+                    setTitre,
+                    surTitre,
+                    etat: etatDoc,
+                    enregistrement,
+                  }}
+                  actions={actionsDoc}
+                  surModification={surModification}
+                  surErreur={(message) => setEchec(message)}
+                />
+              </Suspense>
             ) : (
-              <div className="wdAccueil">
-                <Icon className="wdAccueilIcone" src="winWord" width={56} />
-                <div className="wdAccueilTitre">Traitement de texte</div>
-                <p>
-                  De vrais documents Word (.docx), rangés dans le cloud de
-                  l'entreprise et ouverts d'un double-clic depuis
-                  l'Explorateur. Ce qui est enregistré ici se rouvre dans Word
-                  sans avertissement, et inversement.
-                </p>
-                <div className="wdAccueilActions">
-                  <div className="wdAccueilBtn handcr" onClick={nouveau}>
-                    <Icon fafa="faFileCirclePlus" width={13} />
-                    Nouveau document
+              // L'accueil de Word : créer, ouvrir, et reprendre un document
+              // récent — sans passer par le volet.
+              <div className="wdAccueil cosScroll">
+                <div className="wdAccueilCorps">
+                  <h2>Bonjour{session.user?.name ? `, ${session.user.name.split(" ")[0]}` : ""}</h2>
+
+                  <div className="wdAccueilNouveau">
+                    <button type="button" className="wdTuile" onClick={nouveau}>
+                      <span className="wdTuileFeuille">
+                        <Icon fafa="faPlus" width={18} />
+                      </span>
+                      <span>Document vierge</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="wdTuile"
+                      onClick={() => refImport.current?.click()}
+                    >
+                      <span className="wdTuileFeuille wdTuileOuvrir">
+                        <Icon fafa="faFolderOpen" width={18} />
+                      </span>
+                      <span>Ouvrir un fichier .docx</span>
+                    </button>
                   </div>
-                  <div className="wdAccueilBtn wdAccueilBtnSecondaire handcr" onClick={() => refImport.current?.click()}>
-                    <Icon fafa="faFolderOpen" width={13} />
-                    Ouvrir un fichier DOCX
-                  </div>
+
+                  <div className="wdAccueilSection">Récents</div>
+                  <Contenu
+                    etat={etat}
+                    vide={!recents.length && !heritage.length}
+                    lignes={4}
+                    rendreVide={() => (
+                      <p className="wdAccueilVide">
+                        Aucun document pour l'instant. Ce que vous créez ici est rangé dans
+                        le dossier {DOSSIER} du cloud, visible de toute l'équipe, et se rouvre
+                        dans Word sans avertissement.
+                      </p>
+                    )}
+                  >
+                    <div className="wdRecents" role="list">
+                      {recents.map((node) => (
+                        <div key={node.id} role="listitem" className="wdRecent">
+                          <button
+                            type="button"
+                            className="wdRecentOuvrir"
+                            onClick={() => ouvrirFichier(node)}
+                          >
+                            <Icon fafa="faFileWord" width={15} />
+                            <span className="wdRecentNom">{sansExtension(node.name)}</span>
+                            <span className="wdRecentDate">{quandModifie(node.updatedAt)}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="wdRecentSuppr"
+                            title="Mettre à la corbeille"
+                            aria-label={`Mettre « ${node.name} » à la corbeille`}
+                            onClick={() => supprimer(node)}
+                          >
+                            <Icon fafa="faTrashCan" width={11} />
+                          </button>
+                        </div>
+                      ))}
+                      {heritage.map((rec) => (
+                        <div key={rec.id} role="listitem" className="wdRecent">
+                          <button
+                            type="button"
+                            className="wdRecentOuvrir"
+                            title="Document de l'ancienne version, à convertir"
+                            onClick={() => ouvrirHeritage(rec)}
+                          >
+                            <Icon fafa="faClockRotateLeft" width={14} />
+                            <span className="wdRecentNom">{rec.data.titre}</span>
+                            <span className="wdRecentDate">à convertir</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </Contenu>
                 </div>
               </div>
             )}
