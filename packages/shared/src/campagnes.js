@@ -21,6 +21,11 @@
 // Extension explicite : Vite s'en moque, et Node peut ainsi éprouver ce
 // domaine sans bundler — comme tous les autres.
 import { adresseValide } from "./courrier.js";
+import { htmlBlocs } from "./campagnes-blocs.js";
+
+export * from "./campagnes-blocs.js";
+export * from "./campagnes-contacts.js";
+export * from "./campagnes-auto.js";
 
 export const CAMPAGNE_VIDE = {
   nom: "",
@@ -39,7 +44,7 @@ export const CAMPAGNE_VIDE = {
   // vides = tous. `achatMois` : a reçu une facture ces N derniers mois (0 =
   // sans condition). `repos` : écarte qui a reçu une campagne ces N
   // derniers jours. `ids` : une liste fermée (relance des non-ouvreurs).
-  filtres: { statut: "tous", villes: [], secteurs: [], achatMois: 0, repos: 0, ids: null },
+  filtres: { statut: "tous", villes: [], secteurs: [], etiquettes: [], achatMois: 0, repos: 0, ids: null },
   // Écartés à la main, pour cette campagne seulement.
   exclus: [],
   statut: "brouillon", // brouillon | programmee | envoi | terminee
@@ -49,6 +54,15 @@ export const CAMPAGNE_VIDE = {
   envoyerLe: "",
   destinataires: [],
   creeLe: "",
+  // Le message par blocs (campagnes-blocs.js). Vide : l'ancien format,
+  // `texte` + `cta`, rendu à l'identique.
+  blocs: [],
+  // La langue du message — le pied et le lien de désinscription la suivent.
+  langue: "fr",
+  // Test A/B de l'objet : `part` % de l'audience reçoit A ou B, moitié
+  // chacun ; après `heures`, la version au meilleur taux d'ouverture part
+  // au reste.
+  ab: { actif: false, sujetB: "", part: 20, heures: 4, gagnant: "" },
 };
 
 /// Les statuts du CRM, tels que la fiche client les enregistre.
@@ -63,6 +77,7 @@ export const STATUTS_CAMPAGNE = {
   brouillon: { label: "Brouillon", ton: "idle" },
   programmee: { label: "Programmée", ton: "attente" },
   envoi: { label: "Envoi en cours", ton: "actif" },
+  pause: { label: "En pause", ton: "attente" },
   terminee: { label: "Terminée", ton: "ok" },
 };
 
@@ -82,6 +97,7 @@ export const normaliserFiltres = (f = {}) => ({
   statut: f.statut === "client" ? "actif" : f.statut || "tous",
   villes: Array.isArray(f.villes) ? f.villes : f.ville ? [f.ville] : [],
   secteurs: Array.isArray(f.secteurs) ? f.secteurs : f.secteur ? [f.secteur] : [],
+  etiquettes: Array.isArray(f.etiquettes) ? f.etiquettes : [],
   achatMois: Number(f.achatMois) || 0,
   repos: Number(f.repos) || 0,
   ids: Array.isArray(f.ids) ? f.ids : null,
@@ -124,18 +140,25 @@ export const segmenter = (clients = [], filtres = {}, { exclus = [], contexte = 
   const limiteAchat = f.achatMois ? ilYA(f.achatMois * 30.44, maintenant).slice(0, 10) : null;
   const limiteRepos = f.repos ? ilYA(f.repos, maintenant) : null;
   const vues = new Set();
-  const out = { correspondants: [], retenus: [], sansEmail: 0, desinscrits: 0, doublons: 0, auRepos: 0, exclus: 0 };
+  const out = { correspondants: [], retenus: [], sansEmail: 0, desinscrits: 0, rebonds: 0, aConfirmer: 0, doublons: 0, auRepos: 0, exclus: 0 };
+  const etiquettes = f.etiquettes.map((e) => e.toLowerCase());
 
   for (const c of clients) {
     const d = c.data || {};
     if (ids && !ids.has(c.id)) continue;
     if (f.statut !== "tous" && d.statut !== f.statut) continue;
     if (!dansListe(d.ville, f.villes) || !dansListe(d.secteur, f.secteurs)) continue;
+    if (etiquettes.length && !(d.etiquettes || []).some((e) => etiquettes.includes(String(e).toLowerCase()))) continue;
     if (limiteAchat && !((contexte.derniereFacture || {})[c.id] >= limiteAchat)) continue;
     out.correspondants.push(c);
 
     if (!adresseValide(d.email)) { out.sansEmail += 1; continue; }
     if (d.emailDesinscrit) { out.desinscrits += 1; continue; }
+    // Une adresse qui a rebondi définitivement n'existe plus : insister
+    // dégrade la réputation de l'expéditeur.
+    if (d.emailRebond) { out.rebonds += 1; continue; }
+    // Inscrit par le formulaire mais pas encore confirmé (double opt-in).
+    if (d.emailAConfirmer) { out.aConfirmer += 1; continue; }
     const cle = d.email.trim().toLowerCase();
     if (vues.has(cle)) { out.doublons += 1; continue; }
     vues.add(cle);
@@ -156,14 +179,22 @@ export const santeDe = (clients = []) => {
   let joignables = 0;
   let sansEmail = 0;
   let desinscrits = 0;
+  let rebonds = 0;
+  let aConfirmer = 0;
   for (const c of clients) {
     const d = c.data || {};
     if (!adresseValide(d.email)) sansEmail += 1;
     else if (d.emailDesinscrit) desinscrits += 1;
+    else if (d.emailRebond) rebonds += 1;
+    else if (d.emailAConfirmer) aConfirmer += 1;
     else joignables += 1;
   }
-  return { total: clients.length, joignables, sansEmail, desinscrits };
+  return { total: clients.length, joignables, sansEmail, desinscrits, rebonds, aConfirmer };
 };
+
+/// Toutes les étiquettes posées sur les fiches, triées.
+export const etiquettesDe = (clients = []) =>
+  [...new Set(clients.flatMap((c) => (c.data?.etiquettes || []).map((e) => String(e).trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));
 
 /// Les valeurs distinctes d'un champ, pour remplir les filtres — triées,
 /// vides écartés.
@@ -172,6 +203,8 @@ export const valeursDe = (clients = [], champ) =>
     (a, b) => a.localeCompare(b, "fr"),
   );
 
+const premierMot = (t) => String(t || "").trim().split(/\s+/)[0] || "";
+
 /// L'instantané d'un destinataire, figé au lancement : la campagne
 /// n'oublie personne même si la fiche CRM change ensuite.
 export const destinataireDe = (client) => ({
@@ -179,23 +212,33 @@ export const destinataireDe = (client) => ({
   email: client.data.email.trim().toLowerCase(),
   nom: client.data.entreprise || client.data.nom || client.data.email,
   contact: client.data.entreprise ? client.data.nom || "" : "",
+  // Le prénom de la personne de la fiche — « Awa » pour « Awa Koné » —,
+  // vide pour une fiche sans nom de personne.
+  prenom: premierMot(client.data.nom && client.data.nom !== client.data.email ? client.data.nom : ""),
   ville: client.data.ville || "",
-  statut: "attente", // attente | envoye | echec
+  statut: "attente", // attente | envoye | echec | reserve (A/B)
   erreur: null,
 });
 
 /// Les variables d'un destinataire, pour appliquerModele.
-export const variablesPour = (destinataire, entreprise = "") => ({
-  client: destinataire.nom,
-  contact: destinataire.contact || destinataire.nom,
-  ville: destinataire.ville,
-  entreprise,
-});
+export const variablesPour = (destinataire, entreprise = "") => {
+  const contact = destinataire.contact || destinataire.nom || "";
+  return {
+    client: destinataire.nom,
+    contact,
+    // Le premier mot du contact : « Awa » pour « Awa Koné ». Une fiche
+    // sans contact nommé donne la société entière, jamais un vide.
+    prenom: destinataire.prenom || premierMot(destinataire.contact) || contact,
+    ville: destinataire.ville,
+    entreprise,
+  };
+};
 
 /// Les variables qu'on peut glisser dans l'objet et le message.
 export const VARIABLES = [
   { id: "client", label: "Client", aide: "La société, ou le nom du contact" },
   { id: "contact", label: "Contact", aide: "La personne, quand la fiche a une société" },
+  { id: "prenom", label: "Prénom", aide: "Le premier mot du contact" },
   { id: "ville", label: "Ville", aide: "La ville de la fiche" },
   { id: "entreprise", label: "Votre entreprise", aide: "Le nom de votre espace" },
 ];
@@ -210,99 +253,21 @@ export const VARIABLES = [
 // clients mail respectent tous. Partagé : le serveur l'envoie, l'éditeur
 // l'affiche en aperçu — le destinataire reçoit exactement ce qu'on a vu.
 
-/// Échappe pour du **texte** HTML et pour l'intérieur d'un attribut.
-///
-/// Les guillemets en font partie, et ce n'était pas le cas : sans eux,
-/// une valeur « échappée » placée dans un attribut peut en sortir avec un
-/// simple `"`. C'est un piège classique — le texte paraît protégé, mais la
-/// protection ne vaut que pour le contexte d'origine.
-const echapperHtml = (t) =>
-  String(t || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
-/// Une couleur, ou la couleur par défaut. Rien d'autre.
-///
-/// `couleur` vient de `fiche.data`, c'est-à-dire d'un champ JSON libre
-/// écrit par l'API : l'écran utilise bien un `<input type="color">`, mais
-/// l'API accepte n'importe quelle chaîne. Elle est ensuite posée dans un
-/// attribut `style`, d'où on sort avec un guillemet — et le résultat est
-/// un mail à l'en-tête d'une entreprise cliente, contenant le HTML de
-/// l'attaquant. On valide donc la forme au lieu d'échapper : pour une
-/// couleur, tout ce qui n'est pas une couleur est une erreur.
-const COULEUR = /^#[0-9a-f]{3,8}$/i;
-const couleurSure = (valeur, defaut = "#e8590c") => {
-  const brute = String(valeur || "").trim();
-  return COULEUR.test(brute) ? brute : defaut;
-};
-
-/// Une URL destinée à un `href`/`src`. Seuls http(s) sont acceptés :
-/// `javascript:` et `data:` n'ont rien à faire dans un mail.
-const lienSur = (valeur) => {
-  const brute = String(valeur || "").trim();
-  if (!/^https?:\/\//i.test(brute)) return "";
-  return echapperHtml(brute);
-};
-
+/// L'e-mail HTML d'une campagne — voir htmlBlocs. `lienCta` reste accepté
+/// pour l'ancien format : c'est le lien n° 0, celui du bouton.
 export const htmlDe = (
   campagne,
-  {
-    entreprise = "",
-    lienCta: cta = "",
-    lienDesinscription: desabo = "",
-    pixel: tracage = "",
-    logo: logoUrl = "",
-    pied = "",
-  } = {},
-) => {
-  const couleur = couleurSure(campagne.couleur);
-  // Les trois liens sont posés dans des attributs : même traitement.
-  const lienCta = lienSur(cta);
-  const lienDesinscription = lienSur(desabo);
-  const pixel = lienSur(tracage);
-  const logo = lienSur(logoUrl);
-  // Le texte d'aperçu, caché dans le corps : les boîtes de réception le
-  // lisent, le lecteur ne le voit pas dans le message ouvert.
-  const preheader = campagne.apercu
-    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${echapperHtml(campagne.apercu)}</div>`
-    : "";
-  const paragraphes = String(campagne.texte || "")
-    .split(/\n{2,}/)
-    .map(
-      (p) =>
-        `<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:#26313d">${echapperHtml(p).replace(/\n/g, "<br>")}</p>`,
-    )
-    .join("");
-
-  const bouton =
-    campagne.cta?.label && lienCta
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px auto 8px"><tr><td style="border-radius:9px;background:${couleur}">
-           <a href="${lienCta}" style="display:inline-block;padding:12px 30px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none">${echapperHtml(campagne.cta.label)}</a>
-         </td></tr></table>`
-      : "";
-
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#f2f4f7">${preheader}
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f4f7;padding:26px 12px">
-<tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;font-family:Segoe UI,Arial,sans-serif">
-  <tr><td style="background:${couleur};padding:20px 32px">
-    ${logo ? `<img src="${logo}" alt="" height="36" style="height:36px;max-width:160px;vertical-align:middle;margin-right:12px;border-radius:6px;background:#ffffff">` : ""}<span style="color:#ffffff;font-size:19px;font-weight:bold;letter-spacing:.02em;vertical-align:middle">${echapperHtml(entreprise)}</span>
-  </td></tr>
-  <tr><td style="padding:30px 32px 12px">${paragraphes}${bouton}</td></tr>
-  <tr><td style="padding:18px 32px 24px;border-top:1px solid #edf0f3">
-    ${pied ? `<p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#8a94a1">${echapperHtml(pied)}</p>` : ""}
-    <p style="margin:0;font-size:12px;line-height:1.6;color:#8a94a1">
-      Vous recevez ce message parce que vous êtes en relation avec ${echapperHtml(entreprise)}.
-      ${lienDesinscription ? `<a href="${lienDesinscription}" style="color:#8a94a1">Se désinscrire</a>` : ""}
-    </p>
-  </td></tr>
-</table>
-${pixel ? `<img src="${pixel}" width="1" height="1" alt="" style="display:block">` : ""}
-</td></tr></table></body></html>`;
-};
+  { entreprise = "", lienCta = "", lienDesinscription = "", pixel = "", logo = "", pied = "", lien, image } = {},
+) =>
+  htmlBlocs(campagne, {
+    entreprise,
+    lienDesinscription,
+    pixel,
+    logo,
+    pied,
+    image,
+    lien: lien || ((i, url) => (lienCta && i === 0 && !(campagne.blocs || []).length ? lienCta : url)),
+  });
 
 // ---------------------------------------------------------------------------
 // Progression et statistiques
@@ -317,6 +282,7 @@ export const resumeDe = (destinataires = []) => {
   const ouverts = destinataires.filter((d) => d.ouvert).length;
   const cliques = destinataires.filter((d) => d.clique).length;
   const desinscrits = destinataires.filter((d) => d.desinscrit).length;
+  const rebonds = destinataires.filter((d) => d.rebond === "definitif").length;
   const attente = total - envoyes - echecs;
   return {
     total,
@@ -326,11 +292,18 @@ export const resumeDe = (destinataires = []) => {
     ouverts,
     cliques,
     desinscrits,
+    rebonds,
     tauxOuverture: taux(ouverts, envoyes),
     tauxClic: taux(cliques, envoyes),
     pourcent: total ? Math.round(((envoyes + echecs) / total) * 100) : 0,
   };
 };
+
+/// Un message à envoyer : des blocs avec du texte, ou l'ancien texte.
+export const aUnMessage = (campagne = {}) =>
+  (campagne.blocs || []).length
+    ? campagne.blocs.some((b) => String(b.texte || b.label || b.code || "").trim() || (b.produits || []).length || b.url || b.nodeId)
+    : Boolean(String(campagne.texte || "").trim());
 
 /// Prête au lancement : un nom, un sujet, un corps, au moins un
 /// destinataire.
@@ -338,7 +311,7 @@ export const prete = (campagne) =>
   Boolean(
     String(campagne.nom || "").trim() &&
     String(campagne.sujet || "").trim() &&
-    String(campagne.texte || "").trim() &&
+    aUnMessage(campagne) &&
     (campagne.destinataires || []).length,
   );
 
@@ -389,8 +362,9 @@ export const verificationsLancement = (campagne, nbRetenus, testEnvoye = false) 
   { id: "nom", label: "Un nom interne", ok: Boolean(String(campagne.nom || "").trim()) },
   { id: "audience", label: nbRetenus ? `Une audience : ${nbRetenus} contact${nbRetenus > 1 ? "s" : ""}` : "Une audience", ok: nbRetenus > 0 },
   { id: "sujet", label: "Un objet", ok: Boolean(String(campagne.sujet || "").trim()) },
-  { id: "texte", label: "Un message", ok: Boolean(String(campagne.texte || "").trim()) },
-  { id: "cta", label: "Un lien valide pour le bouton", ok: !campagne.cta?.label || /^https?:\/\//i.test(campagne.cta?.url || ""), facultatif: !campagne.cta?.label },
+  { id: "texte", label: "Un message", ok: aUnMessage(campagne) },
+  { id: "cta", label: "Un lien valide pour le bouton", ok: (campagne.blocs || []).length ? campagne.blocs.filter((b) => b.type === "bouton").every((b) => b.label && /^https?:\/\//i.test(b.url || "")) : !campagne.cta?.label || /^https?:\/\//i.test(campagne.cta?.url || ""), facultatif: (campagne.blocs || []).length ? !campagne.blocs.some((b) => b.type === "bouton") : !campagne.cta?.label },
+  { id: "ab", label: "Deux objets différents pour le test A/B", ok: !campagne.ab?.actif || (String(campagne.ab.sujetB || "").trim() && campagne.ab.sujetB.trim() !== String(campagne.sujet || "").trim()), facultatif: !campagne.ab?.actif },
   { id: "test", label: "Un test reçu dans votre boîte", ok: testEnvoye, conseil: true },
 ];
 
@@ -424,6 +398,8 @@ export const FILTRES_DESTINATAIRES = {
   desinscrits: { label: "Désinscrits", garde: (d) => d.desinscrit },
 };
 
+const copieBlocs = (blocs) => JSON.parse(JSON.stringify(blocs || []));
+
 /// Une nouvelle campagne pour ceux qui n'ont pas ouvert : même message,
 /// objet à retravailler, audience fermée sur ces seules personnes.
 export const relanceDe = (campagne) => {
@@ -436,6 +412,8 @@ export const relanceDe = (campagne) => {
     texte: campagne.texte || "",
     cta: { ...(campagne.cta || { label: "", url: "" }) },
     couleur: campagne.couleur || CAMPAGNE_VIDE.couleur,
+    blocs: copieBlocs(campagne.blocs),
+    langue: campagne.langue || "fr",
     filtres: { ...CAMPAGNE_VIDE.filtres, ids },
     relanceDe: campagne.nom || "",
   };
@@ -450,6 +428,9 @@ export const dupliquer = (campagne) => ({
   texte: campagne.texte || "",
   cta: { ...(campagne.cta || { label: "", url: "" }) },
   couleur: campagne.couleur || CAMPAGNE_VIDE.couleur,
+  blocs: copieBlocs(campagne.blocs),
+  langue: campagne.langue || "fr",
+  ab: { ...CAMPAGNE_VIDE.ab, actif: Boolean(campagne.ab?.actif), sujetB: campagne.ab?.sujetB || "" },
   filtres: normaliserFiltres(campagne.filtres),
 });
 
@@ -459,7 +440,7 @@ export const reessayerEchecs = (campagne) => ({
   statut: "programmee",
   envoyerLe: "",
   destinataires: (campagne.destinataires || []).map((d) =>
-    d.statut === "echec" && !d.desinscrit ? { ...d, statut: "attente", erreur: null } : d),
+    d.statut === "echec" && !d.desinscrit && d.rebond !== "definitif" ? { ...d, statut: "attente", erreur: null, essais: 0 } : d),
 });
 
 const cellule = (v) => {
@@ -469,10 +450,10 @@ const cellule = (v) => {
 
 /// Les destinataires en CSV (séparateur « ; », que les tableurs français
 /// ouvrent sans import).
-export const csvDe = (campagne) => {
-  const lignes = [["Nom", "E-mail", "Ville", "Statut", "Ouvert le", "Cliqué le", "Désinscrit", "Erreur"]];
+export const csvDe = (campagne, entetes = ["Nom", "E-mail", "Ville", "Statut", "Version", "Ouvert le", "Cliqué le", "Désinscrit", "Erreur"]) => {
+  const lignes = [entetes];
   for (const d of campagne.destinataires || []) {
-    lignes.push([d.nom, d.email, d.ville, d.statut, d.ouvertLe || "", d.cliqueLe || "", d.desinscrit ? "oui" : "", d.erreur || ""]);
+    lignes.push([d.nom, d.email, d.ville, d.statut, d.variante || "", d.ouvertLe || "", d.cliqueLe || "", d.desinscrit ? "oui" : "", d.erreur || ""]);
   }
   return lignes.map((l) => l.map(cellule).join(";")).join("\r\n");
 };
@@ -504,3 +485,141 @@ export const statistiquesGlobales = (campagnes = [], jours = 30, maintenant = ne
     tauxClic: avecClic ? Math.round((sommeClic / avecClic) * 1000) / 10 : null,
   };
 };
+
+// ---------------------------------------------------------------------------
+// Test A/B de l'objet
+// ---------------------------------------------------------------------------
+
+/// Répartit les destinataires au lancement : les `part` % premiers, mêlés,
+/// reçoivent A ou B en alternance ; les autres attendent le gagnant
+/// (statut « reserve »). Sans test, rien ne change.
+export const repartirAB = (destinataires = [], ab = {}, hasard = Math.random) => {
+  if (!ab?.actif) return destinataires;
+  const melanges = destinataires.map((d) => ({ d, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.d);
+  const part = Math.min(50, Math.max(5, Number(ab.part) || 20));
+  // Au moins deux personnes par version, sinon le test ne mesure rien.
+  const n = Math.min(melanges.length, Math.max(4, Math.round((melanges.length * part) / 100)));
+  return melanges.map((d, i) =>
+    i < n ? { ...d, variante: i % 2 ? "B" : "A" } : { ...d, variante: "", statut: "reserve" });
+};
+
+/// Les chiffres de chaque version.
+export const resultatsAB = (campagne = {}) => {
+  const par = (v) => {
+    const dests = (campagne.destinataires || []).filter((d) => d.variante === v && d.statut === "envoye");
+    const ouverts = dests.filter((d) => d.ouvert).length;
+    const cliques = dests.filter((d) => d.clique).length;
+    return { envoyes: dests.length, ouverts, cliques, tauxOuverture: taux(ouverts, dests.length), tauxClic: taux(cliques, dests.length) };
+  };
+  return { A: par("A"), B: par("B"), gagnant: campagne.ab?.gagnant || "" };
+};
+
+/// Faut-il trancher ? Quand tout l'échantillon est parti et que le délai
+/// est écoulé depuis le dernier envoi du test. Renvoie la campagne mise à
+/// jour (gagnant choisi, réserve libérée), ou null s'il faut attendre.
+export const decisionAB = (campagne = {}, maintenant = new Date().toISOString()) => {
+  if (!campagne.ab?.actif || campagne.ab.gagnant) return null;
+  const dests = campagne.destinataires || [];
+  const test = dests.filter((d) => d.variante === "A" || d.variante === "B");
+  // Un destinataire du test en réessai (boîte pleine) ne bloque pas la
+  // décision : il a déjà eu sa chance, et attendre pourrait durer un jour.
+  if (!test.length || test.some((d) => d.statut === "attente" && !d.essais)) return null;
+  const dernier = test.map((d) => d.envoyeLe || "").sort().pop() || "";
+  const heures = Math.max(1, Number(campagne.ab.heures) || 4);
+  if (dernier && new Date(maintenant) - new Date(dernier) < heures * 3600000) return null;
+  const r = resultatsAB(campagne);
+  // À égalité d'ouvertures, les clics départagent ; puis A, l'objet
+  // d'origine.
+  const gagnant = r.B.tauxOuverture > r.A.tauxOuverture || (r.B.tauxOuverture === r.A.tauxOuverture && r.B.tauxClic > r.A.tauxClic) ? "B" : "A";
+  return {
+    ...campagne,
+    statut: dests.some((d) => d.statut === "reserve") ? "envoi" : campagne.statut,
+    ab: { ...campagne.ab, gagnant, decideLe: maintenant },
+    destinataires: dests.map((d) => (d.statut === "reserve" ? { ...d, statut: "attente", variante: gagnant } : d)),
+  };
+};
+
+/// L'objet d'un destinataire, selon sa version.
+export const sujetPour = (campagne = {}, destinataire = {}) =>
+  destinataire.variante === "B" && campagne.ab?.sujetB ? campagne.ab.sujetB : campagne.sujet;
+
+// ---------------------------------------------------------------------------
+// Rebonds
+// ---------------------------------------------------------------------------
+
+/// Le genre d'un échec SMTP : « definitif » (5xx — adresse inexistante,
+/// domaine introuvable), « temporaire » (4xx — boîte pleine, greylisting),
+/// ou null (relais injoignable : rien à reprocher à l'adresse).
+export const classerErreur = (message = "") => {
+  const m = String(message);
+  if (/\b5\.\d\.\d+\b|\b55[0-4]\b|user unknown|no such user|does not exist|mailbox unavailable|ENOTFOUND|domain not found|recipient address rejected/i.test(m)) return "definitif";
+  if (/\b4\.\d\.\d+\b|\b4[2-5]\d\b|mailbox full|over quota|try again later|greylist/i.test(m)) return "temporaire";
+  return null;
+};
+
+/// Combien d'essais pour un rebond temporaire, et à quel intervalle.
+export const ESSAIS_MAX = 3;
+export const HEURES_ENTRE_ESSAIS = 6;
+
+// ---------------------------------------------------------------------------
+// Liens, ventes et engagement
+// ---------------------------------------------------------------------------
+
+/// Clics uniques par lien : [n0, n1, …], d'après les numéros de liens
+/// enregistrés sur chaque destinataire.
+export const clicsParLien = (campagne = {}, nbLiens = 0) => {
+  const t = Array.from({ length: nbLiens }, () => 0);
+  for (const d of campagne.destinataires || []) {
+    for (const i of new Set(d.liens || [])) if (i >= 0 && i < nbLiens) t[i] += 1;
+  }
+  // Les anciennes campagnes ne notaient pas le numéro : leurs clics vont au
+  // seul lien qu'elles avaient, le bouton.
+  if (nbLiens && !t.some(Boolean)) t[0] = (campagne.destinataires || []).filter((d) => d.clique).length;
+  return t;
+};
+
+/// Les factures émises par un client dans les `jours` qui suivent son clic
+/// — ce que la campagne a fait vendre, au sens prudent.
+export const ventesAttribuees = (campagne = {}, factures = [], jours = 7) => {
+  const clics = new Map();
+  for (const d of campagne.destinataires || []) if (d.cliqueLe && d.clientId) clics.set(d.clientId, d.cliqueLe);
+  const out = [];
+  for (const f of factures) {
+    const d = f.data || f;
+    if (d.type !== "facture" || ["brouillon", "annule"].includes(d.statut) || !clics.has(d.clientId)) continue;
+    const clic = clics.get(d.clientId).slice(0, 10);
+    const limite = new Date(new Date(`${clic}T12:00:00Z`).getTime() + jours * 86400000).toISOString().slice(0, 10);
+    if (d.date >= clic && d.date <= limite) {
+      const montant = Number(d.totalTTC ?? d.total ?? d.montant ?? 0) || (d.lignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0) * (1 - (Number(l.remise) || 0) / 100) * (1 + (Number(l.tva) || 0) / 100), 0);
+      out.push({ id: f.id, numero: d.numero, clientId: d.clientId, client: d.clientEntreprise || d.clientNom || "", date: d.date, montant: Math.round(montant), joursApres: Math.round((new Date(`${d.date}T12:00:00Z`) - new Date(`${clic}T12:00:00Z`)) / 86400000) });
+    }
+  }
+  return out.sort((a, b) => b.montant - a.montant);
+};
+
+/// L'engagement de chaque contact sur ses dernières campagnes : une note
+/// de 0 à 5 (ouvre souvent, clique), et la date de la dernière ouverture.
+export const engagementDe = (campagnes = []) => {
+  const t = {};
+  for (const c of campagnes) {
+    for (const d of (c.data || c).destinataires || []) {
+      if (d.statut !== "envoye" || !d.clientId) continue;
+      const e = (t[d.clientId] ||= { envoyes: 0, ouverts: 0, cliques: 0, derniereOuverture: "" });
+      e.envoyes += 1;
+      if (d.ouvert) e.ouverts += 1;
+      if (d.clique) e.cliques += 1;
+      if (d.ouvertLe && d.ouvertLe > e.derniereOuverture) e.derniereOuverture = d.ouvertLe;
+    }
+  }
+  for (const e of Object.values(t)) {
+    const ouv = e.ouverts / e.envoyes;
+    const cli = e.cliques / e.envoyes;
+    e.score = Math.min(5, Math.round(ouv * 3 + cli * 4 + (e.envoyes >= 3 && ouv > 0 ? 0.5 : 0)));
+  }
+  return t;
+};
+
+/// Inactif : a reçu au moins trois campagnes et n'en a ouvert aucune
+/// depuis six mois.
+export const estInactif = (e, maintenant = new Date().toISOString()) =>
+  Boolean(e && e.envoyes >= 3 && (!e.derniereOuverture || e.derniereOuverture < ilYA(182, maintenant)));

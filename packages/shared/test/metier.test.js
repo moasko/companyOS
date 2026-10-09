@@ -133,6 +133,7 @@ test("résume la progression d'une campagne", () => {
       attente: 1,
       ouverts: 1,
       cliques: 1,
+      rebonds: 0,
       desinscrits: 0,
       tauxOuverture: 50,
       tauxClic: 50,

@@ -31,7 +31,7 @@ const clients = [
 
 test("anciens filtres : ville unique et statut « client » deviennent le format courant", () => {
   assert.deepEqual(normaliserFiltres({ statut: "client", ville: "Abidjan", secteur: "" }), {
-    statut: "actif", villes: ["Abidjan"], secteurs: [], achatMois: 0, repos: 0, ids: null,
+    statut: "actif", villes: ["Abidjan"], secteurs: [], etiquettes: [], achatMois: 0, repos: 0, ids: null,
   });
   // Le statut « client » ne correspondait à aucune fiche du CRM : il
   // retrouve désormais les clients actifs.
@@ -66,7 +66,7 @@ test("segment : achat récent (Facturation) et repos après une campagne", () =>
 });
 
 test("santé du fichier", () => {
-  assert.deepEqual(santeDe(clients), { total: 6, joignables: 4, sansEmail: 1, desinscrits: 1 });
+  assert.deepEqual(santeDe(clients), { total: 6, joignables: 4, sansEmail: 1, desinscrits: 1, rebonds: 0, aConfirmer: 0 });
 });
 
 test("aide à la rédaction : objet et durée d'envoi", () => {

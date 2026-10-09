@@ -1,18 +1,19 @@
 // Campagnes — voir index.jsx.
 //
-// Trois écrans : le tableau de bord, l'éditeur en trois étapes (Audience,
-// Message, Envoi) et le rapport. L'état d'une campagne se lit par une
-// étiquette de couleur doublée d'un libellé — jamais par la couleur seule.
-// Les mises en page passent en une colonne quand la fenêtre rétrécit
-// (requêtes de conteneur).
+// Même grammaire que les autres apps de gestion : chiffres tabulaires
+// alignés à droite, couleur réservée aux états et toujours doublée d'un
+// mot. L'accent orange distingue Campagnes ; l'encre presque noire sert
+// aux actions fortes. Les boîtes de dialogue vivent hors de la fenêtre :
+// elles reçoivent les mêmes variables.
 
-.cmpApp {
+@mixin jetons {
   --cm-fond: #f6f7f9;
   --cm-carte: #ffffff;
   --cm-ligne: #e5e7eb;
   --cm-ligne-douce: #f0f1f3;
   --cm-texte: #111827;
   --cm-doux: #4b5563;
+  --cm-pale: #9ca3af;
   --cm-sombre: #18181b;
   --cm-sur-sombre: #ffffff;
   --cm-accent: #c2410c;
@@ -22,25 +23,75 @@
   --cm-ok: #15803d;
   --cm-ok-texte: #166534;
   --cm-ok-fond: #dcfce7;
+  --cm-info: #1d4ed8;
   --cm-info-texte: #1e40af;
   --cm-info-fond: #dbeafe;
   --cm-attention: #d97706;
   --cm-erreur: #b91c1c;
   --cm-erreur-fond: #fef2f2;
+  --cm-erreur-bord: #fecaca;
   --cm-neutre: #6b7280;
   --cm-survol: rgb(0 0 0 / 4%);
   --cm-piste: #eef0f3;
+  --cm-selection: #2563eb;
+}
 
+@mixin jetons-sombres {
+  --cm-fond: #17181c;
+  --cm-carte: #22242a;
+  --cm-ligne: #34373f;
+  --cm-ligne-douce: #2b2e35;
+  --cm-texte: #eceef2;
+  --cm-doux: #a1a8b3;
+  --cm-pale: #6b7280;
+  --cm-sombre: #f4f4f5;
+  --cm-sur-sombre: #18181b;
+  --cm-accent: #fb923c;
+  --cm-accent-texte: #fdba74;
+  --cm-accent-fond: #3a2112;
+  --cm-accent-bord: #7c3a12;
+  --cm-ok: #4ade80;
+  --cm-ok-texte: #86efac;
+  --cm-ok-fond: #14321f;
+  --cm-info: #93c5fd;
+  --cm-info-texte: #93c5fd;
+  --cm-info-fond: #1e2a44;
+  --cm-attention: #fbbf24;
+  --cm-erreur: #fca5a5;
+  --cm-erreur-fond: #3b1d1d;
+  --cm-erreur-bord: #7f1d1d;
+  --cm-neutre: #9ca3af;
+  --cm-survol: rgb(255 255 255 / 5%);
+  --cm-piste: #2f323a;
+  --cm-selection: #60a5fa;
+}
+
+.cmpApp,
+.cmpForm,
+.cmpChoix {
+  @include jetons;
+}
+
+body[data-theme="dark"] {
+  .cmpApp,
+  .cmpForm,
+  .cmpChoix {
+    @include jetons-sombres;
+  }
+}
+
+// ---- Fenêtre et navigation ------------------------------------------------------
+
+.cmpApp {
   background: var(--cm-fond);
   color: var(--cm-texte);
-  container-type: inline-size;
 
   &.floatTab[data-size="mini"] {
-    width: 86%;
-    height: 86%;
-    top: 6%;
-    left: 7%;
-    min-width: min(860px, 96%);
+    width: 88%;
+    height: 88%;
+    top: 5%;
+    left: 6%;
+    min-width: min(900px, 96%);
     min-height: min(560px, 90%);
   }
 
@@ -48,1194 +99,1423 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     flex-grow: 1;
     font-size: 0.84em;
     color: var(--cm-doux);
   }
+
+  .cmpShell {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    font-size: 13.5px;
+
+    button { font: inherit; color: inherit; }
+    input, select, textarea { font: inherit; color: var(--cm-texte); }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible { outline: 2px solid var(--cm-accent); outline-offset: 1px; }
+  }
+
+  .cmpPage {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    container-type: inline-size;
+  }
+
+  .cmpNav {
+    width: 228px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 16px 12px;
+    background: var(--cm-carte);
+    border-right: 1px solid var(--cm-ligne);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    nav { display: flex; flex-direction: column; gap: 2px; }
+  }
+
+  .cmpMarque {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 10px 12px;
+
+    b { font-size: 15px; font-weight: 650; }
+    span { color: var(--cm-doux); font-size: 12px; }
+  }
+
+  .cmpNavGroupe {
+    display: block;
+    padding: 14px 10px 4px;
+    color: var(--cm-pale);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .cmpNavItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+
+    .uicon { display: flex; color: var(--cm-doux); flex-shrink: 0; }
+    span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &:hover { background: var(--cm-survol); }
+
+    &[aria-current="page"] {
+      background: var(--cm-accent-fond);
+      color: var(--cm-accent-texte);
+      font-weight: 600;
+
+      .uicon { color: var(--cm-accent); }
+    }
+  }
+
+  .cmpPastille {
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--cm-accent);
+    color: #fff;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+
+    &[data-ton="rouge"] { background: var(--cm-erreur); }
+  }
+
+  .cmpLangue {
+    margin-top: auto;
+    padding: 14px 10px 0;
+    border-top: 1px solid var(--cm-ligne-douce);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--cm-doux);
+    font-size: 12px;
+
+    b { color: var(--cm-texte); font-weight: 600; }
+  }
 }
 
-body[data-theme="dark"] .cmpApp {
-  --cm-fond: #17181c;
-  --cm-carte: #22242a;
-  --cm-ligne: #34373f;
-  --cm-ligne-douce: #2b2e35;
-  --cm-texte: #eceef2;
-  --cm-doux: #a1a8b3;
-  --cm-sombre: #f4f4f5;
-  --cm-sur-sombre: #18181b;
-  --cm-accent: #ea580c;
-  --cm-accent-texte: #fdba74;
-  --cm-accent-fond: #3a2617;
-  --cm-accent-bord: #7c2d12;
-  --cm-ok: #22c55e;
-  --cm-ok-texte: #86efac;
-  --cm-ok-fond: #14321f;
-  --cm-info-texte: #93c5fd;
-  --cm-info-fond: #1e2a44;
-  --cm-erreur: #fca5a5;
-  --cm-erreur-fond: #3b1d1d;
-  --cm-survol: rgb(255 255 255 / 6%);
-  --cm-piste: #2f323a;
-}
+// ---- Briques communes (aussi dans les boîtes de dialogue) ---------------------------
 
-.cmpApp .cmpShell {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  font-size: 14px;
-
-  button { font: inherit; color: inherit; }
-  input, select, textarea { font: inherit; color: var(--cm-texte); }
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  select:focus-visible { outline: 2px solid var(--cm-sombre); outline-offset: 2px; }
-}
-
-.cmpApp .cmpPage {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.cmpApp .cmpConteneur {
-  box-sizing: border-box;
-  max-width: 1380px;
-  margin: 0 auto;
-  padding: 24px 28px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-// ---- Boutons -----------------------------------------------------------------------
-
-.cmpApp {
-  .cmpPrincipal,
-  .cmpSecondaire,
-  .cmpAction {
+.cmpApp,
+.cmpForm,
+.cmpChoix {
+  .cmpBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    height: 38px;
+    gap: 7px;
+    height: 36px;
     padding: 0 14px;
+    border: 1px solid var(--cm-ligne);
     border-radius: 10px;
+    background: var(--cm-carte);
+    color: var(--cm-texte);
+    font: inherit;
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
 
     .uicon { display: flex; }
-    &:disabled { opacity: 0.5; cursor: default; }
-  }
-
-  .cmpPrincipal { border: 0; background: var(--cm-sombre); color: var(--cm-sur-sombre) !important; }
-  .cmpSecondaire {
-    border: 1px solid var(--cm-ligne);
-    background: var(--cm-carte);
     &:hover:not(:disabled) { background: var(--cm-survol); }
-  }
-  .cmpAction {
-    height: 46px;
-    padding: 0 20px;
-    border: 0;
-    border-radius: 12px;
-    background: var(--cm-accent);
-    color: #ffffff !important;
-    font-weight: 650;
-    &:hover:not(:disabled) { filter: brightness(1.06); }
+    &:disabled { opacity: 0.5; cursor: default; }
+
+    &[data-variante="principal"] {
+      border-color: var(--cm-sombre);
+      background: var(--cm-sombre);
+      color: var(--cm-sur-sombre);
+
+      &:hover:not(:disabled) { opacity: 0.88; background: var(--cm-sombre); }
+    }
   }
 
-  .cmpIcone {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--cm-doux) !important;
-    cursor: pointer;
-
-    .uicon { display: flex; }
-    &:hover:not(:disabled) { background: var(--cm-survol); color: var(--cm-texte) !important; }
-    &:disabled { opacity: 0.4; }
-  }
+  .cmpMt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cmpDoux { color: var(--cm-doux); }
+  .cmpRien { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--cm-doux); }
+  .cmpAide { margin: 0; color: var(--cm-doux); font-size: 12.5px; line-height: 1.5; }
+  .cmpEllipse { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .cmpLien {
     padding: 0;
     border: 0;
     background: none;
-    color: var(--cm-accent-texte) !important;
+    color: var(--cm-accent);
+    font: inherit;
     font-weight: 600;
-    font-size: 13px;
     text-align: left;
     cursor: pointer;
+
     &:hover { text-decoration: underline; }
   }
 
-  .cmpDoux { color: var(--cm-doux); }
-  .cmpNum { font-variant-numeric: tabular-nums; }
-  .cmpMasque { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-}
-
-// ---- En-tête du tableau de bord ---------------------------------------------------
-
-.cmpApp .cmpTete {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-
-  h1 { margin: 0; font-size: 25px; font-weight: 650; letter-spacing: -0.01em; }
-  p { margin: 4px 0 0; color: var(--cm-doux); }
-}
-
-.cmpApp .cmpTeteActions { display: flex; flex-wrap: wrap; gap: 10px; }
-
-.cmpApp .cmpRecherche {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  min-width: 230px;
-  padding: 0 12px;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 10px;
-  background: var(--cm-carte);
-  color: var(--cm-doux);
-
-  .uicon { display: flex; }
-  &:focus-within { border-color: var(--cm-sombre); }
-  input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; }
-}
-
-.cmpApp .cmpBandeau {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--cm-survol);
-  color: var(--cm-doux);
-  font-size: 13px;
-  line-height: 1.45;
-
-  .uicon { display: flex; flex-shrink: 0; }
-  &[data-ton="info"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
-  &[data-ton="accent"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
-  &[data-ton="ok"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
-}
-
-.cmpApp .cmpEditeur > .cmpBandeau { margin: 12px 28px 0; }
-
-// ---- Indicateurs ---------------------------------------------------------------------
-
-.cmpApp .cmpKpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.cmpApp .cmpKpi {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 14px;
-  background: var(--cm-carte);
-  min-width: 0;
-
-  > span:first-child { color: var(--cm-doux); font-size: 12.5px; }
-  > b { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  small { color: var(--cm-doux); font-size: 12px; }
-}
-
-.cmpApp .cmpKpiValeur {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-
-  b { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  em { font-style: normal; font-weight: 600; color: var(--cm-doux); }
-}
-
-// ---- Colonnes et cartes ----------------------------------------------------------------
-
-.cmpApp .cmpColonnes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  align-items: flex-start;
-}
-
-.cmpApp .cmpConteneur.cmpColonnes { flex-direction: row; }
-
-.cmpApp .cmpPrincipale,
-.cmpApp .cmpListe {
-  flex: 999 1 600px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.cmpApp .cmpCote {
-  flex: 1 1 300px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.cmpApp .cmpCoteLarge { flex: 1 1 460px; }
-
-.cmpApp .cmpCarte {
-  border: 1px solid var(--cm-ligne);
-  border-radius: 14px;
-  background: var(--cm-carte);
-  overflow: hidden;
-}
-
-.cmpApp .cmpListe { gap: 0; }
-
-.cmpApp .cmpBloc {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px 20px;
-  overflow: visible;
-
-  h2 { margin: 0; font-size: 15px; font-weight: 650; }
-}
-
-.cmpApp .cmpBlocTete {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-
-  h2 { margin: 0; font-size: 16px; font-weight: 650; }
-  p { margin: 0; color: var(--cm-doux); font-size: 13px; }
-}
-
-.cmpApp .cmpBlocTete.cmpBlocTeteLigne,
-.cmpApp .cmpBlocTeteLigne {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-
-  h2 { margin: 0; font-size: 15px; font-weight: 650; }
-}
-
-.cmpApp .cmpTitreCote { margin: 0; font-size: 14px; font-weight: 650; }
-
-.cmpApp .cmpCarteTete {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--cm-ligne-douce);
-}
-
-.cmpApp .cmpCartePied {
-  padding: 11px 16px;
-  color: var(--cm-doux);
-  font-size: 12.5px;
-}
-
-.cmpApp .cmpOnglets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--cm-piste);
-
-  button {
-    height: 30px;
-    padding: 0 12px;
+  .cmpLienTexte {
+    padding: 0;
     border: 0;
-    border-radius: 8px;
-    background: transparent;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--cm-doux) !important;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
     cursor: pointer;
 
-    span { margin-left: 5px; font-weight: 400; }
-    &[aria-selected="true"] { background: var(--cm-carte); color: var(--cm-texte) !important; box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+    &:hover b { color: var(--cm-accent); }
+  }
+
+  .cmpIcone {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: none;
+    color: var(--cm-doux);
+    cursor: pointer;
+
+    .uicon { display: flex; }
+    &:hover { background: var(--cm-survol); color: var(--cm-texte); }
+  }
+
+  .cmpCase {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+
+    input { accent-color: var(--cm-accent); width: 16px; height: 16px; margin: 0; flex: none; }
+    select { height: 30px; padding: 0 6px; border: 1px solid var(--cm-ligne); border-radius: 8px; background: var(--cm-carte); }
+  }
+
+  .cmpChip {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--cm-piste);
+    color: var(--cm-doux);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+
+    &:first-child { margin-left: 0; }
+    &[data-ton="vert"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+    &[data-ton="orange"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
+    &[data-ton="bleu"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+    &[data-ton="rouge"] { background: var(--cm-erreur-fond); color: var(--cm-erreur); }
+  }
+
+  .cmpChamp {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+
+    > span { display: flex; justify-content: space-between; gap: 8px; color: var(--cm-doux); font-size: 12px; font-weight: 600; }
+    > span small { font-weight: 500; }
+    > span small[data-ton="attention"] { color: var(--cm-attention); }
+    > small { color: var(--cm-doux); font-size: 12px; }
+
+    input, select, textarea {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--cm-ligne);
+      border-radius: 9px;
+      background: var(--cm-carte);
+      color: var(--cm-texte);
+      font: inherit;
+    }
+
+    textarea { padding: 8px 10px; resize: vertical; line-height: 1.5; }
+    input[aria-invalid="true"] { border-color: var(--cm-erreur); }
+  }
+
+  .cmpDeux { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+  .cmpActionsForm { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+  .cmpEncadre {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--cm-accent-fond);
+    color: var(--cm-accent-texte);
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+}
+
+.cmpForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(440px, 82vw);
+  font-size: 13.5px;
+  color: var(--cm-texte);
+}
+
+.cmpChoix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(460px, 82vw);
+  max-height: 60vh;
+  overflow-y: auto;
+
+  button {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 9px;
+    background: none;
+    color: var(--cm-texte);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    small { color: var(--cm-doux); }
+    &:hover { background: var(--cm-accent-fond); }
+  }
+
+  p { color: var(--cm-doux); }
+}
+
+// ---- Page, en-tête, cartes -----------------------------------------------------------
+
+.cmpApp {
+  .cmpVue { display: flex; flex-direction: column; min-height: 100%; }
+
+  .cmpTete {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding: 12px 24px;
+    background: var(--cm-carte);
+    border-bottom: 1px solid var(--cm-ligne);
+  }
+
+  .cmpRetour {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px 6px 0;
+    border: 0;
+    border-right: 1px solid var(--cm-ligne);
+    background: none;
+    color: var(--cm-doux);
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { color: var(--cm-texte); }
+  }
+
+  .cmpTeteTitre {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-right: auto;
+    min-width: 0;
+
+    h1 { margin: 0; font-size: 17px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    span { color: var(--cm-doux); font-size: 12.5px; }
+  }
+
+  .cmpTeteActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  .cmpRecherche {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 10px;
+    background: var(--cm-carte);
+    color: var(--cm-doux);
+
+    .uicon { display: flex; }
+    input { width: 200px; max-width: 100%; border: 0; outline: none; background: transparent; }
+  }
+
+  .cmpConteneur {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .cmpCarte {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 14px;
+    background: var(--cm-carte);
+
+    &[data-ton="accent"] { border: 2px solid var(--cm-accent); }
+    &[data-ton="rouge"] { border-color: var(--cm-erreur-bord); }
+  }
+
+  .cmpCarteTete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
+    h2 { margin: 0; font-size: 15px; font-weight: 650; }
+    p { margin: 3px 0 0; color: var(--cm-doux); font-size: 12.5px; }
+  }
+
+  .cmpCarteActions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .cmpCarte > .cmpBtn { align-self: flex-start; }
+  .cmpCartePied { color: var(--cm-doux); font-size: 12.5px; }
+
+  .cmpGrille {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+
+    > .cmpLarge, > .cmpCarteClics { flex: 999 1 560px; min-width: 0; }
+    > .cmpLarge { display: flex; flex-direction: column; gap: 16px; }
+    > .cmpColonne { flex: 1 1 300px; }
+    > .cmpColonneLarge { flex: 1 1 420px; }
+  }
+
+  .cmpColonne { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .cmpKpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .cmpKpis5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .cmpKpis2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .cmpKpi {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 15px 17px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 14px;
+    background: var(--cm-carte);
+    text-align: left;
+    cursor: pointer;
+
+    &:disabled { cursor: default; opacity: 1; }
+    &:hover:not(:disabled) { border-color: var(--cm-accent-bord); }
+
+    span { color: var(--cm-doux); font-size: 12.5px; }
+    b { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    small { color: var(--cm-doux); font-size: 12px; line-height: 1.4; }
+
+    &[data-ton="vert"] small, &[data-ton="vert"] b { color: var(--cm-ok); }
+    &[data-ton="orange"] b { color: var(--cm-attention); }
+  }
+
+  .cmpOnglets {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-self: flex-start;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--cm-piste);
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 30px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--cm-doux);
+      font-weight: 600;
+      cursor: pointer;
+
+      span { font-weight: 400; color: var(--cm-pale); }
+      &[aria-selected="true"] { background: var(--cm-carte); color: var(--cm-texte); box-shadow: 0 1px 2px rgb(0 0 0 / 10%); }
+    }
+  }
+
+  .cmpBandeau {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 24px;
+    background: var(--cm-accent-fond);
+    color: var(--cm-accent-texte);
+    font-size: 13px;
+
+    .uicon { display: flex; }
+    &[data-ton="bleu"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+    &[data-ton="rouge"] { background: var(--cm-erreur-fond); color: var(--cm-erreur); border-radius: 10px; padding: 10px 14px; }
+  }
+
+  .cmpCarte .cmpBandeau { border-radius: 10px; padding: 10px 14px; }
+
+  .cmpPuce {
+    display: grid;
+    place-items: center;
+    flex: none;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    background: var(--cm-piste);
+    color: var(--cm-doux);
+    font-size: 12px;
+    font-weight: 700;
+
+    &[data-ton="orange"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
+    &[data-ton="rouge"] { background: var(--cm-erreur-fond); color: var(--cm-erreur); }
+    &[data-ton="bleu"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+  }
+
+  .cmpTaches {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 0;
+      border-top: 1px solid var(--cm-ligne-douce);
+
+      &:first-child { border-top: 0; padding-top: 2px; }
+      > span:not(.cmpPuce) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      small { color: var(--cm-doux); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+  }
+
+  .cmpVide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 30px 10px;
+    color: var(--cm-doux);
+    text-align: center;
+
+    b { color: var(--cm-texte); font-size: 15px; }
+  }
+
+  .cmpPiste {
+    display: block;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--cm-piste);
+    overflow: hidden;
+
+    > span { display: block; height: 100%; border-radius: 3px; background: var(--cm-accent); }
+  }
+
+  .cmpProgression {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--cm-piste);
+    overflow: hidden;
+
+    span { display: block; height: 100%; background: var(--cm-accent); transition: width 0.4s; }
+    &[data-pause] span { background: var(--cm-attention); }
   }
 }
 
 // ---- Tableaux ---------------------------------------------------------------------------
 
-.cmpApp .cmpTableau { overflow-x: auto; }
+.cmpApp {
+  .cmpTableau { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; }
 
-.cmpApp .cmpLigne {
-  display: grid;
-  grid-template-columns: minmax(220px, 2.4fr) 130px 90px minmax(140px, 1.2fr) 86px 76px 40px;
-  gap: 12px;
-  align-items: center;
-  min-width: 820px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--cm-ligne-douce);
-
-  &:hover:not(.cmpLigneTete) { background: var(--cm-survol); }
-}
-
-.cmpApp .cmpLigneTete {
-  color: var(--cm-doux);
-  font-size: 12px;
-  padding-top: 9px;
-  padding-bottom: 9px;
-}
-
-.cmpApp .cmpLigneOuvrir {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.cmpApp .cmpPastille {
-  flex: none;
-  width: 8px;
-  height: 34px;
-  border-radius: 4px;
-  background: var(--cm-neutre);
-}
-
-.cmpApp .cmpLigne[data-statut="terminee"] .cmpPastille { background: var(--cm-ok); }
-.cmpApp .cmpLigne[data-statut="envoi"] .cmpPastille { background: var(--cm-accent); }
-.cmpApp .cmpLigne[data-statut="programmee"] .cmpPastille { background: #1d4ed8; }
-.cmpApp .cmpLigne[data-statut="brouillon"] .cmpPastille { background: #9ca3af; }
-
-.cmpApp .cmpLigneNom {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-
-  b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  b { font-weight: 600; }
-  small { color: var(--cm-doux); font-size: 12.5px; }
-}
-
-.cmpApp .cmpStatut {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 99px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  background: var(--cm-piste);
-  color: var(--cm-doux);
-
-  &[data-ton="ok"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
-  &[data-ton="actif"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
-  &[data-ton="attente"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
-}
-
-.cmpApp .cmpEnvoi {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-
-  small { font-size: 12.5px; color: var(--cm-doux); }
-}
-
-.cmpApp .cmpJauge {
-  display: block;
-  height: 5px;
-  border-radius: 99px;
-  background: var(--cm-piste);
-  overflow: hidden;
-
-  > span { display: block; height: 100%; border-radius: 99px; background: var(--cm-accent); }
-  &[data-neutre] > span { background: var(--cm-neutre); }
-}
-
-.cmpApp .cmpJaugeHaute { height: 8px; border-radius: 4px; > span { border-radius: 4px; } }
-
-.cmpApp .cmpVideLigne { padding: 22px 16px; color: var(--cm-doux); text-align: center; }
-
-.cmpApp .cmpVide {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 48px 20px;
-  text-align: center;
-  color: var(--cm-doux);
-
-  > .uicon { color: var(--cm-accent); }
-  b { color: var(--cm-texte); font-size: 15px; }
-  span { max-width: 420px; }
-  .cmpPrincipal { margin-top: 8px; }
-}
-
-// Menu d'actions d'une ligne.
-.cmpApp .cmpMenuZone { position: relative; display: inline-flex; justify-content: flex-end; }
-
-.cmpApp .cmpMenu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  min-width: 220px;
-  padding: 5px;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 10px;
-  background: var(--cm-carte);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 16%);
-
-  button {
-    display: flex;
+  .cmpLigneT {
+    display: grid;
+    gap: 12px;
     align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
+    min-width: 640px;
+    padding: 9px 4px;
     border: 0;
-    border-radius: 7px;
+    border-top: 1px solid var(--cm-ligne-douce);
     background: none;
+    color: inherit;
     text-align: left;
-    cursor: pointer;
+    font-variant-numeric: tabular-nums;
 
-    .uicon { display: flex; color: var(--cm-doux); }
-    &:hover { background: var(--cm-survol); }
-    &[data-danger] { color: var(--cm-erreur) !important; .uicon { color: inherit; } }
+    > * { min-width: 0; }
+    &[data-inactif] { opacity: 0.55; }
+    input[type="checkbox"] { accent-color: var(--cm-accent); width: 16px; height: 16px; margin: 0; }
   }
-}
 
-// ---- Côté du tableau de bord : santé, à faire -------------------------------------
+  .cmpTableau > .cmpLigneT:first-child { border-top: 0; }
+  button.cmpLigneT { width: 100%; cursor: pointer; &:hover { background: var(--cm-survol); } }
+  .cmpEnteteT { border-top: 0; padding-top: 0; color: var(--cm-doux); font-size: 12px; font-weight: 600; }
 
-.cmpApp .cmpEmpile {
-  display: flex;
-  gap: 2px;
-  height: 10px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--cm-piste);
+  .cmpQui {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
 
-  span { display: block; height: 100%; min-width: 0; }
-}
-
-.cmpApp [data-ton="ok"]:is(span, i) { background: var(--cm-ok); }
-.cmpApp [data-ton="attention"]:is(span, i) { background: var(--cm-attention); }
-.cmpApp [data-ton="neutre"]:is(span, i) { background: var(--cm-neutre); }
-
-.cmpApp .cmpLegende {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-
-  li { display: flex; align-items: center; gap: 8px; }
-  i { width: 9px; height: 9px; border-radius: 3px; }
-  b { margin-left: auto; font-variant-numeric: tabular-nums; }
-}
-
-.cmpApp .cmpAFaire {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--cm-piste);
-  font-size: 13px;
-
-  > .uicon { display: flex; margin-top: 2px; flex-shrink: 0; color: var(--cm-doux); }
-  > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  b { font-weight: 600; }
-  small { color: var(--cm-doux); line-height: 1.45; }
-
-  &[data-ton="accent"] { background: var(--cm-accent-fond); > .uicon { color: var(--cm-accent); } }
-  &[data-ton="erreur"] { background: var(--cm-erreur-fond); > .uicon { color: var(--cm-erreur); } }
-}
-
-.cmpApp .cmpLiens { display: flex; gap: 14px; }
-
-// ---- Barre de l'éditeur et du rapport ----------------------------------------------
-
-.cmpApp .cmpEditeur {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.cmpApp .cmpBarre {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 14px;
-  padding: 12px 28px;
-  background: var(--cm-carte);
-  border-bottom: 1px solid var(--cm-ligne);
-}
-
-.cmpApp .cmpRetour {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  margin-left: -8px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  font-weight: 600;
-  color: var(--cm-doux) !important;
-  cursor: pointer;
-
-  .uicon { display: flex; }
-  &:hover { background: var(--cm-survol); color: var(--cm-texte) !important; }
-}
-
-.cmpApp .cmpSep { width: 1px; height: 22px; background: var(--cm-ligne); }
-
-.cmpApp .cmpNomInterne {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-
-  span { font-size: 11px; color: var(--cm-doux); }
-  input {
-    width: 240px;
-    padding: 0;
-    border: 0;
-    border-bottom: 1px dashed transparent;
-    outline: none;
-    background: transparent;
-    font-size: 16px;
-    font-weight: 650;
-
-    &:hover, &:focus { border-bottom-color: var(--cm-ligne); }
-    &[aria-invalid]::placeholder { color: var(--cm-accent-texte); }
+    small { font-size: 12px; }
   }
-}
 
-.cmpApp .cmpEtapes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 auto;
-}
+  .cmpQuiIcone { flex-direction: row; align-items: center; gap: 10px; > span:last-child { display: flex; flex-direction: column; min-width: 0; } }
 
-.cmpApp .cmpEtapeTrait { width: 22px; height: 2px; background: var(--cm-ligne); }
-
-.cmpApp .cmpEtape {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 14px 0 8px;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 99px;
-  background: var(--cm-carte);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--cm-doux) !important;
-  cursor: pointer;
-
-  > b {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--cm-piste);
-    font-size: 11.5px;
-    .uicon { display: flex; }
-  }
-  small { font-weight: 400; }
-
-  &[data-etat="actif"] {
-    border-color: var(--cm-sombre);
-    background: var(--cm-sombre);
-    color: var(--cm-sur-sombre) !important;
-    > b { background: var(--cm-sur-sombre); color: var(--cm-sombre); }
-  }
-  &[data-etat="fait"] {
-    border-color: transparent;
-    background: var(--cm-ok-fond);
-    color: var(--cm-ok-texte) !important;
-    > b { background: var(--cm-ok-texte); color: var(--cm-ok-fond); }
-  }
-}
-
-.cmpApp .cmpBarreActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-
-.cmpApp .cmpRapportTitre {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-right: auto;
-  min-width: 0;
-
-  > span { display: flex; align-items: center; gap: 10px; }
-  b { font-size: 17px; font-weight: 650; }
-  small { color: var(--cm-doux); font-size: 12.5px; }
-}
-
-// ---- Audience ---------------------------------------------------------------------------
-
-.cmpApp .cmpCriteres {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 12px 14px;
-  align-items: center;
-}
-
-.cmpApp .cmpCritere { font-size: 13px; font-weight: 600; color: var(--cm-doux); }
-
-.cmpApp .cmpChips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.cmpApp .cmpChip {
-  height: 32px;
-  padding: 0 14px;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 99px;
-  background: var(--cm-carte);
-  font-size: 13px;
-  cursor: pointer;
-
-  &:hover { background: var(--cm-survol); }
-  &[aria-checked="true"],
-  &[aria-pressed="true"] {
-    border-color: var(--cm-sombre);
-    background: var(--cm-sombre);
-    color: var(--cm-sur-sombre) !important;
-    font-weight: 600;
-  }
-}
-
-.cmpApp .cmpJeton {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 4px 0 12px;
-  border: 1px solid var(--cm-accent-bord);
-  border-radius: 99px;
-  background: var(--cm-accent-fond);
-  color: var(--cm-accent-texte);
-  font-size: 13px;
-  font-weight: 600;
-
-  button {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: none;
-    color: inherit !important;
-    cursor: pointer;
-    .uicon { display: flex; }
-    &:hover { background: rgb(0 0 0 / 6%); }
-  }
-}
-
-.cmpApp .cmpAjouter {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px dashed var(--cm-ligne);
-  border-radius: 99px;
-  background: transparent;
-  font-size: 13px;
-  color: var(--cm-doux);
-  cursor: pointer;
-}
-
-.cmpApp .cmpCase {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-
-  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cm-sombre); }
-  select { height: 32px; padding: 0 8px; border: 1px solid var(--cm-ligne); border-radius: 8px; background: var(--cm-carte); }
-  small { color: var(--cm-doux); }
-}
-
-.cmpApp .cmpLigneDest {
-  grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1.6fr) 110px minmax(0, 1.2fr);
-  min-width: 640px;
-
-  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cm-sombre); }
-  &[data-inactif] > :not(input) { opacity: 0.55; }
-}
-
-.cmpApp .cmpPersonne { display: flex; align-items: center; gap: 10px; min-width: 0; b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
-
-.cmpApp .cmpAvatar {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--cm-piste);
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.cmpApp .cmpLigneDest > span,
-.cmpApp .cmpLigneDest > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-// Le grand chiffre de l'audience.
-.cmpApp .cmpAudience {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  border-radius: 14px;
-  background: var(--cm-sombre);
-  color: var(--cm-sur-sombre);
-
-  > span { font-size: 12.5px; opacity: 0.8; }
-  p { margin: 0; display: flex; align-items: baseline; gap: 8px; opacity: 0.9; }
-  p b { font-size: 44px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; opacity: 1; }
-  ul { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; font-size: 13px; opacity: 0.9; }
-  li { display: flex; justify-content: space-between; gap: 10px; }
-  small { font-size: 12.5px; line-height: 1.5; opacity: 0.8; }
-}
-
-.cmpApp .cmpVerifs {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 13px;
-  color: var(--cm-doux);
-
-  li { display: flex; align-items: center; gap: 10px; }
-  li > span:first-child {
+  .cmpIconeRonde {
     display: grid;
     place-items: center;
     flex: none;
-    width: 20px;
-    height: 20px;
-    box-sizing: border-box;
-    border: 1.5px dashed var(--cm-neutre);
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
+    background: var(--cm-accent-fond);
+    color: var(--cm-accent);
+
     .uicon { display: flex; }
   }
-  li[data-ok] { color: var(--cm-texte); }
-  li[data-ok] > span:first-child { border: 0; background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
-  small { margin-left: auto; font-size: 11.5px; }
-}
 
-.cmpApp .cmpCote > .cmpAction { width: 100%; }
+  .cmpPersonne { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
-// ---- Message ---------------------------------------------------------------------------
-
-.cmpApp .cmpBoutons { display: flex; flex-wrap: wrap; gap: 8px; .cmpSecondaire { height: 34px; font-size: 13px; } }
-
-.cmpApp .cmpChamp {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-
-  > span {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 6px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--cm-texte);
-
-    small { font-weight: 400; color: var(--cm-doux); }
-    small[data-ton="ok"] { color: var(--cm-ok-texte); }
-    small[data-ton="attention"] { color: var(--cm-accent-texte); }
-  }
-
-  input {
-    height: 42px;
-    padding: 0 12px;
-    border: 1px solid var(--cm-ligne);
-    border-radius: 10px;
-    background: var(--cm-carte);
-    outline: none;
-
-    &:focus { border-color: var(--cm-sombre); box-shadow: 0 0 0 3px rgb(24 24 27 / 8%); }
-  }
-
-  &[data-erreur] input { border-color: var(--cm-erreur); }
-}
-
-.cmpApp .cmpRedaction {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 10px;
-  overflow: hidden;
-
-  &:focus-within { border-color: var(--cm-sombre); }
-
-  textarea {
-    min-height: 200px;
-    padding: 12px 14px;
-    border: 0;
-    outline: none;
-    background: var(--cm-carte);
-    line-height: 1.6;
-    resize: vertical;
-  }
-}
-
-.cmpApp .cmpInserer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--cm-ligne-douce);
-  background: var(--cm-fond);
-
-  > span { color: var(--cm-doux); font-size: 12.5px; margin-right: 2px; }
-  button {
-    height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--cm-accent-bord);
-    border-radius: 99px;
-    background: var(--cm-accent-fond);
-    color: var(--cm-accent-texte) !important;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-}
-
-.cmpApp .cmpGrille2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-
-.cmpApp .cmpCouleurs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 14px;
-
-  > span:first-child { font-size: 12.5px; font-weight: 600; }
-  [role="radiogroup"] { display: flex; align-items: center; gap: 8px; }
-  [role="radio"] {
-    width: 28px;
-    height: 28px;
-    border: 3px solid var(--cm-carte);
+  .cmpAvatar {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    box-shadow: 0 0 0 1px var(--cm-ligne);
-    cursor: pointer;
-    &[aria-checked="true"] { box-shadow: 0 0 0 2px var(--cm-sombre); }
+    background: var(--cm-accent-fond);
+    color: var(--cm-accent-texte);
+    font-size: 11px;
+    font-weight: 700;
   }
+
+  .cmpActionsLigne { display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
+  .cmpActivite { font-size: 12.5px; color: var(--cm-doux); &[data-ton="vert"] { color: var(--cm-ok-texte); } &[data-ton="fort"] { color: var(--cm-accent-texte); font-weight: 600; } &[data-ton="rouge"] { color: var(--cm-erreur); } }
+  .cmpEtoiles { color: var(--cm-accent); letter-spacing: 2px; }
+
+  .cmpColsRecentes { grid-template-columns: minmax(0, 2.2fr) 130px 90px 80px 120px; }
+  .cmpColsCampagnes { grid-template-columns: minmax(0, 2.4fr) 130px 100px 90px 80px 120px 72px; }
+  .cmpColsDest { grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .cmpColsRapport { grid-template-columns: minmax(0, 1.6fr) 44px minmax(0, 2fr) 80px 110px; }
+  .cmpColsAutos { grid-template-columns: minmax(0, 2.2fr) 100px 80px 80px 90px 70px; }
+  .cmpColsInscrits { grid-template-columns: minmax(0, 1.6fr) 90px 150px minmax(0, 1.4fr); }
+  .cmpColsContacts { grid-template-columns: 22px minmax(0, 1.8fr) minmax(0, 1.6fr) 100px minmax(0, 1fr) 90px 92px; min-width: 820px; }
 }
 
-.cmpApp .cmpCouleurLibre {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px dashed var(--cm-ligne);
-  border-radius: 50%;
-  color: var(--cm-doux);
-  cursor: pointer;
+// ---- Accueil ------------------------------------------------------------------------------
 
-  .uicon { display: flex; }
-  input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-}
+.cmpApp {
+  .cmpListeAutos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
 
-.cmpApp .cmpFiche {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: auto;
-  font-size: 12.5px;
-  color: var(--cm-accent-texte);
+    li + li { border-top: 1px solid var(--cm-ligne-douce); }
+    button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 0;
+      border: 0;
+      background: none;
+      text-align: left;
+      cursor: pointer;
 
-  .uicon { display: flex; }
-  &[data-ok] { color: var(--cm-ok-texte); }
-}
+      > span:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+      small { color: var(--cm-doux); font-size: 12px; }
+      &:hover b { color: var(--cm-accent); }
+    }
+  }
 
-.cmpApp .cmpBas {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--cm-ligne-douce);
-}
+  .cmpPoint { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--cm-pale); &[data-actif] { background: var(--cm-ok); } }
 
-// ---- Envoi ----------------------------------------------------------------------------
+  .cmpBarreSante {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--cm-piste);
 
-.cmpApp .cmpMoments {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+    span[data-ton="vert"] { background: var(--cm-ok); }
+    span[data-ton="orange"] { background: var(--cm-attention); }
+    span[data-ton="gris"] { background: var(--cm-neutre); }
+    span[data-ton="rouge"] { background: var(--cm-erreur); }
+  }
 
-  button {
+  .cmpLegende {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 3px;
-    padding: 14px;
+    gap: 7px;
+    font-size: 13px;
+
+    li { display: flex; align-items: center; gap: 8px; }
+    b { margin-left: auto; font-variant-numeric: tabular-nums; }
+    i { width: 9px; height: 9px; border-radius: 50%; }
+    i[data-ton="vert"] { background: var(--cm-ok); }
+    i[data-ton="orange"] { background: var(--cm-attention); }
+    i[data-ton="gris"] { background: var(--cm-neutre); }
+    i[data-ton="rouge"] { background: var(--cm-erreur); }
+  }
+}
+
+// ---- Éditeur de campagne ---------------------------------------------------------------
+
+.cmpApp {
+  .cmpVueEditeur { min-height: 100%; }
+
+  .cmpNomInterne {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-right: auto;
+    min-width: 220px;
+
+    span { color: var(--cm-doux); font-size: 11.5px; font-weight: 600; }
+    input { height: 32px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; font-size: 16px; font-weight: 650; }
+    input:hover, input:focus { border-color: var(--cm-ligne); background: var(--cm-carte); }
+    input[aria-invalid="true"] { border-color: var(--cm-accent-bord); }
+  }
+
+  .cmpEtapes {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 12px 0 6px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--cm-piste);
+      color: var(--cm-doux);
+      font-weight: 600;
+      cursor: pointer;
+
+      b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--cm-carte); font-size: 11.5px; .uicon { display: flex; } }
+      small { font-weight: 500; opacity: 0.8; }
+      &[data-etat="fait"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+      &[data-etat="actif"] { background: var(--cm-sombre); color: var(--cm-sur-sombre); b { background: var(--cm-accent); color: #fff; } }
+    }
+  }
+
+  .cmpCriteres {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 14px 16px;
+    align-items: center;
+  }
+
+  .cmpCritere { color: var(--cm-doux); font-size: 12.5px; font-weight: 600; }
+  .cmpChips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+  .cmpChipBouton {
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 999px;
+    background: var(--cm-carte);
+    color: var(--cm-doux);
+    font-weight: 600;
+    cursor: pointer;
+
+    &[aria-checked="true"], &[aria-pressed="true"] { border-color: var(--cm-sombre); background: var(--cm-sombre); color: var(--cm-sur-sombre); }
+  }
+
+  .cmpJeton {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 4px 0 10px;
+    border-radius: 999px;
+    background: var(--cm-accent-fond);
+    color: var(--cm-accent-texte);
+    font-weight: 600;
+
+    button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; .uicon { display: flex; } }
+  }
+
+  .cmpAjouter { height: 30px; padding: 0 8px; border: 1px dashed var(--cm-ligne); border-radius: 999px; background: transparent; color: var(--cm-doux); }
+
+  .cmpAudience {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border-radius: 14px;
+    background: var(--cm-sombre);
+    color: var(--cm-sur-sombre);
+
+    > span { font-size: 12.5px; opacity: 0.8; }
+    p { margin: 0; display: flex; align-items: baseline; gap: 8px; }
+    p b { font-size: 42px; font-weight: 650; line-height: 1; font-variant-numeric: tabular-nums; }
+    ul { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; font-size: 13px; opacity: 0.9; }
+    li { display: flex; justify-content: space-between; gap: 10px; }
+    small { font-size: 12.5px; line-height: 1.5; opacity: 0.8; }
+  }
+
+  .cmpVerifs {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    color: var(--cm-doux);
+
+    li { display: flex; align-items: center; gap: 10px; }
+    li > span:first-child { display: grid; place-items: center; flex: none; width: 20px; height: 20px; box-sizing: border-box; border: 1.5px dashed var(--cm-neutre); border-radius: 50%; font-size: 11px; font-weight: 700; .uicon { display: flex; } }
+    li[data-ok] { color: var(--cm-texte); }
+    li[data-ok] > span:first-child { border: 0; background: var(--cm-ok); color: #fff; }
+    li[data-conseil]:not([data-ok]) > span:first-child { border-color: var(--cm-attention); color: var(--cm-attention); }
+    small { margin-left: auto; color: var(--cm-attention); }
+  }
+
+  .cmpMoments {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+
+    button {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 14px 16px;
+      border: 1px solid var(--cm-ligne);
+      border-radius: 12px;
+      background: var(--cm-carte);
+      text-align: left;
+      cursor: pointer;
+
+      small { color: var(--cm-doux); }
+      &[aria-checked="true"] { border: 2px solid var(--cm-sombre); padding: 13px 15px; }
+    }
+  }
+
+  .cmpCreneaux {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+
+    input { height: 32px; padding: 0 8px; border: 1px solid var(--cm-ligne); border-radius: 9px; background: var(--cm-carte); }
+  }
+
+  .cmpRecap {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-top: 1px solid var(--cm-ligne-douce); }
+    li:first-child { border-top: 0; }
+    span { color: var(--cm-doux); }
+    b { text-align: right; overflow: hidden; text-overflow: ellipsis; }
+  }
+
+  .cmpLancement {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: var(--cm-carte);
+    border: 1px solid var(--cm-ligne);
+
+    em { color: var(--cm-erreur); font-style: normal; }
+  }
+
+  // L'aperçu, tel que le destinataire le recevra.
+  .cmpApercu { display: flex; flex-direction: column; gap: 12px; }
+
+  .cmpBoite {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
     border: 1px solid var(--cm-ligne);
     border-radius: 12px;
     background: var(--cm-carte);
-    text-align: left;
+
+    .cmpAvatar { width: 36px; height: 36px; background: var(--cm-accent); color: #fff; }
+  }
+
+  .cmpBoiteTexte {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+
+    > span { display: flex; justify-content: space-between; gap: 8px; }
+    b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    small { color: var(--cm-doux); font-size: 12.5px; }
+  }
+
+  .cmpCadre {
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--cm-piste);
+
+    iframe { display: block; width: 100%; height: 560px; margin: 0 auto; border: 0; border-radius: 10px; background: #f2f4f7; transition: width 0.2s; }
+  }
+
+  .cmpApercu[data-appareil="mobile"] .cmpCadre iframe { width: 375px; max-width: 100%; height: 640px; border: 8px solid #18181b; border-radius: 28px; }
+}
+
+// ---- Éditeur par blocs -------------------------------------------------------------------
+
+.cmpApp {
+  .cmpEditeurBlocs {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .cmpPalette,
+  .cmpReglages {
+    box-sizing: border-box;
+    padding: 16px;
+    background: var(--cm-carte);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    h3 { margin: 0; font-size: 14px; font-weight: 650; }
+  }
+
+  .cmpPalette { flex: 1 1 220px; max-width: 250px; border-right: 1px solid var(--cm-ligne); }
+
+  .cmpPaletteGrille {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+
+    button {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 3px;
+      min-height: 70px;
+      padding: 10px;
+      border: 1px solid var(--cm-ligne);
+      border-radius: 10px;
+      background: var(--cm-carte);
+      text-align: left;
+      cursor: grab;
+
+      .uicon { display: flex; color: var(--cm-accent); }
+      b { font-size: 13px; font-weight: 600; }
+      small { color: var(--cm-doux); font-size: 11.5px; line-height: 1.3; }
+      &:hover:not(:disabled) { border-color: var(--cm-accent-bord); background: var(--cm-accent-fond); }
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
+  }
+
+  .cmpPlan {
+    flex: 999 1 520px;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 16px 20px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+
+    > .cmpApercu { width: 100%; max-width: 680px; }
+  }
+
+  .cmpPlanBarre { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; width: 100%; max-width: 640px; }
+
+  .cmpFeuille {
+    width: 100%;
+    max-width: 600px;
+    box-sizing: border-box;
+    padding-bottom: 6px;
+    background: #ffffff;
+    color: #26313d;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 6%);
+    overflow: hidden;
+  }
+
+  .cmpFeuilleTete { padding: 16px 28px; color: #fff; font-size: 12.5px; font-weight: 600; opacity: 0.95; }
+  .cmpFeuillePied { margin: 10px 20px 4px; padding-top: 10px; border-top: 1px solid #edf0f3; color: #8a94a1; font-size: 11.5px; text-align: center; }
+
+  .cmpFeuilleVide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 20px;
+    padding: 40px 10px;
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    color: #6b7280;
+    .uicon { display: flex; }
+  }
+
+  .cmpBlocPlan {
+    position: relative;
+    margin: 4px 8px;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+
+    &:hover { border-color: #bfdbfe; }
+    &:focus-visible { border-color: var(--cm-selection); }
+    &[data-choisi] { border-color: var(--cm-selection); }
+    &[data-choisi] .cmpBlocType, &:hover .cmpBlocType { display: block; }
+  }
+
+  .cmpBlocType {
+    display: none;
+    position: absolute;
+    top: -11px;
+    left: 8px;
+    z-index: 2;
+    padding: 1px 8px;
+    border-radius: 6px;
+    background: var(--cm-selection);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .cmpBlocOutils {
+    position: absolute;
+    top: -14px;
+    right: 6px;
+    z-index: 2;
+    display: flex;
+    gap: 2px;
+
+    button { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 6px; background: var(--cm-selection); color: #fff; cursor: pointer; .uicon { display: flex; } &:disabled { opacity: 0.45; cursor: default; } }
+  }
+
+  .cmpBlocRendu { pointer-events: auto; a { pointer-events: none; } img { max-width: 100%; } }
+  .cmpBlocVide { margin: 6px 20px; padding: 18px; border: 1px dashed #d1d5db; border-radius: 8px; color: #6b7280; font-size: 12.5px; text-align: center; }
+  .cmpLienManquant { position: absolute; bottom: 4px; right: 8px; padding: 1px 8px; border-radius: 6px; background: #fff7ed; color: #9a3412; font-size: 11px; font-weight: 700; }
+  .cmpInsertion { height: 4px; margin: 2px 12px; border-radius: 2px; background: var(--cm-selection); }
+
+  .cmpReglages {
+    flex: 1 1 300px;
+    max-width: 340px;
+    border-left: 1px solid var(--cm-ligne);
+
+    > section { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--cm-ligne-douce); }
+    > section:last-child { border-bottom: 0; }
+  }
+
+  .cmpReglageTete { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .cmpConseil { margin: 0; color: var(--cm-attention); font-size: 12px; }
+
+  .cmpVariables {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    color: var(--cm-doux);
+    font-size: 12px;
+
+    button { height: 26px; padding: 0 8px; border: 1px solid var(--cm-ligne); border-radius: 7px; background: var(--cm-piste); font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; cursor: pointer; &:hover { border-color: var(--cm-accent-bord); } }
+  }
+
+  .cmpCouleurs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+
+    > button { width: 28px; height: 28px; border: 2px solid var(--cm-carte); border-radius: 50%; box-shadow: 0 0 0 1px var(--cm-ligne); cursor: pointer; &[aria-checked="true"] { box-shadow: 0 0 0 2px var(--cm-texte); } }
+  }
+
+  .cmpCouleurLibre {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 1px dashed var(--cm-ligne);
+    border-radius: 50%;
+    color: var(--cm-doux);
     cursor: pointer;
 
-    b { font-weight: 650; }
-    small { color: var(--cm-doux); font-size: 12.5px; }
-    &[aria-checked="true"] { border: 2px solid var(--cm-sombre); padding: 13px; }
+    .uicon { display: flex; }
+    input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   }
+
+  .cmpBoutonsLigne { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  .cmpProduitChoisi { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 9px; background: var(--cm-accent-fond); input { height: 30px; padding: 0 8px; border: 1px solid var(--cm-ligne); border-radius: 7px; background: var(--cm-carte); } }
+  .cmpPetiteRecherche { height: 32px; padding: 0 10px; border: 1px solid var(--cm-ligne); border-radius: 9px; background: var(--cm-carte); }
+  .cmpListeArticles { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; small { margin-left: auto; color: var(--cm-doux); } }
 }
 
-.cmpApp .cmpCreneaux {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+// ---- Rapport --------------------------------------------------------------------------------
 
-  input {
-    height: 32px;
-    padding: 0 10px;
+.cmpApp {
+  .cmpAB { display: flex; flex-wrap: wrap; gap: 14px; > .cmpEncadre { flex: 1 1 100%; } }
+
+  .cmpVariante {
+    flex: 1 1 380px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px;
     border: 1px solid var(--cm-ligne);
-    border-radius: 99px;
+    border-radius: 14px;
     background: var(--cm-carte);
+
+    &[data-gagnant] { border: 2px solid var(--cm-ok); }
   }
+
+  .cmpVarianteTete { display: flex; justify-content: space-between; align-items: center; gap: 10px; b { color: var(--cm-doux); font-size: 12.5px; } }
+  .cmpVarianteObjet { font-size: 15px; font-weight: 600; }
+  .cmpVarianteChiffres { display: flex; gap: 24px; span { display: flex; flex-direction: column; } small { color: var(--cm-doux); } b { font-size: 22px; font-variant-numeric: tabular-nums; } }
+
+  .cmpFeuilleClics { align-self: center; }
+  .cmpBlocClics { cursor: default; &:hover { border-color: transparent; } }
+
+  .cmpBadgeClics {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 2;
+    padding: 3px 9px;
+    border-radius: 7px;
+    background: #18181b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cmpLiens,
+  .cmpVentes,
+  .cmpATraiter {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li { display: grid; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--cm-ligne-douce); }
+    li:first-child { border-top: 0; }
+  }
+
+  .cmpLiens li { grid-template-columns: minmax(0, 1fr) 50px 120px; }
+  .cmpVentes li { grid-template-columns: minmax(0, 1fr) auto; }
+  .cmpATraiter li {
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: flex-start;
+
+    > b { font-size: 18px; font-variant-numeric: tabular-nums; &[data-ton="rouge"] { color: var(--cm-erreur); } &[data-ton="orange"] { color: var(--cm-attention); } }
+    > span { display: flex; flex-direction: column; gap: 2px; small { color: var(--cm-doux); } }
+  }
+
+  .cmpCourbe { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+  .cmpCourbeZone { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; height: 180px; }
+  .cmpAxe { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; padding-bottom: 2px; color: var(--cm-doux); font-size: 11px; }
+  .cmpBarres { display: flex; align-items: stretch; gap: 2px; border-bottom: 1px solid var(--cm-ligne); }
+  .cmpBarreH { flex: 1 1 0; min-width: 0; display: flex; align-items: flex-end; > span { display: block; width: 100%; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--cm-accent); &[data-vide] { min-height: 0; } } }
+  .cmpGraduations { display: flex; justify-content: space-between; margin-left: 42px; color: var(--cm-doux); font-size: 11px; }
 }
 
-.cmpApp .cmpTest {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px;
+// ---- Automatisations ----------------------------------------------------------------------
 
-  .cmpChamp { flex: 1 1 260px; }
-  .cmpSecondaire { height: 42px; }
-}
+.cmpApp {
+  .cmpRecettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 
-.cmpApp .cmpLancement {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding-top: 14px;
-  border-top: 1px solid var(--cm-ligne-douce);
+  .cmpRecette {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 14px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 12px;
 
-  > span { flex: 1 1 260px; color: var(--cm-doux); font-size: 13px; line-height: 1.5; }
-  em { font-style: normal; color: var(--cm-accent-texte); }
-}
+    small { color: var(--cm-doux); font-size: 12.5px; flex: 1; }
+    .cmpBtn { margin-top: 4px; }
+  }
 
-// ---- Aperçu du mail --------------------------------------------------------------------
+  .cmpRecetteSource { display: flex; flex-wrap: wrap; gap: 4px; .cmpChip { margin: 0; } }
 
-.cmpApp .cmpApercu {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+  .cmpScenario { display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
+  .cmpFleche { width: 2px; height: 24px; background: var(--cm-ligne); }
 
-.cmpApp .cmpBoite {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--cm-ligne);
-  border-radius: 12px;
-  background: var(--cm-carte);
-
-  .cmpAvatar { width: 36px; height: 36px; background: var(--cm-accent); color: #ffffff; }
-}
-
-.cmpApp .cmpBoiteTexte {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-
-  > span { display: flex; justify-content: space-between; gap: 8px; }
-  b, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  > b { font-weight: 600; }
-  small { color: var(--cm-doux); font-size: 12.5px; }
-}
-
-.cmpApp .cmpCadre {
-  padding: 16px;
-  border-radius: 14px;
-  background: var(--cm-piste);
-
-  iframe {
-    display: block;
+  .cmpEtapeScenario {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     width: 100%;
-    height: 520px;
-    margin: 0 auto;
-    border: 0;
-    border-radius: 10px;
+    max-width: 620px;
+    box-sizing: border-box;
+    padding: 14px 16px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 12px;
+    background: var(--cm-carte);
+
+    &[data-ton="noir"] { border: 2px solid var(--cm-accent); }
+  }
+
+  .cmpEtapeType {
+    flex: none;
+    min-width: 92px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--cm-piste);
+    color: var(--cm-doux);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .cmpEtapeScenario[data-ton="bleu"] .cmpEtapeType { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+  .cmpEtapeScenario[data-ton="orange"] .cmpEtapeType { background: var(--cm-accent-fond); color: var(--cm-accent-texte); }
+  .cmpEtapeScenario[data-ton="noir"] .cmpEtapeType { background: var(--cm-sombre); color: var(--cm-sur-sombre); }
+
+  .cmpEtapeTexte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; small { color: var(--cm-doux); } }
+  .cmpEtapeStat { color: var(--cm-doux); text-align: right; white-space: pre-line; font-variant-numeric: tabular-nums; }
+}
+
+// ---- Modèles ----------------------------------------------------------------------------------
+
+.cmpApp {
+  .cmpModeles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+
+  .cmpModele {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 12px;
+
+    small { color: var(--cm-doux); font-size: 12.5px; flex: 1; }
+  }
+
+  .cmpMiniature {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    height: 150px;
+    padding: 0 0 8px;
+    border-radius: 8px;
     background: #f2f4f7;
-    transition: width 0.2s;
+    overflow: hidden;
+  }
+
+  .cmpMiniTete { height: 22px; }
+
+  .cmpMiniBloc {
+    margin: 0 14px;
+    height: 8px;
+    border-radius: 3px;
+    background: #d6dbe2;
+
+    &[data-type="titre"] { height: 12px; width: 60%; background: #9aa3af; }
+    &[data-type="image"] { height: 36px; background: #e5d5c8; }
+    &[data-type="bouton"] { height: 12px; width: 40%; align-self: center; }
+    &[data-type="produits"], &[data-type="colonnes"] { height: 24px; background: repeating-linear-gradient(90deg, #d6dbe2 0 47%, transparent 47% 53%); }
+    &[data-type="separateur"] { height: 1px; }
+    &[data-type="promo"] { height: 16px; border: 1px dashed #9aa3af; background: transparent; }
   }
 }
 
-.cmpApp .cmpApercu[data-appareil="mobile"] .cmpCadre iframe {
-  width: 375px;
-  max-width: 100%;
-  height: 640px;
-  border: 8px solid #18181b;
-  border-radius: 28px;
-}
+// ---- Contacts ------------------------------------------------------------------------------
 
-// ---- Rapport ------------------------------------------------------------------------------
+.cmpApp {
+  .cmpAvecListes { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; > .cmpLarge { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px; } }
 
-.cmpApp .cmpProgression {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--cm-piste);
-  overflow: hidden;
+  .cmpListes {
+    flex: 1 1 200px;
+    max-width: 230px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 
-  span { display: block; height: 100%; background: var(--cm-accent); transition: width 0.4s; }
-}
+    button {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: none;
+      text-align: left;
+      cursor: pointer;
 
-.cmpApp .cmpCourbe {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-
-  figcaption { color: var(--cm-doux); font-size: 12px; }
-}
-
-.cmpApp .cmpCourbeZone {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 8px;
-  height: 200px;
-}
-
-.cmpApp .cmpAxe {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-bottom: 2px;
-  color: var(--cm-doux);
-  font-size: 11px;
-}
-
-.cmpApp .cmpBarres {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  border-bottom: 1px solid var(--cm-ligne);
-  background:
-    linear-gradient(var(--cm-ligne-douce), var(--cm-ligne-douce)) 0 0 / 100% 1px no-repeat,
-    linear-gradient(var(--cm-ligne-douce), var(--cm-ligne-douce)) 0 50% / 100% 1px no-repeat;
-}
-
-// Chaque barre a une zone de survol de toute la hauteur : on vise la
-// colonne, pas un trait de deux pixels.
-.cmpApp .cmpBarreH {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  align-items: flex-end;
-  cursor: default;
-
-  > span {
-    display: block;
-    width: 100%;
-    min-height: 2px;
-    border-radius: 4px 4px 0 0;
-    background: var(--cm-accent);
-    &[data-vide] { min-height: 0; }
+      span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      small { color: var(--cm-doux); font-variant-numeric: tabular-nums; }
+      &:hover { background: var(--cm-survol); }
+      &[aria-pressed="true"] { background: var(--cm-accent-fond); color: var(--cm-accent-texte); font-weight: 600; }
+    }
   }
-  &:hover > span { filter: brightness(1.15); }
-  &:hover { background: var(--cm-survol); }
+
+  .cmpSelection { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--cm-info-fond); color: var(--cm-info-texte); }
+
+  .cmpMiniEtapes {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12.5px;
+    font-weight: 600;
+
+    li { padding: 4px 10px; border-radius: 999px; background: var(--cm-piste); color: var(--cm-doux); }
+    li[data-etat="fait"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+    li[data-etat="actif"] { background: var(--cm-sombre); color: var(--cm-sur-sombre); }
+  }
+
+  .cmpImportDepart { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; .cmpAide { flex: 1 1 100%; } }
+
+  .cmpColonnesImport { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+
+  .cmpColonneImport {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--cm-ligne);
+    border-radius: 10px;
+    background: var(--cm-fond);
+
+    small { color: var(--cm-doux); }
+    select { height: 34px; padding: 0 8px; border: 1px solid var(--cm-ligne); border-radius: 8px; background: var(--cm-carte); font-weight: 600; }
+    span { font-size: 12.5px; color: var(--cm-doux); }
+  }
+
+  .cmpBilan {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    span { padding: 6px 12px; border-radius: 10px; background: var(--cm-piste); font-size: 13px; }
+    span[data-ton="vert"] { background: var(--cm-ok-fond); color: var(--cm-ok-texte); }
+    span[data-ton="bleu"] { background: var(--cm-info-fond); color: var(--cm-info-texte); }
+    span[data-ton="rouge"] { background: var(--cm-erreur-fond); color: var(--cm-erreur); }
+  }
+
+  .cmpImportOptions { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .cmpConsentement { align-items: flex-start !important; line-height: 1.5; input { margin-top: 3px; } }
 }
 
-.cmpApp .cmpGraduations {
-  display: flex;
-  justify-content: space-between;
-  margin-left: 42px;
-  color: var(--cm-doux);
-  font-size: 11px;
+// ---- Formulaire ------------------------------------------------------------------------------
+
+.cmpApp {
+  .cmpCopie {
+    display: flex;
+    gap: 8px;
+
+    input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--cm-ligne); border-radius: 9px; background: var(--cm-fond); font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+  }
+
+  .cmpCarte textarea[readonly] { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--cm-fond); }
+
+  .cmpEtapesTexte {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; .uicon { display: flex; margin-top: 3px; color: var(--cm-accent); } }
+  }
 }
 
-.cmpApp .cmpMessageLu {
-  margin: 0;
-  max-height: 160px;
-  overflow: auto;
-  white-space: pre-wrap;
-  color: var(--cm-doux);
-  font-size: 13px;
-  line-height: 1.55;
+// ---- Petites largeurs ------------------------------------------------------------------------
+
+@container (max-width: 1000px) {
+  .cmpApp .cmpPalette { max-width: none; flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--cm-ligne); }
+  .cmpApp .cmpPaletteGrille { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .cmpApp .cmpReglages { max-width: none; flex-basis: 100%; border-left: 0; border-top: 1px solid var(--cm-ligne); }
+  .cmpApp .cmpKpis, .cmpApp .cmpKpis5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-.cmpApp .cmpLigneRapport {
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) 110px minmax(0, 1.6fr) 100px;
-  min-width: 760px;
-
-  > b, > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  > b { font-weight: 600; }
+@container (max-width: 560px) {
+  .cmpApp {
+    .cmpTete { padding: 10px 14px; }
+    .cmpConteneur { padding: 14px 14px 30px; }
+    .cmpKpis, .cmpKpis5 { grid-template-columns: minmax(0, 1fr); }
+    .cmpCriteres { grid-template-columns: minmax(0, 1fr); }
+    .cmpMoments, .cmpDeux { grid-template-columns: minmax(0, 1fr); }
+    .cmpNomInterne { min-width: 0; flex: 1 1 100%; }
+    .cmpListes { max-width: none; flex-basis: 100%; }
+    .cmpPlan { order: -1; padding: 12px 8px 20px; }
+    .cmpEtapes { flex-wrap: wrap; }
+    .cmpPaletteGrille { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+    .cmpPaletteGrille button { min-height: 0; small { display: none; } }
+    .cmpPalette > .cmpAide { display: none; }
+  }
 }
 
-.cmpApp .cmpActivite {
-  font-size: 12.5px;
-  color: var(--cm-doux);
-
-  &[data-ton="ok"] { color: var(--cm-texte); }
-  &[data-ton="fort"] { color: var(--cm-ok-texte); font-weight: 600; }
-  &[data-ton="erreur"] { color: var(--cm-erreur); }
-}
-
-// ---- Fenêtre étroite ---------------------------------------------------------------------
-
-@container (max-width: 1100px) {
-  .cmpApp .cmpKpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cmpApp .cmpEtapes { order: 5; width: 100%; justify-content: center; }
-}
-
-@container (max-width: 720px) {
-  .cmpApp .cmpConteneur { padding: 16px; }
-  .cmpApp .cmpBarre { padding: 10px 16px; }
-  .cmpApp .cmpKpis { grid-template-columns: minmax(0, 1fr); }
-  .cmpApp .cmpCriteres { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-  .cmpApp .cmpCritere { margin-top: 8px; }
-  .cmpApp .cmpGrille2,
-  .cmpApp .cmpMoments { grid-template-columns: minmax(0, 1fr); }
-  .cmpApp .cmpEtape small,
-  .cmpApp .cmpEtapeTrait { display: none; }
-  .cmpApp .cmpNomInterne input { width: 160px; }
-  .cmpApp .cmpRecherche { min-width: 0; flex: 1; }
+@media (max-width: 720px) {
+  .cmpApp .cmpNav { width: 64px; padding: 12px 6px; }
+  .cmpApp .cmpNav .cmpMarque,
+  .cmpApp .cmpNav .cmpNavGroupe,
+  .cmpApp .cmpNav .cmpLangue,
+  .cmpApp .cmpNavItem span { display: none; }
+  .cmpApp .cmpNavItem { justify-content: center; position: relative; }
+  .cmpApp .cmpNavItem .cmpPastille { position: absolute; top: 0; right: 0; min-width: 16px; line-height: 16px; font-size: 10px; padding: 0 3px; }
 }

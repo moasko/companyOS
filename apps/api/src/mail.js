@@ -61,7 +61,7 @@ export const mailActif = () => transporteur !== null;
 /// annuler.
 export const envoyerVia = async (
   transport,
-  { de, a, cc, sujet, texte, html, piecesJointes },
+  { de, a, cc, sujet, texte, html, piecesJointes, entetes },
 ) => {
   if (!transport) return { envoye: false, erreur: "Aucun relais SMTP configuré." };
   try {
@@ -73,6 +73,8 @@ export const envoyerVia = async (
       text: texte,
       html,
       attachments: piecesJointes,
+      // En-têtes propres à l'envoi de masse (List-Unsubscribe…).
+      headers: entetes || undefined,
     });
     return { envoye: true };
   } catch (err) {

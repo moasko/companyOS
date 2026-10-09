@@ -132,6 +132,14 @@ export const api = {
     request("/courrier/reglages", { method: "PUT", body: data }),
   courrierEnvoyer: (data) => request("/courrier/envoyer", { method: "POST", body: data }),
 
+  // Campagnes — e-mail de test (vrai rendu, membres de l'équipe), pause et
+  // reprise d'un envoi, adresse du formulaire d'inscription public.
+  campagnesTester: (message, adresses, exemple) =>
+    request("/campagnes/test", { method: "POST", body: { message, adresses, exemple } }),
+  campagnesPause: (id) => request(`/campagnes/${id}/pause`, { method: "POST", body: {} }),
+  campagnesReprendre: (id) => request(`/campagnes/${id}/reprendre`, { method: "POST", body: {} }),
+  campagnesFormulaire: () => request("/campagnes/formulaire"),
+
   // Console de l'exploitant du SaaS — réservée aux emails PLATFORM_ADMINS.
   plateforme: () => request("/plateforme"),
   plateformeFormule: (tenantId, plan) =>
