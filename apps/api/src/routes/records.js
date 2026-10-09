@@ -25,10 +25,17 @@ const MAX_DATA_BYTES = 64 * 1024;
 const MAX_CLASSEUR_BYTES = 8 * 1024 * 1024;
 const MAX_RECORD_BODY_BYTES = 10 * 1024 * 1024;
 
+/// Une campagne porte ses destinataires (et leurs ouvertures, clics…), une
+/// automatisation ses inscrits : quelques centaines d'octets par personne.
+/// 64 Ko plafonnaient une campagne à environ trois cents clients.
+const MAX_EMAILING_BYTES = 4 * 1024 * 1024;
+
 const limiteDonnees = (names) =>
   names?.module === "classeur" && names?.collection === "classeurs"
     ? MAX_CLASSEUR_BYTES
-    : MAX_DATA_BYTES;
+    : names?.module === "campagnes" && ["campagnes", "automatisations"].includes(names?.collection)
+      ? MAX_EMAILING_BYTES
+      : MAX_DATA_BYTES;
 
 /// Collections lues par un **moteur** du serveur, et non par un simple
 /// écran.
@@ -49,6 +56,8 @@ const limiteDonnees = (names) =>
 /// de mal.
 const COLLECTIONS_MOTEUR = new Set([
   "campagnes/campagnes",
+  "campagnes/automatisations",
+  "campagnes/modeles",
   "courrier/modeles",
   "courrier/envois",
   "relances/relances",
