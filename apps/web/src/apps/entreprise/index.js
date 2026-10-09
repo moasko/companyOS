@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useSyncExternalStore } from "react";
-import { api, getToken } from "../../api/client";
+import { api, cleSession } from "../../api/client";
 import { TAILLE_MAX, tailleFiche } from "./domaine";
 
 export const MODULE_ENTREPRISE = "entreprise";
@@ -49,8 +49,8 @@ const publier = (suite) => {
 
 /// Lit la fiche (une fois par session) et la renvoie, ou `null`.
 export const chargerEntreprise = async ({ force = false } = {}) => {
-  // Le jeton change quand on change d'espace : la fiche aussi.
-  const cle = getToken();
+  // La clé change à chaque connexion : changer de compte recharge la fiche.
+  const cle = cleSession();
   if (!force && etat.charge && etat.cle === cle) return etat.fiche;
   if (!force && enCours) return enCours;
   enCours = api.records
@@ -78,7 +78,7 @@ export const enregistrerEntreprise = async (data) => {
   const fiche = etat.id
     ? await api.records.update(MODULE_ENTREPRISE, COLLECTION_ENTREPRISE, etat.id, data)
     : await api.records.create(MODULE_ENTREPRISE, COLLECTION_ENTREPRISE, data);
-  publier({ fiche: fiche.data, id: fiche.id, charge: true, erreur: null, cle: getToken() });
+  publier({ fiche: fiche.data, id: fiche.id, charge: true, erreur: null, cle: cleSession() });
   return fiche.data;
 };
 

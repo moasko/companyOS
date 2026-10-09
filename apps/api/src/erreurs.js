@@ -53,14 +53,29 @@ export const empreinteDe = ({ source, message, pile }) =>
 // Les alertes par courriel sont plafonnées : une panne qui produit cent
 // erreurs différentes en une minute ne doit pas produire cent courriels.
 const ALERTES_PAR_HEURE = 10;
-let alertes = [];
+let alertes = { api: [], web: [] };
+
+/// Rapports **anonymes** (sans session) : la route est publique, donc
+/// ouverte à n'importe quel script. Plafonds :
+///   - empreintes nouvelles par heure, toutes IP confondues ;
+///   - taille totale du journal — au-delà, plus rien d'anonyme n'entre.
+/// Un rapport anonyme n'envoie pas d'alerte par courriel (le texte vient
+/// de l'extérieur : ce serait offrir aux exploitants un message
+/// d'hameçonnage), ne rouvre pas une erreur résolue et n'écrase pas
+/// l'attribution d'une erreur déjà connue.
+const ANONYMES_NOUVEAUX_PAR_HEURE = 100;
+const JOURNAL_MAX_LIGNES = 20_000;
+let anonymesNouveaux = [];
 
 const alerter = async (erreur) => {
   if (!env.plateformeAdmins.length) return;
   const maintenant = Date.now();
-  alertes = alertes.filter((t) => maintenant - t < 3600_000);
-  if (alertes.length >= ALERTES_PAR_HEURE) return;
-  alertes.push(maintenant);
+  // Un budget par source : un navigateur qui invente dix erreurs par heure
+  // ne doit pas faire taire les alertes du serveur.
+  const pile = erreur.source === "api" ? "api" : "web";
+  alertes[pile] = alertes[pile].filter((t) => maintenant - t < 3600_000);
+  if (alertes[pile].length >= ALERTES_PAR_HEURE) return;
+  alertes[pile].push(maintenant);
 
   const lien = env.urlPublique ? `\n\nConsole Plateforme : ${env.urlPublique}` : "";
   for (const a of env.plateformeAdmins) {
@@ -79,7 +94,7 @@ const alerter = async (erreur) => {
 };
 
 /// Consigne une erreur. Ne lève jamais.
-export const consigner = async ({ source, message, pile, url, tenantId, userId, details }) => {
+export const consigner = async ({ source, message, pile, url, tenantId, userId, details, anonyme = false }) => {
   try {
     const propre = {
       source: source === "web" ? "web" : "api",
@@ -94,6 +109,14 @@ export const consigner = async ({ source, message, pile, url, tenantId, userId, 
       where: { empreinte },
       select: { id: true, resolue: true },
     });
+
+    if (existante && anonyme) {
+      await prisma.erreurApp.update({
+        where: { id: existante.id },
+        data: { occurrences: { increment: 1 }, derniere: maintenant },
+      });
+      return;
+    }
 
     if (existante) {
       // Une erreur marquée résolue qui revient est une régression : elle
@@ -113,6 +136,14 @@ export const consigner = async ({ source, message, pile, url, tenantId, userId, 
       return;
     }
 
+    if (anonyme) {
+      const t = Date.now();
+      anonymesNouveaux = anonymesNouveaux.filter((d) => t - d < 3600_000);
+      if (anonymesNouveaux.length >= ANONYMES_NOUVEAUX_PAR_HEURE) return;
+      if ((await prisma.erreurApp.count()) >= JOURNAL_MAX_LIGNES) return;
+      anonymesNouveaux.push(t);
+    }
+
     await prisma.erreurApp.create({
       data: {
         ...propre,
@@ -122,7 +153,7 @@ export const consigner = async ({ source, message, pile, url, tenantId, userId, 
         details: details ?? undefined,
       },
     });
-    await alerter(propre);
+    if (!anonyme) await alerter(propre);
   } catch (e) {
     // Deux créations simultanées de la même empreinte : la seconde perd la
     // course sur l'index unique. L'erreur est consignée, c'est l'essentiel.

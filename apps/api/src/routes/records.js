@@ -37,6 +37,32 @@ const limiteDonnees = (names) =>
       ? MAX_EMAILING_BYTES
       : MAX_DATA_BYTES;
 
+/// Volume maximal renvoyé par une lecture de liste, pour les collections
+/// aux fiches volumineuses (classeurs, campagnes).
+///
+/// Sans ce plafond, trois cents classeurs de 8 Mo suffisaient à faire
+/// charger 2,4 Go en mémoire à chaque lecture de la liste — et le processus
+/// partagé par tous les espaces tombait avec.
+const BUDGET_LISTE_OCTETS = 48 * 1024 * 1024;
+
+/// Les fiches les plus récentes tenant dans le budget, mesurées par la
+/// base elle-même (sans rien charger).
+const idsDansLeBudget = async (tenantId, names) => {
+  const tailles = await prisma.$queryRaw`
+    SELECT id, pg_column_size(data)::bigint AS taille FROM records
+    WHERE "tenantId" = ${tenantId} AND module = ${names.module}
+      AND collection = ${names.collection}
+    ORDER BY "createdAt" DESC LIMIT 500`;
+  const ids = [];
+  let total = 0;
+  for (const { id, taille } of tailles) {
+    total += Number(taille);
+    if (total > BUDGET_LISTE_OCTETS && ids.length) break;
+    ids.push(id);
+  }
+  return ids;
+};
+
 /// Collections lues par un **moteur** du serveur, et non par un simple
 /// écran.
 ///
@@ -60,8 +86,42 @@ const COLLECTIONS_MOTEUR = new Set([
   "campagnes/modeles",
   "courrier/modeles",
   "courrier/envois",
+  // Le moteur des relances de factures range ses paliers dans
+  // `courrier/relances` : une fiche déposée là par un membre suffisait à
+  // faire taire toutes les relances d'une facture.
+  "courrier/relances",
   "relances/relances",
 ]);
+
+/// Collections **à validation** : une demande que quelqu'un d'autre
+/// tranche. L'écran ne propose « Approuver » qu'aux administrateurs, mais
+/// c'est le serveur qui doit le garantir — sinon un membre approuve sa
+/// propre note de frais d'un simple PUT, et la Paie la rembourse.
+///
+/// Hors administrateur, on ne peut donc qu'écrire **sa propre** fiche, et
+/// seulement tant qu'elle est dans un état « ouvert ».
+const COLLECTIONS_VALIDATION = {
+  "frais/notes": { champ: "etat", ouverts: ["soumise"] },
+  "rh/absences": { champ: "etat", ouverts: ["demande"] },
+};
+
+const validationDe = (names) => COLLECTIONS_VALIDATION[`${names.module}/${names.collection}`];
+
+/// Message d'erreur si ce geste de validation est refusé, sinon `null`.
+const refusValidation = (names, user, data, existante) => {
+  const regle = validationDe(names);
+  if (!regle || auMoins(user?.role, "ADMIN")) return null;
+  if (existante && existante.userId !== user?.id) {
+    return "Cette demande appartient à quelqu'un d'autre : seul un administrateur peut la modifier.";
+  }
+  if (existante && !regle.ouverts.includes(existante.data?.[regle.champ])) {
+    return "Cette demande a déjà été traitée : elle ne se modifie plus.";
+  }
+  if (!regle.ouverts.includes(data?.[regle.champ])) {
+    return "Seul un administrateur peut approuver, refuser ou clore une demande.";
+  }
+  return null;
+};
 
 /// Collections **de référence**, communes à toutes les applications : la
 /// fiche de l'entreprise (raison sociale, NCC, RIB…) part sur chaque
@@ -145,7 +205,13 @@ export default async function recordRoutes(app) {
     if (!autorise && !partage) return refuserAcces(reply, names);
 
     const records = await prisma.record.findMany({
-      where: { tenantId: request.tenantId, ...names },
+      where: {
+        tenantId: request.tenantId,
+        ...names,
+        ...(limiteDonnees(names) > MAX_DATA_BYTES
+          ? { id: { in: await idsDansLeBudget(request.tenantId, names) } }
+          : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 500,
     });
@@ -170,6 +236,8 @@ export default async function recordRoutes(app) {
     // quelqu'un qui a accès tranchera.
     const { autorise } = await accesModule(request, names.module);
     if (!autorise && !creationPartagee(names, data)) return refuserAcces(reply, names);
+    const refusCreation = refusValidation(names, request.user, data, null);
+    if (refusCreation) return reply.code(403).send({ error: refusCreation });
 
     const execution = await executerAutomatisations({
       tenantId: request.tenantId,
@@ -220,6 +288,16 @@ export default async function recordRoutes(app) {
     // Modifier, c'est trancher : jamais sans accès à l'application.
     if (!(await accesModule(request, names.module)).autorise) {
       return refuserAcces(reply, names);
+    }
+
+    if (validationDe(names)) {
+      const existante = await prisma.record.findFirst({
+        where: { id: request.params.id, tenantId: request.tenantId, ...names },
+        select: { userId: true, data: true },
+      });
+      if (!existante) return reply.code(404).send({ error: "Enregistrement introuvable" });
+      const refus = refusValidation(names, request.user, data, existante);
+      if (refus) return reply.code(403).send({ error: refus });
     }
 
     const execution = await executerAutomatisations({

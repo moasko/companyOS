@@ -25,9 +25,22 @@ import { env } from "./env.js";
 const SEL = "companyos-config-v1";
 
 let cleCache = null;
+let avertie = false;
+const TAG = 16;
 const cle = () => {
   if (cleCache) return cleCache;
-  const source = process.env.ENCRYPTION_KEY || env.jwtSecret;
+  const propre = process.env.ENCRYPTION_KEY;
+  if (env.production && propre && propre.length < 32) {
+    throw new Error("ENCRYPTION_KEY trop courte : au moins 32 caractères aléatoires.");
+  }
+  if (env.production && !propre && !avertie) {
+    avertie = true;
+    console.warn(
+      "[sécurité] ENCRYPTION_KEY absente : les secrets stockés sont chiffrés avec " +
+        "une clé dérivée de JWT_SECRET. Définissez une clé distincte (voir DEPLOIEMENT.md).",
+    );
+  }
+  const source = propre || env.jwtSecret;
   if (!source) throw new Error("Aucun secret de chiffrement configuré.");
   cleCache = scryptSync(source, SEL, 32);
   return cleCache;
@@ -58,9 +71,18 @@ export const dechiffrer = (paquet) => {
   try {
     const [version, iv, tag, chiffre] = String(paquet).split(".");
     if (version !== "v1") return null;
-    const d = createDecipheriv("aes-256-gcm", cle(), Buffer.from(iv, "base64url"));
-    d.setAuthTag(Buffer.from(tag, "base64url"));
-    return Buffer.concat([d.update(Buffer.from(chiffre, "base64url")), d.final()]).toString("utf8");
+    // Étiquette de 16 octets exigée : sans `authTagLength`, Node accepte
+    // une étiquette tronquée, ce qui affaiblit l'authentification du GCM.
+    const etiquette = Buffer.from(tag, "base64url");
+    if (etiquette.length !== TAG) return null;
+    const d = createDecipheriv("aes-256-gcm", cle(), Buffer.from(iv, "base64url"), {
+      authTagLength: TAG,
+    });
+    d.setAuthTag(etiquette);
+    return Buffer.concat([
+      d.update(Buffer.from(chiffre, "base64url")),
+      d.final(),
+    ]).toString("utf8");
   } catch {
     return null;
   }

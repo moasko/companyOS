@@ -10,9 +10,11 @@
 // invitations continuent de fonctionner par code, comme avant. Un mail
 // qui échoue ne casse jamais l'action qui l'a déclenché.
 
+import net from "node:net";
 import nodemailer from "nodemailer";
 import { env } from "./env.js";
 import { dechiffrer } from "./chiffrement.js";
+import { resoudre } from "./web.js";
 
 /// Rend le mot de passe utilisable, qu'il soit chiffré ou non.
 ///
@@ -47,6 +49,72 @@ export const creerTransporteur = ({ host, port, user, pass }) =>
       })
     : null;
 
+/// Ports d'un relais SMTP. Un autre port n'est pas un relais : c'est une
+/// sonde vers un autre service.
+export const PORTS_SMTP = [25, 465, 587, 2525];
+
+/// Le relais **d'un espace client**, réglé par son administrateur — donc
+/// par n'importe qui pouvant créer un compte.
+///
+/// Sans garde, viser 10.0.0.5:6379 depuis « Courrier → Réglages » faisait
+/// du serveur une sonde du réseau interne, et le message d'erreur
+/// (« connexion refusée », bannière du service) en rapportait le
+/// résultat. Ici :
+///   - seuls les ports SMTP sont admis ;
+///   - le nom est résolu à **chaque** envoi, toutes ses adresses doivent
+///     être publiques, et la connexion part sur l'IP vérifiée (le nom reste
+///     utilisé pour le certificat TLS) — pas de fenêtre pour un DNS
+///     changeant ;
+///   - un refus du garde ne dit rien de plus que « adresse refusée ».
+///
+/// `AUTORISER_RESEAU_PRIVE=true` lève le contrôle d'adresse, pour un
+/// relais de développement sur la machine locale. Jamais en production.
+export const creerTransporteurEspace = (smtp) => {
+  if (!smtp?.host) return null;
+  const port = Number(smtp.port) || 587;
+  const prive = !env.production && process.env.AUTORISER_RESEAU_PRIVE === "true";
+  return {
+    async sendMail(message) {
+      if (!PORTS_SMTP.includes(port)) {
+        throw Object.assign(new Error("port"), { code: "EPORT" });
+      }
+      let host = smtp.host;
+      const options = {};
+      if (!prive) {
+        let adresses;
+        try {
+          adresses = await resoudre(String(smtp.host).trim());
+        } catch {
+          throw Object.assign(new Error("adresse"), { code: "EADRESSE" });
+        }
+        host = adresses[0].address;
+        options.tls = { servername: net.isIP(smtp.host) ? undefined : smtp.host };
+      }
+      const t = creerTransporteur({ ...smtp, host, port });
+      Object.assign(t.options, options);
+      try {
+        return await t.sendMail(message);
+      } finally {
+        t.close();
+      }
+    },
+    espace: true,
+  };
+};
+
+/// Les refus du garde, dits en clair. Une fois l'adresse vérifiée
+/// publique, la réponse du relais (« 550 boîte inconnue »…) est rendue
+/// telle quelle : c'est elle qui classe les rebonds des campagnes.
+const erreurEspace = (err) => {
+  if (err?.code === "EPORT") {
+    return `Port SMTP non autorisé (ports acceptés : ${PORTS_SMTP.join(", ")}).`;
+  }
+  if (err?.code === "EADRESSE") {
+    return "Le relais SMTP doit être une adresse publique joignable sur Internet.";
+  }
+  return err?.message;
+};
+
 const transporteur = creerTransporteur({
   host: env.smtpHost,
   port: env.smtpPort,
@@ -78,8 +146,8 @@ export const envoyerVia = async (
     });
     return { envoye: true };
   } catch (err) {
-    console.error(`Envoi du mail à ${a} impossible :`, err.message);
-    return { envoye: false, erreur: err.message };
+    console.error(`Envoi du mail à ${a} impossible :`, err.code || "", err.message);
+    return { envoye: false, erreur: transport.espace ? erreurEspace(err) : err.message };
   }
 };
 

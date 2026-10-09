@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon, Image } from "../../utils/general";
-import { api, setToken, clearToken } from "../../api/client";
+import { api } from "../../api/client";
 import { syncInstalledModules, detachAllModules } from "../../apps/sync";
 import { appliquerApparence, reinitialiserApparence } from "../../apps/appearance";
 import { demarrerPreferences } from "../../apps/preferences";
@@ -14,6 +14,11 @@ import "./back.scss";
 const TEXTES = {
   fr: {
     connexionImpossible: "Connexion impossible",
+    titreMfa: "Vérification en deux étapes",
+    aideMfa: "Saisissez le code à 6 chiffres de votre application d'authentification, ou un code de secours.",
+    codeMfa: "Code",
+    verifier: "Vérifier",
+    retour: "Retour",
     ouvrir: "Ouvrir mon espace",
     changerCompte: "Changer de compte",
     titreLogin: "Connexion à CompanyOS",
@@ -35,6 +40,11 @@ const TEXTES = {
   },
   en: {
     connexionImpossible: "Could not sign in",
+    titreMfa: "Two-step verification",
+    aideMfa: "Enter the 6-digit code from your authenticator app, or a recovery code.",
+    codeMfa: "Code",
+    verifier: "Verify",
+    retour: "Back",
     ouvrir: "Open my workspace",
     changerCompte: "Switch account",
     titreLogin: "Sign in to CompanyOS",
@@ -134,7 +144,11 @@ export const LockScreen = (props) => {
     email: "",
     password: "",
     code: "",
+    otp: "",
   });
+  // Défi rendu par la première étape quand le compte a la double
+  // authentification : seul le code le transforme en session.
+  const [defi, setDefi] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const dispatch = useDispatch();
@@ -151,28 +165,49 @@ export const LockScreen = (props) => {
     setError("");
   };
 
+  /// La session est ouverte : on installe l'espace et on entre.
+  ///
+  /// Double authentification exigée mais pas encore configurée : on entre
+  /// sans rien charger — l'écran de configuration recouvre le bureau, et la
+  /// page repart de zéro une fois la protection activée.
+  const terminer = async (result) => {
+    dispatch({ type: "SESSION_SET", payload: result });
+    dispatch({
+      type: "STNGSETV",
+      payload: { path: "person.name", value: result.user.name },
+    });
+    if (!result.mfaAConfigurer) {
+      await syncInstalledModules();
+      await resynchroniserNotifications();
+      await appliquerApparence(result.tenant.id);
+      await demarrerPreferences(result.tenant.id);
+    }
+    proceed();
+  };
+
   const submit = async () => {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
+      if (mode === "mfa") {
+        await terminer(await api.loginMfa(defi, form.otp));
+        setDefi(null);
+        return;
+      }
       const result =
         mode === "login"
           ? await api.login({ email: form.email, password: form.password })
           : mode === "join"
             ? await api.join(form.code, form.name, form.password)
             : await api.register(form);
-      setToken(result.token);
-      dispatch({ type: "SESSION_SET", payload: result });
-      dispatch({
-        type: "STNGSETV",
-        payload: { path: "person.name", value: result.user.name },
-      });
-      await syncInstalledModules();
-      await resynchroniserNotifications();
-      await appliquerApparence(result.tenant.id);
-      await demarrerPreferences(result.tenant.id);
-      proceed();
+      if (result.mfa) {
+        setDefi(result.defi);
+        setForm((f) => ({ ...f, otp: "" }));
+        setMode("mfa");
+        return;
+      }
+      await terminer(result);
     } catch (err) {
       setError(err.message || t("connexionImpossible"));
     } finally {
@@ -249,7 +284,7 @@ export const LockScreen = (props) => {
             <div
               className="text-xs text-gray-400 mt-4 handcr"
               onClick={() => {
-                clearToken();
+                api.logout().catch(() => {});
                 dispatch({ type: "SESSION_CLEAR" });
                 detachAllModules();
                 reinitialiserApparence();
@@ -260,6 +295,40 @@ export const LockScreen = (props) => {
             </div>
           </>
         ) : (
+          mode === "mfa" ? (
+          <div className="authForm mt-4">
+            <div className="text-xl font-medium text-gray-200 mb-1">{t("titreMfa")}</div>
+            <div className="text-xs text-gray-300 mb-3 authAide">{t("aideMfa")}</div>
+            <input
+              type="text"
+              className="authCode"
+              inputMode="text"
+              autoComplete="one-time-code"
+              placeholder={t("codeMfa")}
+              value={form.otp}
+              maxLength={12}
+              onChange={(e) => {
+                setForm({ ...form, otp: e.target.value.replace(/[^0-9A-Za-z-]/g, "").toUpperCase() });
+                setError("");
+              }}
+              onKeyDown={onKey}
+              autoFocus
+            />
+            {error ? <div className="authError">{error}</div> : null}
+            <div className="flex items-center mt-4 signInBtn" onClick={submit}>
+              {busy ? "…" : t("verifier")}
+            </div>
+            <div
+              className="text-xs text-gray-400 mt-4 handcr"
+              onClick={() => {
+                setDefi(null);
+                changerMode("login");
+              }}
+            >
+              {t("retour")}
+            </div>
+          </div>
+          ) : (
           <div className="authForm mt-4">
             <div className="text-xl font-medium text-gray-200 mb-3">
               {
@@ -344,6 +413,7 @@ export const LockScreen = (props) => {
               {mode === "join" ? t("retourConnexion") : t("jaiUnCode")}
             </div>
           </div>
+          )
         )}
       </div>
       <div className="bottomInfo flex">

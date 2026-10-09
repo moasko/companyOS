@@ -43,6 +43,7 @@ import { Apercu } from "./Apercu";
 import { factureEnPdf } from "./pdf";
 import { imagesPdf } from "./images";
 import "./editeur.scss";
+import { echapperHtml } from "../../../utils/securite.js";
 
 // ---------------------------------------------------------------------------
 // Éditeur de factures
@@ -726,7 +727,7 @@ function EditeurFactures() {
     const styles = [...document.querySelectorAll('style, link[rel="stylesheet"]')].map((n) => n.outerHTML).join("");
     const doc = cadre.contentDocument;
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${facture.numero}</title>${styles}
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${echapperHtml(facture.numero)}</title>${styles}
       <style>@page { size: A4; margin: 0; } html, body { margin: 0; background: #fff; }
       .efPage { box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }</style>
       </head><body>${page.outerHTML}</body></html>`);

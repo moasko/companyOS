@@ -9,7 +9,7 @@
 // deux fois la même erreur, et un envoi qui échoue n'en provoque pas un
 // autre — un rapporteur d'erreurs qui boucle est pire que pas de rapporteur.
 
-import { BASE_URL, getToken } from "../api/client";
+import { BASE_URL } from "../api/client";
 
 const PLAFOND = 20;
 const deja = new Set();
@@ -22,13 +22,11 @@ export const signalerErreur = (erreur, contexte = "") => {
     if (deja.has(cle) || deja.size >= PLAFOND) return;
     deja.add(cle);
 
-    const headers = { "Content-Type": "application/json" };
-    const jeton = getToken();
-    if (jeton) headers.Authorization = `Bearer ${jeton}`;
-
+    // Le cookie de session, s'il existe, dit qui était touché.
     fetch(`${BASE_URL}/api/erreurs`, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
       keepalive: true,
       body: JSON.stringify({
         message: contexte ? `${contexte} : ${message}`.slice(0, 500) : message,

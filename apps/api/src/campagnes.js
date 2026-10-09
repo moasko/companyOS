@@ -21,10 +21,10 @@
 // List-Unsubscribe que Gmail et Outlook exigent des envois de masse.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
-import { creerTransporteur, envoyerVia } from "./mail.js";
+import { creerTransporteur, creerTransporteurEspace, envoyerVia } from "./mail.js";
 import { journaliser } from "./audit.js";
 import { compterEnvois, resteAEnvoyer } from "./quota-mail.js";
 import { adresseValide } from "@companyos/shared/courrier";
@@ -55,6 +55,15 @@ const PAUSE_MS = 700; // entre deux messages d'un lot
 const signer = (corps) =>
   createHmac("sha256", env.jwtSecret).update(corps).digest("hex").slice(0, 24);
 
+/// Compare deux signatures en temps constant : `===` s'arrête au premier
+/// caractère différent, et la durée de la réponse trahit alors combien de
+/// caractères sont justes.
+export const signatureEgale = (recue, attendue) => {
+  const a = Buffer.from(String(recue ?? ""));
+  const b = Buffer.from(String(attendue));
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
 /// Le jeton de suivi : espace, campagne (ou automatisation), fiche client
 /// — signé. Le même jeton sert à l'ouverture (pixel), aux clics
 /// (redirection) et à la désinscription.
@@ -71,12 +80,16 @@ export const verifierJeton = (jeton) => {
     const morceaux = Buffer.from(String(jeton), "base64url").toString().split(".");
     if (morceaux.length === 4) {
       const [tenantId, campagneId, clientId, signature] = morceaux;
-      return signature === signer(`${tenantId}.${campagneId}.${clientId}`)
+      // Un jeton de confirmation d'inscription a la même forme : il ne
+      // vaut pas jeton de suivi.
+      if (campagneId === "confirmer") return null;
+      return signatureEgale(signature, signer(`${tenantId}.${campagneId}.${clientId}`))
         ? { tenantId, campagneId, clientId }
         : null;
     }
     const [tenantId, clientId, signature] = morceaux;
-    return signature === signer(`${tenantId}.${clientId}`)
+    if (morceaux.length !== 3) return null;
+    return signatureEgale(signature, signer(`${tenantId}.${clientId}`))
       ? { tenantId, campagneId: null, clientId }
       : null;
   } catch {
@@ -108,7 +121,7 @@ export const jetonConfirmation = (tenantId, clientId) => {
 export const verifierConfirmation = (jeton) => {
   try {
     const [tenantId, mot, clientId, signature] = Buffer.from(String(jeton), "base64url").toString().split(".");
-    return mot === "confirmer" && signature === signer(`${tenantId}.confirmer.${clientId}`) ? { tenantId, clientId } : null;
+    return mot === "confirmer" && signatureEgale(signature, signer(`${tenantId}.confirmer.${clientId}`)) ? { tenantId, clientId } : null;
   } catch {
     return null;
   }
@@ -198,6 +211,12 @@ export const marquerDestinataire = async (infos, marque, { lien = null } = {}) =
 export const urlLienDe = async (infos, i = 0) => {
   const trouvee = await ficheSuivie(infos);
   if (!trouvee) return null;
+  // Seul un vrai destinataire de ce message est redirigé. Sinon,
+  // n'importe quel espace fabriquait une redirection vers son site de
+  // hameçonnage depuis le domaine de la plateforme, avec un jeton obtenu
+  // en s'écrivant à lui-même.
+  const liste = trouvee.fiche.data?.[trouvee.cle] || [];
+  if (!liste.some((d) => d.clientId === infos.clientId)) return null;
   const tous = liensDe(trouvee.fiche.data);
   const l = tous[Number.isInteger(i) && i >= 0 ? i : 0] || tous[0];
   return l && /^(https?:|mailto:|tel:)/i.test(l.url) ? l.url : null;
@@ -225,7 +244,7 @@ const transporteurDe = async (tenantId) => {
   // Sans relais propre, la campagne **attend** au lieu de partir : rien
   // n'est perdu, elle repartira dès qu'un relais sera configuré.
   return {
-    transport: smtp?.host ? creerTransporteur(smtp) : null,
+    transport: smtp?.host ? creerTransporteurEspace(smtp) : null,
     de: smtp?.de || null,
     smtpUser: smtp?.user || null,
   };

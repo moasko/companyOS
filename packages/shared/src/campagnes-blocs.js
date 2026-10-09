@@ -136,17 +136,35 @@ const CHAMPS_TEXTE = ["texte", "label", "alt", "gauche", "droite", "code"];
 /// La campagne avec les variables remplacées dans l'objet, l'aperçu et
 /// tous les textes des blocs. Les adresses des liens ne sont pas touchées :
 /// une variable dans une URL fabriquerait des liens imprévisibles.
-export const personnaliser = (campagne = {}, variables = {}) => ({
-  ...campagne,
-  sujet: appliquerModele(campagne.sujet, variables),
-  apercu: appliquerModele(campagne.apercu, variables),
-  texte: appliquerModele(campagne.texte, variables),
-  blocs: (campagne.blocs || []).map((b) => {
-    const out = { ...b };
-    for (const k of CHAMPS_TEXTE) if (typeof out[k] === "string") out[k] = appliquerModele(out[k], variables);
-    return out;
-  }),
-});
+///
+/// Dans les textes mis en forme, la valeur d'une variable est neutralisée :
+/// un nom saisi dans le formulaire public comme `[Cliquez](https://…)`
+/// devenait sinon un vrai lien suivi — et décalait la numérotation de tous
+/// les liens du message pour ce destinataire.
+const neutraliser = (variables) =>
+  Object.fromEntries(
+    Object.entries(variables).map(([k, v]) => [
+      k,
+      typeof v === "string"
+        ? v.replace(/\[/g, "(").replace(/\]/g, ")").replace(/[\r\n]+/g, " ")
+        : v,
+    ]),
+  );
+
+export const personnaliser = (campagne = {}, variables = {}) => {
+  const surs = neutraliser(variables);
+  return {
+    ...campagne,
+    sujet: appliquerModele(campagne.sujet, variables),
+    apercu: appliquerModele(campagne.apercu, variables),
+    texte: appliquerModele(campagne.texte, surs),
+    blocs: (campagne.blocs || []).map((b) => {
+      const out = { ...b };
+      for (const k of CHAMPS_TEXTE) if (typeof out[k] === "string") out[k] = appliquerModele(out[k], surs);
+      return out;
+    }),
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Rendu

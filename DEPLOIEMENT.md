@@ -36,7 +36,9 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `CORS_ORIGIN` | `https://app.companyos.fr` | le shell autorisé à appeler l'API |
 | `VITE_API_URL` | `https://api.companyos.fr` | figée dans le build du shell |
 | `TRUST_PROXY` | `1` | un proxy devant l'API (Traefik) |
-| `JWT_EXPIRES_IN` | `7d` (défaut) | durée d'une session |
+| `JWT_EXPIRES_IN` | `7d` (défaut) | durée maximale d'une session de navigateur |
+| `SESSION_INACTIVITE_MINUTES` | `720` (défaut, 12 h) | une session de navigateur sans activité se ferme |
+| `SESSION_SAMESITE` | `Strict` (défaut) | `SameSite` du cookie de session ; `None` seulement si le shell et l'API sont sur deux domaines différents (HTTPS obligatoire) |
 | `DEFAULT_TENANT_QUOTA` | vide (défaut : quota de la formule Découverte) | à ne renseigner que pour une offre de lancement |
 | `UPLOAD_MAX_OCTETS` | `134217728` (défaut, 128 Mo) | taille maximale d'un fichier importé |
 | `MAIL_QUOTA_JOUR` | `500` (défaut) | plafond d'envoi par espace et par 24 h |
@@ -51,6 +53,10 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 > `VITE_API_URL` est cuite **au build** : la changer exige un redéploiement,
 > pas seulement un redémarrage.
 
+> En production (`NODE_ENV=production`), l'API **refuse de démarrer** si
+> `JWT_SECRET` fait moins de 32 caractères ou garde sa valeur d'exemple, ou
+> si `ENCRYPTION_KEY` est renseignée avec moins de 32 caractères.
+>
 > `ENCRYPTION_KEY` doit être **distincte** de `JWT_SECRET`. À défaut, le
 > secret JWT sert de repli — et faire tourner les sessions rendrait alors
 > illisibles tous les secrets déjà stockés (clé S3, mots de passe SMTP des

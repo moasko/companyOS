@@ -36,6 +36,7 @@ export default async function erreursRoutes(app) {
       ...parsed.data,
       userId: user ? userId : null,
       tenantId: user?.tenantId || null,
+      anonyme: !user,
     });
     return reply.code(204).send();
   });

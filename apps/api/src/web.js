@@ -102,7 +102,7 @@ export const analyserUrl = (entree) => {
 };
 
 /// Résout le nom et n'en garde que les adresses publiques.
-const resoudre = async (hostname) => {
+export const resoudre = async (hostname) => {
   // Une adresse IP écrite directement n'a rien à résoudre — et doit être
   // jugée comme les autres, sinon http://127.0.0.1 passerait.
   if (net.isIP(hostname)) {

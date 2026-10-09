@@ -6,32 +6,84 @@
 // permet d'appeler l'API depuis un endroit qui n'est pas un composant
 // React (un gestionnaire d'événement, un module de fond) sans rien casser.
 //
-// Le jeton est conservé dans localStorage et rejoué à chaque appel.
+// La session vit dans un cookie `HttpOnly` posé par l'API : aucun script
+// de la page ne peut lire le jeton — ni une bibliothèque d'analyse de
+// fichier compromise, ni une injection. Chaque appel part avec
+// `credentials: "include"` et l'en-tête `X-CompanyOS`, que l'API exige de
+// toute écriture faite par cookie (protection CSRF : un site tiers ne peut
+// pas l'ajouter sans passer la vérification CORS).
 //
-// ⚠ Le jour où l'API et le shell partageront une origine, ce choix devra
-// être revu : un jeton dans localStorage est lisible par tout script qui
-// s'exécute sur l'origine, et l'application analyse des fichiers
-// utilisateur (docx, pptx, pdf) avec des bibliothèques tierces. Un cookie
-// `HttpOnly` est la vraie réponse ; il demande une protection CSRF en
-// contrepartie.
+// Le navigateur ne garde qu'un **témoin** non secret (« une session a été
+// ouverte ici ») pour savoir, au démarrage, s'il faut interroger l'API ou
+// montrer la vitrine.
 
 export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-const TOKEN_KEY = "companyos-token";
+const TEMOIN = "companyos-session";
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+// L'ancien jeton en clair, d'avant le cookie : il ne vaut plus rien côté
+// serveur, on ne le laisse pas traîner.
+try {
+  localStorage.removeItem("companyos-token");
+} catch {
+  // Stockage indisponible : rien à nettoyer.
+}
+
+/// Une session a-t-elle été ouverte dans ce navigateur ? (indice, pas
+/// preuve : seule l'API sait si elle est encore valide)
+export const sessionOuverte = () => {
+  try {
+    return localStorage.getItem(TEMOIN) === "1";
+  } catch {
+    return false;
+  }
+};
+/// Change à chaque connexion ou déconnexion : les caches liés au compte
+/// (fiche de l'entreprise…) savent ainsi qu'ils doivent se recharger.
+let generation = 0;
+export const cleSession = () => (sessionOuverte() ? `s${generation}` : null);
+
+export const noterSession = () => {
+  generation += 1;
+  try {
+    localStorage.setItem(TEMOIN, "1");
+  } catch {
+    // Sans stockage, le démarrage interrogera simplement l'API.
+  }
+};
+export const oublierSession = () => {
+  generation += 1;
+  try {
+    localStorage.removeItem(TEMOIN);
+  } catch {
+    // Rien.
+  }
+};
+
+/// `fetch` vers l'API avec la session : pour les téléchargements de
+/// fichiers et autres lectures qui ne passent pas par `request`.
+export const apiFetch = (url, init = {}) =>
+  fetch(url, {
+    ...init,
+    credentials: "include",
+    headers: { ...(init.headers || {}), "X-CompanyOS": "1" },
+  });
+
+/// Prévient l'interface qu'une session doit configurer sa double
+/// authentification avant d'aller plus loin.
+const MFA_REQUISE = "companyos:mfa-requise";
+export const surMfaRequise = (rappel) => {
+  window.addEventListener(MFA_REQUISE, rappel);
+  return () => window.removeEventListener(MFA_REQUISE, rappel);
+};
 
 const request = async (path, { method = "GET", body, isForm = false } = {}) => {
-  const headers = {};
-  const token = getToken();
-
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers = { "X-CompanyOS": "1" };
   if (body && !isForm) headers["Content-Type"] = "application/json";
 
   const response = await fetch(`${BASE_URL}/api${path}`, {
     method,
     headers,
+    credentials: "include",
     body: isForm ? body : body ? JSON.stringify(body) : undefined,
   });
 
@@ -41,18 +93,40 @@ const request = async (path, { method = "GET", body, isForm = false } = {}) => {
 
   if (!response.ok) {
     const error = new Error(payload?.error || `Erreur ${response.status}`);
-    // Le code HTTP permet de distinguer un jeton refusé (401) d'une panne
-    // passagère : seul le premier cas doit déconnecter l'utilisateur.
+    // Le code HTTP permet de distinguer une session refusée (401) d'une
+    // panne passagère : seul le premier cas doit déconnecter l'utilisateur.
     error.status = response.status;
+    if (payload?.mfaAConfigurer) {
+      error.mfaAConfigurer = true;
+      window.dispatchEvent(new Event(MFA_REQUISE));
+    }
     throw error;
   }
 
   return payload;
 };
 
+/// Une réponse de connexion : la session est ouverte (cookie posé).
+const connecte = (reponse) => {
+  if (reponse && !reponse.mfa) noterSession();
+  return reponse;
+};
+
 export const api = {
-  register: (data) => request("/auth/register", { method: "POST", body: data }),
-  login: (data) => request("/auth/login", { method: "POST", body: data }),
+  register: async (data) => connecte(await request("/auth/register", { method: "POST", body: data })),
+  /// Rend soit la session ouverte, soit `{ mfa: true, defi }` : il faut
+  /// alors le code de l'application d'authentification (`loginMfa`).
+  login: async (data) => connecte(await request("/auth/login", { method: "POST", body: data })),
+  loginMfa: async (defi, code) =>
+    connecte(await request("/auth/login/mfa", { method: "POST", body: { defi, code } })),
+  /// Ferme la session côté serveur (le cookie est effacé par la réponse).
+  logout: async () => {
+    try {
+      await request("/auth/logout", { method: "POST", body: {} });
+    } finally {
+      oublierSession();
+    }
+  },
   me: () => request("/auth/me"),
   preferences: () => request("/auth/preferences"),
   enregistrerPreferences: (preferences) =>
@@ -75,25 +149,30 @@ export const api = {
     request("/auth/invitations", { method: "POST", body: { email, role } }),
   cancelInvite: (id) => request(`/auth/invitations/${id}`, { method: "DELETE" }),
   /// Rejoindre un espace avec un code — la personne n'a pas encore de compte.
-  join: (code, name, password) =>
-    request("/auth/join", { method: "POST", body: { code, name, password } }),
-  /// Changer de mot de passe ferme les sessions des autres appareils : le
-  /// serveur renvoie un jeton neuf pour celle-ci, à conserver aussitôt —
-  /// l'ancien est déjà refusé.
-  updatePassword: async (current, next) => {
-    const reponse = await request("/auth/password", {
-      method: "PUT",
-      body: { current, next },
-    });
-    if (reponse?.token) setToken(reponse.token);
-    return reponse;
-  },
-  /// « Déconnecter mes autres appareils » — même mécanique.
-  revoquerSessions: async () => {
-    const reponse = await request("/auth/sessions/revoquer", { method: "POST" });
-    if (reponse?.token) setToken(reponse.token);
-    return reponse;
-  },
+  join: async (code, name, password) =>
+    connecte(await request("/auth/join", { method: "POST", body: { code, name, password } })),
+  /// Changer de mot de passe ferme les sessions des autres appareils ;
+  /// celle-ci reste ouverte.
+  updatePassword: (current, next) =>
+    request("/auth/password", { method: "PUT", body: { current, next } }),
+  /// « Déconnecter mes autres appareils ».
+  revoquerSessions: () => request("/auth/sessions/revoquer", { method: "POST", body: {} }),
+  /// Sessions ouvertes (appareils, jetons d'outils) et fermeture d'une seule.
+  sessions: () => request("/auth/sessions"),
+  fermerSession: (id) => request(`/auth/sessions/${id}`, { method: "DELETE" }),
+  /// Un jeton pour un outil (serveur MCP…) : rendu une seule fois.
+  creerJeton: (libelle) => request("/auth/jetons", { method: "POST", body: { libelle } }),
+
+  // Double authentification.
+  mfa: () => request("/auth/mfa"),
+  mfaPreparer: () => request("/auth/mfa/preparer", { method: "POST", body: {} }),
+  mfaActiver: (code) => request("/auth/mfa/activer", { method: "POST", body: { code } }),
+  mfaCodes: (code) => request("/auth/mfa/codes", { method: "POST", body: { code } }),
+  mfaDesactiver: (password, code) =>
+    request("/auth/mfa/desactiver", { method: "POST", body: { password, code } }),
+  mfaObligatoire: (mfaObligatoire) =>
+    request("/auth/tenant/securite", { method: "PUT", body: { mfaObligatoire } }),
+  reinitialiserMfaMembre: (id) => request(`/auth/members/${id}/mfa`, { method: "DELETE" }),
   updateProfile: (name) => request("/auth/profile", { method: "PUT", body: { name } }),
   /// `avatar` : une data URL déjà redimensionnée, ou null pour revenir aux
   /// initiales. Voir src/apps/image.js.

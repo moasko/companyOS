@@ -102,7 +102,9 @@ const piloteLocal = {
     const cible = resolve(env.storageLocalPath, key);
     await mkdir(dirname(cible), { recursive: true });
     await pipeline(
-      (async function* () { yield Buffer.from("companyos"); })(),
+      (async function* () {
+        yield Buffer.from("companyos");
+      })(),
       createWriteStream(cible),
     );
     await rm(cible, { force: true });
@@ -141,7 +143,11 @@ export const chargerConfig = async () => {
 
   const brut = ligne?.s3 || null;
   const s3 = brut
-    ? { ...brut, secretKey: dechiffrer(brut.secretKey), pathStyle: brut.pathStyle !== false }
+    ? {
+        ...brut,
+        secretKey: dechiffrer(brut.secretKey),
+        pathStyle: brut.pathStyle !== false,
+      }
     : null;
 
   // Un secret illisible — clé de chiffrement changée — vaut « non
@@ -169,7 +175,8 @@ export const enregistrerConfig = async ({ stockage, s3 }) => {
   const nouveau = s3
     ? {
         ...Object.fromEntries(CHAMPS_S3.map((c) => [c, s3[c] ?? ancien[c] ?? ""])),
-        pathStyle: s3.pathStyle !== undefined ? !!s3.pathStyle : ancien.pathStyle !== false,
+        pathStyle:
+          s3.pathStyle !== undefined ? !!s3.pathStyle : ancien.pathStyle !== false,
         secretKey: s3.secretKey ? chiffrer(s3.secretKey) : ancien.secretKey || null,
       }
     : ancien;
@@ -234,7 +241,13 @@ export const chargerConfigEspace = async (tenantId) => {
 
   const brut = ligne?.stockageS3 || null;
   const s3 = brut
-    ? { ...brut, secretKey: dechiffrer(brut.secretKey), pathStyle: brut.pathStyle !== false }
+    ? {
+        ...brut,
+        secretKey: dechiffrer(brut.secretKey),
+        pathStyle: brut.pathStyle !== false,
+        // Réglé par l'espace lui-même : jamais d'adresse interne.
+        reseauPublic: true,
+      }
     : null;
   const utilisable = !!(s3 && s3.endpoint && s3.bucket && s3.accessKey && s3.secretKey);
 
@@ -261,7 +274,8 @@ export const enregistrerConfigEspace = async (tenantId, { stockage, s3 }) => {
   const nouveau = s3
     ? {
         ...Object.fromEntries(CHAMPS_S3.map((c) => [c, s3[c] ?? ancien[c] ?? ""])),
-        pathStyle: s3.pathStyle !== undefined ? !!s3.pathStyle : ancien.pathStyle !== false,
+        pathStyle:
+          s3.pathStyle !== undefined ? !!s3.pathStyle : ancien.pathStyle !== false,
         secretKey: s3.secretKey ? chiffrer(s3.secretKey) : ancien.secretKey || null,
       }
     : ancien;
@@ -293,6 +307,7 @@ export const testerConfigEspace = async (tenantId, { stockage, s3 }) => {
     secretKey: secret,
     prefix: s3.prefix || "",
     pathStyle: s3.pathStyle !== false,
+    reseauPublic: true,
   }).tester();
 };
 
@@ -363,3 +378,30 @@ export const testerConfig = async ({ stockage, s3 }) => {
 /// directement. Il continue de fonctionner sur le disque local ; les
 /// routes migrées passent par `piloteEcriture` / `piloteLecture`.
 export const storage = piloteLocal;
+
+/// Impute `delta` octets au quota de l'espace, **dans** la transaction, et
+/// seulement s'il reste la place : le contrôle et l'incrément sont une
+/// seule instruction SQL. Lire le compteur puis l'incrémenter laissait N
+/// envois simultanés passer chacun le contrôle, et l'espace finir N fois
+/// au-delà de son quota. Une réduction (delta ≤ 0) passe toujours.
+export const consommerQuota = async (tx, tenantId, delta) => {
+  const d = BigInt(delta);
+  const n = await tx.$executeRaw`
+    UPDATE tenants SET "usedBytes" = "usedBytes" + ${d}
+    WHERE id = ${tenantId} AND (${d} <= 0 OR "usedBytes" + ${d} <= quota)`;
+  if (n !== 1) throw Object.assign(new Error("Quota de stockage dépassé"), { code: "QUOTA" });
+};
+
+/// Écrit un flux, et efface ce qui a été écrit s'il échoue en route
+/// (fichier trop gros, client parti) : sans cela, chaque envoi interrompu
+/// laissait jusqu'à 128 Mo sur le disque, hors de tout quota.
+export const ecrireOuNettoyer = async (pilote, cle, flux) => {
+  try {
+    const taille = await pilote.put(cle, flux);
+    if (flux.truncated) throw Object.assign(new Error("Fichier trop volumineux"), { code: "TROP_GROS" });
+    return taille;
+  } catch (err) {
+    await pilote.remove(cle).catch(() => {});
+    throw err;
+  }
+};

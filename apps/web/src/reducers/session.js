@@ -14,8 +14,13 @@ const sessionReducer = (state = defState, action) => {
       return {
         user: action.payload.user,
         tenant: action.payload.tenant,
+        // Double authentification exigée mais pas encore configurée : le
+        // bureau reste derrière l'écran de configuration.
+        mfaAConfigurer: !!action.payload.mfaAConfigurer,
         status: "authenticated",
       };
+    case "SESSION_MFA":
+      return { ...state, mfaAConfigurer: !!action.payload };
     case "SESSION_USAGE":
       return {
         ...state,

@@ -1,13 +1,56 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+
+/// La politique de sécurité du contenu, posée aussi **dans la page** au
+/// build. nginx l'envoie en en-tête (voir nginx.conf) ; mais servi par un
+/// autre hébergeur (le fichier `_redirects` en prévoit un), le shell
+/// partait sans aucune CSP — et la moindre injection devenait un vol de
+/// session. La balise `<meta>` ne couvre pas `frame-ancestors` : cette
+/// directive reste du ressort de l'en-tête.
+///
+/// Uniquement au build : en développement, Vite injecte des scripts en
+/// ligne (rafraîchissement à chaud) que cette politique bloquerait.
+const cspEnPage = (mode) => {
+  const brute = loadEnv(mode, dirname(fileURLToPath(import.meta.url)), "VITE_").VITE_API_URL || "";
+  let api = "";
+  try {
+    api = brute ? new URL(brute).origin : "";
+  } catch {
+    api = "";
+  }
+  const politique = [
+    "default-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: ${api} https://api.producthunt.com`,
+    `media-src 'self' blob: ${api}`,
+    "font-src 'self' data:",
+    `connect-src 'self' ${api}`,
+    "worker-src 'self' blob:",
+    "frame-src https:",
+    "base-uri 'none'",
+    "object-src 'none'",
+    "form-action 'self'",
+  ]
+    .map((d) => d.replace(/\s+/g, " ").trim())
+    .join("; ");
+  return {
+    name: "companyos-csp",
+    apply: "build",
+    transformIndexHtml: () => [
+      { tag: "meta", attrs: { "http-equiv": "Content-Security-Policy", content: politique }, injectTo: "head-prepend" },
+    ],
+  };
+};
 
 const config = ({ mode }) => {
   return defineConfig({
     plugins: [
       react(),
+      cspEnPage(mode),
       VitePWA({
         registerType: "autoUpdate",
         workbox: {

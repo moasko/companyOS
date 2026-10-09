@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Icon } from "../utils/general";
-import { api, getToken } from "../api/client";
+import { api, apiFetch } from "../api/client";
 import { modal } from "./modalRequest";
 import { FileThumb, estImage } from "../containers/applications/apps/assets/FileThumb";
 import "./choisirfichier.scss";
@@ -170,7 +170,7 @@ export const choisirFichierCloud = async ({ titre = "Choisir dans le Cloud", fil
 
 /// Le contenu d'un fichier du Cloud.
 export const blobDuFichier = async (node) => {
-  const r = await fetch(api.downloadUrl(node.id), { headers: { Authorization: `Bearer ${getToken()}` } });
+  const r = await apiFetch(api.downloadUrl(node.id));
   if (!r.ok) throw new Error(`Lecture de « ${node.name} » impossible.`);
   return r.blob();
 };

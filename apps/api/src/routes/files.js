@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { prisma, serialize } from "../db.js";
 import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { piloteEcriture, piloteLecture } from "../storage.js";
+import { consommerQuota, ecrireOuNettoyer, piloteEcriture, piloteLecture } from "../storage.js";
 import { typeDeFlux, typeNeutralise } from "../mimetype.js";
 
 const folderSchema = z.object({
@@ -278,7 +278,7 @@ export default async function fileRoutes(app) {
     // relire ses octets.
     const pilote = await piloteEcriture(request.tenantId);
     const key = pilote.buildKey(request.tenantId, upload.filename);
-    const size = await pilote.put(key, upload.file);
+    const size = await ecrireOuNettoyer(pilote, key, upload.file);
 
     // Le stream a pu dépasser le quota restant : on annule dans ce cas.
     if (tenant.usedBytes + BigInt(size) > tenant.quota) {
@@ -302,10 +302,7 @@ export default async function fileRoutes(app) {
           },
         });
 
-        await tx.tenant.update({
-          where: { id: request.tenantId },
-          data: { usedBytes: { increment: BigInt(size) } },
-        });
+        await consommerQuota(tx, request.tenantId, size);
 
         return created;
       });
@@ -318,6 +315,7 @@ export default async function fileRoutes(app) {
       return reply.code(201).send(serialize(node));
     } catch (err) {
       await pilote.remove(key);
+      if (err.code === "QUOTA") return reply.code(413).send({ error: err.message });
       if (err.code === "P2002") {
         return reply.code(409).send({ error: "Un fichier porte déjà ce nom ici" });
       }
@@ -375,11 +373,19 @@ export default async function fileRoutes(app) {
       return reply.send((await piloteLecture(node.storage, lien.tid)).read(node.storageKey));
     }
 
-    const m = /bytes=(\d*)-(\d*)/.exec(plage);
-    const debut = m && m[1] ? parseInt(m[1], 10) : 0;
-    let fin = m && m[2] ? parseInt(m[2], 10) : total - 1;
+    const m = /^bytes=(\d*)-(\d*)$/.exec(String(plage).trim());
+    let debut;
+    let fin;
+    if (m && !m[1] && m[2]) {
+      // « bytes=-500 » : les 500 derniers octets.
+      debut = Math.max(0, total - parseInt(m[2], 10));
+      fin = total - 1;
+    } else {
+      debut = m && m[1] ? parseInt(m[1], 10) : 0;
+      fin = m && m[2] ? parseInt(m[2], 10) : total - 1;
+    }
 
-    if (!Number.isFinite(debut) || debut >= total) {
+    if (!m || !Number.isFinite(debut) || debut >= total || fin < debut) {
       return reply.code(416).header("Content-Range", `bytes */${total}`).send();
     }
     fin = Math.min(fin, total - 1);
@@ -511,7 +517,7 @@ export default async function fileRoutes(app) {
 
     const pilote = await piloteEcriture(request.tenantId);
     const cle = pilote.buildKey(request.tenantId, node.name);
-    const taille = await pilote.put(cle, upload.file);
+    const taille = await ecrireOuNettoyer(pilote, cle, upload.file);
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: request.tenantId },
@@ -544,14 +550,12 @@ export default async function fileRoutes(app) {
           },
         });
         if (resultat.count !== 1) throw Object.assign(new Error("Conflit de version"), { code: "FILE_VERSION_CONFLICT" });
-        await tx.tenant.update({
-          where: { id: request.tenantId },
-          data: { usedBytes: { increment: difference } },
-        });
+        await consommerQuota(tx, request.tenantId, difference);
         return tx.fsNode.findUnique({ where: { id: node.id } });
       });
     } catch (erreur) {
       await pilote.remove(cle);
+      if (erreur.code === "QUOTA") return reply.code(413).send({ error: erreur.message });
       if (erreur.code === "FILE_VERSION_CONFLICT") {
         return reply.code(409).send({
           error: "Ce fichier a été modifié dans une autre fenêtre. Rechargez sa dernière version avant d’enregistrer.",

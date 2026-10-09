@@ -31,7 +31,7 @@ import { useSelector } from "react-redux";
 import store from "../../../reducers";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
-import { api, getToken } from "../../../api/client";
+import { api, apiFetch } from "../../../api/client";
 import { ensureRootFolder, saveToCloud } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { notifier } from "../../notifications";
@@ -108,9 +108,7 @@ function PresentationApp() {
   // ---- Ouverture ---------------------------------------------------------
 
   const telecharger = async (node) => {
-    const reponse = await fetch(api.downloadUrl(node.id), {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    const reponse = await apiFetch(api.downloadUrl(node.id), {});
     if (!reponse.ok) throw new Error("Cette présentation n'a pas pu être téléchargée.");
     return new Uint8Array(await reponse.arrayBuffer());
   };
