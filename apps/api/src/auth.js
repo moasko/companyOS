@@ -22,7 +22,7 @@ export const signToken = (user) =>
       ver: user.sessionVersion ?? 0,
     },
     env.jwtSecret,
-    { expiresIn: env.jwtExpiresIn },
+    { expiresIn: env.jwtExpiresIn, algorithm: "HS256" },
   );
 
 /// Ferme toutes les sessions ouvertes d'un compte. Renvoie le compte à jour,
@@ -39,7 +39,10 @@ export const revoquerSessions = (userId) =>
 /// distincts pour la base — alors que le contrôle d'exploitant, lui, passait
 /// tout en minuscules : il suffisait de s'inscrire avec la bonne adresse
 /// écrite en majuscules pour ouvrir la console de la plateforme.
-export const normaliserEmail = (email) => String(email ?? "").trim().toLowerCase();
+export const normaliserEmail = (email) =>
+  String(email ?? "")
+    .trim()
+    .toLowerCase();
 
 /// Le compte qui porte cette adresse, quelle que soit sa casse.
 ///
@@ -68,7 +71,7 @@ export const idDuJeton = (request) => {
   const [scheme, token] = (request.headers.authorization || "").split(" ");
   if (scheme !== "Bearer" || !token) return null;
   try {
-    return jwt.verify(token, env.jwtSecret).sub || null;
+    return jwt.verify(token, env.jwtSecret, { algorithms: ["HS256"] }).sub || null;
   } catch {
     return null;
   }
@@ -87,7 +90,7 @@ export const authenticate = async (request, reply) => {
 
   let payload;
   try {
-    payload = jwt.verify(token, env.jwtSecret);
+    payload = jwt.verify(token, env.jwtSecret, { algorithms: ["HS256"] });
   } catch {
     return reply.code(401).send({ error: "Jeton invalide ou expiré" });
   }

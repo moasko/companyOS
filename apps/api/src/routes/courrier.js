@@ -19,7 +19,7 @@ import { authenticate, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { piloteLecture } from "../storage.js";
 import { env } from "../env.js";
-import { creerTransporteur, envoyerVia } from "../mail.js";
+import { PORTS_SMTP, creerTransporteur, creerTransporteurEspace, envoyerVia } from "../mail.js";
 import { chiffrer } from "../chiffrement.js";
 import { compterEnvois, messageQuotaAtteint, peutEnvoyer } from "../quota-mail.js";
 import {
@@ -82,7 +82,13 @@ export default async function courrierRoutes(app) {
     const parsed = z
       .object({
         host: z.string().trim(),
-        port: z.coerce.number().int().min(1).max(65535).default(587),
+        port: z.coerce
+          .number()
+          .int()
+          .refine((p) => PORTS_SMTP.includes(p), {
+            message: `Port SMTP non autorisé (ports acceptés : ${PORTS_SMTP.join(", ")}).`,
+          })
+          .default(587),
         user: z.string().trim().default(""),
         // Vide = garder le mot de passe en place ; on ne force personne à
         // le ressaisir pour changer un port.
@@ -211,7 +217,7 @@ export default async function courrierRoutes(app) {
     const installation = await installationCourrier(request.tenantId);
     const smtp = installation?.settings?.smtp;
     const transport = smtp?.host
-      ? creerTransporteur(smtp)
+      ? creerTransporteurEspace(smtp)
       : creerTransporteur({
           host: env.smtpHost,
           port: env.smtpPort,

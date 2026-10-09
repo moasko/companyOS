@@ -10,9 +10,29 @@ const required = (key) => {
   return value;
 };
 
+const enProduction = process.env.NODE_ENV === "production";
+
+/// Le secret qui signe les sessions. Un secret court ou laissé à sa valeur
+/// d'exemple se devine hors ligne à partir d'un seul jeton intercepté — et
+/// avec lui on signe un jeton au nom de n'importe quel compte, exploitant
+/// compris. En production, le serveur refuse donc de démarrer plutôt que
+/// de tourner avec.
+const SECRETS_D_EXEMPLE = ["changez-moi-en-production", "changeme", "secret"];
+const secretJwt = () => {
+  const s = required("JWT_SECRET");
+  if (enProduction && (s.length < 32 || SECRETS_D_EXEMPLE.includes(s))) {
+    throw new Error(
+      "JWT_SECRET trop faible : au moins 32 caractères aléatoires en production " +
+        "(node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\").",
+    );
+  }
+  return s;
+};
+
 export const env = {
+  production: enProduction,
   databaseUrl: required("DATABASE_URL"),
-  jwtSecret: required("JWT_SECRET"),
+  jwtSecret: secretJwt(),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   port: Number(process.env.PORT || 4000),
   // Les adresses du shell autorisées à appeler l'API, séparées par des

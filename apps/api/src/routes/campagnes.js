@@ -12,14 +12,16 @@
 import { prisma } from "../db.js";
 import { authenticate, exigerRole } from "../auth.js";
 import { env } from "../env.js";
-import { creerTransporteur, envoyerVia } from "../mail.js";
+import { creerTransporteur, creerTransporteurEspace, envoyerVia } from "../mail.js";
 import { piloteLecture } from "../storage.js";
+import { compterEnvois, peutEnvoyer } from "../quota-mail.js";
 import { adresseValide } from "@companyos/shared/courrier";
 import {
   envoyerTest,
   ficheEntreprise,
   jetonConfirmation,
   marquerDestinataire,
+  signatureEgale,
   signatureFormulaire,
   signatureImage,
   signatureLogo,
@@ -44,6 +46,10 @@ const T = {
     invalide: ["Lien invalide", "Ce lien est incomplet ou périmé."],
     expire: ["Lien expiré", "Cette campagne n'existe plus."],
     note: ["C'est noté", "Vous ne recevrez plus ces messages."],
+    desaboDemande: ["Se désinscrire", "Confirmez que vous ne souhaitez plus recevoir les campagnes de cet expéditeur."],
+    desaboBouton: "Me désinscrire",
+    confirmeDemande: ["Confirmer l'inscription", "Un clic pour confirmer que vous souhaitez recevoir nos actualités."],
+    confirmeBouton: "Confirmer",
     desabo: ["Désinscription confirmée", "Vous ne recevrez plus de campagnes de cet expéditeur. Les messages liés à vos commandes et factures, eux, continuent de vous parvenir."],
     inscription: "Recevoir nos actualités",
     inscriptionAide: "Nouveautés, offres et conseils — quelques messages par mois. Désinscription en un clic.",
@@ -62,6 +68,10 @@ const T = {
     invalide: ["Invalid link", "This link is incomplete or expired."],
     expire: ["Link expired", "This campaign no longer exists."],
     note: ["Done", "You will no longer receive these emails."],
+    desaboDemande: ["Unsubscribe", "Confirm that you no longer want to receive campaigns from this sender."],
+    desaboBouton: "Unsubscribe me",
+    confirmeDemande: ["Confirm your subscription", "One click to confirm you want to receive our news."],
+    confirmeBouton: "Confirm",
     desabo: ["Unsubscribed", "You will no longer receive campaigns from this sender. Emails about your orders and invoices will still reach you."],
     inscription: "Get our news",
     inscriptionAide: "News, offers and tips — a few emails a month. Unsubscribe in one click.",
@@ -101,6 +111,10 @@ const page = (reply, langue, [titre, corps], contenu = "", { integrable = false 
 <body><main><h1>${echapper(titre)}</h1><p>${echapper(corps)}</p>${contenu}</main></body></html>`);
 };
 
+/// Fiches nouvelles qu'un formulaire public peut créer par heure, toutes
+/// IP confondues.
+const INSCRIPTIONS_PAR_HEURE = 60;
+
 const LIMITE_FORMULAIRE = { rateLimit: { max: 6, timeWindow: "1 hour", keyGenerator: (request) => request.ip } };
 
 /// Le compte qui « saisit » une fiche créée par le formulaire public : le
@@ -123,7 +137,7 @@ export default async function campagnesRoutes(app) {
   /// Le logo de l'espace, pour l'en-tête des messages.
   app.get("/logo", async (request, reply) => {
     const { e, s: sig } = request.query || {};
-    if (!e || sig !== signatureLogo(String(e))) return reply.code(404).send();
+    if (!e || !signatureEgale(sig, signatureLogo(String(e)))) return reply.code(404).send();
     const logo = String((await ficheEntreprise(String(e))).logo || "");
     const m = /^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/.exec(logo);
     if (!m) return reply.code(404).send();
@@ -134,7 +148,7 @@ export default async function campagnesRoutes(app) {
   /// seulement si c'est une image.
   app.get("/image", async (request, reply) => {
     const { e, f, s: sig } = request.query || {};
-    if (!e || !f || sig !== signatureImage(String(e), String(f))) return reply.code(404).send();
+    if (!e || !f || !signatureEgale(sig, signatureImage(String(e), String(f)))) return reply.code(404).send();
     const node = await prisma.fsNode.findFirst({ where: { id: String(f), tenantId: String(e), deletedAt: null, type: "FILE" } });
     if (!node?.storageKey || !/^image\/(png|jpeg|gif|webp)$/.test(node.mimeType || "")) return reply.code(404).send();
     return reply
@@ -181,20 +195,35 @@ export default async function campagnesRoutes(app) {
     return Boolean(client);
   };
 
+  /// Le lien du message n'agit pas : il affiche un bouton. Les passerelles
+  /// de sécurité (Safe Links, antivirus) ouvrent chaque lien d'un courriel
+  /// reçu — un GET qui désinscrit désinscrivait donc, en silence et pour
+  /// de bon, des contacts qui n'avaient rien demandé.
   app.get("/desinscription", async (request, reply) => {
     const langue = langueDe(request);
-    const infos = verifierJeton(request.query?.jeton || "");
-    if (!infos) return page(reply.code(400), langue, T[langue].invalide);
-    const trouve = await desinscrire(infos);
-    return page(reply, langue, trouve ? T[langue].desabo : T[langue].note);
+    const jeton = String(request.query?.jeton || "");
+    if (!verifierJeton(jeton)) return page(reply.code(400), langue, T[langue].invalide);
+    const t = T[langue];
+    return page(reply, langue, t.desaboDemande, `
+<form method="post" action="desinscription?jeton=${encodeURIComponent(jeton)}&amp;page=1">
+  <button type="submit">${t.desaboBouton}</button>
+</form>`);
   });
 
   /// RFC 8058 : le bouton « Se désinscrire » de Gmail et d'Outlook poste
-  /// ici, sans que la personne ouvre le message.
+  /// ici, sans que la personne ouvre le message. Le formulaire de la page
+  /// ci-dessus aussi (`page=1`), qui attend une page en retour.
   app.post("/desinscription", async (request, reply) => {
+    const langue = langueDe(request);
     const infos = verifierJeton(request.query?.jeton || "");
-    if (!infos) return reply.code(400).send({ error: "Jeton invalide" });
-    await desinscrire(infos);
+    const enPage = request.query?.page === "1";
+    if (!infos) {
+      return enPage
+        ? page(reply.code(400), langue, T[langue].invalide)
+        : reply.code(400).send({ error: "Jeton invalide" });
+    }
+    const trouve = await desinscrire(infos);
+    if (enPage) return page(reply, langue, trouve ? T[langue].desabo : T[langue].note);
     return reply.send({ ok: true });
   });
 
@@ -203,7 +232,7 @@ export default async function campagnesRoutes(app) {
   app.get("/inscription", async (request, reply) => {
     const langue = langueDe(request);
     const { e, s: sig } = request.query || {};
-    if (!e || sig !== signatureFormulaire(String(e))) return page(reply.code(404), langue, T[langue].invalide);
+    if (!e || !signatureEgale(sig, signatureFormulaire(String(e)))) return page(reply.code(404), langue, T[langue].invalide);
     const entreprise = await ficheEntreprise(String(e));
     const tenant = await prisma.tenant.findUnique({ where: { id: String(e) } });
     const nom = entreprise.nom || tenant?.name || "";
@@ -223,7 +252,7 @@ export default async function campagnesRoutes(app) {
     const langue = langueDe(request);
     const t = T[langue];
     const { e, s: sig } = request.query || {};
-    if (!e || sig !== signatureFormulaire(String(e))) return page(reply.code(404), langue, t.invalide);
+    if (!e || !signatureEgale(sig, signatureFormulaire(String(e)))) return page(reply.code(404), langue, t.invalide);
     const corps = request.body || {};
     // Le champ piège : invisible pour un humain, rempli par les robots. On
     // leur répond comme à tout le monde, sans rien enregistrer.
@@ -232,10 +261,35 @@ export default async function campagnesRoutes(app) {
     if (!adresseValide(email) || corps.accord !== "1") return page(reply.code(400), langue, t.erreur, "", { integrable: true });
     const tenantId = String(e);
 
-    const clients = await prisma.record.findMany({ where: { tenantId, module: "crm", collection: "clients" } });
-    let fiche = clients.find((c) => String(c.data?.email || "").trim().toLowerCase() === email);
+    // Recherche par l'index JSON plutôt que charger tout le CRM à chaque
+    // envoi anonyme du formulaire.
+    const [trouvee] = await prisma.$queryRaw`
+      SELECT id FROM records
+      WHERE "tenantId" = ${tenantId} AND module = 'crm' AND collection = 'clients'
+        AND lower(trim(data->>'email')) = ${email}
+      ORDER BY "createdAt" ASC LIMIT 1`;
+    let fiche = trouvee ? await prisma.record.findUnique({ where: { id: trouvee.id } }) : null;
     const consentement = { source: "formulaire", le: new Date().toISOString() };
+
+    // Une demande par adresse et par jour : sans cela, le formulaire
+    // servait à bombarder une boîte de courriels de confirmation.
+    const derniere = Date.parse(fiche?.data?.consentementDemande?.le || "");
+    if (fiche && Date.now() - derniere < 24 * 3600 * 1000) {
+      return page(reply, langue, t.merci, "", { integrable: true });
+    }
+    // Les confirmations comptent dans le plafond d'envoi de l'espace, comme
+    // tout courriel qu'il fait partir.
+    if (!(await peutEnvoyer(tenantId, 1))) {
+      return page(reply, langue, t.merci, "", { integrable: true });
+    }
     if (!fiche) {
+      // Plafond de fiches créées par le formulaire, par espace et par
+      // heure : changer d'IP ne permet pas de remplir un CRM de déchets.
+      const [{ n }] = await prisma.$queryRaw`
+        SELECT count(*)::int AS n FROM records
+        WHERE "tenantId" = ${tenantId} AND module = 'crm' AND collection = 'clients'
+          AND data->>'source' = 'formulaire' AND "createdAt" > now() - interval '1 hour'`;
+      if (n >= INSCRIPTIONS_PAR_HEURE) return page(reply, langue, t.merci, "", { integrable: true });
       const auteur = await auteurDeLEspace(tenantId);
       if (!auteur) return page(reply.code(404), langue, t.invalide);
       fiche = await prisma.record.create({
@@ -269,22 +323,45 @@ export default async function campagnesRoutes(app) {
     // le relais de l'espace s'il existe, celui de la plateforme sinon.
     const entreprise = await ficheEntreprise(tenantId);
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    const nomEntreprise = entreprise.nom || tenant?.name || "";
+    // Par le relais de la plateforme, le nom de l'espace part sous notre
+    // signature : on en retire tout ce qui ressemble à une adresse, pour
+    // qu'il ne serve pas de support d'hameçonnage.
+    const nomEntreprise = String(entreprise.nom || tenant?.name || "")
+      .replace(/\b(?:https?:\/\/|www\.)\S*/gi, "")
+      .replace(/\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/gi, "")
+      .replace(/[\r\n]+/g, " ")
+      .trim()
+      .slice(0, 80);
     const lien = `${env.apiPublique || `http://localhost:${env.port}`}/api/campagnes/inscription/confirmer?jeton=${jetonConfirmation(tenantId, fiche.id)}`;
     const appCourrier = await prisma.app.findFirst({ where: { slug: "courrier", tenantId: null } });
     const installation = appCourrier ? await prisma.installation.findUnique({ where: { tenantId_appId: { tenantId, appId: appCourrier.id } } }) : null;
     const smtp = installation?.settings?.smtp;
-    const transport = smtp?.host ? creerTransporteur(smtp) : creerTransporteur({ host: env.smtpHost, port: env.smtpPort, user: env.smtpUser, pass: env.smtpPass });
-    await envoyerVia(transport, {
+    const transport = smtp?.host ? creerTransporteurEspace(smtp) : creerTransporteur({ host: env.smtpHost, port: env.smtpPort, user: env.smtpUser, pass: env.smtpPass });
+    const envoi = await envoyerVia(transport, {
       de: smtp?.host ? smtp.de || `${nomEntreprise} <${smtp.user}>` : env.mailFrom,
       a: email,
       sujet: `${t.sujetConfirmation} — ${nomEntreprise}`,
       texte: t.texteConfirmation.replace("{e}", nomEntreprise).replace("{l}", lien),
     });
+    if (envoi.envoye) await compterEnvois(tenantId, 1);
     return page(reply, langue, t.merci, "", { integrable: true });
   });
 
+  /// Même règle que la désinscription : le lien affiche un bouton, et
+  /// seul le POST confirme. Une passerelle qui ouvre les liens ne doit pas
+  /// pouvoir consentir à la place de la personne.
   app.get("/inscription/confirmer", async (request, reply) => {
+    const langue = langueDe(request);
+    const jeton = String(request.query?.jeton || "");
+    if (!verifierConfirmation(jeton)) return page(reply.code(400), langue, T[langue].invalide);
+    const t = T[langue];
+    return page(reply, langue, t.confirmeDemande, `
+<form method="post" action="confirmer?jeton=${encodeURIComponent(jeton)}">
+  <button type="submit">${t.confirmeBouton}</button>
+</form>`);
+  });
+
+  app.post("/inscription/confirmer", async (request, reply) => {
     const langue = langueDe(request);
     const infos = verifierConfirmation(request.query?.jeton || "");
     if (!infos) return page(reply.code(400), langue, T[langue].invalide);

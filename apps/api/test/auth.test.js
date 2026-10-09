@@ -127,3 +127,12 @@ test("la limitation de débit lit le compte dans le jeton", () => {
   assert.equal(auth.idDuJeton(requete(auth.signToken(comptes[0]))), "u1");
   assert.equal(auth.idDuJeton({ headers: {} }), null);
 });
+
+test("un jeton signé avec un autre algorithme est refusé", async () => {
+  const jwt = (await import("jsonwebtoken")).default;
+  const hs512 = jwt.sign({ sub: "u1", tenantId: "t1", ver: 0 }, "secret-de-test", { algorithm: "HS512" });
+  const r = await jouer(auth.authenticate, requete(hs512));
+  assert.equal(r.code, 401);
+  const none = jwt.sign({ sub: "u1", tenantId: "t1", ver: 0 }, null, { algorithm: "none" });
+  assert.equal((await jouer(auth.authenticate, requete(none))).code, 401);
+});

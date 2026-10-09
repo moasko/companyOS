@@ -72,6 +72,56 @@ const LIMITE_SENSIBLE = {
   rateLimit: { max: 8, timeWindow: "15 minutes", keyGenerator: (request) => request.ip },
 };
 
+/// La connexion a son propre plafond par IP, plus large : une grande
+/// entreprise sort sur Internet par une seule adresse, et huit connexions
+/// par quart d'heure pour tout un siège bloquaient le lundi matin. La
+/// protection contre l'essai de mots de passe est **par compte**, juste
+/// en dessous.
+const LIMITE_CONNEXION = {
+  rateLimit: { max: 40, timeWindow: "15 minutes", keyGenerator: (request) => request.ip },
+};
+
+/// Verrou par compte : après 5 échecs, chaque nouvel échec double l'attente
+/// (1 min, 2, 4… plafonnée à 15 min). Un attaquant qui change d'IP à chaque
+/// essai ne gagne donc rien. Le plafond est bas exprès : un verrou long
+/// donnerait à n'importe qui le moyen de bloquer le compte d'un dirigeant.
+const ECHECS_AVANT_VERROU = 5;
+const VERROU_MAX_MS = 15 * 60 * 1000;
+const echecsParCompte = new Map();
+
+const verrouDe = (email) => {
+  const e = echecsParCompte.get(email);
+  if (!e) return 0;
+  if (Date.now() - e.dernier > 60 * 60 * 1000) {
+    echecsParCompte.delete(email);
+    return 0;
+  }
+  return Math.max(0, e.jusqua - Date.now());
+};
+
+const noterEchec = (email) => {
+  const e = echecsParCompte.get(email) || { n: 0, jusqua: 0, dernier: 0 };
+  e.n += 1;
+  e.dernier = Date.now();
+  if (e.n >= ECHECS_AVANT_VERROU) {
+    e.jusqua = Date.now() + Math.min(VERROU_MAX_MS, 60_000 * 2 ** (e.n - ECHECS_AVANT_VERROU));
+  }
+  echecsParCompte.set(email, e);
+  // Borne mémoire : les entrées les plus anciennes partent d'abord.
+  if (echecsParCompte.size > 100_000) echecsParCompte.delete(echecsParCompte.keys().next().value);
+};
+
+/// Une empreinte bcrypt jetable, comparée quand l'adresse n'existe pas :
+/// la réponse prend alors le même temps (~250 ms) que pour un vrai compte.
+/// Sans cela, la durée seule disait quelles adresses ont un compte.
+/// Calculée dès le chargement : la première tentative ne doit pas, elle
+/// non plus, se distinguer par sa durée.
+const empreinteFactice = hashPassword("companyos-compte-inexistant");
+const comparerFactice = async (password) => {
+  await verifyPassword(password, await empreinteFactice);
+  return false;
+};
+
 /// Créer un espace est plus coûteux qu'une simple écriture — une
 /// transaction, un hachage bcrypt, des dossiers, un catalogue — et chaque
 /// espace créé consomme un quota de stockage offert.
@@ -132,18 +182,32 @@ export default async function authRoutes(app) {
   /// bcrypt à 12 tours coûte ~250 ms : c'est un ralentisseur, pas un mur.
   /// Sans plafond, un attaquant qui parallélise essaie des milliers de mots
   /// de passe par minute — et sature l'event loop du serveur au passage.
-  app.post("/login", { config: LIMITE_SENSIBLE }, async (request, reply) => {
+  app.post("/login", { config: LIMITE_CONNEXION }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Données invalides" });
     }
     const { email, password } = parsed.data;
+    const cle = normaliserEmail(email);
+
+    const attente = verrouDe(cle);
+    if (attente > 0) {
+      return reply.code(429).send({
+        error: `Trop de tentatives pour ce compte. Réessayez dans ${Math.ceil(attente / 60000)} min.`,
+      });
+    }
 
     const user = await compteParEmail(email, { include: { tenant: true } });
-    // Message identique dans les deux cas : ne pas révéler quels e-mails existent.
-    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    // Message et durée identiques dans les deux cas : ne pas révéler quels
+    // e-mails existent.
+    const valide = user
+      ? await verifyPassword(password, user.passwordHash)
+      : await comparerFactice(password);
+    if (!valide) {
+      noterEchec(cle);
       return reply.code(401).send({ error: "Identifiants incorrects" });
     }
+    echecsParCompte.delete(cle);
 
     // Espace suspendu : on le dit ici, avec le motif. `authenticate`
     // refuserait de toute façon chaque requête suivante, mais l'utilisateur
@@ -323,8 +387,42 @@ export default async function authRoutes(app) {
 
   /// Un espace doit toujours garder au moins un propriétaire : sans cela,
   /// plus personne ne peut gérer les membres ni fermer l'espace.
-  const proprietaires = (tenantId) =>
-    prisma.user.count({ where: { tenantId, role: "OWNER" } });
+  const proprietaires = (tenantId, client = prisma) =>
+    client.user.count({ where: { tenantId, role: "OWNER" } });
+
+  /// Un administrateur n'agit que sur un rang **strictement inférieur** au
+  /// sien : un membre. Sans cette règle, un administrateur pouvait
+  /// rétrograder, retirer ou déconnecter les autres administrateurs — et un
+  /// seul compte compromis prenait l'espace en main. Le propriétaire, lui,
+  /// agit sur tout le monde.
+  const peutViser = (acteur, cible) =>
+    acteur.role === "OWNER" || (cible.role === "MEMBER" && acteur.id !== cible.id);
+
+  /// Le dernier propriétaire se vérifie **dans** la transaction qui le
+  /// retire, en isolation sérialisable : deux propriétaires qui se
+  /// rétrogradent l'un l'autre au même instant laissaient sinon l'espace
+  /// sans aucun propriétaire.
+  const sansDernierProprietaire = (tenantId, cible, operation) =>
+    prisma.$transaction(
+      async (tx) => {
+        if (cible.role === "OWNER" && (await proprietaires(tenantId, tx)) <= 1) {
+          throw Object.assign(new Error("dernier"), { code: "DERNIER_PROPRIETAIRE" });
+        }
+        return operation(tx);
+      },
+      { isolationLevel: "Serializable" },
+    );
+
+  const refusDernier = (reply, err) => {
+    if (err?.code === "DERNIER_PROPRIETAIRE") {
+      return reply.code(400).send({ error: "L'espace doit garder au moins un propriétaire." });
+    }
+    // Conflit de sérialisation : une autre modification est passée avant.
+    if (err?.code === "P2034") {
+      return reply.code(409).send({ error: "Modification concurrente : réessayez." });
+    }
+    throw err;
+  };
 
   app.put(
     "/members/:id/role",
@@ -370,11 +468,27 @@ export default async function authRoutes(app) {
         }
       }
 
-      const maj = await prisma.user.update({
-        where: { id: cible.id },
-        data: { role },
-        select: { id: true, name: true, email: true, role: true, avatar: true },
-      });
+      if (!peutViser(request.user, cible)) {
+        return reply
+          .code(403)
+          .send({ error: "Seul le propriétaire peut modifier le rôle d'un administrateur." });
+      }
+
+      let maj;
+      try {
+        maj = await sansDernierProprietaire(
+          request.tenantId,
+          role === "OWNER" ? { role: "MEMBER" } : cible,
+          (tx) =>
+            tx.user.update({
+              where: { id: cible.id },
+              data: { role },
+              select: { id: true, name: true, email: true, role: true, avatar: true },
+            }),
+        );
+      } catch (err) {
+        return refusDernier(reply, err);
+      }
 
       await journaliser(request, "membre.role", cible.email, {
         avant: cible.role,
@@ -415,7 +529,19 @@ export default async function authRoutes(app) {
           .send({ error: "Seul le propriétaire peut retirer un propriétaire." });
       }
 
-      await prisma.user.delete({ where: { id: cible.id } });
+      if (!peutViser(request.user, cible)) {
+        return reply
+          .code(403)
+          .send({ error: "Seul le propriétaire peut retirer un administrateur." });
+      }
+
+      try {
+        await sansDernierProprietaire(request.tenantId, cible, (tx) =>
+          tx.user.delete({ where: { id: cible.id } }),
+        );
+      } catch (err) {
+        return refusDernier(reply, err);
+      }
 
       await journaliser(request, "membre.retrait", cible.email, {
         nom: cible.name,
@@ -441,10 +567,10 @@ export default async function authRoutes(app) {
       });
       if (!cible) return reply.code(404).send({ error: "Membre introuvable" });
 
-      if (cible.role === "OWNER" && request.user.role !== "OWNER") {
+      if (cible.id !== request.user.id && !peutViser(request.user, cible)) {
         return reply
           .code(403)
-          .send({ error: "Seul le propriétaire peut déconnecter un propriétaire." });
+          .send({ error: "Seul le propriétaire peut déconnecter un administrateur." });
       }
 
       const compte = await revoquerSessions(cible.id);

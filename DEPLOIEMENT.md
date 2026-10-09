@@ -51,6 +51,10 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 > `VITE_API_URL` est cuite **au build** : la changer exige un redéploiement,
 > pas seulement un redémarrage.
 
+> En production (`NODE_ENV=production`), l'API **refuse de démarrer** si
+> `JWT_SECRET` fait moins de 32 caractères ou garde sa valeur d'exemple, ou
+> si `ENCRYPTION_KEY` est renseignée avec moins de 32 caractères.
+>
 > `ENCRYPTION_KEY` doit être **distincte** de `JWT_SECRET`. À défaut, le
 > secret JWT sert de repli — et faire tourner les sessions rendrait alors
 > illisibles tous les secrets déjà stockés (clé S3, mots de passe SMTP des

@@ -173,7 +173,9 @@ const appReducer = (state = defState, action) => {
 
     return tmpState;
   } else if (action.type == "EXTERNAL") {
-    window.open(action.payload, "_blank");
+    // `noopener` : la page ouverte ne reçoit pas `window.opener`, et ne
+    // peut donc pas renvoyer le shell vers une fausse page de connexion.
+    window.open(action.payload, "_blank", "noopener,noreferrer");
   } else if (action.type == "ADDAPP") {
     tmpState[cleApp(action.payload)] = nouvelleFenetre(action.payload);
     return tmpState;

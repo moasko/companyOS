@@ -42,6 +42,7 @@ import * as D from "./domaine";
 import { depuisXlsx, versXlsx } from "./xlsx";
 import { depuisXls, estXls } from "./xls";
 import "./classeur.scss";
+import { lienSur } from "../../../utils/securite.js";
 
 export const manifest = {
   id: "classeur",
@@ -1486,8 +1487,15 @@ function ClasseurApp() {
   };
 
   const insererLien = async () => {
-    const href = await modal.prompt({ title: "Insérer un lien", label: "Adresse URL", confirmLabel: "Insérer" });
-    if (!href) return;
+    const saisie = await modal.prompt({ title: "Insérer un lien", label: "Adresse URL", confirmLabel: "Insérer" });
+    if (!saisie) return;
+    // Sans schéma, on suppose une adresse web ; tout autre schéma
+    // (javascript:, data:…) est refusé.
+    const href = /^[a-z][a-z0-9+.-]*:/i.test(saisie.trim()) ? saisie.trim() : `https://${saisie.trim()}`;
+    if (!lienSur(href)) {
+      modal.alert({ title: "Lien refusé", message: "Seules les adresses http(s) et mailto sont acceptées.", tone: "error" });
+      return;
+    }
     const libelle = await modal.prompt({ title: "Texte du lien", label: "Texte affiché", confirmLabel: "Insérer" });
     appliquer(D.poser(cellules, sel.l, sel.c, {
       v: libelle || href, f: undefined, href,
@@ -2598,7 +2606,7 @@ function ClasseurApp() {
                                     <option value="" />
                                     {optionsListe.map((option) => <option key={option}>{option}</option>)}
                                   </select>
-                                ) : cel.href ? (
+                                ) : cel.href && lienSur(cel.href) ? (
                                   <a className="clsLienCellule" href={cel.href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{affichee}</a>
                                 ) : (
                                   <span className={cel.type === "forme" ? "clsFormeCellule" : undefined}>{affichee}</span>

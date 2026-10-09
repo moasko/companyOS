@@ -41,6 +41,9 @@ export const MODES = ["membres", "admins", "selection"];
 const PAR_DEFAUT = {
   paie: { mode: "admins" },
   rh: { mode: "admins" },
+  // Grand livre, relevés bancaires, lettrages : lisibles par un caissier,
+  // ils exposaient toute la trésorerie. Ouvrir la compta reste un choix.
+  comptabilite: { mode: "admins" },
 };
 
 /// Champs d'une fiche salarié visibles en annuaire.

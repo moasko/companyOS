@@ -29,9 +29,15 @@
 // 192.168.x.x supprimerait la moitié de la fonctionnalité.
 //
 // Le garde qui compte ici est ailleurs : l'accès à ces routes est réservé
-// à `PLATFORM_ADMINS` (voir src/routes/plateforme.js). Si un jour un
-// administrateur d'espace pouvait régler son propre stockage, il faudrait
-// alors filtrer les adresses privées.
+// à `PLATFORM_ADMINS` (voir src/routes/plateforme.js).
+//
+// **Le stockage d'un espace, lui, est réglé par l'administrateur de cet
+// espace** — n'importe qui pouvant créer un compte. Ses configurations
+// portent donc `reseauPublic: true` : HTTPS obligatoire, adresse résolue et
+// vérifiée **au moment de la connexion** (pas avant : un DNS à durée de vie
+// nulle répondrait une IP publique au contrôle puis 169.254.169.254 à la
+// connexion), aucune redirection suivie, et des messages d'erreur
+// génériques — le contenu d'une réponse interne ne doit jamais remonter.
 //
 // SUR LA SIGNATURE
 //
@@ -45,6 +51,71 @@
 import { createHash, createHmac } from "node:crypto";
 import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
+import dns from "node:dns";
+import net from "node:net";
+import { Agent, fetch as fetchUndici } from "undici";
+import { adressePrivee } from "./web.js";
+
+/// Résolution qui refuse toute adresse non publique. Branchée sur la
+/// connexion elle-même : c'est l'IP vérifiée qui est jointe, sans fenêtre
+/// entre le contrôle et l'usage.
+const resolutionPublique = (hote, options, cb) => {
+  dns.lookup(hote, { all: true }, (err, adresses) => {
+    if (err) return cb(err);
+    if (!adresses.length || adresses.some((a) => adressePrivee(a.address))) {
+      return cb(new Error("adresse interne refusée"));
+    }
+    if (options?.all) return cb(null, adresses);
+    return cb(null, adresses[0].address, adresses[0].family);
+  });
+};
+
+const agentPublic = new Agent({
+  connect: { lookup: resolutionPublique, timeout: 15_000 },
+  headersTimeout: 30_000,
+  bodyTimeout: 120_000,
+});
+
+/// Nom de bucket S3 valide. En style « virtual-hosted », le bucket devient
+/// une partie du nom d'hôte : un bucket `x@autre-hote` ou `a/b` changerait
+/// la destination de la requête.
+const BUCKET_VALIDE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+
+/// Contrôle de forme d'une configuration réglée par un espace client.
+/// Lève une erreur lisible, sans rien révéler du réseau.
+export const verifierConfigPublique = (config) => {
+  let url;
+  try {
+    url = new URL(String(config.endpoint || ""));
+  } catch {
+    throw new Error("L'adresse du stockage n'est pas valide.");
+  }
+  if (url.protocol !== "https:") {
+    throw new Error("L'adresse du stockage doit commencer par https://.");
+  }
+  if (
+    url.username ||
+    url.password ||
+    (url.pathname && url.pathname !== "/") ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("L'adresse du stockage doit être de la forme https://hôte[:port].");
+  }
+  const hote = url.hostname.replace(/^\[|\]$/g, "");
+  if (
+    net.isIP(hote)
+      ? adressePrivee(hote)
+      : /^(localhost|.*\.local|.*\.internal)$/i.test(hote)
+  ) {
+    throw new Error(
+      "Le stockage doit être joignable sur Internet : les adresses internes sont refusées.",
+    );
+  }
+  if (!BUCKET_VALIDE.test(String(config.bucket || ""))) {
+    throw new Error("Nom de bucket invalide (minuscules, chiffres, points et tirets).");
+  }
+};
 
 const VIDE_SHA256 = createHash("sha256").update("").digest("hex");
 
@@ -55,7 +126,10 @@ const hmac = (cle, donnees) => createHmac("sha256", cle).update(donnees).digest(
 /// barres obliques restent des séparateurs. `encodeURIComponent` échappe
 /// aussi `!'()*`, qu'AWS attend en clair — d'où la reprise.
 const encoderSegment = (s) =>
-  encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  encodeURIComponent(s).replace(
+    /[!'()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 
 const encoderChemin = (chemin) => chemin.split("/").map(encoderSegment).join("/");
 
@@ -81,18 +155,20 @@ const signer = ({ config, methode, chemin, requete = "", entetes = {}, empreinte
   // Les en-têtes signés doivent être triés, en minuscules, valeurs
   // resserrées : la moindre différence avec ce que le serveur recalcule
   // invalide la signature.
-  const noms = Object.keys(tous).map((k) => k.toLowerCase()).sort();
-  const canoniques = noms.map((n) => `${n}:${String(tous[Object.keys(tous).find((k) => k.toLowerCase() === n)]).trim()}\n`).join("");
+  const noms = Object.keys(tous)
+    .map((k) => k.toLowerCase())
+    .sort();
+  const canoniques = noms
+    .map(
+      (n) =>
+        `${n}:${String(tous[Object.keys(tous).find((k) => k.toLowerCase() === n)]).trim()}\n`,
+    )
+    .join("");
   const signes = noms.join(";");
 
-  const requeteCanonique = [
-    methode,
-    chemin,
-    requete,
-    canoniques,
-    signes,
-    empreinte,
-  ].join("\n");
+  const requeteCanonique = [methode, chemin, requete, canoniques, signes, empreinte].join(
+    "\n",
+  );
 
   const portee = `${court}/${config.region}/s3/aws4_request`;
   const aSigner = ["AWS4-HMAC-SHA256", long, portee, sha256(requeteCanonique)].join("\n");
@@ -125,97 +201,149 @@ const cheminObjet = (config, key) =>
     ? `/${encoderSegment(config.bucket)}/${encoderChemin(key)}`
     : `/${encoderChemin(key)}`;
 
-const erreurLisible = async (rep, action) => {
+/// Requête vers un stockage d'espace client : connexion sur IP publique
+/// vérifiée, aucune redirection, et une erreur réseau sans détail.
+const fetchPublic = async (url, options) => {
+  try {
+    return await fetchUndici(url, {
+      ...options,
+      dispatcher: agentPublic,
+      redirect: "manual",
+    });
+  } catch {
+    throw new Error("Le stockage est injoignable depuis la plateforme.");
+  }
+};
+
+/// Pour un stockage d'espace client : le statut seul. Recopier la réponse
+/// ferait du test de connexion un lecteur de pages internes.
+const erreurGenerique = async (rep, action) => {
+  await rep.body?.cancel?.().catch(() => {});
+  if (rep.status === 403 || rep.status === 401) {
+    return new Error(`${action} : accès refusé (vérifiez les clés et le bucket).`);
+  }
+  if (rep.status === 404) return new Error(`${action} : bucket introuvable.`);
+  return new Error(`${action} : le stockage a répondu ${rep.status}.`);
+};
+
+const erreurDetaillee = async (rep, action) => {
   const texte = await rep.text().catch(() => "");
   // Les erreurs S3 arrivent en XML : on en extrait le message plutôt que
   // de renvoyer trente lignes de balises à l'utilisateur.
   const message = /<Message>([^<]+)<\/Message>/.exec(texte)?.[1];
-  return new Error(
-    `${action} : ${rep.status}${message ? ` — ${message}` : ""}`,
-  );
+  return new Error(`${action} : ${rep.status}${message ? ` — ${message}` : ""}`);
 };
 
 /// Fabrique un pilote à partir d'une configuration.
-export const creerPiloteS3 = (config) => ({
-  nom: "s3",
+///
+/// `config.reseauPublic` : la configuration vient d'un espace client, voir
+/// l'en-tête du fichier.
+export const creerPiloteS3 = (config) => {
+  if (config.reseauPublic) verifierConfigPublique(config);
+  const fetch = config.reseauPublic ? fetchPublic : globalThis.fetch;
+  const erreurLisible = config.reseauPublic ? erreurGenerique : erreurDetaillee;
+  return {
+    nom: "s3",
 
-  buildKey(tenantId, filename) {
-    // Le nom d'origine est conservé en fin de clé : retrouver un objet
-    // depuis la console du fournisseur reste possible.
-    const propre = String(filename).replace(/[^\w.-]+/g, "_").slice(-120);
-    return `${config.prefix || ""}${tenantId}/${randomUUID()}-${propre}`;
-  },
+    buildKey(tenantId, filename) {
+      // Le nom d'origine est conservé en fin de clé : retrouver un objet
+      // depuis la console du fournisseur reste possible.
+      const propre = String(filename)
+        .replace(/[^\w.-]+/g, "_")
+        .slice(-120);
+      return `${config.prefix || ""}${tenantId}/${randomUUID()}-${propre}`;
+    },
 
-  async put(key, stream) {
-    // Le flux est rassemblé en mémoire : la taille écrite doit être
-    // rendue à l'appelant, et le quota se calcule dessus. C'est le
-    // compromis assumé — les fichiers de gestion sont des documents, pas
-    // des vidéos de plusieurs gigaoctets.
-    const morceaux = [];
-    for await (const m of stream) morceaux.push(m);
-    const corps = Buffer.concat(morceaux);
+    async put(key, stream) {
+      // Le flux est rassemblé en mémoire : la taille écrite doit être
+      // rendue à l'appelant, et le quota se calcule dessus. C'est le
+      // compromis assumé — les fichiers de gestion sont des documents, pas
+      // des vidéos de plusieurs gigaoctets.
+      const morceaux = [];
+      for await (const m of stream) morceaux.push(m);
+      const corps = Buffer.concat(morceaux);
 
-    const chemin = cheminObjet(config, key);
-    const entetes = signer({
-      config, methode: "PUT", chemin, empreinte: "UNSIGNED-PAYLOAD",
-      entetes: { "content-length": String(corps.length) },
-    });
+      const chemin = cheminObjet(config, key);
+      const entetes = signer({
+        config,
+        methode: "PUT",
+        chemin,
+        empreinte: "UNSIGNED-PAYLOAD",
+        entetes: { "content-length": String(corps.length) },
+      });
 
-    const rep = await fetch(adresse(config, chemin), { method: "PUT", headers: entetes, body: corps });
-    if (!rep.ok) throw await erreurLisible(rep, "Envoi vers le stockage objet");
-    return corps.length;
-  },
+      const rep = await fetch(adresse(config, chemin), {
+        method: "PUT",
+        headers: entetes,
+        body: corps,
+      });
+      if (!rep.ok) throw await erreurLisible(rep, "Envoi vers le stockage objet");
+      return corps.length;
+    },
 
-  read(key) {
-    return this.readRange(key, null, null);
-  },
+    read(key) {
+      return this.readRange(key, null, null);
+    },
 
-  readRange(key, debut, fin) {
-    const chemin = cheminObjet(config, key);
-    const supplement = debut !== null && debut !== undefined
-      ? { range: `bytes=${debut}-${fin}` }
-      : {};
-    const entetes = signer({
-      config, methode: "GET", chemin, empreinte: VIDE_SHA256, entetes: supplement,
-    });
+    readRange(key, debut, fin) {
+      const chemin = cheminObjet(config, key);
+      const supplement =
+        debut !== null && debut !== undefined ? { range: `bytes=${debut}-${fin}` } : {};
+      const entetes = signer({
+        config,
+        methode: "GET",
+        chemin,
+        empreinte: VIDE_SHA256,
+        entetes: supplement,
+      });
 
-    // L'appelant attend un flux Node lisible, comme avec le disque local.
-    // On lui en rend un tout de suite, alimenté dès que la réponse arrive.
-    const flux = new Readable({ read() {} });
-    fetch(adresse(config, chemin), { headers: entetes })
-      .then(async (rep) => {
-        if (!rep.ok) throw await erreurLisible(rep, "Lecture depuis le stockage objet");
-        for await (const morceau of rep.body) flux.push(Buffer.from(morceau));
-        flux.push(null);
-      })
-      .catch((e) => flux.destroy(e));
-    return flux;
-  },
+      // L'appelant attend un flux Node lisible, comme avec le disque local.
+      // On lui en rend un tout de suite, alimenté dès que la réponse arrive.
+      const flux = new Readable({ read() {} });
+      fetch(adresse(config, chemin), { headers: entetes })
+        .then(async (rep) => {
+          if (!rep.ok) throw await erreurLisible(rep, "Lecture depuis le stockage objet");
+          for await (const morceau of rep.body) flux.push(Buffer.from(morceau));
+          flux.push(null);
+        })
+        .catch((e) => flux.destroy(e));
+      return flux;
+    },
 
-  async remove(key) {
-    const chemin = cheminObjet(config, key);
-    const entetes = signer({ config, methode: "DELETE", chemin, empreinte: VIDE_SHA256 });
-    const rep = await fetch(adresse(config, chemin), { method: "DELETE", headers: entetes });
-    // 404 sur une suppression n'est pas une erreur : l'objet n'est plus
-    // là, c'est le résultat voulu.
-    if (!rep.ok && rep.status !== 404) throw await erreurLisible(rep, "Suppression");
-  },
+    async remove(key) {
+      const chemin = cheminObjet(config, key);
+      const entetes = signer({
+        config,
+        methode: "DELETE",
+        chemin,
+        empreinte: VIDE_SHA256,
+      });
+      const rep = await fetch(adresse(config, chemin), {
+        method: "DELETE",
+        headers: entetes,
+      });
+      // 404 sur une suppression n'est pas une erreur : l'objet n'est plus
+      // là, c'est le résultat voulu.
+      if (!rep.ok && rep.status !== 404) throw await erreurLisible(rep, "Suppression");
+    },
 
-  /// Vérifie que la configuration fonctionne vraiment : on écrit un petit
-  /// objet, on le relit, on le supprime. Un simple accès au bucket ne
-  /// prouverait pas le droit d'écriture — et c'est celui qui manque le
-  /// plus souvent.
-  async tester() {
-    const key = `${config.prefix || ""}_verification/${randomUUID()}.txt`;
-    const temoin = `companyos ${new Date().toISOString()}`;
-    await this.put(key, Readable.from([Buffer.from(temoin)]));
+    /// Vérifie que la configuration fonctionne vraiment : on écrit un petit
+    /// objet, on le relit, on le supprime. Un simple accès au bucket ne
+    /// prouverait pas le droit d'écriture — et c'est celui qui manque le
+    /// plus souvent.
+    async tester() {
+      const key = `${config.prefix || ""}_verification/${randomUUID()}.txt`;
+      const temoin = `companyos ${new Date().toISOString()}`;
+      await this.put(key, Readable.from([Buffer.from(temoin)]));
 
-    const morceaux = [];
-    for await (const m of this.readRange(key, null, null)) morceaux.push(m);
-    const relu = Buffer.concat(morceaux).toString("utf8");
-    await this.remove(key);
+      const morceaux = [];
+      for await (const m of this.readRange(key, null, null)) morceaux.push(m);
+      const relu = Buffer.concat(morceaux).toString("utf8");
+      await this.remove(key);
 
-    if (relu !== temoin) throw new Error("L'objet relu ne correspond pas à ce qui a été écrit.");
-    return true;
-  },
-});
+      if (relu !== temoin)
+        throw new Error("L'objet relu ne correspond pas à ce qui a été écrit.");
+      return true;
+    },
+  };
+};

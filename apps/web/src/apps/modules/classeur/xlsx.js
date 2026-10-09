@@ -911,7 +911,9 @@ export const depuisXlsx = async (blob, titre = "Classeur") => {
       if (!plageLien) continue;
       const ridLien = lien.getAttribute("r:id") || lien.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
       const cibleLien = lien.getAttribute("location") || relationsFeuille.get(ridLien);
-      if (!cibleLien) continue;
+      // Un lien `javascript:` glissé dans un classeur reçu par mail
+      // s'exécuterait au clic : seuls http(s) et mailto sont repris.
+      if (!cibleLien || !/^(https?:|mailto:)/i.test(String(cibleLien).trim())) continue;
       for (let l = plageLien.l1; l <= plageLien.l2 && l < cellules.length; l += 1) {
         for (let c = plageLien.c1; c <= plageLien.c2 && c < cellules[0].length; c += 1) {
           cellules[l][c] = { ...cellules[l][c], href: cibleLien };

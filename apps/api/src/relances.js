@@ -27,7 +27,7 @@
 
 import { prisma } from "./db.js";
 import { env } from "./env.js";
-import { creerTransporteur, envoyerVia } from "./mail.js";
+import { creerTransporteur, creerTransporteurEspace, envoyerVia } from "./mail.js";
 import { journaliser } from "./audit.js";
 import {
   totaux,
@@ -108,7 +108,7 @@ const relancerEspace = async (installation) => {
   // Le relais de l'espace, sinon celui de la plateforme.
   const smtp = installation.settings?.smtp;
   const transport = smtp?.host
-    ? creerTransporteur(smtp)
+    ? creerTransporteurEspace(smtp)
     : creerTransporteur({
         host: env.smtpHost,
         port: env.smtpPort,

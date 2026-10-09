@@ -34,6 +34,7 @@
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^10.0.16",
     "sanitize-html": "^2.14.0",
+    "undici": "^7.19.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

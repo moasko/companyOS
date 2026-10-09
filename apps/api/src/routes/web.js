@@ -22,7 +22,7 @@ import { Transform } from "node:stream";
 import { prisma, serialize } from "../db.js";
 import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { piloteEcriture } from "../storage.js";
+import { consommerQuota, piloteEcriture } from "../storage.js";
 import { typeNeutralise } from "../mimetype.js";
 import { randomUUID } from "node:crypto";
 import {
@@ -51,6 +51,11 @@ const APERCU_MAX = 64 * 1024;
 /// connexions sortantes en série. Trente par minute suffisent largement à
 /// l'usage normal du Navigateur.
 const LIMITE_SORTANTE = { rateLimit: { max: 30, timeWindow: "1 minute" } };
+
+/// La vue de lecture est publique (jeton d'URL) : chaque page chargée
+/// déclenche une requête sortante. Plus large que l'inspection — une
+/// lecture enchaîne les clics — mais bornée.
+const LIMITE_VUE = { rateLimit: { max: 60, timeWindow: "1 minute" } };
 
 /// Plafond par téléchargement, indépendamment du quota. Il protège d'un
 /// serveur distant qui annonce 2 Ko et en envoie 20 Go.
@@ -151,13 +156,30 @@ const repondreErreur = (reply, err) => {
 const VUE_DUREE_MS = 60 * 60 * 1000;
 const vues = new Map();
 
-const creerVue = (url, tenantId) => {
+/// Plafonds de la vue de lecture. Une page de 4 Mo peut contenir des
+/// centaines de milliers de liens : sans limite, une seule requête
+/// remplissait la mémoire et bloquait le serveur pour tous les espaces
+/// (la purge parcourait toute la table à chaque lien — un coût
+/// quadratique).
+const VUES_MAX = 50_000;
+const LIENS_PAR_PAGE = 1500;
+const URL_VUE_MAX = 2048;
+
+// La purge des vues échues passe à intervalle régulier, jamais par lien.
+setInterval(() => {
   const maintenant = Date.now();
   for (const [cle, valeur] of vues) {
     if (valeur.expire < maintenant) vues.delete(cle);
   }
+}, 5 * 60 * 1000).unref();
+
+const creerVue = (url, tenantId) => {
+  if (url.length > URL_VUE_MAX) return null;
+  // Table pleine : les plus anciennes cèdent la place (une Map garde
+  // l'ordre d'insertion).
+  while (vues.size >= VUES_MAX) vues.delete(vues.keys().next().value);
   const jeton = randomUUID().replace(/-/g, "");
-  vues.set(jeton, { url, tenantId, expire: maintenant + VUE_DUREE_MS });
+  vues.set(jeton, { url, tenantId, expire: Date.now() + VUE_DUREE_MS });
   return jeton;
 };
 
@@ -181,7 +203,7 @@ export default async function webRoutes(app) {
   /// Sert une page distante depuis notre origine, pour qu'elle s'affiche
   /// dans un cadre malgré son refus. Voir ../lecture.js pour ce que cela
   /// implique — et pour ce que le client doit faire de son côté.
-  app.get("/voir/:jeton", async (request, reply) => {
+  app.get("/voir/:jeton", { config: LIMITE_VUE }, async (request, reply) => {
     const vue = lireVue(request.params.jeton);
     if (!vue) {
       return reply
@@ -213,17 +235,33 @@ export default async function webRoutes(app) {
 
     const morceaux = [];
     let taille = 0;
-    for await (const morceau of reponse) {
-      morceaux.push(morceau);
-      taille += morceau.length;
-      if (taille >= HTML_MAX) break;
+    // Délai total, pas seulement d'inactivité : un serveur qui distille un
+    // octet toutes les quinze secondes retiendrait sinon la requête des
+    // heures durant.
+    const delai = setTimeout(() => reponse.destroy(), 30_000);
+    try {
+      for await (const morceau of reponse) {
+        morceaux.push(morceau);
+        taille += morceau.length;
+        if (taille >= HTML_MAX) break;
+      }
+    } catch {
+      // Flux coupé par le délai : on sert ce qui est arrivé.
+    } finally {
+      clearTimeout(delai);
     }
     reponse.destroy();
 
+    // Au-delà du plafond, un lien garde son adresse d'origine : il sortira
+    // du cadre au clic, mais la page reste lisible.
+    let liens = 0;
     const html = preparer(
       decoder(Buffer.concat(morceaux), type),
       finale.href,
-      (cible) => `/api/web/voir/${creerVue(cible, vue.tenantId)}`,
+      (cible) => {
+        const jeton = ++liens <= LIENS_PAR_PAGE ? creerVue(cible, vue.tenantId) : null;
+        return jeton ? `/api/web/voir/${jeton}` : cible;
+      },
     );
 
     return (
@@ -423,10 +461,7 @@ export default async function webRoutes(app) {
           },
         });
 
-        await tx.tenant.update({
-          where: { id: request.tenantId },
-          data: { usedBytes: { increment: BigInt(taille) } },
-        });
+        await consommerQuota(tx, request.tenantId, taille);
 
         return cree;
       });
@@ -442,6 +477,7 @@ export default async function webRoutes(app) {
       return reply.code(201).send(serialize(node));
     } catch (err) {
       await pilote.remove(cle);
+      if (err.code === "QUOTA") return reply.code(413).send({ error: err.message });
       if (err.code === "P2002") {
         // Le nom est déjà pris ici. Le client réessaiera avec un autre :
         // c'est lui qui sait comment il numérote les doublons.

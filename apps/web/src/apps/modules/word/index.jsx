@@ -51,6 +51,7 @@ import { subscribeVisionneuse } from "../../openRequest";
 import { Contenu, useChargement } from "../../chargement";
 import { MIME_DOCX, documentVierge } from "./gabarit";
 import "./word.scss";
+import { echapperHtml } from "../../../utils/securite.js";
 
 export const manifest = {
   slug: "word",
@@ -414,7 +415,7 @@ function WordApp() {
       .join("");
     const doc = cadre.contentDocument;
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${titre}</title>${styles}
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${echapperHtml(titre)}</title>${styles}
       <style>
         @page { margin: 0; }
         html, body { margin: 0; background: #fff; }
