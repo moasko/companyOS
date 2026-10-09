@@ -17,6 +17,7 @@ export const SectionEspace = ({
   changerRole,
   retirerMembre,
   deconnecterMembre,
+  reinitialiserMfa,
   invitations,
   mailInvite,
   setMailInvite,
@@ -106,6 +107,23 @@ export const SectionEspace = ({
             ) : (
               <span className="setBadge">{ROLES[m.role]}</span>
             )}
+
+            {m.totpActif ? (
+              <span className="setBadge" title="Double authentification activée">
+                2FA
+              </span>
+            ) : null}
+
+            {peutGerer && !moi && m.totpActif && reinitialiserMfa ? (
+              <span title="Réinitialiser sa double authentification (téléphone perdu)">
+                <Icon
+                  className="setRetirer"
+                  fafa="faShieldHalved"
+                  width={12}
+                  onClick={() => reinitialiserMfa(m)}
+                />
+              </span>
+            ) : null}
 
             {peutGerer && !moi ? (
               <span title="Déconnecter de tous ses appareils">

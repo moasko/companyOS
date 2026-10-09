@@ -9,10 +9,23 @@ import {
   exigerRole,
   hashPassword,
   normaliserEmail,
+  effacerCookie,
+  mfaExigee,
+  ouvrirSession,
   revoquerSessions,
-  signToken,
   verifyPassword,
 } from "../auth.js";
+import { chiffrer, dechiffrer } from "../chiffrement.js";
+import {
+  consommerSecours,
+  empreinteSecours,
+  nouveauSecret,
+  nouveauxCodesSecours,
+  ressembleSecours,
+  uriOtpauth,
+  verifierCode,
+} from "../totp.js";
+import jwt from "jsonwebtoken";
 import { creerEspace } from "../espaces.js";
 import { journaliser, journaliserPour } from "../audit.js";
 import { formuleDe } from "../formules.js";
@@ -41,6 +54,7 @@ const profil = (u) => ({
   email: u.email,
   role: u.role,
   avatar: u.avatar || null,
+  mfa: !!u.totpActif,
 });
 
 /// Adresse d'un exploitant de la plateforme : aucun compte ne se crée
@@ -163,9 +177,10 @@ export default async function authRoutes(app) {
       tenant.name,
     );
 
+    await ouvrirSession(request, reply, { ...user, tenantId: tenant.id });
+
     return reply.code(201).send(
       serialize({
-        token: signToken(user),
         user: profil(user),
         tenant: {
           id: tenant.id,
@@ -221,11 +236,38 @@ export default async function authRoutes(app) {
       });
     }
 
-    await journaliserPour(request, user, "session.connexion");
+    // Double authentification : le mot de passe ne suffit pas. On rend un
+    // défi de cinq minutes, que seule la saisie du code transforme en
+    // session.
+    if (user.totpActif) {
+      return {
+        mfa: true,
+        defi: jwt.sign({ sub: user.id, but: "mfa", jeton: !!request.body?.jeton }, env.jwtSecret, {
+          expiresIn: "5m",
+          algorithm: "HS256",
+        }),
+      };
+    }
 
+    return terminerConnexion(request, reply, user, { mfa: false });
+  });
+
+  /// Ouvre la session au terme de la connexion (avec ou sans second
+  /// facteur) et rend ce que le shell attend.
+  ///
+  /// `jeton: true` dans le corps : un outil (le serveur MCP) demande un
+  /// jeton porteur au lieu d'un cookie.
+  const terminerConnexion = async (request, reply, user, { mfa, jeton = request.body?.jeton }) => {
+    const { token } = await ouvrirSession(request, reply, user, {
+      mfa,
+      type: jeton ? "api" : "navigateur",
+      libelle: jeton ? String(request.body?.libelle || "Outil").slice(0, 80) : null,
+    });
+    await journaliserPour(request, user, "session.connexion", null, { mfa });
     return serialize({
-      token: signToken(user),
+      ...(jeton ? { token } : {}),
       user: profil(user),
+      mfaAConfigurer: !mfa && mfaExigee(user),
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
@@ -234,7 +276,73 @@ export default async function authRoutes(app) {
         usedBytes: user.tenant.usedBytes,
       },
     });
+  };
+
+  /// Seconde étape de la connexion : le code de l'application
+  /// d'authentification, ou un code de secours.
+  app.post("/login/mfa", { config: LIMITE_CONNEXION }, async (request, reply) => {
+    let defi;
+    try {
+      defi = jwt.verify(String(request.body?.defi || ""), env.jwtSecret, { algorithms: ["HS256"] });
+    } catch {
+      return reply.code(401).send({ error: "Délai dépassé. Reprenez la connexion." });
+    }
+    if (defi.but !== "mfa") return reply.code(401).send({ error: "Défi invalide." });
+
+    const cle = `mfa:${defi.sub}`;
+    const attente = verrouDe(cle);
+    if (attente > 0) {
+      return reply.code(429).send({
+        error: `Trop de codes erronés. Réessayez dans ${Math.ceil(attente / 60000)} min.`,
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: defi.sub },
+      include: { tenant: true },
+    });
+    if (!user?.totpActif) return reply.code(401).send({ error: "Défi invalide." });
+
+    const resultat = await verifierSecondFacteur(user, request.body?.code);
+    if (!resultat) {
+      noterEchec(cle);
+      await journaliserPour(request, user, "session.mfa.echec");
+      return reply.code(401).send({ error: "Code incorrect." });
+    }
+    echecsParCompte.delete(cle);
+    if (resultat === "secours") {
+      await journaliserPour(request, user, "session.mfa.secours");
+    }
+    return terminerConnexion(request, reply, user, { mfa: true, jeton: defi.jeton });
   });
+
+  /// Vérifie un code TOTP ou de secours et l'enregistre comme consommé.
+  /// Rend "totp", "secours" ou null.
+  const verifierSecondFacteur = async (user, code) => {
+    if (ressembleSecours(code)) {
+      const reste = consommerSecours(user.codesSecours, code);
+      if (!reste) return null;
+      // Mise à jour conditionnelle : deux connexions simultanées avec le
+      // même code de secours ne passent pas toutes les deux.
+      const { count } = await prisma.user.updateMany({
+        where: { id: user.id, codesSecours: { equals: user.codesSecours } },
+        data: { codesSecours: reste },
+      });
+      return count === 1 ? "secours" : null;
+    }
+    const secret = dechiffrer(user.totpSecret);
+    if (!secret) return null;
+    const pas = verifierCode(secret, code, { dernierPas: user.totpDernierPas });
+    if (pas === null) return null;
+    const { count } = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        OR: [{ totpDernierPas: null }, { totpDernierPas: { lt: pas } }],
+      },
+      data: { totpDernierPas: pas },
+    });
+    return count === 1 ? "totp" : null;
+  };
 
   /// Changement de mot de passe : l'ancien est exigé, sinon un poste
   /// resté ouvert suffirait à verrouiller le compte de son propriétaire.
@@ -261,20 +369,189 @@ export default async function authRoutes(app) {
       where: { id: request.user.id },
       data: { passwordHash: await hashPassword(parsed.data.next) },
     });
-    const compte = await revoquerSessions(request.user.id);
+    await revoquerSessions(request.user.id, { sauf: request.session.id });
 
     await journaliser(request, "compte.motdepasse");
 
-    return { ok: true, token: signToken(compte) };
+    return { ok: true };
   });
 
   /// « Déconnecter tous mes appareils » : ferme toutes les sessions du
-  /// compte, sauf celle qui fait la demande, qui reçoit un jeton neuf.
+  /// compte, sauf celle qui fait la demande.
   app.post("/sessions/revoquer", { preHandler: authenticate }, async (request) => {
-    const compte = await revoquerSessions(request.user.id);
+    await revoquerSessions(request.user.id, { sauf: request.session.id });
     await journaliser(request, "compte.sessions.revocation");
-    return { ok: true, token: signToken(compte) };
+    return { ok: true };
   });
+
+  /// Se déconnecter : la session est fermée **côté serveur** — un jeton
+  /// copié avant la déconnexion ne sert plus à rien.
+  app.post("/logout", { preHandler: authenticate }, async (request, reply) => {
+    await prisma.session.update({
+      where: { id: request.session.id },
+      data: { revoqueLe: new Date() },
+    });
+    effacerCookie(request, reply);
+    await journaliser(request, "session.deconnexion");
+    return { ok: true };
+  });
+
+  /// Mes sessions ouvertes : appareils connectés et jetons d'outils.
+  app.get("/sessions", { preHandler: authenticate }, async (request) => {
+    const sessions = await prisma.session.findMany({
+      where: { userId: request.user.id, revoqueLe: null, expireLe: { gt: new Date() } },
+      orderBy: { vuLe: "desc" },
+      take: 100,
+    });
+    return sessions.map((x) => ({
+      id: x.id,
+      type: x.type,
+      libelle: x.libelle,
+      ip: x.ip,
+      agent: x.agent,
+      mfa: x.mfa,
+      creeLe: x.creeLe,
+      vuLe: x.vuLe,
+      expireLe: x.expireLe,
+      actuelle: x.id === request.session.id,
+    }));
+  });
+
+  /// Fermer une de ses sessions (un téléphone perdu, un jeton d'outil).
+  app.delete("/sessions/:id", { preHandler: authenticate }, async (request, reply) => {
+    const { count } = await prisma.session.updateMany({
+      where: { id: request.params.id, userId: request.user.id, revoqueLe: null },
+      data: { revoqueLe: new Date() },
+    });
+    if (!count) return reply.code(404).send({ error: "Session introuvable" });
+    if (request.params.id === request.session.id) effacerCookie(request, reply);
+    await journaliser(request, "compte.session.fermeture");
+    return { ok: true };
+  });
+
+  /// Un jeton pour un outil (serveur MCP, script) : montré une seule fois,
+  /// révocable dans la liste des sessions. Il hérite du second facteur de
+  /// la session qui le crée.
+  app.post("/jetons", { preHandler: authenticate }, async (request, reply) => {
+    const libelle = String(request.body?.libelle || "Jeton d'API").trim().slice(0, 80);
+    const { token, session } = await ouvrirSession(request, reply, request.user, {
+      type: "api",
+      mfa: request.session.mfa,
+      libelle,
+    });
+    await journaliser(request, "compte.jeton.creation", libelle);
+    return { token, id: session.id, expireLe: session.expireLe };
+  });
+
+  // -------------------------------------------------------------------------
+  // Double authentification
+  // -------------------------------------------------------------------------
+
+  app.get("/mfa", { preHandler: authenticate }, async (request) => ({
+    actif: !!request.user.totpActif,
+    exigee: mfaExigee(request.user),
+    obligatoireEspace: !!request.user.tenant.mfaObligatoire,
+    codesRestants: Array.isArray(request.user.codesSecours) ? request.user.codesSecours.length : 0,
+  }));
+
+  /// Étape 1 : un secret neuf, à scanner. Rien n'est actif tant qu'un
+  /// premier code n'a pas été validé.
+  app.post("/mfa/preparer", { preHandler: authenticate }, async (request, reply) => {
+    if (request.user.totpActif) {
+      return reply.code(409).send({ error: "La double authentification est déjà active." });
+    }
+    const secret = nouveauSecret();
+    await prisma.user.update({
+      where: { id: request.user.id },
+      data: { totpSecret: chiffrer(secret), totpDernierPas: null },
+    });
+    return {
+      secret,
+      uri: uriOtpauth({ secret, compte: request.user.email, emetteur: "CompanyOS" }),
+    };
+  });
+
+  /// Étape 2 : le premier code valide active la double authentification et
+  /// rend les codes de secours — une seule fois. Les autres sessions,
+  /// ouvertes sans second facteur, sont fermées.
+  app.post("/mfa/activer", { preHandler: authenticate }, async (request, reply) => {
+    const user = await prisma.user.findUnique({ where: { id: request.user.id } });
+    if (user.totpActif) {
+      return reply.code(409).send({ error: "La double authentification est déjà active." });
+    }
+    const secret = dechiffrer(user.totpSecret);
+    if (!secret) return reply.code(400).send({ error: "Recommencez la configuration." });
+    const pas = verifierCode(secret, request.body?.code);
+    if (pas === null) return reply.code(400).send({ error: "Code incorrect. Vérifiez l'heure du téléphone." });
+
+    const codes = nouveauxCodesSecours();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { totpActif: true, totpDernierPas: pas, codesSecours: codes.map(empreinteSecours) },
+    });
+    await prisma.session.update({ where: { id: request.session.id }, data: { mfa: true } });
+    await revoquerSessions(user.id, { sauf: request.session.id });
+    await journaliser(request, "compte.mfa.activation");
+    return { ok: true, codesSecours: codes };
+  });
+
+  /// Nouveaux codes de secours (les anciens cessent de valoir). Exige un
+  /// code de l'application.
+  app.post("/mfa/codes", { preHandler: authenticate }, async (request, reply) => {
+    if (!request.user.totpActif) return reply.code(409).send({ error: "Double authentification inactive." });
+    if ((await verifierSecondFacteur(request.user, request.body?.code)) !== "totp") {
+      return reply.code(400).send({ error: "Code incorrect." });
+    }
+    const codes = nouveauxCodesSecours();
+    await prisma.user.update({
+      where: { id: request.user.id },
+      data: { codesSecours: codes.map(empreinteSecours) },
+    });
+    await journaliser(request, "compte.mfa.codes");
+    return { codesSecours: codes };
+  });
+
+  /// Désactiver : mot de passe **et** code exigés — une session laissée
+  /// ouverte ne suffit pas à retirer la protection.
+  app.post("/mfa/desactiver", { preHandler: authenticate }, async (request, reply) => {
+    if (!request.user.totpActif) return reply.code(409).send({ error: "Double authentification inactive." });
+    if (mfaExigee(request.user)) {
+      return reply.code(403).send({
+        error: "La double authentification est obligatoire pour votre compte : elle ne peut pas être désactivée.",
+      });
+    }
+    const motDePasse = await verifyPassword(String(request.body?.password || ""), request.user.passwordHash);
+    if (!motDePasse || !(await verifierSecondFacteur(request.user, request.body?.code))) {
+      return reply.code(401).send({ error: "Mot de passe ou code incorrect." });
+    }
+    await prisma.user.update({
+      where: { id: request.user.id },
+      data: { totpActif: false, totpSecret: null, totpDernierPas: null, codesSecours: null },
+    });
+    await journaliser(request, "compte.mfa.desactivation");
+    return { ok: true };
+  });
+
+  /// Rendre la double authentification obligatoire dans l'espace. Réservé
+  /// au propriétaire, qui doit l'avoir activée lui-même.
+  app.put(
+    "/tenant/securite",
+    { preHandler: [authenticate, exigerRole("OWNER")] },
+    async (request, reply) => {
+      const obligatoire = request.body?.mfaObligatoire === true;
+      if (obligatoire && !request.user.totpActif) {
+        return reply.code(400).send({
+          error: "Activez d'abord la double authentification sur votre propre compte.",
+        });
+      }
+      await prisma.tenant.update({
+        where: { id: request.tenantId },
+        data: { mfaObligatoire: obligatoire },
+      });
+      await journaliser(request, "espace.mfa", obligatoire ? "obligatoire" : "facultative");
+      return { ok: true, mfaObligatoire: obligatoire };
+    },
+  );
 
   /// Renommer son profil.
   app.put("/profile", { preHandler: authenticate }, async (request, reply) => {
@@ -378,6 +655,7 @@ export default async function authRoutes(app) {
           email: true,
           role: true,
           avatar: true,
+          totpActif: true,
           createdAt: true,
         },
         orderBy: [{ role: "asc" }, { name: "asc" }],
@@ -573,14 +851,37 @@ export default async function authRoutes(app) {
           .send({ error: "Seul le propriétaire peut déconnecter un administrateur." });
       }
 
-      const compte = await revoquerSessions(cible.id);
-      await journaliser(request, "membre.deconnexion", cible.email, { nom: cible.name });
-
       // Se viser soi-même revient à « déconnecter mes autres appareils » :
-      // la session qui a fait la demande reçoit de quoi continuer.
-      return cible.id === request.user.id
-        ? { ok: true, token: signToken(compte) }
-        : { ok: true };
+      // la session qui a fait la demande reste ouverte.
+      await revoquerSessions(cible.id, cible.id === request.user.id ? { sauf: request.session.id } : {});
+      await journaliser(request, "membre.deconnexion", cible.email, { nom: cible.name });
+      return { ok: true };
+    },
+  );
+
+  /// Réinitialiser la double authentification d'un membre (téléphone perdu
+  /// **et** codes de secours égarés). Mêmes règles de rang que le reste ;
+  /// toutes ses sessions sont fermées, il reconfigurera à la connexion.
+  app.delete(
+    "/members/:id/mfa",
+    { preHandler: [authenticate, exigerRole("ADMIN")] },
+    async (request, reply) => {
+      const cible = await prisma.user.findFirst({
+        where: { id: request.params.id, tenantId: request.tenantId },
+      });
+      if (!cible) return reply.code(404).send({ error: "Membre introuvable" });
+      if (cible.id === request.user.id || !peutViser(request.user, cible)) {
+        return reply.code(403).send({
+          error: "Seul le propriétaire peut réinitialiser la double authentification d'un administrateur.",
+        });
+      }
+      await prisma.user.update({
+        where: { id: cible.id },
+        data: { totpActif: false, totpSecret: null, totpDernierPas: null, codesSecours: null },
+      });
+      await revoquerSessions(cible.id);
+      await journaliser(request, "membre.mfa.reinitialisation", cible.email, { nom: cible.name });
+      return { ok: true };
     },
   );
 
@@ -793,10 +1094,12 @@ export default async function authRoutes(app) {
       nom: user.name,
     });
 
+    await ouvrirSession(request, reply, user);
+
     return reply.code(201).send(
       serialize({
-        token: signToken(user),
         user: profil(user),
+        mfaAConfigurer: mfaExigee(user),
         tenant: {
           id: user.tenant.id,
           name: user.tenant.name,
@@ -812,6 +1115,8 @@ export default async function authRoutes(app) {
   app.get("/me", { preHandler: authenticate }, async (request) =>
     serialize({
       user: profil(request.user),
+      mfaAConfigurer: !request.session.mfa && mfaExigee(request.user),
+      mfaObligatoire: !!request.user.tenant.mfaObligatoire,
       tenant: {
         id: request.user.tenant.id,
         name: request.user.tenant.name,

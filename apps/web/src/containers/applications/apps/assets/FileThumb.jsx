@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api, getToken } from "../../../../api/client";
+import { api, apiFetch } from "../../../../api/client";
 import { iconeDeFichier } from "../../../../apps/iconesFichiers";
 
 // Vignettes des fichiers du cloud.
@@ -27,9 +27,7 @@ export const peutEtreAffiche = (node) => estImage(node) && node.size <= TAILLE_M
 export const chargerApercu = async (node) => {
   if (cache.has(node.id)) return cache.get(node.id);
 
-  const promesse = fetch(api.downloadUrl(node.id), {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  })
+  const promesse = apiFetch(api.downloadUrl(node.id), {})
     .then((r) => (r.ok ? r.blob() : null))
     .then((blob) => (blob ? URL.createObjectURL(blob) : null))
     .catch(() => null);

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
-import { BASE_URL, getToken } from "../../../api/client";
+import { BASE_URL, api, apiFetch } from "../../../api/client";
 import { modal } from "../../modalRequest";
 import "./mcp.scss";
 
@@ -54,23 +54,37 @@ function McpApp() {
   const [serveurPath, setServeurPath] = useState(
     "E:\\companyos\\apps\\mcp\\src\\index.js",
   );
-  const token = getToken() || "";
+  // Le jeton de session du navigateur est dans un cookie illisible par la
+  // page : le serveur MCP reçoit son **propre** jeton, créé à la demande,
+  // montré une seule fois et révocable dans Paramètres → Sécurité.
+  const [token, setToken] = useState("");
+  const [creation, setCreation] = useState(false);
+  const genererJeton = async () => {
+    setCreation(true);
+    try {
+      const r = await api.creerJeton("Serveur MCP");
+      setToken(r.token);
+    } catch (err) {
+      await modal.alert({ title: "Jeton non créé", message: err.message, tone: "error" });
+    } finally {
+      setCreation(false);
+    }
+  };
+  const jetonAffiche = token || "<générez un jeton>";
 
   useEffect(() => {
     if (!ouvert) return;
     let actif = true;
     Promise.all([
       fetch(`${BASE_URL}/health`).then((r) => r.ok),
-      fetch(`${BASE_URL}/api/auth/me`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }).then((r) => r.ok),
+      apiFetch(`${BASE_URL}/api/auth/me`).then((r) => r.ok),
     ])
       .then(([api, auth]) => actif && setEtat({ chargement: false, api, session: auth }))
       .catch(() => actif && setEtat({ chargement: false, api: false, session: false }));
     return () => {
       actif = false;
     };
-  }, [ouvert, token]);
+  }, [ouvert]);
 
   const config = useMemo(
     () => ({
@@ -81,13 +95,13 @@ function McpApp() {
           startup_timeout_sec: 30,
           env: {
             COMPANYOS_API_URL: BASE_URL,
-            COMPANYOS_TOKEN: token,
+            COMPANYOS_TOKEN: jetonAffiche,
             COMPANYOS_ALLOW_WRITES: ecriture ? "1" : "0",
           },
         },
       },
     }),
-    [nodePath, serveurPath, token, ecriture],
+    [nodePath, serveurPath, jetonAffiche, ecriture],
   );
 
   const json = JSON.stringify(
@@ -95,8 +109,8 @@ function McpApp() {
     null,
     2,
   );
-  const toml = `[mcp_servers.companyos]\ncommand = '${nodePath}'\nargs = ['${serveurPath}']\nstartup_timeout_sec = 30\n\n[mcp_servers.companyos.env]\nCOMPANYOS_API_URL = '${BASE_URL}'\nCOMPANYOS_TOKEN = '${token}'\nCOMPANYOS_ALLOW_WRITES = '${ecriture ? "1" : "0"}'`;
-  const commande = `codex mcp add companyos --env COMPANYOS_API_URL=${BASE_URL} --env COMPANYOS_TOKEN=${token} --env COMPANYOS_ALLOW_WRITES=${ecriture ? "1" : "0"} -- "${nodePath}" "${serveurPath}"`;
+  const toml = `[mcp_servers.companyos]\ncommand = '${nodePath}'\nargs = ['${serveurPath}']\nstartup_timeout_sec = 30\n\n[mcp_servers.companyos.env]\nCOMPANYOS_API_URL = '${BASE_URL}'\nCOMPANYOS_TOKEN = '${jetonAffiche}'\nCOMPANYOS_ALLOW_WRITES = '${ecriture ? "1" : "0"}'`;
+  const commande = `codex mcp add companyos --env COMPANYOS_API_URL=${BASE_URL} --env COMPANYOS_TOKEN=${jetonAffiche} --env COMPANYOS_ALLOW_WRITES=${ecriture ? "1" : "0"} -- "${nodePath}" "${serveurPath}"`;
   const proteger = (texte) => (token ? texte.replaceAll(token, masquer(token)) : texte);
 
   const changerEcriture = (value) => {
@@ -161,20 +175,29 @@ function McpApp() {
             </section>
             <section className="mcpPanel">
               <h2>Jeton de connexion</h2>
-              <p>Le MCP agit avec votre compte et exactement les mêmes rôles.</p>
+              <p>
+                Le MCP agit avec votre compte et exactement les mêmes rôles. Son jeton
+                lui est propre : il est affiché une seule fois, et se révoque dans
+                Paramètres → Sécurité sans vous déconnecter.
+              </p>
               <div className="mcpToken">
-                <code>{masquer(token)}</code>
-                <button
-                  disabled={!token}
-                  onClick={() =>
-                    copier(
-                      token,
-                      "Le jeton est dans le presse-papiers. Ne le partagez pas.",
-                    )
-                  }
-                >
-                  Copier
-                </button>
+                <code>{token ? masquer(token) : "Aucun jeton généré"}</code>
+                {token ? (
+                  <button
+                    onClick={() =>
+                      copier(
+                        token,
+                        "Le jeton est dans le presse-papiers. Ne le partagez pas.",
+                      )
+                    }
+                  >
+                    Copier
+                  </button>
+                ) : (
+                  <button disabled={creation} onClick={genererJeton}>
+                    {creation ? "…" : "Générer un jeton"}
+                  </button>
+                )}
               </div>
               <div className="mcpWarning">
                 Secret sensible : ne le collez jamais dans un ticket, un dépôt Git ou une

@@ -6,7 +6,7 @@
 // par espace de travail.
 
 import store from "../reducers";
-import { api, getToken } from "../api/client";
+import { api, apiFetch } from "../api/client";
 import { saveToCloud } from "./cloud";
 
 export const DOSSIER_FONDS = "Fonds d'écran";
@@ -54,9 +54,7 @@ const ecrirePreferences = (tenantId, prefs) => {
 
 /// Télécharge un fichier du cloud et renvoie une URL d'objet.
 const urlDuFichier = async (nodeId) => {
-  const res = await fetch(api.downloadUrl(nodeId), {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
+  const res = await apiFetch(api.downloadUrl(nodeId), {});
   if (!res.ok) return null;
   return URL.createObjectURL(await res.blob());
 };

@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
 import { Vide } from "../../ui";
-import { api, getToken } from "../../../api/client";
+import { api, apiFetch } from "../../../api/client";
 import { subscribeVisionneuse, oublierFichier } from "../../openRequest";
 import { memeGenre } from "../../fileTypes";
 import {
@@ -218,9 +218,7 @@ function PdfApp() {
   };
 
   const telecharger = async () => {
-    const res = await fetch(api.downloadUrl(courant.id), {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    const res = await apiFetch(api.downloadUrl(courant.id), {});
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

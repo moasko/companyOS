@@ -17,7 +17,7 @@
 //
 // Le magasin est hors Redux, comme `saveRequest` et `modalRequest`.
 
-import { api, getToken } from "../api/client";
+import { api, sessionOuverte } from "../api/client";
 import { ouvrirFenetre } from "./windows";
 import { creerTraducteur } from "../utils/intl";
 import { localeEffective } from "../utils/langue";
@@ -105,7 +105,7 @@ export const notifier = ({ titre, message = "", app = "", ton = "info", icone })
 /// L'application destinataire relit `params` comme elle l'entend — le
 /// centre ne sait qu'ouvrir la bonne fenêtre.
 export const envoyerA = async (a, { source, titre, message, lien } = {}) => {
-  if (!getToken() || !titre || !source) return null;
+  if (!sessionOuverte() || !titre || !source) return null;
   try {
     return await api.envoyerNotification({ a, source, titre, message, lien });
   } catch (err) {
@@ -195,7 +195,7 @@ export const suivreLien = (n) => {
 let minuteur = null;
 
 const rafraichir = async () => {
-  if (!getToken()) {
+  if (!sessionOuverte()) {
     if (distantes.length) {
       distantes = [];
       publier();

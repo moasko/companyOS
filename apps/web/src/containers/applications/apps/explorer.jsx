@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon, Image, ToolBar } from "../../../utils/general";
 import { useNomApp } from "../../../utils/nomsApps";
-import { api, getToken } from "../../../api/client";
+import { api, apiFetch } from "../../../api/client";
 import { FileThumb, oublierApercu } from "./assets/FileThumb";
 import { modal } from "../../../apps/modalRequest";
 import { applicationManquante, ouvrirFichier } from "../../../apps/openRequest";
@@ -219,9 +219,7 @@ export const Explorer = () => {
 
   const download = async (node) => {
     try {
-      const res = await fetch(api.downloadUrl(node.id), {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const res = await apiFetch(api.downloadUrl(node.id), {});
       if (!res.ok) throw new Error("Téléchargement impossible");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

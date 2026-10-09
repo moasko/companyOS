@@ -31,7 +31,8 @@ import { CustomApp } from "./apps/CustomApp";
 import { CustomWebApp } from "./apps/CustomWebApp";
 import { syncInstalledModules, detachAllModules, attachSystemModules } from "./apps/sync";
 import { appliquerApparence, reinitialiserApparence } from "./apps/appearance";
-import { api, getToken, clearToken } from "./api/client";
+import { api, oublierSession, sessionOuverte, surMfaRequise } from "./api/client";
+import { MfaObligatoire } from "./components/securite/MfaObligatoire";
 import { demarrerPreferences, arreterPreferences } from "./apps/preferences";
 
 /// Monte une application à sa première ouverture, et pas avant.
@@ -161,7 +162,7 @@ function App() {
     dispatch({ type: "WALLBOOTED" });
   };
 
-  // Restauration de session : un jeton valide en localStorage remet
+  // Restauration de session : un cookie de session valide remet
   // l'espace de travail et ses modules en place, écran verrouillé ou non.
   // Les applications système existent avant toute session : elles font
   // partie du socle, pas du catalogue d'un espace de travail.
@@ -172,9 +173,13 @@ function App() {
     appliquerLangue();
   }, []);
 
+  // Le serveur a exigé la double authentification en cours de route
+  // (l'espace vient de la rendre obligatoire, par exemple).
+  useEffect(() => surMfaRequise(() => dispatch({ type: "SESSION_MFA", payload: true })), [dispatch]);
+
   useEffect(() => {
     const boot = async () => {
-      if (!getToken()) {
+      if (!sessionOuverte()) {
         // Un visiteur sans compte arrive sur la vitrine, pas sur un écran
         // de connexion nu. La landing ramène ici avec `?connexion` pour
         // s'inscrire ou entrer — et quiconque a déjà un jeton ne voit
@@ -193,13 +198,16 @@ function App() {
           type: "STNGSETV",
           payload: { path: "person.name", value: me.user.name },
         });
+        // Double authentification à configurer : rien d'autre ne
+        // répondrait. L'écran dédié s'affiche, la page repartira ensuite.
+        if (me.mfaAConfigurer) return;
         await syncInstalledModules();
         await appliquerApparence(me.tenant.id);
         await demarrerPreferences(me.tenant.id);
       } catch (err) {
-        // API injoignable : on garde le jeton, la session repartira au
-        // prochain chargement. Seul un 401 signifie un jeton mort.
-        if (err.status === 401) clearToken();
+        // API injoignable : on garde le témoin, la session repartira au
+        // prochain chargement. Seul un 401 signifie une session morte.
+        if (err.status === 401) oublierSession();
         dispatch({ type: "SESSION_CLEAR" });
         detachAllModules();
         arreterPreferences();
@@ -234,6 +242,7 @@ function App() {
       >
         {!wall.booted ? <BootScreen dir={wall.dir} /> : null}
         {wall.locked ? <LockScreen dir={wall.dir} /> : null}
+        <MfaObligatoire />
         <div className="appwrap">
           <Background />
           <div className="desktop">

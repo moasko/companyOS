@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Icon } from "../../../utils/general";
-import { api, BASE_URL, getToken } from "../../../api/client";
+import { api, BASE_URL, apiFetch } from "../../../api/client";
 import { modal } from "../../modalRequest";
 import { Bouton, Notice } from "../../ui";
 
@@ -47,9 +47,7 @@ const etatSauvegardes = (s) => {
 };
 
 const telecharger = async (s) => {
-  const rep = await fetch(`${BASE_URL}/api/plateforme/sauvegardes/${s.id}/fichier`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
+  const rep = await apiFetch(`${BASE_URL}/api/plateforme/sauvegardes/${s.id}/fichier`, {});
   if (!rep.ok) {
     const corps = await rep.json().catch(() => null);
     throw new Error(corps?.error || `Erreur ${rep.status}`);

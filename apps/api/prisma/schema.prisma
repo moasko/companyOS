@@ -168,6 +168,8 @@ model Tenant {
   /// motif transforme un litige commercial en incident technique, et fait
   /// perdre du temps aux deux parties.
   motifSuspension String?
+  /// Double authentification exigée de tous les membres de l'espace.
+  mfaObligatoire  Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -203,6 +205,15 @@ model User {
   /// Version des sessions, recopiée dans chaque jeton. L'incrémenter
   /// déconnecte d'un coup tous les appareils du compte — voir `signToken`.
   sessionVersion Int      @default(0)
+  /// Double authentification (TOTP, RFC 6238). Le secret est chiffré
+  /// (voir src/chiffrement.js) ; il n'est actif qu'une fois un premier code
+  /// validé — un secret généré mais jamais confirmé ne verrouille personne.
+  totpSecret     String?
+  totpActif      Boolean  @default(false)
+  /// Dernier pas de 30 s accepté : un code déjà servi ne sert pas deux fois.
+  totpDernierPas Int?
+  /// Codes de secours, à usage unique : leurs empreintes SHA-256 seulement.
+  codesSecours   Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -210,6 +221,7 @@ model User {
   nodes         FsNode[]
   installations Installation[]
   notifications Notification[]
+  sessions      Session[]
 
   @@index([tenantId])
   @@map("users")
@@ -479,4 +491,34 @@ model ErreurApp {
 
   @@index([resolue, derniere])
   @@map("erreurs")
+}
+
+/// Une session ouverte : un navigateur connecté, ou un jeton d'API (le
+/// serveur MCP, par exemple).
+///
+/// Le jeton signé porte l'identifiant de la session (`sid`) ; chaque
+/// requête la relit. Fermer une session — déconnexion, appareil perdu,
+/// intervention d'un administrateur — prend donc effet à la requête
+/// suivante, appareil par appareil, au lieu d'attendre l'expiration du
+/// jeton.
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  /// « navigateur » (cookie HttpOnly) ou « api » (jeton porté par un
+  /// outil). Une session d'API n'expire pas par inactivité.
+  type      String    @default("navigateur")
+  libelle   String?
+  ip        String?
+  agent     String?
+  /// Ouverte avec un second facteur.
+  mfa       Boolean   @default(false)
+  creeLe    DateTime  @default(now())
+  vuLe      DateTime  @default(now())
+  expireLe  DateTime
+  revoqueLe DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
 }

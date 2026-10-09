@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { Icon, ToolBar } from "../../../utils/general";
-import { api, getToken } from "../../../api/client";
+import { api, apiFetch } from "../../../api/client";
 import { subscribeVisionneuse, oublierFichier } from "../../openRequest";
 import { memeGenre, TAILLE_MAX_LECTURE } from "../../fileTypes";
 import { chargerApercu } from "../../../containers/applications/apps/assets/FileThumb";
@@ -122,9 +122,7 @@ export const useVisionneuse = (cle, action, genre, mode = "blob") => {
       return;
     }
 
-    fetch(api.downloadUrl(courant.id), {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
+    apiFetch(api.downloadUrl(courant.id), {})
       .then((r) => {
         if (!r.ok) throw new Error("Fichier illisible");
         return r.blob();

@@ -4,7 +4,7 @@ import { Icon } from "../../utils/general";
 import { Avatar } from "../../apps/Avatar";
 import { menuContextuel } from "../../apps/menuRequest";
 import { ouvrirFenetre } from "../../apps/windows";
-import { clearToken } from "../../api/client";
+import { api } from "../../api/client";
 import { detachAllModules } from "../../apps/sync";
 import { reinitialiserApparence } from "../../apps/appearance";
 import { resynchroniserNotifications } from "../../apps/notifications";
@@ -230,7 +230,8 @@ export const StartMenu = () => {
           // verrouillage : jeton, session, modules, apparence, notifications.
           // En oublier un laisse des morceaux de l'espace précédent à
           // l'écran après la déconnexion.
-          clearToken();
+          // Fermée côté serveur : un cookie copié ne servirait plus à rien.
+          api.logout().catch(() => {});
           dispatch({ type: "SESSION_CLEAR" });
           detachAllModules();
           reinitialiserApparence();

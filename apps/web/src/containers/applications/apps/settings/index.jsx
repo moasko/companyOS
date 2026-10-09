@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { changeTheme } from "../../../../actions";
 import { Icon, ToolBar } from "../../../../utils/general";
-import { api, clearToken } from "../../../../api/client";
+import { api } from "../../../../api/client";
 import { syncInstalledModules, detachAllModules } from "../../../../apps/sync";
 import { scrollElementTo } from "../../../../apps/scrollTo";
 import { modal } from "../../../../apps/modalRequest";
@@ -31,6 +31,7 @@ import { SectionBureau } from "./Bureau";
 import { SectionApplications } from "./Applications";
 import { SectionStockage } from "./Stockage";
 import { SectionCompte } from "./Compte";
+import { SectionSecurite } from "./Securite";
 import { SectionEspace } from "./Espace";
 import { SectionEntreprise } from "./Entreprise";
 import { consommerRubrique, surRubrique } from "../../../../apps/parametresRequest";
@@ -63,6 +64,7 @@ const SECTIONS = [
   { id: "applications", label: "Applications", icon: "faGrip" },
   { id: "stockage", label: "Stockage", icon: "faHardDrive" },
   { id: "compte", label: "Compte", icon: "faUser" },
+  { id: "securite", label: "Sécurité", icon: "faShieldHalved" },
   { id: "espace", label: "Espace de travail", icon: "faBuilding" },
   { id: "entreprise", label: "Fiche de l'entreprise", icon: "faIdCard" },
   { id: "formule", label: "Formule et tarifs", icon: "faCreditCard" },
@@ -83,6 +85,7 @@ const TEXTES = {
     "section.applications": "Applications",
     "section.stockage": "Storage",
     "section.compte": "Account",
+    "section.securite": "Security",
     "section.espace": "Workspace",
     "section.entreprise": "Company profile",
     "section.formule": "Plan and pricing",
@@ -386,6 +389,27 @@ export const Settings = () => {
     }
   };
 
+  /// Téléphone perdu et codes de secours égarés : on retire sa double
+  /// authentification, il la reconfigurera à la connexion.
+  const reinitialiserMfa = async (membre) => {
+    const ok = await modal.confirm({
+      title: "Réinitialiser la double authentification",
+      message: `Retirer la double authentification de ${membre.name} ?`,
+      detail:
+        "À faire seulement après avoir vérifié son identité (téléphone perdu, codes de secours égarés). Ses sessions sont fermées ; si l'espace l'exige, il devra la reconfigurer à sa prochaine connexion.",
+      confirmLabel: "Réinitialiser",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.reinitialiserMfaMembre(membre.id);
+      await rafraichirEquipe();
+      flash(`Double authentification de ${membre.name} réinitialisée`);
+    } catch (err) {
+      flash(err.message);
+    }
+  };
+
   // ---- Apparence personnalisée -------------------------------------------
 
   const importerUnFond = async (e) => {
@@ -640,7 +664,7 @@ export const Settings = () => {
   };
 
   const deconnecter = () => {
-    clearToken();
+    api.logout().catch(() => {});
     dispatch({ type: "SESSION_CLEAR" });
     detachAllModules();
     dispatch({ type: "SETTINGS", payload: "close" });
@@ -786,6 +810,9 @@ export const Settings = () => {
                 deconnecterAutresAppareils={deconnecterAutresAppareils}
               />
 
+              {/* ---------- Sécurité ---------- */}
+              <SectionSecurite section={section} session={session} flash={flash} />
+
               {/* ---------- Espace de travail ---------- */}
               <SectionEspace
                 section={section}
@@ -801,6 +828,7 @@ export const Settings = () => {
                 changerRole={changerRole}
                 retirerMembre={retirerMembre}
                 deconnecterMembre={deconnecterMembre}
+                reinitialiserMfa={reinitialiserMfa}
                 invitations={invitations}
                 mailInvite={mailInvite}
                 setMailInvite={setMailInvite}
