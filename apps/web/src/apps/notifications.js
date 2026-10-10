@@ -177,15 +177,29 @@ export const viderNotifications = () => {
 ///     window.addEventListener("companyos:lien", aller);
 ///     return () => window.removeEventListener("companyos:lien", aller);
 ///   }, []);
+///
+/// L'application peut ne pas être encore chargée (son code se télécharge à
+/// la première ouverture) : le lien est alors gardé quelques secondes et
+/// rejoué par `ModuleWindow` quand la fenêtre se monte.
+const liensEnAttente = new Map();
+const DUREE_LIEN_MS = 30_000;
+
 export const suivreLien = (n) => {
   if (!n?.lien?.app) return false;
+  const detail = { app: n.lien.app, params: n.lien.params || {} };
+  liensEnAttente.set(n.lien.app, { detail, le: Date.now() });
   ouvrirFenetre(n.lien.app);
-  window.dispatchEvent(
-    new CustomEvent("companyos:lien", {
-      detail: { app: n.lien.app, params: n.lien.params || {} },
-    }),
-  );
+  window.dispatchEvent(new CustomEvent("companyos:lien", { detail }));
   return true;
+};
+
+/// Rejoue (une fois) le lien en attente d'une application qui vient de se
+/// monter. Appelé par ModuleWindow.
+export const rejouerLienEnAttente = (app) => {
+  const attente = liensEnAttente.get(app);
+  liensEnAttente.delete(app);
+  if (!attente || Date.now() - attente.le > DUREE_LIEN_MS) return;
+  window.dispatchEvent(new CustomEvent("companyos:lien", { detail: attente.detail }));
 };
 
 // ---------------------------------------------------------------------------

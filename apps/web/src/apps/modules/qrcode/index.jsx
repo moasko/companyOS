@@ -10,6 +10,7 @@ import { TYPES } from "./types";
 import { buildMatrix, drawToCanvas, toSvg, toPdf, toEps } from "./render";
 import { Avatar } from "../../Avatar";
 import "./qrcode.scss";
+import { manifest as descriptif } from "./manifest";
 
 const SECTIONS = [
   { id: "contenu", label: "Contenu", icon: "faFileLines" },
@@ -38,19 +39,7 @@ const DEFAULTS = {
   rounded: false,
 };
 
-export const manifest = {
-  slug: "qrcode",
-  version: "1.1.0",
-  /// Annoncé dans la Boutique quand une mise à jour est disponible.
-  /// Seules les entrées postérieures à la version installée sont montrées.
-  nouveautes: [
-    { version: "1.1.0", texte: "L'historique montre qui a généré chaque code." },
-  ],
-  name: "Générateur de QR Code Avancé",
-  icon: "qrcode",
-  action: "QRCODEAPP",
-  Window: QrApp,
-};
+export const manifest = { ...descriptif, Window: QrApp };
 
 function QrApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);

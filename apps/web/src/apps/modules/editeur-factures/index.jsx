@@ -44,6 +44,7 @@ import { factureEnPdf } from "./pdf";
 import { imagesPdf } from "./images";
 import "./editeur.scss";
 import { echapperHtml } from "../../../utils/securite.js";
+import { manifest as descriptif } from "./manifest";
 
 // ---------------------------------------------------------------------------
 // Éditeur de factures
@@ -69,30 +70,7 @@ import { echapperHtml } from "../../../utils/securite.js";
 //     la Facturation pour la situation du client.
 // ---------------------------------------------------------------------------
 
-export const manifest = {
-  id: ID_EDITEUR,
-  slug: "editeur-factures",
-  name: "Éditeur de factures",
-  icon: "editeur-factures",
-  version: "1.1.0",
-  nouveautes: [
-    { version: "1.1.0", texte: "Fiche de l'entreprise partagée, signature et cachet sur le PDF, pièces jointes du Cloud, vérifications en direct et raccourcis clavier." },
-    { version: "1.0.0", texte: "Six modèles, aperçu en direct, paiement fractionné, factures récurrentes et envoi au client en PDF." },
-  ],
-  capacites: {
-    lit: [
-      "crm:clients",
-      "stock:articles",
-      "facturation:factures",
-      "facturation:reglements",
-      "entreprise:profil",
-      "signature:signatures",
-    ],
-    ecrit: ["facturation:factures"],
-  },
-  action: "EDITEURFACTURESAPP",
-  Window: EditeurFactures,
-};
+export const manifest = { ...descriptif, Window: EditeurFactures };
 
 // Les données propres à l'app vivent sous son slug (l'API n'accepte que
 // minuscules et tirets), pas sous l'identifiant de fenêtre.

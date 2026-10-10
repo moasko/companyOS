@@ -48,19 +48,9 @@ import { Modeles } from "./vues/Modeles";
 import { Contacts } from "./vues/Contacts";
 import { Formulaire } from "./vues/Formulaire";
 import "./campagnes.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "campagnes",
-  slug: "campagnes",
-  name: "Campagnes",
-  icon: "campagnes",
-  action: "CAMPAGNESAPP",
-  version: "2.0.0",
-  nouveautes: [
-    { version: "2.0.0", texte: "Éditeur par blocs, test A/B de l'objet, suivi de chaque lien, ventes attribuées, automatisations (bienvenue, devis non signé, après achat, livraison, client endormi, anniversaire), import CSV vers le CRM, formulaire d'inscription avec double opt-in, rebonds, français et anglais." },
-  ],
-  Window: CampagnesApp,
-};
+export const manifest = { ...descriptif, Window: CampagnesApp };
 
 const NAV = [
   { id: "accueil", label: "navAccueil", icone: "faHouse" },

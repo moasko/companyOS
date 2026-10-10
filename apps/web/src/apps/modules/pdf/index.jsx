@@ -13,6 +13,7 @@ import {
   ouvrirDocument,
 } from "./moteur";
 import "./pdf.scss";
+import { manifest as descriptif } from "./manifest";
 
 // Lecteur PDF du socle.
 //
@@ -21,14 +22,7 @@ import "./pdf.scss";
 // pdf.js — voir moteur.js pour le pourquoi.
 
 /// Lecteur PDF du socle : ouvert par l'Explorateur, jamais installé.
-export const manifest = {
-  id: "pdf",
-  name: "Lecteur PDF",
-  icon: "pdf",
-  action: "PDFAPP",
-  systeme: true,
-  Window: PdfApp,
-};
+export const manifest = { ...descriptif, Window: PdfApp };
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 

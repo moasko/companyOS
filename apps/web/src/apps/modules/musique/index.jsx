@@ -13,16 +13,10 @@ import {
   useRaccourcis,
   useVisionneuse,
 } from "../_visionneuse/commun";
+import { manifest as descriptif } from "./manifest";
 
 /// Lecteur audio du socle.
-export const manifest = {
-  id: "groove",
-  name: "Musique",
-  icon: "groove",
-  action: "MUSIQUE",
-  systeme: true,
-  Window: MusiqueApp,
-};
+export const manifest = { ...descriptif, Window: MusiqueApp };
 
 // ---------------------------------------------------------------------------
 // Musique

@@ -4,6 +4,7 @@ import { ModuleWindow } from "../../ModuleWindow";
 import { useTraduction } from "../../../utils/intl";
 import { api } from "../../../api/client";
 import "./fne.scss";
+import { manifest as descriptif } from "./manifest";
 
 // ---------------------------------------------------------------------------
 // FNE — le portail de la facture normalisée électronique
@@ -101,14 +102,7 @@ const TEXTES = {
   },
 };
 
-export const manifest = {
-  id: "fne",
-  slug: "fne",
-  name: "FNE",
-  icon: "fne",
-  action: "FNEAPP",
-  Window: FneApp,
-};
+export const manifest = { ...descriptif, Window: FneApp };
 
 /// Ouvre le portail dans un onglet.
 ///

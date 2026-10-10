@@ -67,6 +67,7 @@ const LIGNE_VIDE = { designation: "", qte: 1, pu: 0, remise: 0, tva: 18 };
 // sans conversion — le réglage d'affichage global ne réécrit pas un
 // document commercial.
 import { montantDans as money } from "../../../utils/monnaie";
+import { manifest as descriptif } from "./manifest";
 
 const documentVide = (type = "facture") => ({
   type,
@@ -87,21 +88,7 @@ const documentVide = (type = "facture") => ({
   lignes: [{ ...LIGNE_VIDE }],
 });
 
-export const manifest = {
-  id: "facturation",
-  slug: "facturation",
-  version: "2.0.0",
-  /// Annoncé dans la Boutique quand une mise à jour est disponible.
-  /// Seules les entrées postérieures à la version installée sont montrées.
-  nouveautes: [
-    { version: "2.0.0", texte: "Devis, avoirs et règlements. L'état de paiement se déduit désormais des encaissements." },
-    { version: "1.1.0", texte: "Choix des produits dans le catalogue partagé." },
-  ],
-  name: "Facturation",
-  icon: "msoffice",
-  action: "FACTURATIONAPP",
-  Window: FacturationApp,
-};
+export const manifest = { ...descriptif, Window: FacturationApp };
 
 function FacturationApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
@@ -167,6 +154,10 @@ function FacturationApp() {
     };
     window.addEventListener("companyos:lien", aller);
     return () => window.removeEventListener("companyos:lien", aller);
+  }, [documents]);
+  // Le lien a pu arriver avant les données (ouverture à la demande).
+  useEffect(() => {
+    appliquerLien();
   }, [documents]);
 
   const appliquerLien = () => {

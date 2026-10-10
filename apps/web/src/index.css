@@ -352,3 +352,35 @@ a {
   background: #010001;
   color: white;
 }
+
+/* Une application en panne : un encart, pas un écran bleu pour tout l'OS. */
+.appEnPanne {
+  position: fixed;
+  left: 50%;
+  top: 24%;
+  transform: translateX(-50%);
+  z-index: 9000;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2733;
+  box-shadow: 0 18px 46px rgb(0 0 0 / 28%);
+  font-size: 13px;
+}
+.appEnPanne span { color: #5b6573; word-break: break-word; }
+.appEnPanne div { display: flex; gap: 8px; justify-content: flex-end; }
+.appEnPanne button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #d5d9df;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.appEnPanne button:first-child { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+body[data-theme="dark"] .appEnPanne { background: #24242d; color: #e8e8ee; }

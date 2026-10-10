@@ -27,6 +27,7 @@ import {
   cheminOuvert,
 } from "./domaine";
 import "./code.scss";
+import { manifest as descriptif } from "./manifest";
 
 // ---------------------------------------------------------------------------
 // CODE — l'éditeur de VS Code, sur les fichiers du cloud
@@ -146,14 +147,7 @@ const TEXTES = {
   },
 };
 
-export const manifest = {
-  id: "code",
-  slug: "code",
-  name: "Code",
-  icon: "code",
-  action: "CODEAPP",
-  Window: CodeApp,
-};
+export const manifest = { ...descriptif, Window: CodeApp };
 
 const poids = (octets) => {
   if (octets < 1024) return `${octets} o`;

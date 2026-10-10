@@ -33,15 +33,9 @@ import { Bouton, Champ, Notice, Vide } from "../../ui";
 import { chargerReferentiel, invaliderReferentiel } from "../../referentiel";
 import * as D from "./domaine";
 import "./achats.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "achats",
-  slug: "achats",
-  name: "Achats",
-  icon: "achats",
-  action: "ACHATSAPP",
-  Window: AchatsApp,
-};
+export const manifest = { ...descriptif, Window: AchatsApp };
 
 const money = D.fcfa;
 

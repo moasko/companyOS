@@ -23,6 +23,7 @@ import { demarrerCampagnes } from "./campagnes.js";
 import erreursRoutes from "./routes/erreurs.js";
 import { consigner, gestionnaireErreurs } from "./erreurs.js";
 import { demarrerSauvegardes } from "./sauvegardes.js";
+import { demarrerPurgeEtatPartage } from "./etatPartage.js";
 
 const app = Fastify({
   logger: true,
@@ -100,7 +101,7 @@ await app.register(cors, {
   // Sans cela, le navigateur cache les en-têtes de plage au code de la
   // page : la lecture en flux marche, mais rien côté client ne peut lire
   // la taille ni la position du morceau reçu.
-  exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length"],
+  exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length", "X-Next-Cursor"],
 });
 await app.register(multipart, {
   limits: { fileSize: env.uploadMaxOctets },
@@ -186,6 +187,8 @@ try {
   demarrerCampagnes();
   // Les sauvegardes de la base et des fichiers — voir src/sauvegardes.js.
   demarrerSauvegardes();
+  // Jetons d'URL échus et vieux compteurs d'échecs — voir src/etatPartage.js.
+  demarrerPurgeEtatPartage();
   diagnostiquerExploitants();
 } catch (err) {
   app.log.error(err);

@@ -29,15 +29,9 @@ import { Contenu, useChargement } from "../../chargement";
 import { Bouton } from "../../ui";
 import * as D from "./domaine";
 import "./agenda.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "agenda",
-  slug: "agenda",
-  name: "Agenda",
-  icon: "agenda",
-  action: "AGENDAAPP",
-  Window: AgendaApp,
-};
+export const manifest = { ...descriptif, Window: AgendaApp };
 
 /// Date du jour, en ISO local (surtout pas en UTC : ici on veut « le jour de
 /// l'utilisateur », pas celui de Greenwich).

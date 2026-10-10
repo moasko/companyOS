@@ -1,10 +1,13 @@
 // Client de l'API CompanyOS — la couche transport, et rien d'autre.
 //
 // Une fonction par route : elle prend des arguments, elle rend la réponse.
-// Pas de cache, pas d'état, pas de rechargement. Tout cela vit dans
-// `queries.js`, qui s'appuie sur ce fichier — c'est la séparation qui
-// permet d'appeler l'API depuis un endroit qui n'est pas un composant
-// React (un gestionnaire d'événement, un module de fond) sans rien casser.
+// Pas d'état, pas de rechargement : cela vit dans `queries.js`, qui
+// s'appuie sur ce fichier — c'est la séparation qui permet d'appeler l'API
+// depuis un endroit qui n'est pas un composant React (un gestionnaire
+// d'événement, un module de fond) sans rien casser.
+//
+// Seule exception : les listes de fiches, lues page par page et partagées
+// quelques secondes entre applications — voir `listes.js`.
 //
 // La session vit dans un cookie `HttpOnly` posé par l'API : aucun script
 // de la page ne peut lire le jeton — ni une bibliothèque d'analyse de
@@ -16,6 +19,8 @@
 // Le navigateur ne garde qu'un **témoin** non secret (« une session a été
 // ouverte ici ») pour savoir, au démarrage, s'il faut interroger l'API ou
 // montrer la vitrine.
+
+import { creerCacheListes, lireToutesLesPages, TAILLE_PAGE } from "./listes";
 
 export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const TEMOIN = "companyos-session";
@@ -44,6 +49,7 @@ export const cleSession = () => (sessionOuverte() ? `s${generation}` : null);
 
 export const noterSession = () => {
   generation += 1;
+  listes.vider();
   try {
     localStorage.setItem(TEMOIN, "1");
   } catch {
@@ -52,6 +58,7 @@ export const noterSession = () => {
 };
 export const oublierSession = () => {
   generation += 1;
+  listes.vider();
   try {
     localStorage.removeItem(TEMOIN);
   } catch {
@@ -76,7 +83,7 @@ export const surMfaRequise = (rappel) => {
   return () => window.removeEventListener(MFA_REQUISE, rappel);
 };
 
-const request = async (path, { method = "GET", body, isForm = false } = {}) => {
+const envoyer = async (path, { method = "GET", body, isForm = false } = {}) => {
   const headers = { "X-CompanyOS": "1" };
   if (body && !isForm) headers["Content-Type"] = "application/json";
 
@@ -87,7 +94,7 @@ const request = async (path, { method = "GET", body, isForm = false } = {}) => {
     body: isForm ? body : body ? JSON.stringify(body) : undefined,
   });
 
-  if (response.status === 204) return null;
+  if (response.status === 204) return { payload: null, response };
 
   const payload = await response.json().catch(() => null);
 
@@ -103,8 +110,28 @@ const request = async (path, { method = "GET", body, isForm = false } = {}) => {
     throw error;
   }
 
-  return payload;
+  return { payload, response };
 };
+
+const request = async (path, options) => (await envoyer(path, options)).payload;
+
+/// Une page d'une liste de fiches. `q` cherche partout dans la fiche,
+/// `filter` compare des champs de premier niveau ({ etape: "gagne" }).
+const lirePage = async (module, collection, { limit, cursor, q, filter } = {}) => {
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+  if (cursor) params.set("cursor", cursor);
+  if (q) params.set("q", q);
+  if (filter && Object.keys(filter).length) params.set("filter", JSON.stringify(filter));
+  const qs = params.toString();
+  const { payload, response } = await envoyer(`/records/${module}/${collection}${qs ? `?${qs}` : ""}`);
+  return { fiches: payload || [], suite: response.headers.get("X-Next-Cursor") };
+};
+
+const listes = creerCacheListes({
+  charger: (module, collection, options) =>
+    lireToutesLesPages((cursor) => lirePage(module, collection, { ...options, limit: TAILLE_PAGE, cursor })),
+});
 
 /// Une réponse de connexion : la session est ouverte (cookie posé).
 const connecte = (reponse) => {
@@ -355,15 +382,39 @@ export const api = {
   // Données génériques des modules : chaque app range ses enregistrements
   // dans des collections nommées, sans migration côté serveur.
   records: {
-    list: (module, collection) => request(`/records/${module}/${collection}`),
-    create: (module, collection, data) =>
-      request(`/records/${module}/${collection}`, { method: "POST", body: { data } }),
-    update: (module, collection, id, data, updatedAt) =>
-      request(`/records/${module}/${collection}/${id}`, {
-        method: "PUT",
-        body: { data, ...(updatedAt ? { updatedAt } : {}) },
-      }),
-    remove: (module, collection, id) =>
-      request(`/records/${module}/${collection}/${id}`, { method: "DELETE" }),
+    /// Toute la collection (toutes les pages), servie depuis le cache
+    /// partagé si une autre application vient de la lire.
+    /// `options` : { q, filter } — filtrés par le serveur.
+    list: (module, collection, options) => listes.lire(module, collection, options),
+    /// Une seule page, pour les écrans qui affichent au fil du défilement.
+    /// Rend { fiches, suite } ; `suite` se repasse en `cursor`.
+    page: (module, collection, options) => lirePage(module, collection, options),
+    create: async (module, collection, data) => {
+      try {
+        return await request(`/records/${module}/${collection}`, { method: "POST", body: { data } });
+      } finally {
+        listes.invalider(module, collection);
+      }
+    },
+    update: async (module, collection, id, data, updatedAt) => {
+      try {
+        return await request(`/records/${module}/${collection}/${id}`, {
+          method: "PUT",
+          body: { data, ...(updatedAt ? { updatedAt } : {}) },
+        });
+      } finally {
+        listes.invalider(module, collection);
+      }
+    },
+    remove: async (module, collection, id) => {
+      try {
+        return await request(`/records/${module}/${collection}/${id}`, { method: "DELETE" });
+      } finally {
+        listes.invalider(module, collection);
+      }
+    },
+    /// Une écriture faite hors de `api.records` (import, moteur serveur
+    /// déclenché à la main) : oublier ce qu'on savait de la collection.
+    invalider: (module, collection) => listes.invalider(module, collection),
   },
 };

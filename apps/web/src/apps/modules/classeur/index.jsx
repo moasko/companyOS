@@ -43,15 +43,9 @@ import { depuisXlsx, versXlsx } from "./xlsx";
 import { depuisXls, estXls } from "./xls";
 import "./classeur.scss";
 import { lienSur } from "../../../utils/securite.js";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "classeur",
-  slug: "classeur",
-  name: "Classeur",
-  icon: "classeur",
-  action: "CLASSEURAPP",
-  Window: ClasseurApp,
-};
+export const manifest = { ...descriptif, Window: ClasseurApp };
 
 const HAUTEUR_LIGNE = 26;
 const LARGEUR_NUMEROTATION = 34;

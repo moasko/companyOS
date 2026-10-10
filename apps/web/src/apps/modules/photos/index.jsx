@@ -13,17 +13,11 @@ import {
   useRaccourcis,
   useVisionneuse,
 } from "../_visionneuse/commun";
+import { manifest as descriptif } from "./manifest";
 
 /// Visionneuse d'images du socle. Ouverte par l'Explorateur via les
 /// associations de `fileTypes.js`, jamais appelée directement.
-export const manifest = {
-  id: "photos",
-  name: "Photos",
-  icon: "photos",
-  action: "PHOTOS",
-  systeme: true,
-  Window: PhotosApp,
-};
+export const manifest = { ...descriptif, Window: PhotosApp };
 
 // ---------------------------------------------------------------------------
 // Photos

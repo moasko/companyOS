@@ -12,6 +12,7 @@ import {
 } from "../../clipboard";
 import { modal } from "../../modalRequest";
 import "./clipboard.scss";
+import { manifest as descriptif } from "./manifest";
 
 // Presse-papiers de CompanyOS — l'historique de ce qui a été copié dans
 // l'OS, à la manière de Win+V.
@@ -24,14 +25,7 @@ import "./clipboard.scss";
 // est propre, la liste des entrées.
 
 /// Presse-papiers du socle : l'historique de ce qui a été copié dans l'OS.
-export const manifest = {
-  id: "clipboard",
-  name: "Presse-papiers",
-  icon: "clipboard",
-  action: "PRESSEPAPIER",
-  systeme: true,
-  Window: ClipboardApp,
-};
+export const manifest = { ...descriptif, Window: ClipboardApp };
 
 const quand = (date) => {
   const s = Math.round((Date.now() - date) / 1000);

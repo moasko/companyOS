@@ -25,15 +25,9 @@ import { Contenu, useChargement } from "../../chargement";
 import { Bouton, Chips, Vide } from "../../ui";
 import * as D from "./domaine";
 import "./signature.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "signature",
-  slug: "signature",
-  name: "Signature",
-  icon: "signature",
-  action: "SIGNATUREAPP",
-  Window: SignatureApp,
-};
+export const manifest = { ...descriptif, Window: SignatureApp };
 
 const VUES = [
   { id: "dessiner", label: "Dessiner", icone: "faPenNib" },

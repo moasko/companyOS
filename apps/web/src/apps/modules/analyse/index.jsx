@@ -44,18 +44,9 @@ import {
   court,
 } from "./graphes";
 import "./analyse.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "analyse",
-  slug: "analyse",
-  name: "Analyse",
-  icon: "analyse",
-  // Sans cette action, l'icône du bureau et la tuile du menu Démarrer
-  // n'ouvrent rien : toutes deux dispatchent `app.action`, et le réducteur
-  // retrouve la fenêtre en cherchant celle dont l'action correspond.
-  action: "ANALYSEAPP",
-  Window: AnalyseApp,
-};
+export const manifest = { ...descriptif, Window: AnalyseApp };
 
 const TEXTES = {
   fr: {

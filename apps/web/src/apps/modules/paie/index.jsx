@@ -54,15 +54,9 @@ import { Bulletins } from "./Bulletins";
 import { Paiement } from "./Paiement";
 import { Reglages } from "./Reglages";
 import "./paie.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "paie",
-  slug: "paie",
-  name: "Paie",
-  icon: "paie",
-  action: "PAIEAPP",
-  Window: PaieApp,
-};
+export const manifest = { ...descriptif, Window: PaieApp };
 
 const NAV = [
   { groupe: "grpSuivre" },

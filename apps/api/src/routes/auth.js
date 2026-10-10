@@ -1,6 +1,7 @@
 ﻿import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { prisma, serialize } from "../db.js";
+import { effacerEchecs, noterEchec, verrouDe } from "../etatPartage.js";
 import { env } from "../env.js";
 import {
   authenticate,
@@ -99,31 +100,8 @@ const LIMITE_CONNEXION = {
 /// (1 min, 2, 4… plafonnée à 15 min). Un attaquant qui change d'IP à chaque
 /// essai ne gagne donc rien. Le plafond est bas exprès : un verrou long
 /// donnerait à n'importe qui le moyen de bloquer le compte d'un dirigeant.
-const ECHECS_AVANT_VERROU = 5;
-const VERROU_MAX_MS = 15 * 60 * 1000;
-const echecsParCompte = new Map();
-
-const verrouDe = (email) => {
-  const e = echecsParCompte.get(email);
-  if (!e) return 0;
-  if (Date.now() - e.dernier > 60 * 60 * 1000) {
-    echecsParCompte.delete(email);
-    return 0;
-  }
-  return Math.max(0, e.jusqua - Date.now());
-};
-
-const noterEchec = (email) => {
-  const e = echecsParCompte.get(email) || { n: 0, jusqua: 0, dernier: 0 };
-  e.n += 1;
-  e.dernier = Date.now();
-  if (e.n >= ECHECS_AVANT_VERROU) {
-    e.jusqua = Date.now() + Math.min(VERROU_MAX_MS, 60_000 * 2 ** (e.n - ECHECS_AVANT_VERROU));
-  }
-  echecsParCompte.set(email, e);
-  // Borne mémoire : les entrées les plus anciennes partent d'abord.
-  if (echecsParCompte.size > 100_000) echecsParCompte.delete(echecsParCompte.keys().next().value);
-};
+// Compteurs en base, partagés par toutes les instances : voir
+// src/etatPartage.js.
 
 /// Une empreinte bcrypt jetable, comparée quand l'adresse n'existe pas :
 /// la réponse prend alors le même temps (~250 ms) que pour un vrai compte.
@@ -205,7 +183,7 @@ export default async function authRoutes(app) {
     const { email, password } = parsed.data;
     const cle = normaliserEmail(email);
 
-    const attente = verrouDe(cle);
+    const attente = await verrouDe(cle);
     if (attente > 0) {
       return reply.code(429).send({
         error: `Trop de tentatives pour ce compte. Réessayez dans ${Math.ceil(attente / 60000)} min.`,
@@ -219,10 +197,10 @@ export default async function authRoutes(app) {
       ? await verifyPassword(password, user.passwordHash)
       : await comparerFactice(password);
     if (!valide) {
-      noterEchec(cle);
+      await noterEchec(cle);
       return reply.code(401).send({ error: "Identifiants incorrects" });
     }
-    echecsParCompte.delete(cle);
+    await effacerEchecs(cle);
 
     // Espace suspendu : on le dit ici, avec le motif. `authenticate`
     // refuserait de toute façon chaque requête suivante, mais l'utilisateur
@@ -290,7 +268,7 @@ export default async function authRoutes(app) {
     if (defi.but !== "mfa") return reply.code(401).send({ error: "Défi invalide." });
 
     const cle = `mfa:${defi.sub}`;
-    const attente = verrouDe(cle);
+    const attente = await verrouDe(cle);
     if (attente > 0) {
       return reply.code(429).send({
         error: `Trop de codes erronés. Réessayez dans ${Math.ceil(attente / 60000)} min.`,
@@ -305,11 +283,11 @@ export default async function authRoutes(app) {
 
     const resultat = await verifierSecondFacteur(user, request.body?.code);
     if (!resultat) {
-      noterEchec(cle);
+      await noterEchec(cle);
       await journaliserPour(request, user, "session.mfa.echec");
       return reply.code(401).send({ error: "Code incorrect." });
     }
-    echecsParCompte.delete(cle);
+    await effacerEchecs(cle);
     if (resultat === "secours") {
       await journaliserPour(request, user, "session.mfa.secours");
     }

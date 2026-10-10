@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma, serialize } from "../db.js";
 import { authenticate, auMoins } from "../auth.js";
 import { journaliser } from "../audit.js";
@@ -10,6 +11,15 @@ import {
   lecturePartagee,
   suppressionPartagee,
 } from "../acces.js";
+import {
+  couperPage,
+  ENTETE_SUITE,
+  ErreurPagination,
+  lireCurseur,
+  lireFiltre,
+  lireLimite,
+  lireRecherche,
+} from "../pagination.js";
 
 /// CRUD générique des modules métier. Un module range ses données dans
 /// des collections nommées : /api/records/crm/clients, etc.
@@ -45,22 +55,30 @@ const limiteDonnees = (names) =>
 /// partagé par tous les espaces tombait avec.
 const BUDGET_LISTE_OCTETS = 48 * 1024 * 1024;
 
-/// Les fiches les plus récentes tenant dans le budget, mesurées par la
-/// base elle-même (sans rien charger).
-const idsDansLeBudget = async (tenantId, names) => {
-  const tailles = await prisma.$queryRaw`
-    SELECT id, pg_column_size(data)::bigint AS taille FROM records
-    WHERE "tenantId" = ${tenantId} AND module = ${names.module}
-      AND collection = ${names.collection}
-    ORDER BY "createdAt" DESC LIMIT 500`;
-  const ids = [];
-  let total = 0;
-  for (const { id, taille } of tailles) {
-    total += Number(taille);
-    if (total > BUDGET_LISTE_OCTETS && ids.length) break;
-    ids.push(id);
+/// Une page de la liste : les identifiants des fiches, dans l'ordre
+/// (plus récentes d'abord), choisis par la base elle-même — curseur,
+/// recherche, filtre et budget d'octets — sans charger les données.
+const pageDeListe = async (tenantId, names, { limite, curseur, recherche, filtre }) => {
+  const conditions = [
+    Prisma.sql`"tenantId" = ${tenantId}`,
+    Prisma.sql`module = ${names.module}`,
+    Prisma.sql`collection = ${names.collection}`,
+  ];
+  if (curseur) {
+    conditions.push(
+      Prisma.sql`("createdAt", id) < (${curseur.createdAt}::timestamp, ${curseur.id})`,
+    );
   }
-  return ids;
+  if (recherche) conditions.push(Prisma.sql`data::text ILIKE ${recherche}`);
+  for (const [cle, valeur] of filtre) conditions.push(Prisma.sql`data->>${cle} = ${valeur}`);
+
+  const lignes = await prisma.$queryRaw`
+    SELECT id, "createdAt"::text AS "createdAt", pg_column_size(data)::bigint AS taille
+    FROM records
+    WHERE ${Prisma.join(conditions, " AND ")}
+    ORDER BY "createdAt" DESC, id DESC
+    LIMIT ${limite + 1}`;
+  return couperPage(lignes, limite, BUDGET_LISTE_OCTETS);
 };
 
 /// Collections lues par un **moteur** du serveur, et non par un simple
@@ -204,17 +222,33 @@ export default async function recordRoutes(app) {
     const partage = autorise ? null : lecturePartagee(names);
     if (!autorise && !partage) return refuserAcces(reply, names);
 
-    const records = await prisma.record.findMany({
-      where: {
-        tenantId: request.tenantId,
-        ...names,
-        ...(limiteDonnees(names) > MAX_DATA_BYTES
-          ? { id: { in: await idsDansLeBudget(request.tenantId, names) } }
-          : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      take: 500,
-    });
+    let page;
+    try {
+      const recherche = lireRecherche(request.query?.q);
+      const filtre = lireFiltre(request.query?.filter);
+      // L'annuaire ne montre qu'une partie de chaque fiche : chercher dans
+      // le reste (le salaire…) en dirait plus que ce qui est affiché.
+      if (partage && (recherche || filtre.length)) return refuserAcces(reply, names);
+      page = await pageDeListe(request.tenantId, names, {
+        limite: lireLimite(request.query?.limit),
+        curseur: lireCurseur(request.query?.cursor),
+        recherche,
+        filtre,
+      });
+    } catch (err) {
+      if (err instanceof ErreurPagination) return reply.code(400).send({ error: err.message });
+      throw err;
+    }
+
+    const parId = new Map(
+      (
+        await prisma.record.findMany({
+          where: { tenantId: request.tenantId, ...names, id: { in: page.ids } },
+        })
+      ).map((r) => [r.id, r]),
+    );
+    const records = page.ids.map((id) => parId.get(id)).filter(Boolean);
+    if (page.suite) reply.header(ENTETE_SUITE, page.suite);
 
     const lisibles = partage === "annuaire" ? records.map(enAnnuaire) : records;
     return serialize(await auteurs(request.tenantId, lisibles));

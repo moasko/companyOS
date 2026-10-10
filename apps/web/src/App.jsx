@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { signalerErreur } from "./utils/rapportErreurs";
 import { useDispatch, useSelector } from "react-redux";
@@ -26,6 +26,7 @@ import { ecouterLesCopies } from "./apps/clipboard";
 import { intercepterMailto } from "./apps/mailto";
 import { demarrerSyncNotifications } from "./apps/notifications";
 import { demarrerGardeFenetres } from "./apps/gardeFenetres";
+import { fermerFenetre } from "./apps/windows";
 import store from "./reducers";
 import { CustomApp } from "./apps/CustomApp";
 import { CustomWebApp } from "./apps/CustomWebApp";
@@ -57,7 +58,50 @@ function AppMontee({ mod }) {
 
   if (!montee) return null;
   const Fenetre = mod.Window;
-  return <Fenetre />;
+  // Le code de l'application se télécharge à la première ouverture (voir
+  // apps/registry.js). Une application qui plante — ou dont le code ne se
+  // charge pas — n'emporte plus toute la session avec elle.
+  return (
+    <ErrorBoundary
+      FallbackComponent={(p) => <AppEnPanne {...p} mod={mod} />}
+      onError={(e) => signalerErreur(e, `Application ${cle}`)}
+    >
+      <Suspense fallback={null}>
+        <Fenetre />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+/// Après un déploiement, l'ancien code d'une application n'existe plus
+/// sur le serveur : le navigateur qui a gardé l'ancien shell échoue à le
+/// charger. Recharger une fois la page récupère la nouvelle version.
+const CLE_RECHARGE = "companyos-recharge-module";
+const echecDeChargement = (e) =>
+  /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(e?.message || ""));
+
+function AppEnPanne({ error, resetErrorBoundary, mod }) {
+  const cle = mod.id || mod.icon;
+  useEffect(() => {
+    if (!echecDeChargement(error)) return;
+    try {
+      if (sessionStorage.getItem(CLE_RECHARGE)) return;
+      sessionStorage.setItem(CLE_RECHARGE, "1");
+    } catch {
+      return;
+    }
+    window.location.reload();
+  }, [error]);
+  return (
+    <div className="appEnPanne" role="alert">
+      <strong>{mod.name} a rencontré un problème.</strong>
+      <span>Le reste de CompanyOS continue de fonctionner. {error?.message}</span>
+      <div>
+        <button type="button" onClick={resetErrorBoundary}>Relancer</button>
+        <button type="button" onClick={() => { fermerFenetre(cle); resetErrorBoundary(); }}>Fermer</button>
+      </div>
+    </div>
+  );
 }
 
 function ErrorFallback({ error, resetErrorBoundary }) {

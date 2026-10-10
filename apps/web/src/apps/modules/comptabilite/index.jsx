@@ -70,15 +70,9 @@ import { Journaux, GrandLivre, Balance, Plan } from "./Registres";
 import { Etats, Tva } from "./Etats";
 import { Cloture } from "./Cloture";
 import "./comptabilite.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "comptabilite",
-  slug: "comptabilite",
-  name: "Comptabilité",
-  icon: "comptabilite",
-  action: "COMPTABILITEAPP",
-  Window: ComptabiliteApp,
-};
+export const manifest = { ...descriptif, Window: ComptabiliteApp };
 
 const NAV = [
   { groupe: "Suivre" },

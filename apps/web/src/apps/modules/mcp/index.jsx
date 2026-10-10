@@ -4,17 +4,9 @@ import { ModuleWindow } from "../../ModuleWindow";
 import { BASE_URL, api, apiFetch } from "../../../api/client";
 import { modal } from "../../modalRequest";
 import "./mcp.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "mcp",
-  slug: "mcp",
-  name: "MCP Center",
-  icon: "terminal",
-  action: "MCPAPP",
-  version: "1.0.0",
-  notes: [{ version: "1.0.0", texte: "Console MCP, configuration et diagnostic." }],
-  Window: McpApp,
-};
+export const manifest = { ...descriptif, Window: McpApp };
 
 const OUTILS = [
   ["companyos_status", "État de l’API, session et droits d’écriture"],

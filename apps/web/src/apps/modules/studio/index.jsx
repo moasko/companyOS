@@ -8,6 +8,7 @@ import { scrollElementTo } from "../../scrollTo";
 import { modal } from "../../modalRequest";
 import * as D from "./domaine";
 import "./studio.scss";
+import { manifest as descriptif } from "./manifest";
 
 // Studio : créer une application depuis le shell, puis la publier dans la
 // Boutique de son espace de travail.
@@ -153,21 +154,7 @@ const APP_VIDE = () => ({
 /// toutes des applications de données.
 const genreDe = (draft) => draft?.definition?.genre || "donnees";
 
-export const manifest = {
-  id: "studio",
-  slug: "studio",
-  name: "Studio",
-  // Sur localhost, le builder doit rester testable même lorsque le
-  // catalogue distant est indisponible. En production il demeure un module
-  // installable depuis la Boutique.
-  systeme: import.meta.env.DEV,
-  // L'icône est un fichier, pas une clé : le générateur QR utilise aussi
-  // « code », et c'est sans conséquence depuis que l'identité d'une
-  // application est son `id`.
-  icon: "studio",
-  action: "STUDIOAPP",
-  Window: StudioApp,
-};
+export const manifest = { ...descriptif, Window: StudioApp };
 
 function StudioApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
