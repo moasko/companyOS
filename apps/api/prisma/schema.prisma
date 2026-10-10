@@ -781,3 +781,82 @@ model IpBloquee {
   @@index([jusqua])
   @@map("ips_bloquees")
 }
+
+/// Boîte de messagerie reliée à CompanyOS (Courrier) : un compte IMAP
+/// pour recevoir, et facultativement son propre relais SMTP pour répondre
+/// sous cette adresse. `userId` vide : boîte partagée de l'espace
+/// (contact@, compta@…), lisible par tous ses membres ; sinon personnelle.
+/// Les mots de passe sont chiffrés (src/chiffrement.js).
+model BoiteCourriel {
+  id              String    @id @default(cuid())
+  tenantId        String
+  userId          String?
+  nom             String
+  adresse         String
+  imap            Json
+  smtp            Json?
+  signature       String?
+  actif           Boolean   @default(true)
+  uidValidite     BigInt?
+  dernierUid      Int       @default(0)
+  derniereSynchro DateTime?
+  /// Bail de synchronisation : une seule instance relève la boîte à la fois.
+  syncJusqua      DateTime?
+  erreur          String?
+  creeLe          DateTime  @default(now())
+
+  courriels Courriel[]
+
+  @@index([tenantId])
+  @@map("boites_courriel")
+}
+
+/// Un courriel : reçu par IMAP, envoyé depuis CompanyOS, ou brouillon.
+/// `filId` regroupe une conversation (Message-ID / In-Reply-To /
+/// References). `liens` : les fiches d'autres apps rattachées
+/// ({ app, collection, id, libelle }) — tâche Projets, événement Agenda,
+/// compte CRM…
+model Courriel {
+  id         String    @id @default(cuid())
+  tenantId   String
+  boiteId    String?
+  /// reception | envoyes | brouillons | archives | corbeille | indesirables
+  dossier    String
+  filId      String
+  messageId  String?
+  inReplyTo  String?
+  references Json?
+  uid        Int?
+  deNom      String?
+  deEmail    String?
+  a          Json
+  cc         Json?
+  cci        Json?
+  sujet      String    @default("")
+  texte      String    @default("")
+  html       String?
+  extrait    String    @default("")
+  date       DateTime  @default(now())
+  lu         Boolean   @default(false)
+  suivi      Boolean   @default(false)
+  etiquettes Json?
+  pieces     Json?
+  /// recu | envoye | echec | brouillon | programme
+  statut     String
+  erreur     String?
+  envoiLe    DateTime?
+  userId     String?
+  liens      Json?
+  creeLe     DateTime  @default(now())
+  modifieLe  DateTime  @updatedAt
+
+  boite BoiteCourriel? @relation(fields: [boiteId], references: [id], onDelete: Cascade)
+
+  @@unique([boiteId, uid])
+  @@index([tenantId, dossier, date(sort: Desc)])
+  @@index([tenantId, filId])
+  @@index([tenantId, messageId])
+  @@index([tenantId, deEmail])
+  @@index([statut, envoiLe])
+  @@map("courriels")
+}

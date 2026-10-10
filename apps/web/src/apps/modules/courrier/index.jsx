@@ -1,52 +1,75 @@
 // Courrier.
 //
 // ─────────────────────────────────────────────────────────────────────────
-// UN CLIENT DE MESSAGERIE, PAS UN FORMULAIRE
+// LA MESSAGERIE DE L'ENTREPRISE, RELIÉE AU RESTE DE L'OS
 //
-// Trois volets, comme les messageries professionnelles : les dossiers à
-// gauche, la liste des messages au centre — avec recherche —, la lecture
-// ou l'écriture à droite. Envoyés, échecs et brouillons se rangent
-// chacun chez eux ; un message se relit tel qu'il est parti, se renvoie
-// d'un clic.
+// Trois volets : dossiers et boîtes, conversations, lecture — et un
+// quatrième, le correspondant tel que le connaissent le CRM, la
+// Facturation, les RH et Projets. Les boîtes IMAP reliées sont relevées
+// toutes les deux minutes ; on répond sous la conversation, brouillon
+// enregistré tout seul, envoi annulable ou programmé.
 //
 // C'est aussi un **service** : n'importe quelle application appelle
-// `composerCourriel({...})` (voir src/apps/courrielRequest.js) et cette
-// fenêtre s'ouvre sur un brouillon prérempli, pièce jointe du cloud
-// comprise. L'utilisateur relit, puis envoie — jamais d'envoi dans son dos.
+// `composerCourriel({...})` (src/apps/courrielRequest.js) et cette fenêtre
+// s'ouvre sur un brouillon prérempli, pièces du Cloud comprises.
+// L'utilisateur relit, puis envoie — jamais d'envoi dans son dos.
 // ─────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
+import { useTelephone } from "../../../utils/telephone";
 import { api } from "../../../api/client";
+import { EVT_COURRIER } from "../../../api/tempsReel";
 import { modal } from "../../modalRequest";
 import { notifier } from "../../notifications";
+import { menuContextuel } from "../../menuRequest";
 import { prendreBrouillon, surBrouillon } from "../../courrielRequest";
-import { iconeDeFichier } from "../../iconesFichiers";
-import { Contenu, useChargement } from "../../chargement";
-import { Bouton, Champ, Notice, Vide } from "../../ui";
-import * as D from "@companyos/shared/courrier";
+import {
+  citation,
+  dateListe,
+  enteteTransfert,
+  htmlDeTexte,
+  listeAdresses,
+  nomAffiche,
+  repondreATous,
+  sujetReponse,
+  sujetTransfert,
+} from "@companyos/shared/courrier";
+import { Composeur } from "./Composeur";
+import { Lecture } from "./Lecture";
+import { Contexte } from "./Contexte";
+import { Reglages } from "./Reglages";
+import { DOSSIERS, initiales, quand, teinte } from "./outils";
 import "./courrier.scss";
 import { manifest as descriptif } from "./manifest";
 
 export const manifest = { ...descriptif, Window: CourrierApp };
 
-const BROUILLON_VIDE = {
-  a: "",
-  cc: "",
-  sujet: "",
-  texte: "",
-  pieces: [], // [{ id, nom }]
+const CLE_CONTEXTE = "companyos-courrier-contexte";
+const lireContexte = () => {
+  try {
+    return localStorage.getItem(CLE_CONTEXTE) !== "0";
+  } catch {
+    return true;
+  }
 };
 
-/// Les intégrations d'avant le pluriel envoient `pieceJointeId` /
-/// `pieceJointeNom` : on les range dans `pieces` sans rien casser.
-const normaliserBrouillon = (b = {}) => {
+const enHtmlSignature = (s) => (s ? `<p><br></p><p>--<br>${htmlDeTexte(s).replace(/^<p>|<\/p>$/g, "")}</p>` : "");
+
+/// Le brouillon d'une autre app (forme historique : chaînes, texte brut,
+/// `pieceJointeId`) en composition.
+const depuisService = (b = {}) => {
   const pieces = [...(b.pieces || [])];
   if (b.pieceJointeId) pieces.push({ id: b.pieceJointeId, nom: b.pieceJointeNom || "pièce jointe" });
-  const { pieceJointeId, pieceJointeNom, ...reste } = b;
-  return { ...BROUILLON_VIDE, ...reste, pieces };
+  return {
+    a: listeAdresses(b.a || ""),
+    cc: listeAdresses(b.cc || ""),
+    sujet: b.sujet || "",
+    html: b.html || (b.texte ? htmlDeTexte(b.texte) : ""),
+    pieces: pieces.map((p) => ({ fsNodeId: p.id || p.fsNodeId, nom: p.nom, taille: p.taille || 0, type: p.type })),
+  };
 };
 
 function CourrierApp() {
@@ -54,1004 +77,720 @@ function CourrierApp() {
   const session = useSelector((state) => state.session);
   const ouvert = !!wnapp && !wnapp.hide && session.status === "authenticated";
   const estAdmin = ["OWNER", "ADMIN"].includes(session.user?.role);
+  const telephone = useTelephone();
 
-  const [dossier, setDossier] = useState("envoyes"); // envoyes | echecs | brouillons | reglages
-  const [envois, setEnvois] = useState([]);
-  const [brouillons, setBrouillons] = useState([]);
+  const [vue, setVue] = useState({ dossier: "reception", boiteId: null });
+  const [filtre, setFiltre] = useState("tous");
+  const [saisie, setSaisie] = useState("");
   const [recherche, setRecherche] = useState("");
-  const [selection, setSelection] = useState(null); // id de la fiche ouverte
-  const [composition, setComposition] = useState(null); // brouillon en cours, ou null
-  const [brouillonId, setBrouillonId] = useState(null); // fiche brouillon d'origine
-  const [occupe, setOccupe] = useState(false);
-
+  const [conversations, setConversations] = useState([]);
+  const [suite, setSuite] = useState(null);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+  const [compteurs, setCompteurs] = useState({ nonLus: {}, parBoite: {} });
+  const [boites, setBoites] = useState([]);
   const [modeles, setModeles] = useState([]);
+  const [selection, setSelection] = useState(null);
+  const [fil, setFil] = useState(null);
+  const [composition, setComposition] = useState(null);
+  const [contexteOuvert, setContexteOuvert] = useState(lireContexte);
+  const [coches, setCoches] = useState(() => new Set());
+  const [navOuverte, setNavOuverte] = useState(false);
+  const [releve, setReleve] = useState(false);
+  const champRecherche = useRef(null);
+  const jeton = useRef(0);
 
-  const charger = useCallback(async () => {
-    const [e, b, m] = await Promise.all([
-      api.records.list(manifest.slug, "envois"),
-      api.records.list(manifest.slug, "brouillons").catch(() => []),
-      api.records.list(manifest.slug, "modeles").catch(() => []),
+  // ---- Chargements --------------------------------------------------------
+
+  const chargerBase = useCallback(async () => {
+    const [b, m, c] = await Promise.all([
+      api.messagerie.boites().catch(() => []),
+      api.records.list("courrier", "modeles").catch(() => []),
+      api.messagerie.compteurs().catch(() => null),
     ]);
-    const parDate = (x, y) => (y.data.date || "").localeCompare(x.data.date || "");
-    setEnvois(e.sort(parDate));
-    setBrouillons(b.sort(parDate));
-    setModeles(m.sort((x, y) => (x.data.nom || "").localeCompare(y.data.nom || "")));
+    setBoites(Array.isArray(b) ? b : []);
+    setModeles((m || []).sort((x, y) => (x.data.nom || "").localeCompare(y.data.nom || "")));
+    if (c) setCompteurs(c);
   }, []);
-  // Rechargement en direct quand un collègue modifie ces collections.
-  const etat = useChargement(ouvert, charger, { ecoute: ["courrier/*"] });
 
-  // Un brouillon poussé par une autre app ouvre directement la composition.
+  const filtres = useMemo(
+    () => ({
+      ...(vue.dossier === "suivis" ? { vue: "suivis" } : { dossier: vue.dossier }),
+      boiteId: vue.boiteId,
+      filtre: filtre === "tous" ? null : filtre,
+      q: recherche,
+    }),
+    [vue, filtre, recherche],
+  );
+
+  const chargerListe = useCallback(
+    async ({ silencieux = false } = {}) => {
+      if (vue.dossier === "reglages") return;
+      const mien = ++jeton.current;
+      if (!silencieux) setChargement(true);
+      try {
+        const r = await api.messagerie.conversations(filtres);
+        if (mien !== jeton.current) return;
+        setConversations(r.conversations || []);
+        setSuite(r.suite || null);
+        setErreur("");
+      } catch (e) {
+        if (mien === jeton.current) setErreur(e.message);
+      } finally {
+        if (mien === jeton.current) setChargement(false);
+      }
+    },
+    [filtres, vue.dossier],
+  );
+
+  const chargerFil = useCallback(async (filId) => {
+    if (!filId) return setFil(null);
+    try {
+      const r = await api.messagerie.fil(filId);
+      setFil({ filId, ...r });
+    } catch {
+      setFil(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (ouvert) chargerBase();
+  }, [ouvert, chargerBase]);
+  useEffect(() => {
+    if (ouvert) chargerListe();
+  }, [ouvert, chargerListe]);
+
+  // Recherche : on attend que la frappe se pose.
+  useEffect(() => {
+    const t = setTimeout(() => setRecherche(saisie.trim()), 300);
+    return () => clearTimeout(t);
+  }, [saisie]);
+
+  // Temps réel : nouveaux courriels, ou changements faits ailleurs.
+  const selRef = useRef(selection);
+  selRef.current = selection;
+  useEffect(() => {
+    let t;
+    const surCourrier = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        chargerListe({ silencieux: true });
+        api.messagerie.compteurs().then(setCompteurs).catch(() => {});
+        if (selRef.current) chargerFil(selRef.current);
+      }, 400);
+    };
+    window.addEventListener(EVT_COURRIER, surCourrier);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener(EVT_COURRIER, surCourrier);
+    };
+  }, [chargerListe, chargerFil]);
+
+  // Brouillon poussé par une autre application.
   useEffect(() => {
     const appliquer = (b) => {
       if (!b) return;
-      setComposition(normaliserBrouillon(b));
-      setBrouillonId(null);
+      setComposition({ mode: "nouveau", cle: Date.now(), initial: depuisService(b) });
       setSelection(null);
+      setFil(null);
     };
     appliquer(prendreBrouillon());
     return surBrouillon(appliquer);
   }, []);
 
-  // ---- Les listes par dossier ---------------------------------------------
-
-  const listes = useMemo(() => {
-    const q = recherche.trim().toLowerCase();
-    const filtre = (r) =>
-      !q ||
-      [r.data.a, r.data.cc, r.data.sujet, r.data.extrait, r.data.texte]
-        .join(" ")
-        .toLowerCase()
-        .includes(q);
-    const filtreModele = (r) =>
-      !q ||
-      [r.data.nom, r.data.sujet, r.data.texte].join(" ").toLowerCase().includes(q);
-    return {
-      envoyes: envois.filter((r) => r.data.envoye !== false).filter(filtre),
-      echecs: envois.filter((r) => r.data.envoye === false).filter(filtre),
-      brouillons: brouillons.filter(filtre),
-      modeles: modeles.filter(filtreModele),
+  // Lien depuis une notification : « Awa : Devis » ouvre la conversation.
+  useEffect(() => {
+    const aller = async (e) => {
+      if (e.detail?.app !== manifest.id || !e.detail.params?.courriel) return;
+      const c = await api.messagerie.courriel(e.detail.params.courriel).catch(() => null);
+      if (!c) return;
+      setVue({ dossier: c.dossier === "brouillons" ? "brouillons" : c.dossier, boiteId: null });
+      setComposition(null);
+      setSelection(c.filId);
+      chargerFil(c.filId);
     };
-  }, [envois, brouillons, modeles, recherche]);
+    window.addEventListener("companyos:lien", aller);
+    return () => window.removeEventListener("companyos:lien", aller);
+  }, [chargerFil]);
 
-  const liste = listes[dossier] || [];
-  const ouverte =
-    [...envois, ...brouillons, ...modeles].find((r) => r.id === selection) || null;
+  const basculerContexte = () =>
+    setContexteOuvert((v) => {
+      try {
+        localStorage.setItem(CLE_CONTEXTE, v ? "0" : "1");
+      } catch {
+        // préférence de session
+      }
+      return !v;
+    });
 
-  // ---- Actions ------------------------------------------------------------
+  // ---- Sélection, actions ----------------------------------------------------
+
+  const mesAdresses = useMemo(() => [session.user?.email, ...boites.map((b) => b.adresse)].filter(Boolean), [session.user, boites]);
+  const boiteParDefaut = (boiteId) => boites.find((b) => b.id === boiteId) || boites.find((b) => b.mienne) || boites[0] || null;
+  const signatureDe = (boiteId) => enHtmlSignature(boiteParDefaut(boiteId)?.signature);
+
+  const ouvrirConversation = async (c) => {
+    if (vue.dossier === "brouillons" || vue.dossier === "programmes") {
+      const d = await api.messagerie.courriel(c.id).catch(() => null);
+      if (!d) return;
+      setSelection(null);
+      setFil(null);
+      setComposition({
+        mode: "nouveau",
+        cle: d.id,
+        initial: {
+          titre: d.statut === "programme" ? `Programmé ${quand(d.envoiLe)} — modifier annule la programmation` : "Brouillon",
+          brouillonId: d.id,
+          boiteId: d.boiteId,
+          a: d.a,
+          cc: d.cc,
+          cci: d.cci,
+          sujet: d.sujet,
+          html: d.html || htmlDeTexte(d.texte),
+          pieces: d.pieces || [],
+          inReplyTo: d.inReplyTo,
+          references: d.references,
+          filId: d.filId,
+          liens: d.liens,
+        },
+      });
+      return;
+    }
+    setComposition(null);
+    setSelection(c.filId);
+    chargerFil(c.filId);
+    if (c.nonLus) {
+      setConversations((l) => l.map((x) => (x.filId === c.filId ? { ...x, nonLus: 0, lu: true } : x)));
+      await api.messagerie.maj({ fils: [c.filId], lu: true }).catch(() => {});
+      api.messagerie.compteurs().then(setCompteurs).catch(() => {});
+    }
+  };
+
+  const agir = async (action, fils) => {
+    const corps = {
+      archiver: { dossier: "archives" },
+      corbeille: { dossier: "corbeille" },
+      reception: { dossier: "reception" },
+      indesirable: { dossier: "indesirables" },
+      nonlu: { lu: false },
+      lu: { lu: true },
+      suivre: { suivi: true },
+      nePlusSuivre: { suivi: false },
+    }[action];
+    if (!corps || !fils.length) return;
+    // Mise à jour immédiate de la liste ; le serveur confirme derrière.
+    if (corps.dossier) {
+      setConversations((l) => l.filter((x) => !fils.includes(x.filId)));
+      if (fils.includes(selection)) {
+        setSelection(null);
+        setFil(null);
+        setComposition(null);
+      }
+    } else {
+      setConversations((l) =>
+        l.map((x) => (fils.includes(x.filId) ? { ...x, ...(corps.lu !== undefined ? { nonLus: corps.lu ? 0 : 1 } : {}), ...(corps.suivi !== undefined ? { suivi: corps.suivi } : {}) } : x)),
+      );
+      if (action === "nonlu" && fils.includes(selection)) {
+        setSelection(null);
+        setFil(null);
+      }
+    }
+    setCoches(new Set());
+    try {
+      await api.messagerie.maj({ fils, ...corps });
+      const libelles = { archiver: "Archivé", corbeille: "Mis à la corbeille", reception: "Remis en boîte de réception", indesirable: "Classé indésirable" };
+      if (libelles[action]) notifier({ titre: `${libelles[action]}${fils.length > 1 ? ` (${fils.length})` : ""}`, app: "Courrier", ton: "success" });
+    } catch (e) {
+      modal.alert({ title: "Action impossible", message: e.message, tone: "error" });
+    } finally {
+      chargerListe({ silencieux: true });
+      api.messagerie.compteurs().then(setCompteurs).catch(() => {});
+      if (selection && !corps.dossier) chargerFil(selection);
+    }
+  };
+
+  const viderCorbeille = async () => {
+    const ok = await modal.confirm({ title: "Vider la corbeille ?", message: "Les courriels de la corbeille seront supprimés définitivement de CompanyOS.", confirmLabel: "Vider", danger: true });
+    if (!ok) return;
+    await api.messagerie.viderCorbeille().catch((e) => modal.alert({ title: "Action impossible", message: e.message, tone: "error" }));
+    setSelection(null);
+    setFil(null);
+    chargerListe();
+    chargerBase();
+  };
+
+  // ---- Composer ---------------------------------------------------------------
 
   const nouveau = () => {
-    setComposition({ ...BROUILLON_VIDE });
-    setBrouillonId(null);
     setSelection(null);
+    setFil(null);
+    const b = boiteParDefaut(vue.boiteId);
+    setComposition({ mode: "nouveau", cle: Date.now(), initial: { boiteId: b?.id || null, html: `<p><br></p>${signatureDe(b?.id)}` } });
   };
 
-  const ouvrirFiche = (r) => {
-    if (dossier === "brouillons") {
-      setComposition(normaliserBrouillon(r.data));
-      setBrouillonId(r.id);
-      setSelection(null);
-    } else {
-      // Envoyés, échecs et modèles s'ouvrent dans le volet de droite.
-      setSelection(r.id);
-      setComposition(null);
-    }
-  };
+  const versMessage = (m) => ({ deNom: m.de?.nom, deEmail: m.de?.email, a: m.a, cc: m.cc, date: m.date, texte: m.texte, html: m.html, sujet: m.sujet });
 
-  const enregistrerModele = async (id, donnees) => {
-    setOccupe(true);
-    try {
-      if (id) {
-        await api.records.update(manifest.slug, "modeles", id, donnees);
-      } else {
-        const fiche = await api.records.create(manifest.slug, "modeles", donnees);
-        setSelection(fiche.id);
-      }
-      await etat.rafraichir();
-      notifier({ titre: "Modèle enregistré", message: donnees.nom, app: "Courrier", ton: "success" });
-    } catch (e) {
-      modal.alert({ title: "Enregistrement impossible", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  const supprimerModele = async (r) => {
-    const ok = await modal.confirm({
-      title: "Supprimer ce modèle ?",
-      message: `« ${r.data.nom} » ne sera plus proposé — les relances qui s'en servent repasseront au message par défaut.`,
-      confirmLabel: "Supprimer",
-      danger: true,
-    });
-    if (!ok) return;
-    await api.records.remove(manifest.slug, "modeles", r.id);
-    setSelection(null);
-    await etat.rafraichir();
-  };
-
-  /// Applique un modèle au brouillon en cours — en préservant ce que
-  /// l'utilisateur a déjà écrit, après confirmation.
-  const appliquerModeleAuBrouillon = async (m) => {
-    const b = composition;
-    if ((b.sujet.trim() || b.texte.trim())) {
-      const ok = await modal.confirm({
-        title: `Appliquer « ${m.data.nom} » ?`,
-        message: "Le sujet et le message en cours seront remplacés par le modèle.",
-        confirmLabel: "Appliquer",
-      });
-      if (!ok) return;
-    }
-    setComposition((prev) => ({
-      ...prev,
-      sujet: m.data.sujet || "",
-      texte: m.data.texte || "",
-    }));
-  };
-
-  const renvoyer = (r) => {
+  const repondre = (m, tous = false) => {
+    if (!m) return;
+    const recu = m.statut === "recu";
+    const dest = tous ? repondreATous(versMessage(m), recu ? mesAdresses : []) : { a: recu ? [m.de] : m.a, cc: [] };
+    // Répondre à un message qu'on a soi-même envoyé : on écrit à ses destinataires.
+    if (!recu && tous) dest.a = m.a;
+    const c = citation(versMessage(m));
     setComposition({
-      ...BROUILLON_VIDE,
-      a: r.data.a,
-      cc: r.data.cc || "",
-      sujet: r.data.sujet,
-      texte: r.data.texte || "",
+      mode: "reponse",
+      cle: `${m.id}-${tous}-${Date.now()}`,
+      initial: {
+        boiteId: m.boiteId || boiteParDefaut()?.id || null,
+        a: dest.a,
+        cc: dest.cc,
+        sujet: sujetReponse(m.sujet),
+        html: `<p><br></p>${signatureDe(m.boiteId)}${c.html}`,
+        inReplyTo: m.messageId || null,
+        references: [...(m.references || []), m.messageId].filter(Boolean),
+        filId: m.filId,
+        liens: m.liens || [],
+      },
     });
-    setBrouillonId(null);
-    setSelection(null);
   };
 
-  const enregistrerBrouillon = async (b) => {
-    setOccupe(true);
-    try {
-      const donnees = { ...b, date: new Date().toISOString() };
-      if (brouillonId) {
-        await api.records.update(manifest.slug, "brouillons", brouillonId, donnees);
-      } else {
-        const fiche = await api.records.create(manifest.slug, "brouillons", donnees);
-        setBrouillonId(fiche.id);
-      }
-      await etat.rafraichir();
-      notifier({ titre: "Brouillon enregistré", message: b.sujet || "Sans sujet", app: "Courrier", ton: "success" });
-    } catch (e) {
-      modal.alert({ title: "Enregistrement impossible", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
+  const transferer = (m) => {
+    if (!m) return;
+    const t = enteteTransfert(versMessage(m));
+    setComposition({
+      mode: "reponse",
+      cle: `${m.id}-tr-${Date.now()}`,
+      initial: {
+        boiteId: m.boiteId || boiteParDefaut()?.id || null,
+        a: [],
+        sujet: sujetTransfert(m.sujet),
+        html: `<p><br></p>${signatureDe(m.boiteId)}${t.html}`,
+        pieces: (m.pieces || []).filter((p) => p.fsNodeId),
+      },
+    });
+  };
+
+  const apresEnvoi = (c, envoiLe) => {
+    setComposition(null);
+    notifier({
+      titre: envoiLe ? `Envoi programmé ${quand(envoiLe)}` : "Courriel envoyé",
+      message: c?.a?.map((x) => x.email).join(", "),
+      app: "Courrier",
+      ton: "success",
+    });
+    chargerListe({ silencieux: true });
+    chargerBase();
+    if (selection) chargerFil(selection);
+  };
+
+  // ---- Clavier ----------------------------------------------------------------
+
+  const surTouche = (e) => {
+    const cible = e.target;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName) || cible.isContentEditable) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const i = conversations.findIndex((c) => c.filId === selection);
+    const touche = e.key;
+    const actuelle = conversations[i];
+    const dernier = fil?.messages?.[fil.messages.length - 1];
+    if (touche === "j" || touche === "ArrowDown") {
+      e.preventDefault();
+      const c = conversations[Math.min(conversations.length - 1, i + 1)];
+      if (c) ouvrirConversation(c);
+    } else if (touche === "k" || touche === "ArrowUp") {
+      e.preventDefault();
+      const c = conversations[Math.max(0, i - 1)];
+      if (c) ouvrirConversation(c);
+    } else if (touche === "c") {
+      e.preventDefault();
+      nouveau();
+    } else if (touche === "/") {
+      e.preventDefault();
+      champRecherche.current?.focus();
+    } else if (touche === "Escape") {
+      if (composition) setComposition(null);
+      else if (selection) (setSelection(null), setFil(null));
+    } else if (actuelle) {
+      if (touche === "e") agir(vue.dossier === "archives" ? "reception" : "archiver", [actuelle.filId]);
+      else if (touche === "#" || touche === "Delete") agir("corbeille", [actuelle.filId]);
+      else if (touche === "s") agir(actuelle.suivi ? "nePlusSuivre" : "suivre", [actuelle.filId]);
+      else if (touche === "u") agir("nonlu", [actuelle.filId]);
+      else if (touche === "r" && dernier) (e.preventDefault(), repondre(dernier));
+      else if (touche === "a" && dernier) (e.preventDefault(), repondre(dernier, true));
+      else if (touche === "f" && dernier) (e.preventDefault(), transferer(dernier));
     }
   };
 
-  const supprimerBrouillon = async (r) => {
-    const ok = await modal.confirm({
-      title: "Supprimer ce brouillon ?",
-      message: `« ${r.data.sujet || "Sans sujet"} » sera retiré.`,
-      confirmLabel: "Supprimer",
-      danger: true,
-    });
-    if (!ok) return;
-    await api.records.remove(manifest.slug, "brouillons", r.id);
-    await etat.rafraichir();
-  };
-
-  const envoyer = async (b) => {
-    if (!D.pretAEnvoyer(b)) return;
-    setOccupe(true);
-    try {
-      await api.courrierEnvoyer({
-        a: D.adressesDe(b.a).join(", "),
-        cc: D.adressesDe(b.cc).join(", ") || undefined,
-        sujet: b.sujet.trim(),
-        texte: b.texte,
-        piecesJointes: b.pieces.length ? b.pieces.map((p) => p.id) : undefined,
-      });
-      // Un brouillon envoyé a fini sa vie de brouillon.
-      if (brouillonId) {
-        await api.records.remove(manifest.slug, "brouillons", brouillonId).catch(() => {});
-      }
-      setComposition(null);
-      setBrouillonId(null);
-      await etat.rafraichir();
-      setDossier("envoyes");
-      notifier({
-        titre: "Courriel envoyé",
-        message: `À ${D.adressesDe(b.a).join(", ")}.`,
-        app: "Courrier",
-        ton: "success",
-      });
-    } catch (e) {
-      modal.alert({ title: "Envoi impossible", message: e.message, tone: "error" });
-      await etat.rafraichir();
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  // ---- Rendu --------------------------------------------------------------
+  // ---- Rendu ------------------------------------------------------------------
 
   if (!ouvert) {
     return (
       <ModuleWindow manifest={manifest} className="crrApp">
-        <div className="crrVerrou">Connectez-vous pour écrire à vos clients.</div>
+        <div className="crrVerrou">Connectez-vous pour lire et écrire vos courriels.</div>
       </ModuleWindow>
     );
   }
 
-  const DOSSIERS = [
-    { id: "envoyes", label: "Envoyés", icone: "faPaperPlane", compte: listes.envoyes.length },
-    { id: "echecs", label: "Échecs", icone: "faTriangleExclamation", compte: listes.echecs.length },
-    { id: "brouillons", label: "Brouillons", icone: "faFileLines", compte: listes.brouillons.length },
-    { id: "modeles", label: "Modèles", icone: "faClone", compte: listes.modeles.length },
-  ];
+  const enReglages = vue.dossier === "reglages";
+  const dossierCourant = DOSSIERS.find((d) => d.id === vue.dossier);
+  const titreListe = vue.boiteId ? boites.find((b) => b.id === vue.boiteId)?.nom || "Boîte" : dossierCourant?.libelle || "Courrier";
+  const dernier = fil?.messages?.[fil.messages.length - 1];
+  const moi = new Set(mesAdresses.map((x) => x.toLowerCase()));
+  const correspondant = (() => {
+    if (!fil) return null;
+    for (let k = fil.messages.length - 1; k >= 0; k--) {
+      const m = fil.messages[k];
+      if (m.statut === "recu" && m.de?.email && !moi.has(m.de.email)) return m.de;
+      const autre = (m.a || []).find((x) => !moi.has(x.email));
+      if (autre) return autre;
+    }
+    return null;
+  })();
+  const conversationCourante = conversations.find((c) => c.filId === selection);
+  const ecran = enReglages ? "reglages" : composition?.mode === "nouveau" ? "composer" : selection ? "lecture" : "liste";
+  const compte = (id) => (id === "brouillons" ? compteurs.brouillons : id === "programmes" ? compteurs.programmes : id === "suivis" ? 0 : compteurs.nonLus?.[id] || 0);
+
+  const changerVue = (v) => {
+    setVue(v);
+    setSelection(null);
+    setFil(null);
+    setCoches(new Set());
+    setNavOuverte(false);
+    if (composition?.mode === "reponse") setComposition(null);
+  };
+
+  const releverTout = async () => {
+    setReleve(true);
+    try {
+      const cibles = vue.boiteId ? boites.filter((b) => b.id === vue.boiteId) : boites;
+      let n = 0;
+      for (const b of cibles) n += (await api.messagerie.synchroniser(b.id).catch(() => ({ nouveaux: 0 }))).nouveaux || 0;
+      await Promise.all([chargerListe({ silencieux: true }), chargerBase()]);
+      if (cibles.length) notifier({ titre: n ? `${n} nouveau${n > 1 ? "x" : ""} courriel${n > 1 ? "s" : ""}` : "Aucun nouveau courriel", app: "Courrier" });
+    } finally {
+      setReleve(false);
+    }
+  };
+
+  const menuConversation = (c) => (e) =>
+    menuContextuel(e, [
+      { nom: c.nonLus ? "Marquer comme lu" : "Marquer comme non lu", icone: "faEnvelopeOpen", action: () => agir(c.nonLus ? "lu" : "nonlu", [c.filId]) },
+      { nom: c.suivi ? "Ne plus suivre" : "Suivre", icone: "faStar", action: () => agir(c.suivi ? "nePlusSuivre" : "suivre", [c.filId]) },
+      { separateur: true },
+      vue.dossier !== "archives" && { nom: "Archiver", icone: "faBoxArchive", raccourci: "E", action: () => agir("archiver", [c.filId]) },
+      vue.dossier !== "reception" && { nom: "Remettre en boîte de réception", icone: "faInbox", action: () => agir("reception", [c.filId]) },
+      vue.dossier !== "indesirables" && c.statut === "recu" && { nom: "Indésirable", icone: "faBan", action: () => agir("indesirable", [c.filId]) },
+      vue.dossier !== "corbeille" && { nom: "Mettre à la corbeille", icone: "faTrashCan", raccourci: "#", danger: true, action: () => agir("corbeille", [c.filId]) },
+    ]);
+
+  const toutCoche = conversations.length > 0 && coches.size === conversations.length;
+  const filsCoches = [...coches];
 
   return (
     <ModuleWindow manifest={manifest} className="crrApp">
-      <div className="crrShell">
-        {/* ---- Rail des dossiers ---- */}
-        <aside className="crrRail">
-          <div className="crrNouveau">
-            <Bouton icone="faPenToSquare" onClick={nouveau}>
-              Nouveau message
-            </Bouton>
-          </div>
+      <div
+        className="crrShell"
+        data-telephone={telephone}
+        data-ecran={ecran}
+        data-contexte={!!(contexteOuvert && fil && correspondant && !telephone)}
+        tabIndex={-1}
+        onKeyDown={surTouche}
+      >
+        {/* ---- Dossiers et boîtes ---- */}
+        {telephone && navOuverte ? <div className="crrVoile" onClick={() => setNavOuverte(false)} /> : null}
+        <nav className="crrNav cosScroll" data-ouverte={navOuverte} aria-label="Dossiers">
+          <button type="button" className="crrEcrire" onClick={() => (setNavOuverte(false), nouveau())}>
+            <Icon fafa="faPenToSquare" width={13} />
+            <span>Écrire</span>
+          </button>
+          <div className="crrNavTitre">Dossiers</div>
           {DOSSIERS.map((d) => (
-            <div
-              key={d.id}
-              className="crrDossier handcr"
-              data-actif={dossier === d.id}
-              onClick={() => {
-                setDossier(d.id);
-                setSelection(null);
-              }}
-            >
+            <button type="button" key={d.id} className="crrNavLigne" data-actif={vue.dossier === d.id && !vue.boiteId} onClick={() => changerVue({ dossier: d.id, boiteId: null })}>
               <Icon fafa={d.icone} width={13} />
-              <span className="crrDossierNom">{d.label}</span>
-              {d.compte ? <span className="crrDossierCompte">{d.compte}</span> : null}
-            </div>
+              <span className="crrNavNom">{d.libelle}</span>
+              {compte(d.id) ? <span className="crrNavCompte" data-fort={d.id === "reception"}>{compte(d.id)}</span> : null}
+            </button>
           ))}
-          <div className="crrRailFin">
-            {estAdmin ? (
-              <div
-                className="crrDossier handcr"
-                data-actif={dossier === "reglages"}
-                onClick={() => setDossier("reglages")}
-              >
-                <Icon fafa="faGear" width={13} />
-                <span className="crrDossierNom">Réglages</span>
-              </div>
-            ) : null}
+          {boites.length ? (
+            <>
+              <div className="crrNavTitre">Boîtes</div>
+              {boites.map((b) => (
+                <button type="button" key={b.id} className="crrNavLigne" data-actif={vue.boiteId === b.id} title={b.erreur || b.adresse} onClick={() => changerVue({ dossier: "reception", boiteId: b.id })}>
+                  <span className="crrAvatar crrAvatarMini" style={{ background: teinte(b.adresse) }}>
+                    {initiales({ nom: b.nom, email: b.adresse })}
+                  </span>
+                  <span className="crrNavNom">{b.nom}</span>
+                  {b.erreur ? <span className="crrNavErreur" title={b.erreur}>!</span> : compteurs.parBoite?.[b.id] ? <span className="crrNavCompte">{compteurs.parBoite[b.id]}</span> : null}
+                </button>
+              ))}
+            </>
+          ) : null}
+          <div className="crrNavFin">
+            <button type="button" className="crrNavLigne" data-actif={enReglages} onClick={() => changerVue({ dossier: "reglages", boiteId: null })}>
+              <Icon fafa="faGear" width={13} />
+              <span className="crrNavNom">Réglages</span>
+            </button>
           </div>
-        </aside>
+        </nav>
 
-        {dossier === "reglages" ? (
-          <div className="crrLecture cosScroll">
-            <Reglages modeles={modeles} />
-          </div>
+        {enReglages ? (
+          <section className="crrColonneLarge">
+            <Reglages boites={boites} modeles={modeles} estAdmin={estAdmin} onRecharger={chargerBase} telephone={telephone} onRetour={() => changerVue({ dossier: "reception", boiteId: null })} />
+          </section>
         ) : (
           <>
-            {/* ---- Liste des messages ---- */}
-            <section className="crrListe">
-              <div className="crrRecherche">
-                <Icon fafa="faMagnifyingGlass" width={11} />
-                <input
-                  value={recherche}
-                  placeholder="Rechercher dans le courrier"
-                  onChange={(e) => setRecherche(e.target.value)}
-                />
-                {recherche ? (
-                  <span className="crrEffacer handcr" onClick={() => setRecherche("")}>
-                    <Icon fafa="faXmark" width={10} />
-                  </span>
+            {/* ---- Conversations ---- */}
+            <section className="crrColonneListe" aria-label="Conversations">
+              <div className="crrListeTete">
+                {telephone ? (
+                  <button type="button" className="crrIconeBtn" aria-label="Dossiers" onClick={() => setNavOuverte(true)}>
+                    <Icon fafa="faBars" width={14} />
+                  </button>
+                ) : null}
+                <h2>{titreListe}</h2>
+                {vue.dossier === "corbeille" && conversations.length ? (
+                  <button type="button" className="crrLienDiscret" onClick={viderCorbeille}>
+                    Vider
+                  </button>
+                ) : null}
+                <span className="crrPiedEspace" />
+                {boites.length ? (
+                  <button type="button" className="crrIconeBtn" title="Relever les boîtes" data-tourne={releve} disabled={releve} onClick={releverTout}>
+                    <Icon fafa="faRotate" width={12} />
+                  </button>
                 ) : null}
               </div>
+              <label className="crrRecherche">
+                <Icon fafa="faMagnifyingGlass" width={12} />
+                <input ref={champRecherche} value={saisie} placeholder="Rechercher (/)" aria-label="Rechercher dans le courrier" onChange={(e) => setSaisie(e.target.value)} />
+                {saisie ? (
+                  <button type="button" aria-label="Effacer" onClick={() => setSaisie("")}>
+                    <Icon fafa="faXmark" width={10} />
+                  </button>
+                ) : null}
+              </label>
+              <div className="crrOnglets" role="tablist">
+                {[
+                  ["tous", "Tous"],
+                  ["nonlus", "Non lus"],
+                  ["pieces", "Pièces jointes"],
+                ].map(([id, libelle]) => (
+                  <button type="button" key={id} role="tab" aria-selected={filtre === id} data-actif={filtre === id} onClick={() => setFiltre(id)}>
+                    {libelle}
+                  </button>
+                ))}
+              </div>
 
-              {dossier === "modeles" ? (
-                <div
-                  className="crrNouveauModele handcr"
-                  onClick={() => setSelection("nouveau-modele")}
-                >
-                  <Icon fafa="faPlus" width={11} />
-                  <span>Nouveau modèle</span>
+              {coches.size ? (
+                <div className="crrActionsGroupees">
+                  <label className="crrCase">
+                    <input type="checkbox" checked={toutCoche} onChange={() => setCoches(toutCoche ? new Set() : new Set(conversations.map((c) => c.filId)))} />
+                  </label>
+                  <span>{coches.size} sélectionnée{coches.size > 1 ? "s" : ""}</span>
+                  <span className="crrPiedEspace" />
+                  <button type="button" className="crrIconeBtn" title="Marquer comme lu" onClick={() => agir("lu", filsCoches)}>
+                    <Icon fafa="faEnvelopeOpen" width={12} />
+                  </button>
+                  {vue.dossier !== "archives" ? (
+                    <button type="button" className="crrIconeBtn" title="Archiver" onClick={() => agir("archiver", filsCoches)}>
+                      <Icon fafa="faBoxArchive" width={12} />
+                    </button>
+                  ) : null}
+                  <button type="button" className="crrIconeBtn" title="Mettre à la corbeille" onClick={() => agir(vue.dossier === "corbeille" ? "reception" : "corbeille", filsCoches)}>
+                    <Icon fafa={vue.dossier === "corbeille" ? "faTrashArrowUp" : "faTrashCan"} width={12} />
+                  </button>
                 </div>
               ) : null}
 
-              <div className="crrMessages cosScroll">
-                <Contenu
-                  etat={etat}
-                  vide={!liste.length}
-                  lignes={5}
-                  rendreVide={() => (
-                    <div className="crrListeVide">
-                      {recherche
-                        ? "Aucun message ne correspond."
-                        : dossier === "brouillons"
-                          ? "Aucun brouillon."
-                          : dossier === "modeles"
-                            ? "Aucun modèle. Créez-en un : relances, devis, confirmations…"
-                            : dossier === "echecs"
-                              ? "Aucun échec d'envoi — tant mieux."
-                              : "Rien d'envoyé pour l'instant."}
-                    </div>
-                  )}
-                >
-                  {dossier === "modeles"
-                    ? liste.map((r) => (
-                        <div
-                          key={r.id}
-                          className="crrMessage handcr"
-                          data-actif={selection === r.id}
-                          onClick={() => ouvrirFiche(r)}
-                        >
-                          <span className="crrPastille crrPastilleModele">
-                            <Icon fafa="faClone" width={12} />
-                          </span>
-                          <div className="crrMessageCorps">
-                            <div className="crrMessageA">{r.data.nom}</div>
-                            <div className="crrMessageSujet">{r.data.sujet}</div>
-                            <div className="crrMessageExtrait">
-                              {D.extraitDe(r.data.texte, 70)}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    : liste.map((r) => (
+              <div className="crrConversations cosScroll">
+                {erreur ? <div className="crrAlerte">{erreur}</div> : null}
+                {chargement && !conversations.length ? (
+                  <div className="crrSquelettes">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={i} className="crrSquelette" />
+                    ))}
+                  </div>
+                ) : null}
+                {!chargement && !conversations.length && !erreur ? (
+                  <div className="crrVide">
+                    <Icon fafa={dossierCourant?.icone || "faInbox"} width={26} />
+                    <strong>{recherche ? "Aucun résultat" : vue.dossier === "reception" ? "Boîte de réception vide" : "Rien ici"}</strong>
+                    {vue.dossier === "reception" && !boites.length && !recherche ? (
+                      <>
+                        <span>Reliez votre adresse professionnelle pour recevoir et répondre depuis CompanyOS.</span>
+                        <button type="button" className="crrEnvoyer" onClick={() => changerVue({ dossier: "reglages", boiteId: null })}>
+                          Relier une boîte
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+                {conversations.map((c) => {
+                  const envoi = ["envoyes", "brouillons", "programmes"].includes(vue.dossier) || (c.statut !== "recu" && vue.dossier !== "reception");
+                  const qui = envoi ? (c.a?.length ? `À ${c.a.map((x) => nomAffiche(x)).join(", ")}` : "(sans destinataire)") : nomAffiche(c.de);
+                  const personne = envoi ? c.a?.[0] || {} : c.de;
+                  return (
                     <div
-                      key={r.id}
-                      className="crrMessage handcr"
-                      data-actif={selection === r.id || brouillonId === r.id}
-                      data-echec={r.data.envoye === false}
-                      onClick={() => ouvrirFiche(r)}
+                      key={c.filId}
+                      role="button"
+                      tabIndex={0}
+                      className="crrConversation"
+                      data-actif={selection === c.filId}
+                      data-nonlu={c.nonLus > 0}
+                      data-coche={coches.has(c.filId)}
+                      onClick={() => ouvrirConversation(c)}
+                      onKeyDown={(e) => e.key === "Enter" && ouvrirConversation(c)}
+                      onContextMenu={menuConversation(c)}
                     >
-                      <span
-                        className="crrPastille"
-                        style={{ background: D.teinteDe(r.data.a) }}
+                      <button
+                        type="button"
+                        className="crrAvatar crrAvatarListe"
+                        style={{ background: teinte(personne?.email) }}
+                        aria-label={coches.has(c.filId) ? "Désélectionner" : "Sélectionner"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCoches((s) => {
+                            const n = new Set(s);
+                            if (n.has(c.filId)) n.delete(c.filId);
+                            else n.add(c.filId);
+                            return n;
+                          });
+                        }}
                       >
-                        {D.initialesDe(r.data.a)}
-                      </span>
-                      <div className="crrMessageCorps">
-                        <div className="crrMessageHaut">
-                          <span className="crrMessageA">{r.data.a || "(sans destinataire)"}</span>
-                          <span className="crrMessageDate">{D.dateEnvoi(r.data.date)}</span>
+                        {coches.has(c.filId) ? <Icon fafa="faCheck" width={12} /> : initiales(personne)}
+                      </button>
+                      <div className="crrConversationCorps">
+                        <div className="crrConversationHaut">
+                          <span className="crrConversationQui">{qui}</span>
+                          <span className="crrConversationDate">{c.statut === "programme" ? quand(c.envoiLe) : dateListe(c.date)}</span>
+                          <button type="button" className="crrIconeBtn crrPlus" aria-label="Actions" onClick={(e) => (e.stopPropagation(), menuConversation(c)(e))}>
+                            <Icon fafa="faEllipsis" width={12} />
+                          </button>
                         </div>
-                        <div className="crrMessageSujet">
-                          {r.data.sujet || "(sans sujet)"}
-                          {r.data.pieceJointe ? (
-                            <Icon fafa="faPaperclip" width={9} />
-                          ) : null}
+                        <div className="crrConversationSujet">
+                          {c.nonLus > 0 ? <span className="crrPoint" /> : null}
+                          {c.statut === "brouillon" ? <span className="crrEtat" data-ton="brouillon">Brouillon</span> : null}
+                          {c.statut === "echec" ? <span className="crrEtat" data-ton="echec">Non envoyé</span> : null}
+                          {c.statut === "programme" ? <span className="crrEtat" data-ton="programme">Programmé</span> : null}
+                          <span>{c.sujet || "(sans sujet)"}</span>
                         </div>
-                        <div className="crrMessageExtrait">
-                          {D.extraitDe(r.data.extrait || r.data.texte, 70)}
+                        <div className="crrConversationExtrait">{c.extrait}</div>
+                        <div className="crrConversationPuces">
+                          {c.nombre > 1 ? <span className="crrMiniPuce" title="Messages dans la conversation"><Icon fafa="faComments" width={9} /> {c.nombre}</span> : null}
+                          {c.avecPieces ? <span className="crrMiniPuce" title="Pièces jointes"><Icon fafa="faPaperclip" width={9} /> {c.pieces?.length || ""}</span> : null}
+                          {(c.liens || []).slice(0, 2).map((l) => (
+                            <span key={`${l.app}-${l.id}`} className="crrMiniPuce" data-app={l.app} title={l.libelle}>
+                              <Icon fafa={l.app === "projets" ? "faTableColumns" : l.app === "agenda" ? "faCalendarDays" : l.app === "crm" ? "faUserTie" : "faLink"} width={9} />
+                            </span>
+                          ))}
+                          <span className="crrPiedEspace" />
+                          <button
+                            type="button"
+                            className="crrEtoile"
+                            data-actif={!!c.suivi}
+                            aria-label={c.suivi ? "Ne plus suivre" : "Suivre"}
+                            onClick={(e) => (e.stopPropagation(), agir(c.suivi ? "nePlusSuivre" : "suivre", [c.filId]))}
+                          >
+                            <Icon fafa="faStar" reg={c.suivi ? undefined : true} width={11} />
+                          </button>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </Contenu>
+                  );
+                })}
+                {suite ? (
+                  <button
+                    type="button"
+                    className="crrPlusDeResultats"
+                    onClick={async () => {
+                      const r = await api.messagerie.conversations({ ...filtres, avant: suite });
+                      setConversations((l) => [...l, ...(r.conversations || []).filter((x) => !l.some((y) => y.filId === x.filId))]);
+                      setSuite(r.suite || null);
+                    }}
+                  >
+                    Charger plus
+                  </button>
+                ) : null}
               </div>
+              {telephone ? (
+                <button type="button" className="crrFab" aria-label="Écrire" onClick={nouveau}>
+                  <Icon fafa="faPenToSquare" width={16} />
+                </button>
+              ) : null}
             </section>
 
             {/* ---- Lecture / composition ---- */}
-            <section className="crrLecture cosScroll">
-              {composition ? (
+            <section className="crrColonneLecture" aria-label="Lecture">
+              {composition?.mode === "nouveau" ? (
                 <Composeur
-                  brouillon={composition}
-                  setBrouillon={setComposition}
-                  occupe={occupe}
+                  key={composition.cle}
+                  initial={composition.initial}
+                  boites={boites}
                   modeles={modeles}
-                  onModele={appliquerModeleAuBrouillon}
-                  onEnvoyer={() => envoyer(composition)}
-                  onBrouillon={() => enregistrerBrouillon(composition)}
-                  onFermer={() => {
-                    setComposition(null);
-                    setBrouillonId(null);
-                  }}
+                  variante="plein"
+                  onFerme={() => (setComposition(null), chargerListe({ silencieux: true }), chargerBase())}
+                  onEnvoye={apresEnvoi}
+                  onBrouillon={() => (vue.dossier === "brouillons" ? chargerListe({ silencieux: true }) : null, api.messagerie.compteurs().then(setCompteurs).catch(() => {}))}
                 />
-              ) : dossier === "modeles" && (selection === "nouveau-modele" || ouverte) ? (
-                <ModeleEditeur
-                  key={selection}
-                  fiche={selection === "nouveau-modele" ? null : ouverte}
-                  occupe={occupe}
-                  onEnregistrer={(donnees) =>
-                    enregistrerModele(selection === "nouveau-modele" ? null : ouverte.id, donnees)
-                  }
-                  onSupprimer={
-                    selection === "nouveau-modele" ? null : () => supprimerModele(ouverte)
-                  }
-                />
-              ) : ouverte ? (
+              ) : fil ? (
                 <Lecture
-                  fiche={ouverte}
-                  estBrouillon={dossier === "brouillons"}
-                  onRenvoyer={() => renvoyer(ouverte)}
-                  onSupprimer={
-                    dossier === "brouillons" ? () => supprimerBrouillon(ouverte) : null
+                  fil={fil}
+                  conversation={conversationCourante}
+                  telephone={telephone}
+                  onRetour={() => (setSelection(null), setFil(null), setComposition(null))}
+                  onRepondre={(m) => repondre(m)}
+                  onRepondreTous={(m) => repondre(m, true)}
+                  onTransferer={transferer}
+                  onSuivi={(v) => agir(v ? "suivre" : "nePlusSuivre", [fil.filId])}
+                  onAction={(a) => agir(a === "archiver" ? "archiver" : a, [fil.filId])}
+                  contexteOuvert={contexteOuvert}
+                  onContexte={basculerContexte}
+                  enfant={
+                    composition?.mode === "reponse" ? (
+                      <Composeur
+                        key={composition.cle}
+                        initial={composition.initial}
+                        boites={boites}
+                        modeles={modeles}
+                        variante="integre"
+                        onFerme={() => setComposition(null)}
+                        onEnvoye={apresEnvoi}
+                        onBrouillon={() => api.messagerie.compteurs().then(setCompteurs).catch(() => {})}
+                      />
+                    ) : dernier ? (
+                      <button type="button" className="crrRepondreRapide" onClick={() => repondre(dernier)}>
+                        <span className="crrAvatar crrAvatarMini" style={{ background: teinte(session.user?.email) }}>
+                          {initiales({ nom: session.user?.name, email: session.user?.email })}
+                        </span>
+                        Répondre à {nomAffiche(dernier.statut === "recu" ? dernier.de : dernier.a?.[0] || {})}…
+                      </button>
+                    ) : null
                   }
                 />
               ) : (
                 <div className="crrAccueil">
-                  <Icon src="courrier" width={54} />
-                  <div className="crrAccueilTitre">Le courrier de l'entreprise</div>
-                  <p>
-                    Choisissez un message pour le relire, ou écrivez-en un
-                    nouveau. Tout ce qui part d'ici — et des autres
-                    applications — reste archivé à gauche.
-                  </p>
+                  <div className="crrAccueilIcone">
+                    <Icon src="courrier" width={56} />
+                  </div>
+                  <strong>{compteurs.nonLus?.reception ? `${compteurs.nonLus.reception} message${compteurs.nonLus.reception > 1 ? "s" : ""} non lu${compteurs.nonLus.reception > 1 ? "s" : ""}` : "Tout est lu"}</strong>
+                  <span>Choisissez une conversation, ou écrivez un nouveau message.</span>
+                  <div className="crrRaccourcis">
+                    <span><kbd>C</kbd> écrire</span>
+                    <span><kbd>J</kbd>/<kbd>K</kbd> naviguer</span>
+                    <span><kbd>R</kbd> répondre</span>
+                    <span><kbd>E</kbd> archiver</span>
+                    <span><kbd>/</kbd> rechercher</span>
+                  </div>
                 </div>
               )}
             </section>
+
+            {contexteOuvert && fil && correspondant && !telephone ? (
+              <Contexte personne={correspondant} conversation={conversationCourante || { filId: fil.filId }} fil={fil} onFerme={basculerContexte} onLie={() => (chargerFil(fil.filId), chargerListe({ silencieux: true }))} />
+            ) : null}
           </>
         )}
       </div>
     </ModuleWindow>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Lecture d'un message envoyé
-// ---------------------------------------------------------------------------
-
-const Lecture = ({ fiche, estBrouillon, onRenvoyer, onSupprimer }) => {
-  const d = fiche.data;
-  return (
-    <div className="crrLectureCorps">
-      <div className="crrBarreCommandes">
-        <Bouton variante="secondaire" icone="faShare" onClick={onRenvoyer}>
-          {estBrouillon ? "Reprendre" : "Renvoyer"}
-        </Bouton>
-        {onSupprimer ? (
-          <Bouton variante="secondaire" icone="faTrashCan" onClick={onSupprimer}>
-            Supprimer
-          </Bouton>
-        ) : null}
-      </div>
-
-      <h2 className="crrLectureSujet">{d.sujet || "(sans sujet)"}</h2>
-
-      <div className="crrLectureTete">
-        <span className="crrPastille crrPastilleGrande" style={{ background: D.teinteDe(d.a) }}>
-          {D.initialesDe(d.a)}
-        </span>
-        <div className="crrLectureQui">
-          <div className="crrLectureA">À : {d.a}</div>
-          {d.cc ? <div className="crrLectureCc">Cc : {d.cc}</div> : null}
-          <div className="crrLectureDate">{D.dateEnvoi(d.date)}</div>
-        </div>
-        {d.auto ? <span className="crrEtiquetteAuto">{d.auto}</span> : null}
-        {d.envoye === false ? (
-          <span className="crrEtiquetteEchec">Refusé par le relais</span>
-        ) : d.envoye === true ? (
-          <span className="crrEtiquetteOk">
-            <Icon fafa="faCircleCheck" width={11} /> Envoyé
-          </span>
-        ) : null}
-      </div>
-
-      {d.erreur ? <Notice ton="erreur">{d.erreur}</Notice> : null}
-
-      {(d.pieces?.length ? d.pieces : d.pieceJointe ? [d.pieceJointe] : []).length ? (
-        <div className="crrPieces crrPiecesLecture">
-          {(d.pieces?.length ? d.pieces : [d.pieceJointe]).map((nom) => (
-            <div key={nom} className="crrPieceChip">
-              <Icon fafa="faPaperclip" width={11} />
-              <span>{nom}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="crrLectureTexte">{d.texte || d.extrait || ""}</div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Éditeur de modèle
-// ---------------------------------------------------------------------------
-
-const ModeleEditeur = ({ fiche, occupe, onEnregistrer, onSupprimer }) => {
-  const [nom, setNom] = useState(fiche?.data.nom || "");
-  const [sujet, setSujet] = useState(fiche?.data.sujet || "");
-  const [texte, setTexte] = useState(fiche?.data.texte || "");
-  const zone = React.useRef(null);
-
-  /// Insère une variable là où le curseur se trouve dans le corps.
-  const insererVariable = (v) => {
-    const el = zone.current;
-    const jeton = `{{${v}}}`;
-    if (!el) return setTexte((t) => t + jeton);
-    const debut = el.selectionStart ?? texte.length;
-    const fin = el.selectionEnd ?? debut;
-    setTexte(texte.slice(0, debut) + jeton + texte.slice(fin));
-  };
-
-  const pret = nom.trim() && sujet.trim() && texte.trim();
-
-  return (
-    <div className="crrComposeur">
-      <div className="crrBarreCommandes">
-        <Bouton
-          icone="faFloppyDisk"
-          off={occupe || !pret}
-          onClick={() => onEnregistrer({ nom: nom.trim(), sujet: sujet.trim(), texte })}
-        >
-          Enregistrer le modèle
-        </Bouton>
-        {onSupprimer ? (
-          <Bouton variante="secondaire" icone="faTrashCan" onClick={onSupprimer}>
-            Supprimer
-          </Bouton>
-        ) : null}
-      </div>
-
-      <div className="crrChampLigne">
-        <label>Nom</label>
-        <input
-          value={nom}
-          placeholder="Relance de facture, Envoi de devis…"
-          onChange={(e) => setNom(e.target.value)}
-          autoFocus
-        />
-      </div>
-      <div className="crrChampLigne">
-        <label>Objet</label>
-        <input
-          value={sujet}
-          placeholder="Rappel — facture {{numero}}"
-          onChange={(e) => setSujet(e.target.value)}
-        />
-      </div>
-
-      {/* L'aide-mémoire des variables : un clic l'insère au curseur. */}
-      <div className="crrVariables">
-        {D.VARIABLES_MODELES.map((v) => (
-          <span
-            key={v.nom}
-            className="crrVariable handcr"
-            title={v.exemple}
-            onClick={() => insererVariable(v.nom)}
-          >
-            {`{{${v.nom}}}`}
-          </span>
-        ))}
-      </div>
-
-      <textarea
-        ref={zone}
-        className="crrCorps"
-        value={texte}
-        placeholder={"Bonjour {{client}},\n\nSauf erreur de notre part, la facture {{numero}} de {{montant}}, échue le {{echeance}}, reste en attente de règlement…"}
-        onChange={(e) => setTexte(e.target.value)}
-      />
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Composition
-// ---------------------------------------------------------------------------
-
-const Composeur = ({ brouillon, setBrouillon, occupe, modeles = [], onModele, onEnvoyer, onBrouillon, onFermer }) => {
-  const maj = (patch) => setBrouillon((b) => ({ ...b, ...patch }));
-  const invalides = D.adressesInvalides(brouillon.a);
-  const [avecCc, setAvecCc] = useState(Boolean(brouillon.cc));
-
-  // Le carnet d'adresses : les clients du CRM et l'équipe des RH. Chargé
-  // une fois — personne ne ressaisit une adresse que l'OS connaît.
-  const [contacts, setContacts] = useState([]);
-  const [champActif, setChampActif] = useState(null); // "a" | "cc" | null
-  useEffect(() => {
-    (async () => {
-      const [clients, salaries] = await Promise.all([
-        api.records.list("crm", "clients").catch(() => []),
-        api.records.list("rh", "salaries").catch(() => []),
-      ]);
-      setContacts(D.contactsDe({ clients, salaries }));
-    })();
-  }, []);
-
-  const suggestions = champActif
-    ? D.suggererContacts(contacts, brouillon[champActif])
-    : [];
-
-  const choisirSuggestion = (email) => {
-    maj({ [champActif]: D.insererContact(brouillon[champActif], email) });
-  };
-
-  const choisirPieces = async () => {
-    const noeuds = await modal.open({
-      title: "Joindre des fichiers du cloud",
-      render: ({ close }) => <ChoixFichier dejaPris={brouillon.pieces} onValider={close} />,
-    });
-    if (!noeuds?.length) return;
-    // Fusion sans doublon, cinq au plus — la même limite que le serveur.
-    const pieces = [...brouillon.pieces];
-    for (const n of noeuds) {
-      if (!pieces.some((p) => p.id === n.id)) pieces.push({ id: n.id, nom: n.name });
-    }
-    maj({ pieces: pieces.slice(0, 5) });
-  };
-
-  return (
-    <div className="crrComposeur">
-      {/* La barre de commandes d'abord, comme dans les messageries : le
-          geste principal — Envoyer — vit en haut à gauche. */}
-      <div className="crrBarreCommandes">
-        <Bouton icone="faPaperPlane" off={occupe || !D.pretAEnvoyer(brouillon)} onClick={onEnvoyer}>
-          Envoyer
-        </Bouton>
-        <Bouton
-          variante="secondaire"
-          icone="faPaperclip"
-          off={brouillon.pieces.length >= 5}
-          onClick={choisirPieces}
-        >
-          Joindre
-        </Bouton>
-        <Bouton variante="secondaire" icone="faFloppyDisk" off={occupe} onClick={onBrouillon}>
-          Brouillon
-        </Bouton>
-        {modeles.length ? (
-          <Bouton
-            variante="secondaire"
-            icone="faClone"
-            onClick={async () => {
-              const m = await modal.open({
-                title: "Appliquer un modèle",
-                render: ({ close }) => (
-                  <div className="crrChoix cosScroll">
-                    {modeles.map((x) => (
-                      <div key={x.id} className="crrChoixLigne handcr" onClick={() => close(x)}>
-                        <div>
-                          <div className="crrChoixNom">{x.data.nom}</div>
-                          <div className="crrChoixChemin">{x.data.sujet}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ),
-              });
-              if (m) onModele(m);
-            }}
-          >
-            Modèle
-          </Bouton>
-        ) : null}
-        <span className="crrBarreFin">
-          <span className="crrFermer handcr" title="Abandonner" onClick={onFermer}>
-            <Icon fafa="faXmark" width={12} />
-          </span>
-        </span>
-      </div>
-
-      <div className="crrChampBloc">
-        <div className="crrChampLigne" data-invalide={invalides.length > 0}>
-          <label>À</label>
-          <input
-            value={brouillon.a}
-            placeholder="client@entreprise.ci — virgules pour plusieurs destinataires"
-            onChange={(e) => maj({ a: e.target.value })}
-            onFocus={() => setChampActif("a")}
-            onBlur={() => setTimeout(() => setChampActif((c) => (c === "a" ? null : c)), 150)}
-            autoFocus
-          />
-          {!avecCc ? (
-            <span className="crrLien handcr" onClick={() => setAvecCc(true)}>
-              Cc
-            </span>
-          ) : null}
-        </div>
-        {champActif === "a" && suggestions.length ? (
-          <Suggestions liste={suggestions} onChoisir={choisirSuggestion} />
-        ) : null}
-      </div>
-      {invalides.length ? (
-        <div className="crrChampErreur">Adresse à corriger : {invalides.join(", ")}</div>
-      ) : null}
-
-      {avecCc ? (
-        <div className="crrChampBloc">
-          <div className="crrChampLigne">
-            <label>Cc</label>
-            <input
-              value={brouillon.cc}
-              onChange={(e) => maj({ cc: e.target.value })}
-              onFocus={() => setChampActif("cc")}
-              onBlur={() => setTimeout(() => setChampActif((c) => (c === "cc" ? null : c)), 150)}
-            />
-          </div>
-          {champActif === "cc" && suggestions.length ? (
-            <Suggestions liste={suggestions} onChoisir={choisirSuggestion} />
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="crrChampLigne">
-        <label>Objet</label>
-        <input
-          value={brouillon.sujet}
-          placeholder="Facture FAC-2026-0001"
-          onChange={(e) => maj({ sujet: e.target.value })}
-        />
-      </div>
-
-      {brouillon.pieces.length ? (
-        <div className="crrPieces">
-          {brouillon.pieces.map((p) => (
-            <div key={p.id} className="crrPieceChip">
-              <Icon fafa="faPaperclip" width={11} />
-              <span>{p.nom}</span>
-              <span
-                className="crrPieceRetirer handcr"
-                title="Retirer cette pièce jointe"
-                onClick={() => maj({ pieces: brouillon.pieces.filter((x) => x.id !== p.id) })}
-              >
-                <Icon fafa="faXmark" width={10} />
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <textarea
-        className="crrCorps"
-        value={brouillon.texte}
-        placeholder={"Bonjour,\n\n…"}
-        onChange={(e) => maj({ texte: e.target.value })}
-      />
-    </div>
-  );
-};
-
-/// La liste déroulante du carnet d'adresses, sous le champ actif.
-/// `onMouseDown` et pas `onClick` : le blur du champ part avant le clic,
-/// et fermerait la liste juste avant qu'il n'atterrisse.
-const Suggestions = ({ liste, onChoisir }) => (
-  <div className="crrSuggestions">
-    {liste.map((c) => (
-      <div
-        key={c.email}
-        className="crrSuggestion handcr"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          onChoisir(c.email);
-        }}
-      >
-        <span className="crrPastille" style={{ background: D.teinteDe(c.email) }}>
-          {D.initialesDe(c.email)}
-        </span>
-        <div className="crrSuggestionCorps">
-          <span className="crrSuggestionNom">{c.nom}</span>
-          <span className="crrSuggestionEmail">{c.email}</span>
-        </div>
-        <span className="crrSuggestionSource">{c.source}</span>
-      </div>
-    ))}
-  </div>
-);
-
-/// Choix de pièces jointes : les fichiers du cloud, dossiers parcourus
-/// jusqu'à trois niveaux. Un clic coche, le bouton du bas joint le tout —
-/// cinq fichiers au plus, ceux déjà joints étant décomptés.
-const ChoixFichier = ({ dejaPris = [], onValider }) => {
-  const [fichiers, setFichiers] = useState(null);
-  const [coches, setCoches] = useState([]); // nœuds sélectionnés
-  const placesLibres = 5 - dejaPris.length;
-
-  useEffect(() => {
-    (async () => {
-      const trouves = [];
-      const parcourir = async (parentId, prof, chemin) => {
-        const ns = await api.listFiles(parentId).catch(() => []);
-        for (const n of ns) {
-          if (n.type === "FILE") trouves.push({ ...n, chemin });
-          else if (n.type === "FOLDER" && prof < 3) {
-            await parcourir(n.id, prof + 1, chemin ? `${chemin} / ${n.name}` : n.name);
-          }
-        }
-      };
-      await parcourir(null, 0, "");
-      setFichiers(trouves);
-    })();
-  }, []);
-
-  const basculer = (f) =>
-    setCoches((c) => {
-      if (c.some((x) => x.id === f.id)) return c.filter((x) => x.id !== f.id);
-      return c.length < placesLibres ? [...c, f] : c;
-    });
-
-  if (fichiers === null) return <div className="crrChoixVide">Lecture du cloud…</div>;
-  if (!fichiers.length) return <div className="crrChoixVide">Aucun fichier dans le cloud.</div>;
-
-  return (
-    <div className="crrChoixCadre">
-      <div className="crrChoix cosScroll">
-        {fichiers.map((f) => {
-          const pris = dejaPris.some((p) => p.id === f.id);
-          const coche = coches.some((x) => x.id === f.id);
-          return (
-            <div
-              key={f.id}
-              className="crrChoixLigne handcr"
-              data-coche={coche}
-              data-pris={pris}
-              onClick={() => !pris && basculer(f)}
-            >
-              <span className="crrChoixCase">
-                {coche || pris ? <Icon fafa="faCheck" width={10} /> : null}
-              </span>
-              <img src={`img/icon/cos/${iconeDeFichier(f)}.svg`} alt="" width={22} />
-              <div>
-                <div className="crrChoixNom">{f.name}</div>
-                <div className="crrChoixChemin">
-                  {pris ? "Déjà jointe" : f.chemin || "Racine du cloud"}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="crrChoixPied">
-        <span>
-          {coches.length
-            ? `${coches.length} fichier${coches.length > 1 ? "s" : ""} sélectionné${coches.length > 1 ? "s" : ""}`
-            : `Jusqu'à ${placesLibres} fichier${placesLibres > 1 ? "s" : ""}`}
-        </span>
-        <Bouton icone="faPaperclip" off={!coches.length} onClick={() => onValider(coches)}>
-          Joindre
-        </Bouton>
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Réglages SMTP de l'espace
-// ---------------------------------------------------------------------------
-
-const Reglages = ({ modeles = [] }) => {
-  const [reglages, setReglages] = useState(null);
-  const [occupe, setOccupe] = useState(false);
-
-  useEffect(() => {
-    api.courrierReglages().then(setReglages).catch(() => setReglages({}));
-  }, []);
-
-  const maj = (patch) => setReglages((r) => ({ ...r, ...patch }));
-  const majRelances = (patch) =>
-    setReglages((r) => ({ ...r, relances: { ...r.relances, ...patch } }));
-
-  const enregistrer = async () => {
-    setOccupe(true);
-    try {
-      await api.courrierEnregistrerReglages({
-        host: reglages.host || "",
-        port: Number(reglages.port) || 587,
-        user: reglages.user || "",
-        pass: reglages.pass || "",
-        de: reglages.de || "",
-        relances: {
-          actif: Boolean(reglages.relances?.actif),
-          paliers: String(reglages.relances?.paliersTexte ?? (reglages.relances?.paliers || []).join(", "))
-            .split(/[,;]/)
-            .map((n) => parseInt(n, 10))
-            .filter((n) => n > 0),
-          modeleId: reglages.relances?.modeleId || "",
-        },
-      });
-      setReglages(await api.courrierReglages());
-      modal.alert({
-        title: "Réglages enregistrés",
-        message: "Le relais SMTP de l'espace est à jour.",
-        tone: "success",
-      });
-    } catch (e) {
-      modal.alert({ title: "Enregistrement impossible", message: e.message, tone: "error" });
-    } finally {
-      setOccupe(false);
-    }
-  };
-
-  if (!reglages) return <div className="crrChoixVide">Lecture des réglages…</div>;
-
-  return (
-    <div className="crrReglages">
-      <h2 className="crrLectureSujet">Relais SMTP de l'entreprise</h2>
-      <Notice>
-        Les courriels partent de votre domaine, à votre nom. N'importe quel
-        fournisseur convient — Brevo, Resend, un Gmail professionnel.
-        {reglages.relaisPlateforme
-          ? " Sans réglage, le relais de la plateforme prend le relais."
-          : " Sans réglage, aucun envoi ne peut partir."}
-      </Notice>
-
-      <div className="crrGrille">
-        <Champ label="Serveur SMTP">
-          <input
-            value={reglages.host || ""}
-            placeholder="smtp-relay.brevo.com"
-            onChange={(e) => maj({ host: e.target.value })}
-          />
-        </Champ>
-        <Champ label="Port" aide="587 (STARTTLS) ou 465 (TLS)">
-          <input
-            type="number"
-            value={reglages.port || 587}
-            onChange={(e) => maj({ port: e.target.value })}
-          />
-        </Champ>
-        <Champ label="Identifiant">
-          <input
-            value={reglages.user || ""}
-            onChange={(e) => maj({ user: e.target.value })}
-          />
-        </Champ>
-        <Champ
-          label="Mot de passe / clé SMTP"
-          aide={reglages.motDePasseDefini ? "Défini — laissez vide pour le conserver" : "À renseigner"}
-        >
-          <input
-            type="password"
-            value={reglages.pass || ""}
-            placeholder={reglages.motDePasseDefini ? "••••••••" : ""}
-            onChange={(e) => maj({ pass: e.target.value })}
-          />
-        </Champ>
-        <Champ label="Expéditeur" aide="Ce que verront vos destinataires">
-          <input
-            value={reglages.de || ""}
-            placeholder="SunLab <contact@sunlab.ci>"
-            onChange={(e) => maj({ de: e.target.value })}
-          />
-        </Champ>
-      </div>
-
-      <h2 className="crrLectureSujet">Relances de factures</h2>
-      <Notice>
-        Quand une facture échue reste impayée, le rappel part tout seul aux
-        paliers choisis — une seule fois par palier, jamais deux d'un coup,
-        et tout s'archive dans les Envoyés. La Facturation fournit les
-        montants ; personne n'écrit à un client qui a déjà payé.
-      </Notice>
-
-      <div className="crrRelanceLigne">
-        <label className="crrBascule handcr">
-          <input
-            type="checkbox"
-            checked={Boolean(reglages.relances?.actif)}
-            onChange={(e) => majRelances({ actif: e.target.checked })}
-          />
-          <span>Relancer automatiquement les factures impayées</span>
-        </label>
-      </div>
-
-      {reglages.relances?.actif ? (
-        <div className="crrGrille">
-          <Champ label="Paliers (jours après l'échéance)" aide="Séparés par des virgules">
-            <input
-              value={
-                reglages.relances?.paliersTexte ??
-                (reglages.relances?.paliers || [7, 15, 30]).join(", ")
-              }
-              onChange={(e) => majRelances({ paliersTexte: e.target.value })}
-            />
-          </Champ>
-          <Champ label="Modèle du message" aide="Variables {{client}}, {{numero}}, {{montant}}, {{echeance}}">
-            <select
-              value={reglages.relances?.modeleId || ""}
-              onChange={(e) => majRelances({ modeleId: e.target.value })}
-            >
-              <option value="">Message par défaut</option>
-              {modeles.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.data.nom}
-                </option>
-              ))}
-            </select>
-          </Champ>
-        </div>
-      ) : null}
-
-      <div className="crrBarreCommandes">
-        <Bouton icone="faFloppyDisk" off={occupe} onClick={enregistrer}>
-          Enregistrer les réglages
-        </Bouton>
-      </div>
-    </div>
-  );
-};

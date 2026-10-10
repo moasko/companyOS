@@ -35,6 +35,8 @@ import publicsRoutes from "./routes/publics.js";
 import { demarrerEspacePublic, filtrerDomainePublic } from "./espacePublic.js";
 import { arreterDetection, demarrerDetection, filtrerIntrusions, observerReponse } from "./detection.js";
 import { plateformeSecuriteRoutes, securiteRoutes } from "./routes/securite.js";
+import { arreterEnvoisProgrammes, demarrerEnvoisProgrammes } from "./courriels.js";
+import { arreterSynchroCourriel, demarrerSynchroCourriel } from "./courrielsSync.js";
 
 const app = Fastify({
   logger: true,
@@ -201,6 +203,8 @@ const diagnostiquerExploitants = async () => {
 const shutdown = async () => {
   await app.close();
   arreterDetection();
+  arreterSynchroCourriel();
+  arreterEnvoisProgrammes();
   await arreterBus();
   await prisma.$disconnect();
   process.exit(0);
@@ -225,6 +229,10 @@ try {
   demarrerMoteurAutomatisations();
   demarrerEspacePublic();
   demarrerDetection();
+  // La messagerie : relève IMAP des boîtes reliées et envois programmés —
+  // voir src/courrielsSync.js et src/courriels.js.
+  demarrerSynchroCourriel();
+  demarrerEnvoisProgrammes();
   diagnostiquerExploitants();
 } catch (err) {
   app.log.error(err);

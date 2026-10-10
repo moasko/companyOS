@@ -93,6 +93,12 @@ export default async function evenementRoutes(app) {
         if (evt.u === user.id) envoyer("notification", {});
         return;
       }
+      if (evt.type === "courrier") {
+        // Une boîte personnelle ne regarde que son titulaire.
+        if (evt.prive && evt.prive !== user.id) return;
+        envoyer("courrier", { boiteId: evt.boiteId || null, par: evt.par || null });
+        return;
+      }
       if (evt.type === "cloud") {
         // Le Cloud de l'espace est commun à tous ses membres.
         envoyer("cloud", { client: evt.client });
