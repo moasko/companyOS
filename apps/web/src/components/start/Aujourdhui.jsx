@@ -73,8 +73,12 @@ export const Ligne = ({ icone, ton, titre, detail, app, libelle }) => (
 /// Les lignes du jour, déjà filtrées par les droits de la personne.
 /// Partagées par le panneau du bureau et le lanceur du téléphone.
 export const useLignesDuJour = () => {
-  const connecte = useSelector((s) => s.session.status === "authenticated");
-  const { data: installees = [] } = useAppsInstallees();
+  const session = useSelector((s) => s.session);
+  const connecte = session.status === "authenticated";
+  const { data: installees = [] } = useAppsInstallees({
+    userId: connecte ? session.user?.id : null,
+    tenantId: connecte ? session.tenant?.id : null,
+  });
   const { montant } = useDevise();
 
   const ouvrable = useMemo(() => {
