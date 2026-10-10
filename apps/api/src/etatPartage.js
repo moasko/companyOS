@@ -75,7 +75,7 @@ export const compterJetons = (type, cible) =>
 
 export const ECHECS_AVANT_VERROU = 5;
 export const VERROU_MAX_MS = 15 * 60 * 1000;
-const OUBLI_MS = 60 * 60 * 1000;
+export const OUBLI_MS = 60 * 60 * 1000;
 
 /// Millisecondes d'attente restantes avant un nouvel essai (0 : libre).
 export const verrouDe = async (cle) => {

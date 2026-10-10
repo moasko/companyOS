@@ -28,6 +28,12 @@ const DUREE_DROITS_MS = 60_000;
 const FLUX_PAR_PERSONNE = 8;
 
 const ouverts = new Map(); // userId → nombre de flux
+
+/// Flux temps réel ouverts sur cette instance, et personnes distinctes.
+export const fluxOuverts = () => ({
+  flux: [...ouverts.values()].reduce((s, n) => s + n, 0),
+  personnes: ouverts.size,
+});
 const fermetures = new Set();
 
 export default async function evenementRoutes(app) {
@@ -88,6 +94,13 @@ export default async function evenementRoutes(app) {
     };
 
     const desabonner = abonner(async (evt) => {
+      // Ordre de l'exploitant : les droits gardés en mémoire sont oubliés,
+      // et, s'il le demande, chaque navigateur relit ses données.
+      if (evt?.type === "caches") {
+        droits.clear();
+        if (evt.navigateurs) envoyer("caches", { le: evt.le || Date.now() });
+        return;
+      }
       if (!evt || evt.t !== tenantId) return;
       if (evt.type === "notification") {
         if (evt.u === user.id) envoyer("notification", {});

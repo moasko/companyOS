@@ -50,6 +50,7 @@ import { montant as fcfa } from "../../../utils/monnaie";
 import { Stockage } from "./Stockage";
 import { Sante } from "./Sante";
 import { Securite } from "./Securite";
+import { Maintenance } from "./Maintenance";
 import "./plateforme.scss";
 import { manifest as descriptif } from "./manifest";
 
@@ -68,7 +69,21 @@ const SECTIONS = [
   { id: "stockage", label: "Stockage", icone: "faCloud" },
   { id: "sante", label: "Santé", icone: "faHeartPulse" },
   { id: "securite", label: "Sécurité", icone: "faShieldHalved" },
+  { id: "maintenance", label: "Maintenance", icone: "faScrewdriverWrench" },
 ];
+
+const JOUR = 86400_000;
+const joursDepuis = (iso) => (iso ? Math.floor((Date.now() - new Date(iso)) / JOUR) : null);
+
+/// « il y a 3 j », « aujourd'hui », « jamais » : la fraîcheur d'un accès.
+const ilYa = (iso) => {
+  const j = joursDepuis(iso);
+  if (j == null) return "jamais";
+  if (j < 1) return "aujourd'hui";
+  if (j < 2) return "hier";
+  if (j < 60) return `il y a ${j} j`;
+  return `il y a ${Math.round(j / 30)} mois`;
+};
 
 /// Les colonnes triables de la table. `valeur` extrait ce sur quoi on
 /// trie — pas ce qu'on affiche : trier « 1,2 Go » comme du texte le
@@ -80,6 +95,7 @@ const COLONNES = [
   { id: "applications", titre: "Apps", valeur: (e) => e.applications, num: true },
   { id: "fiches", titre: "Fiches", valeur: (e) => e.fiches, num: true },
   { id: "stockage", titre: "Stockage", valeur: (e) => Number(e.usedBytes) },
+  { id: "dernierAcces", titre: "Dernier accès", valeur: (e) => (e.dernierAcces ? new Date(e.dernierAcces).getTime() : 0), num: true },
   { id: "creeLe", titre: "Créé le", valeur: (e) => new Date(e.creeLe).getTime(), num: true },
 ];
 
@@ -94,6 +110,16 @@ const alerteDe = (e) => {
   }
   if (part >= 0.85) {
     return { ton: "attention", titre: "Quota bientôt atteint", aide: `${Math.round(part * 100)} % utilisés.` };
+  }
+  // Un client qui ne revient plus : on le perd bien avant qu'il ne
+  // résilie. Seulement pour un espace qui a vraiment servi.
+  const absent = joursDepuis(e.dernierAcces);
+  if (e.fiches > 0 && !e.suspendu && (absent == null || absent >= 30)) {
+    return {
+      ton: "attention",
+      titre: "Client silencieux",
+      aide: absent == null ? "Personne ne s'est jamais reconnecté." : `Aucune connexion depuis ${absent} jours.`,
+    };
   }
   if (e.utilisateurs <= 1 && e.fiches === 0) {
     return { ton: "info", titre: "Espace inoccupé", aide: "Créé mais jamais utilisé — un accompagnement ferait la différence." };
@@ -145,7 +171,7 @@ function PlateformeApp() {
   }, []);
   const etat = useChargement(ouvert, charger);
 
-  const tous = donnees?.espaces || [];
+  const tous = useMemo(() => donnees?.espaces || [], [donnees]);
 
   const surveiller = useMemo(
     () => tous.map((e) => ({ espace: e, alerte: alerteDe(e) })).filter((x) => x.alerte),
@@ -377,6 +403,9 @@ function PlateformeApp() {
                         donnees={donnees}
                         parFormule={parFormule}
                         surveiller={surveiller}
+                        sante={sante}
+                        securite={securite}
+                        onAller={setSection}
                         onVoirEspaces={() => { setFiltre("alerte"); setSection("espaces"); }}
                       />
                     ) : null}
@@ -430,6 +459,8 @@ function PlateformeApp() {
                       )
                     ) : null}
 
+                    {section === "maintenance" ? <Maintenance /> : null}
+
                     {section === "stockage" ? (
                       stockage ? (
                         <Stockage config={stockage} onRecharger={etat.rafraichir} />
@@ -456,7 +487,81 @@ function PlateformeApp() {
 // Tableau de bord
 // ---------------------------------------------------------------------------
 
-const Bord = ({ donnees, parFormule, surveiller, onVoirEspaces }) => (
+/// Les inscriptions des six derniers mois, du plus ancien au plus récent.
+const inscriptionsParMois = (espaces) => {
+  const mois = [];
+  const d = new Date();
+  for (let i = 5; i >= 0; i -= 1) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    mois.push({
+      cle: `${m.getFullYear()}-${m.getMonth()}`,
+      libelle: m.toLocaleDateString("fr-FR", { month: "short" }),
+      n: 0,
+    });
+  }
+  for (const e of espaces) {
+    const c = new Date(e.creeLe);
+    const ligne = mois.find((m) => m.cle === `${c.getFullYear()}-${c.getMonth()}`);
+    if (ligne) ligne.n += 1;
+  }
+  return mois;
+};
+
+/// L'état des trois chantiers de l'exploitant, en une ligne chacun.
+const etatsPlateforme = (sante, securite) => {
+  const etats = [];
+  if (sante) {
+    const s = sante.sauvegardes;
+    const age = s.derniereBase ? (Date.now() - new Date(s.derniereBase.debut)) / 3600_000 : Infinity;
+    etats.push({
+      section: "sante",
+      icone: "faDatabase",
+      titre: "Sauvegardes",
+      ton: !s.active || age > 36 ? "danger" : s.horsSitePossible ? "ok" : "attention",
+      texte: !s.active
+        ? "désactivées"
+        : age > 36
+          ? "base non sauvegardée depuis plus d'un jour"
+          : s.horsSitePossible
+            ? "à jour, copiées hors site"
+            : "à jour, sur le serveur seulement",
+    });
+    etats.push({
+      section: "sante",
+      icone: "faBug",
+      titre: "Erreurs",
+      ton: sante.erreurs.aTraiter ? "attention" : "ok",
+      texte: sante.erreurs.aTraiter ? `${sante.erreurs.aTraiter} à traiter` : "aucune à traiter",
+    });
+  }
+  if (securite) {
+    const graves = securite.resume?.ouvertesGraves || 0;
+    etats.push({
+      section: "securite",
+      icone: "faShieldHalved",
+      titre: "Sécurité",
+      ton: graves ? "danger" : "ok",
+      texte: graves
+        ? `${graves} alerte${graves > 1 ? "s" : ""} grave${graves > 1 ? "s" : ""}`
+        : `${securite.ipsBloquees?.length || 0} adresse(s) bloquée(s), rien de grave`,
+    });
+  }
+  return etats;
+};
+
+const Bord = ({ donnees, parFormule, surveiller, sante, securite, onAller, onVoirEspaces }) => {
+  const espaces = donnees.espaces || [];
+  const mois = inscriptionsParMois(espaces);
+  const maxMois = Math.max(1, ...mois.map((m) => m.n));
+  const nouveaux30 = espaces.filter((e) => joursDepuis(e.creeLe) < 30).length;
+  const actifs7 = espaces.filter((e) => {
+    const j = joursDepuis(e.dernierAcces);
+    return j != null && j < 7;
+  }).length;
+  const payants = espaces.filter((e) => e.prixMois > 0).length;
+  const etats = etatsPlateforme(sante, securite);
+
+  return (
   <>
     <header className="pltTete">
       <div>
@@ -471,11 +576,15 @@ const Bord = ({ donnees, parFormule, surveiller, onVoirEspaces }) => (
     <div className="pltChiffres">
       <div className="pltChiffre" data-fort="true">
         <b>{fcfa(donnees.totaux.mrr)}</b>
-        <span>revenu mensuel</span>
+        <span>revenu mensuel · {payants} payant{payants > 1 ? "s" : ""}</span>
       </div>
       <div className="pltChiffre">
         <b>{donnees.totaux.espaces}</b>
-        <span>espaces clients</span>
+        <span>espaces clients · +{nouveaux30} sur 30 j</span>
+      </div>
+      <div className="pltChiffre">
+        <b>{actifs7}</b>
+        <span>espaces actifs sur 7 jours</span>
       </div>
       <div className="pltChiffre">
         <b>{donnees.totaux.utilisateurs}</b>
@@ -486,6 +595,40 @@ const Bord = ({ donnees, parFormule, surveiller, onVoirEspaces }) => (
         <span>stockage servi</span>
       </div>
     </div>
+
+    {etats.length ? (
+      <div className="pltEtats">
+        {etats.map((e) => (
+          <button key={e.titre} type="button" className="pltEtat" data-ton={e.ton} onClick={() => onAller(e.section)}>
+            <span className="pltEtatIcone"><Icon fafa={e.icone} width={13} /></span>
+            <span>
+              <b>{e.titre}</b>
+              <small>{e.texte}</small>
+            </span>
+            <Icon fafa="faChevronRight" width={9} />
+          </button>
+        ))}
+      </div>
+    ) : null}
+
+    <section className="pltBloc">
+      <div className="pltBlocTete">
+        <div>
+          <h3>Inscriptions</h3>
+          <p className="pltAide">Nouveaux espaces par mois, sur six mois.</p>
+        </div>
+      </div>
+      <div className="pltMois" role="img"
+           aria-label={mois.map((m) => `${m.libelle} : ${m.n}`).join(", ")}>
+        {mois.map((m) => (
+          <div key={m.cle} className="pltMoisBarre">
+            <em>{m.n || ""}</em>
+            <i style={{ height: `${(m.n / maxMois) * 100}%` }} data-vide={!m.n || undefined} />
+            <span>{m.libelle}</span>
+          </div>
+        ))}
+      </div>
+    </section>
 
     {/* D'où vient le revenu. Une somme seule ne dit pas si elle tient à un
         seul client ou à trente. */}
@@ -555,7 +698,8 @@ const Bord = ({ donnees, parFormule, surveiller, onVoirEspaces }) => (
       )}
     </section>
   </>
-);
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Espaces clients
@@ -705,6 +849,9 @@ const Espaces = ({
                         {formatOctets(e.usedBytes)} / {formatOctets(e.quota)}
                       </span>
                     </div>
+                  </td>
+                  <td data-num title={e.dernierAcces ? new Date(e.dernierAcces).toLocaleString("fr-FR") : undefined}>
+                    {ilYa(e.dernierAcces)}
                   </td>
                   <td data-num>{new Date(e.creeLe).toLocaleDateString("fr-FR")}</td>
                   <td>

@@ -20,6 +20,8 @@ export const EVT_NOTIFICATION = "companyos:notification-serveur";
 export const EVT_ETAT = "companyos:temps-reel";
 export const EVT_CLOUD = "companyos:cloud";
 export const EVT_COURRIER = "companyos:courrier";
+/// L'exploitant a vidé les caches : ce navigateur oublie les siens.
+export const EVT_CACHES = "companyos:caches";
 
 let source = null;
 let connecte = false;
@@ -90,6 +92,10 @@ const ouvrir = () => {
     window.dispatchEvent(new CustomEvent(EVT_COURRIER, { detail: lire(e) }));
   });
 
+  source.addEventListener("caches", () => {
+    window.dispatchEvent(new Event(EVT_CACHES));
+  });
+
   source.addEventListener("notification", () => {
     window.dispatchEvent(new Event(EVT_NOTIFICATION));
   });
@@ -116,8 +122,10 @@ export const synchroniserTempsReel = () => {
 };
 
 /// « crm/clients » correspond-il à l'un des motifs (« crm/* », « crm/clients ») ?
+/// Un module « * » (caches vidés : tout a pu changer) correspond à tout.
 export const correspond = (motifs, module, collection) =>
   (motifs || []).some((m) => {
+    if (module === "*") return true;
     const [mod, col = "*"] = String(m).split("/");
     return mod === module && (col === "*" || col === collection);
   });

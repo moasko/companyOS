@@ -369,6 +369,11 @@ export const api = {
   securiteTraiterTout: () => request("/securite/alertes/traiter-tout", { method: "POST", body: {} }),
   /// Santé de la plateforme : sauvegardes et erreurs.
   plateformeSante: () => request("/plateforme/sante"),
+  /// Maintenance : état du serveur, caches, données expirées.
+  plateformeMaintenance: () => request("/plateforme/maintenance"),
+  plateformeViderCaches: ({ noms = [], navigateurs = false } = {}) =>
+    request("/plateforme/caches/vider", { method: "POST", body: { noms, navigateurs } }),
+  plateformePurge: () => request("/plateforme/purge", { method: "POST", body: {} }),
   plateformeSauvegarder: (type) =>
     request("/plateforme/sauvegardes", { method: "POST", body: { type } }),
   plateformeErreurResolue: (id, resolue) =>
@@ -537,5 +542,7 @@ export const api = {
     /// Une écriture faite hors de `api.records` (import, moteur serveur
     /// déclenché à la main) : oublier ce qu'on savait de la collection.
     invalider: (module, collection) => listes.invalider(module, collection),
+    /// Oublie toutes les listes (ordre de vider les caches).
+    viderTout: () => listes.vider(),
   },
 };

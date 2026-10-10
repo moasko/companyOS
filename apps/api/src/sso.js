@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createLocalJWKSet, jwtVerify } from "jose";
 import { lireJsonExterne } from "./web.js";
+import { declarerCache } from "./caches.js";
 
 /// Authentification unique (OpenID Connect) — Microsoft Entra ID, Google
 /// Workspace, Okta, Keycloak, Auth0… : tout fournisseur conforme.
@@ -78,6 +79,13 @@ export const urlAutorisation = (decouverte, { clientId, redirection, etat, nonce
 
 const cache = new Map(); // url → { le, valeur }
 const DUREE_CACHE_MS = 60 * 60 * 1000;
+
+declarerCache("sso", {
+  libelle: "Fournisseurs SSO",
+  description: "Documents de découverte OpenID et clés publiques des fournisseurs d'identité (une heure).",
+  taille: () => cache.size,
+  vider: () => cache.clear(),
+});
 
 const enCache = async (cle, charger, { forcer = false } = {}) => {
   const c = cache.get(cle);
