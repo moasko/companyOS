@@ -43,6 +43,7 @@ const REJOUABLES = [
   "20261010180000_versions_fiches",
   "20261010200000_fichiers_versions_partages",
   "20261010210000_sso",
+  "20261010230000_liens_publics",
 ];
 
 const prisma = new PrismaClient();

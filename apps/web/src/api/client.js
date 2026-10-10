@@ -241,6 +241,9 @@ export const api = {
   urlExportEspace: () => `${BASE_URL}/api/conformite/export`,
   reglagesConformite: () => request("/conformite/reglages"),
   enregistrerReglagesConformite: (r) => request("/conformite/reglages", { method: "PUT", body: r }),
+  declarerDomainePublic: (domaine) => request("/conformite/domaine", { method: "PUT", body: { domaine } }),
+  verifierDomainePublic: () => request("/conformite/domaine/verifier", { method: "POST", body: {} }),
+  retirerDomainePublic: () => request("/conformite/domaine", { method: "DELETE" }),
   // Versions et liens de partage des fichiers.
   versionsFichier: (id) => request(`/files/${id}/versions`),
   urlVersionFichier: (id, vid) => `${BASE_URL}/api/files/${id}/versions/${vid}/download`,
@@ -297,6 +300,7 @@ export const api = {
   campagnesPause: (id) => request(`/campagnes/${id}/pause`, { method: "POST", body: {} }),
   campagnesReprendre: (id) => request(`/campagnes/${id}/reprendre`, { method: "POST", body: {} }),
   campagnesFormulaire: () => request("/campagnes/formulaire"),
+  regenererFormulaire: () => request("/campagnes/formulaire/regenerer", { method: "POST", body: {} }),
 
   // Console de l'exploitant du SaaS — réservée aux emails PLATFORM_ADMINS.
   plateforme: () => request("/plateforme"),

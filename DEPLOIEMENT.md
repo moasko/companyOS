@@ -280,3 +280,22 @@ par mot de passe (accès de secours).
 **Historique des fiches** : 50 versions par fiche, fiches supprimées
 récupérables 180 jours (purge automatique). **Versions de fichiers** : 10
 par fichier, comptées dans le quota.
+
+## Domaine personnalisé des liens publics
+
+Un espace peut faire partir ses liens publics (partage de fichiers,
+formulaire d'inscription, désinscription et suivi des campagnes) sous son
+nom, ex. `liens.entreprise.ci` (Paramètres › Données et conformité) :
+
+1. Le client crée chez son hébergeur DNS un **CNAME** `liens.entreprise.ci`
+   → l'hôte de l'API (ex. `api.companyos.fr`).
+2. L'exploitant ajoute ce domaine au service **api** dans Dokploy (Domains) :
+   Traefik obtient le certificat https.
+3. Le client clique « Vérifier » : l'API s'appelle par ce domaine et doit y
+   trouver une preuve qu'elle seule sait calculer. Les nouveaux liens
+   l'utilisent ensuite.
+
+Sur un domaine personnalisé, seules les routes publiques répondent
+(`/api/public/…` et les pages publiques des campagnes) : la connexion,
+l'espace de travail et les fichiers privés restent sur l'adresse de la
+plateforme. Un domaine n'appartient qu'à un espace.

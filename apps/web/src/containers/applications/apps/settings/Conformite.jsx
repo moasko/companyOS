@@ -35,12 +35,39 @@ export const SectionConformite = ({ section, session, flash }) => {
   const [resultat, setResultat] = useState(null);
   const [collection, setCollection] = useState(`${COLLECTIONS[0].module}/${COLLECTIONS[0].collection}`);
   const [reglages, setReglages] = useState(null);
+  const [domaine, setDomaine] = useState("");
   const visible = section === "conformite";
 
   useEffect(() => {
     if (!visible) return;
     api.reglagesConformite().then(setReglages).catch(() => setReglages(null));
   }, [visible]);
+
+  const declarerDomaine = () =>
+    agir("domaine", async () => {
+      const r = await api.declarerDomainePublic(domaine);
+      setReglages((x) => ({ ...x, ...r }));
+      setDomaine("");
+    });
+
+  const verifierDomaine = () =>
+    agir("verification", async () => {
+      const r = await api.verifierDomainePublic();
+      setReglages((x) => ({ ...x, ...r }));
+      flash("Domaine vérifié : les nouveaux liens publics l'utilisent");
+    });
+
+  const retirerDomaine = () =>
+    agir("retrait", async () => {
+      const ok = await modal.confirm({
+        title: "Revenir à l'adresse de la plateforme",
+        message: "Les nouveaux liens utiliseront de nouveau l'adresse de CompanyOS. Les liens déjà envoyés sous votre domaine fonctionneront tant que celui-ci pointe vers la plateforme.",
+        confirmLabel: "Retirer",
+      });
+      if (!ok) return;
+      await api.retirerDomainePublic();
+      setReglages((x) => ({ ...x, domainePublic: null, domainePublicVerifie: null }));
+    });
 
   const basculerPartage = () =>
     agir("partage", async () => {
@@ -133,6 +160,49 @@ export const SectionConformite = ({ section, session, flash }) => {
               <Toggle on={!!reglages.partagePublic} onClick={occupe ? undefined : basculerPartage} />
             </Row>
           </div>
+
+          <div className="setSubTitle">Domaine des liens publics</div>
+          <p className="setHint">
+            Faites partir les liens publics (partage de fichiers, formulaire d'inscription, désinscription et suivi des campagnes)
+            sous votre propre nom, par exemple <b>liens.votre-entreprise.ci</b> : vos clients reconnaissent l'expéditeur, et un e-mail
+            imité se repère plus facilement. Sur ce domaine, seules les pages publiques répondent.
+          </p>
+          {reglages.domainePublic ? (
+            <div className="setList">
+              <Row
+                title={reglages.domainePublic}
+                desc={
+                  reglages.domainePublicVerifie
+                    ? `Vérifié — les nouveaux liens l'utilisent.`
+                    : `En attente : créez chez votre hébergeur DNS un enregistrement CNAME « ${reglages.domainePublic} → ${reglages.cibleDns} », faites ajouter le domaine (certificat https) côté serveur, puis vérifiez.`
+                }
+              >
+                <span style={{ display: "inline-flex", gap: 8 }}>
+                  {!reglages.domainePublicVerifie ? (
+                    <div className="setPrimary handcr" data-off={!!occupe} onClick={verifierDomaine}>
+                      {occupe === "verification" ? "Vérification…" : "Vérifier"}
+                    </div>
+                  ) : null}
+                  <div className="setBtnGhost setDanger handcr" data-off={!!occupe} onClick={retirerDomaine}>
+                    Retirer
+                  </div>
+                </span>
+              </Row>
+            </div>
+          ) : (
+            <div className="setCard setConformiteRecherche">
+              <input
+                className="setInput"
+                value={domaine}
+                placeholder="liens.votre-entreprise.ci"
+                onChange={(e) => setDomaine(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && domaine.trim() && declarerDomaine()}
+              />
+              <div className="setPrimary handcr" data-off={!!occupe || !domaine.trim()} onClick={declarerDomaine}>
+                {occupe === "domaine" ? "…" : "Utiliser ce domaine"}
+              </div>
+            </div>
+          )}
         </>
       ) : null}
 

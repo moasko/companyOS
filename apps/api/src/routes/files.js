@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { prisma, serialize } from "../db.js";
 import { creerJeton, lireJeton } from "../etatPartage.js";
 import { authenticate, hashPassword } from "../auth.js";
-import { env } from "../env.js";
+import { basePublique } from "../espacePublic.js";
 import { journaliser } from "../audit.js";
 import { consommerQuota, ecrireOuNettoyer, piloteEcriture, piloteLecture } from "../storage.js";
 import { typeDeFlux, typeNeutralise } from "../mimetype.js";
@@ -843,7 +843,7 @@ export default async function fileRoutes(app) {
       jours: parsed.data.joursValidite,
       protege: !!parsed.data.motDePasse,
     });
-    const base = env.apiPublique || `${request.protocol}://${request.headers.host}`;
+    const base = await basePublique(request.tenantId);
     return reply.code(201).send(serialize({ ...enLien(lien), url: `${base.replace(/\/+$/, "")}/api/public/partages/${jeton}` }));
   });
 

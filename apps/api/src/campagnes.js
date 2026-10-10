@@ -21,6 +21,7 @@
 // List-Unsubscribe que Gmail et Outlook exigent des envois de masse.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { baseDefaut, basePublique, selFormulaire } from "./espacePublic.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
@@ -97,23 +98,30 @@ export const verifierJeton = (jeton) => {
   }
 };
 
-const baseApi = () => env.apiPublique || `http://localhost:${env.port}`;
+// L'adresse des liens publics dépend de l'espace (domaine personnalisé
+// éventuel) : elle est calculée une fois par envoi (`ctx.base`), voir
+// src/espacePublic.js.
 
 /// Le logo de l'espace, servi aux boîtes de réception.
 export const signatureLogo = (tenantId) => signer(`logo.${tenantId}`);
-const urlLogo = (tenantId) => `${baseApi()}/api/campagnes/logo?e=${tenantId}&s=${signatureLogo(tenantId)}`;
+const urlLogo = (base, tenantId) => `${base}/api/campagnes/logo?e=${tenantId}&s=${signatureLogo(tenantId)}`;
 
 /// Une image du Cloud posée dans un message. Le Cloud est privé : on sert
 /// cette image-là, et elle seule, par une adresse signée.
 export const signatureImage = (tenantId, nodeId) => signer(`image.${tenantId}.${nodeId}`);
-const urlImage = (tenantId) => (bloc) =>
+const urlImage = (base, tenantId) => (bloc) =>
   bloc.nodeId
-    ? `${baseApi()}/api/campagnes/image?e=${tenantId}&f=${bloc.nodeId}&s=${signatureImage(tenantId, bloc.nodeId)}`
+    ? `${base}/api/campagnes/image?e=${tenantId}&f=${bloc.nodeId}&s=${signatureImage(tenantId, bloc.nodeId)}`
     : bloc.url;
 
 /// Le formulaire d'inscription public d'un espace.
-export const signatureFormulaire = (tenantId) => signer(`inscription.${tenantId}`);
-export const urlFormulaire = (tenantId) => `${baseApi()}/api/campagnes/inscription?e=${tenantId}&s=${signatureFormulaire(tenantId)}`;
+/// Le sel de l'espace entre dans la signature : « Régénérer » le change, et
+/// l'ancien lien cesse de valoir. Sans sel (espace qui n'a jamais
+/// régénéré), la signature d'origine reste valable.
+export const signatureFormulaire = (tenantId, sel = null) =>
+  signer(sel ? `inscription.${tenantId}.${sel}` : `inscription.${tenantId}`);
+export const urlFormulaire = async (tenantId) =>
+  `${await basePublique(tenantId)}/api/campagnes/inscription?e=${tenantId}&s=${signatureFormulaire(tenantId, await selFormulaire(tenantId))}`;
 export const jetonConfirmation = (tenantId, clientId) => {
   const corps = `${tenantId}.confirmer.${clientId}`;
   return Buffer.from(`${corps}.${signer(corps)}`).toString("base64url");
@@ -146,12 +154,12 @@ export const piedDe = (e = {}, nom = "") =>
     e.telephone || "",
   ].filter(Boolean).join(" · ");
 
-const liens = (tenantId, campagneId, clientId) => {
+const liens = (base, tenantId, campagneId, clientId) => {
   const jeton = jetonSuivi(tenantId, campagneId, clientId);
   return {
-    desinscription: `${baseApi()}/api/campagnes/desinscription?jeton=${jeton}`,
-    pixel: `${baseApi()}/api/campagnes/ouverture?jeton=${jeton}`,
-    clic: (i) => `${baseApi()}/api/campagnes/clic?jeton=${jeton}&l=${i}`,
+    desinscription: `${base}/api/campagnes/desinscription?jeton=${jeton}`,
+    pixel: `${base}/api/campagnes/ouverture?jeton=${jeton}`,
+    clic: (i) => `${base}/api/campagnes/clic?jeton=${jeton}&l=${i}`,
   };
 };
 
@@ -258,6 +266,7 @@ const contexteEnvoi = async (tenantId) => {
   return {
     tenantId,
     tenant,
+    base: await basePublique(tenantId),
     transport,
     expediteur: de || `${tenant?.name || "CompanyOS"} <${smtpUser || "no-reply@localhost"}>`,
     entreprise,
@@ -271,13 +280,14 @@ const contexteEnvoi = async (tenantId) => {
 export const rendreMessage = (ctx, message, dest, { ficheId = "", suivi = true, extra = {} } = {}) => {
   const variables = { ...variablesPour(dest, ctx.nomEntreprise), ...extra };
   const p = personnaliser({ ...message, sujet: sujetPour(message, dest) }, variables);
-  const l = suivi ? liens(ctx.tenantId, ficheId, dest.clientId) : null;
+  const base = ctx.base || baseDefaut();
+  const l = suivi ? liens(base, ctx.tenantId, ficheId, dest.clientId) : null;
   const lien = l ? (i) => l.clic(i) : (_i, url) => url;
   const options = {
     entreprise: ctx.nomEntreprise,
     lien,
-    image: urlImage(ctx.tenantId),
-    logo: ctx.entreprise.logo ? urlLogo(ctx.tenantId) : "",
+    image: urlImage(base, ctx.tenantId),
+    logo: ctx.entreprise.logo ? urlLogo(base, ctx.tenantId) : "",
     pied: ctx.pied,
     lienDesinscription: l?.desinscription || "",
     pixel: l?.pixel || "",

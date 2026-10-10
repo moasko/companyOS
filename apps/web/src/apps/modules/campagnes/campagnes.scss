@@ -269,6 +269,18 @@ body[data-theme="dark"] {
     &:hover { text-decoration: underline; }
   }
 
+  .cmpRegenerer {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cm-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; }
+  }
+
   .cmpLienTexte {
     padding: 0;
     border: 0;
