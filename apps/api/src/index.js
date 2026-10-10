@@ -31,6 +31,8 @@ import automatisationRoutes from "./routes/automatisations.js";
 import conformiteRoutes from "./routes/conformite.js";
 import partagesPublicsRoutes from "./routes/partagesPublics.js";
 import ssoRoutes from "./routes/sso.js";
+import publicsRoutes from "./routes/publics.js";
+import { demarrerEspacePublic, filtrerDomainePublic } from "./espacePublic.js";
 
 const app = Fastify({
   logger: true,
@@ -55,6 +57,10 @@ const app = Fastify({
 // que l'API et doit pouvoir afficher les images et les vidéos servies par
 // `/api/files`. Le contrôle d'accès reste porté par le jeton, pas par
 // l'en-tête.
+// Domaines personnalisés des espaces (liens publics) : seules les routes
+// publiques y répondent — voir src/espacePublic.js.
+app.addHook("onRequest", filtrerDomainePublic);
+
 await app.register(helmet, {
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: false,
@@ -151,6 +157,7 @@ await app.register(automatisationRoutes, { prefix: "/api/automatisations" });
 await app.register(conformiteRoutes, { prefix: "/api/conformite" });
 await app.register(partagesPublicsRoutes, { prefix: "/api/public/partages" });
 await app.register(ssoRoutes, { prefix: "/api/auth/sso" });
+await app.register(publicsRoutes, { prefix: "/api/public" });
 
 /// Dit, dans les journaux du conteneur, si chaque adresse de
 /// PLATFORM_ADMINS a bien un compte qui lui ouvrira la console. « Je suis
@@ -206,6 +213,7 @@ try {
   // automatisations entre apps — voir src/evenements.js.
   await demarrerBus();
   demarrerMoteurAutomatisations();
+  demarrerEspacePublic();
   diagnostiquerExploitants();
 } catch (err) {
   app.log.error(err);

@@ -12,6 +12,8 @@
 import { prisma } from "../db.js";
 import { authenticate, exigerRole } from "../auth.js";
 import { env } from "../env.js";
+import { journaliser } from "../audit.js";
+import { basePublique, regenererSelFormulaire, selFormulaire } from "../espacePublic.js";
 import { creerTransporteur, creerTransporteurEspace, envoyerVia } from "../mail.js";
 import { piloteLecture } from "../storage.js";
 import { compterEnvois, peutEnvoyer } from "../quota-mail.js";
@@ -232,7 +234,7 @@ export default async function campagnesRoutes(app) {
   app.get("/inscription", async (request, reply) => {
     const langue = langueDe(request);
     const { e, s: sig } = request.query || {};
-    if (!e || !signatureEgale(sig, signatureFormulaire(String(e)))) return page(reply.code(404), langue, T[langue].invalide);
+    if (!e || !signatureEgale(sig, signatureFormulaire(String(e), await selFormulaire(String(e))))) return page(reply.code(404), langue, T[langue].invalide);
     const entreprise = await ficheEntreprise(String(e));
     const tenant = await prisma.tenant.findUnique({ where: { id: String(e) } });
     const nom = entreprise.nom || tenant?.name || "";
@@ -252,7 +254,7 @@ export default async function campagnesRoutes(app) {
     const langue = langueDe(request);
     const t = T[langue];
     const { e, s: sig } = request.query || {};
-    if (!e || !signatureEgale(sig, signatureFormulaire(String(e)))) return page(reply.code(404), langue, t.invalide);
+    if (!e || !signatureEgale(sig, signatureFormulaire(String(e), await selFormulaire(String(e))))) return page(reply.code(404), langue, t.invalide);
     const corps = request.body || {};
     // Le champ piège : invisible pour un humain, rempli par les robots. On
     // leur répond comme à tout le monde, sans rien enregistrer.
@@ -332,7 +334,7 @@ export default async function campagnesRoutes(app) {
       .replace(/[\r\n]+/g, " ")
       .trim()
       .slice(0, 80);
-    const lien = `${env.apiPublique || `http://localhost:${env.port}`}/api/campagnes/inscription/confirmer?jeton=${jetonConfirmation(tenantId, fiche.id)}`;
+    const lien = `${await basePublique(tenantId)}/api/campagnes/inscription/confirmer?jeton=${jetonConfirmation(tenantId, fiche.id)}`;
     const appCourrier = await prisma.app.findFirst({ where: { slug: "courrier", tenantId: null } });
     const installation = appCourrier ? await prisma.installation.findUnique({ where: { tenantId_appId: { tenantId, appId: appCourrier.id } } }) : null;
     const smtp = installation?.settings?.smtp;
@@ -382,7 +384,15 @@ export default async function campagnesRoutes(app) {
     prive.addHook("preHandler", authenticate);
 
     /// L'adresse publique du formulaire d'inscription de l'espace.
-    prive.get("/formulaire", async (request) => ({ url: urlFormulaire(request.tenantId) }));
+    prive.get("/formulaire", async (request) => ({ url: await urlFormulaire(request.tenantId) }));
+
+    /// Nouveau lien : l'ancien (collé sur un site, aspiré par un robot)
+    /// cesse aussitôt de fonctionner.
+    prive.post("/formulaire/regenerer", { preHandler: exigerRole("ADMIN") }, async (request) => {
+      await regenererSelFormulaire(request.tenantId);
+      await journaliser(request, "campagnes.formulaire.regeneration");
+      return { url: await urlFormulaire(request.tenantId) };
+    });
 
     /// Le vrai rendu, aux membres de l'équipe seulement.
     prive.post("/test", { preHandler: exigerRole("ADMIN"), config: { rateLimit: { max: 20, timeWindow: "10 minutes" } }, bodyLimit: 1024 * 1024 }, async (request, reply) => {

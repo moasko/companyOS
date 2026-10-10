@@ -7,6 +7,7 @@ import { authenticate, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { publierFiche } from "../evenements.js";
 import { sansSecrets } from "./apps.js";
+import { baseDefaut, invaliderEspacePublic, normaliserDomaine, verifierDomaine } from "../espacePublic.js";
 
 /// Conformité RGPD : droit d'accès, portabilité, droit à l'effacement.
 ///
@@ -195,8 +196,55 @@ export default async function conformiteRoutes(app) {
   // ---- Réglages de l'espace -----------------------------------------------
 
   app.get("/reglages", async (request) => {
-    const t = await prisma.tenant.findUnique({ where: { id: request.tenantId }, select: { partagePublic: true } });
-    return { partagePublic: t?.partagePublic !== false };
+    const t = await prisma.tenant.findUnique({
+      where: { id: request.tenantId },
+      select: { partagePublic: true, domainePublic: true, domainePublicVerifie: true },
+    });
+    return {
+      partagePublic: t?.partagePublic !== false,
+      domainePublic: t?.domainePublic || null,
+      domainePublicVerifie: t?.domainePublicVerifie || null,
+      // La cible du CNAME : l'adresse de l'API de la plateforme.
+      cibleDns: new URL(baseDefaut()).hostname,
+    };
+  });
+
+  // ---- Domaine des liens publics -------------------------------------------
+
+  app.put("/domaine", { preHandler: exigerRole("ADMIN") }, async (request, reply) => {
+    const domaine = normaliserDomaine(request.body?.domaine);
+    if (!domaine) return reply.code(400).send({ error: "Nom de domaine invalide (ex. liens.entreprise.ci)." });
+    if (domaine === new URL(baseDefaut()).hostname) return reply.code(400).send({ error: "C'est déjà l'adresse de la plateforme." });
+    const pris = await prisma.tenant.findFirst({ where: { domainePublic: domaine, id: { not: request.tenantId } }, select: { id: true } });
+    if (pris) return reply.code(409).send({ error: "Ce domaine est déjà utilisé par un autre espace." });
+    await prisma.tenant.update({ where: { id: request.tenantId }, data: { domainePublic: domaine, domainePublicVerifie: null } });
+    invaliderEspacePublic(request.tenantId);
+    await journaliser(request, "espace.domaine-public", domaine, { etape: "declaration" });
+    return { domainePublic: domaine, domainePublicVerifie: null };
+  });
+
+  app.post("/domaine/verifier", { preHandler: exigerRole("ADMIN"), config: { rateLimit: { max: 10, timeWindow: "10 minutes" } } }, async (request, reply) => {
+    const t = await prisma.tenant.findUnique({ where: { id: request.tenantId }, select: { domainePublic: true } });
+    if (!t?.domainePublic) return reply.code(400).send({ error: "Déclarez d'abord un domaine." });
+    try {
+      await verifierDomaine(request.tenantId, t.domainePublic);
+    } catch (err) {
+      return reply.code(400).send({ error: err.message });
+    }
+    const maj = await prisma.tenant.update({ where: { id: request.tenantId }, data: { domainePublicVerifie: new Date() } });
+    invaliderEspacePublic(request.tenantId);
+    await journaliser(request, "espace.domaine-public", t.domainePublic, { etape: "verification" });
+    return { domainePublic: maj.domainePublic, domainePublicVerifie: maj.domainePublicVerifie };
+  });
+
+  /// Retour à l'adresse de la plateforme. Les liens déjà envoyés sous le
+  /// domaine personnalisé cessent de fonctionner dès que celui-ci ne pointe
+  /// plus vers l'API.
+  app.delete("/domaine", { preHandler: exigerRole("ADMIN") }, async (request) => {
+    await prisma.tenant.update({ where: { id: request.tenantId }, data: { domainePublic: null, domainePublicVerifie: null } });
+    invaliderEspacePublic(request.tenantId);
+    await journaliser(request, "espace.domaine-public", null, { etape: "retrait" });
+    return { domainePublic: null };
   });
 
   /// Couper les liens publics : ceux déjà envoyés cessent aussitôt de

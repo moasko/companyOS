@@ -3,10 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { Icon } from "../../../../utils/general";
 import { api } from "../../../../api/client";
+import { modal } from "../../../modalRequest";
 import { Bouton, Carte, Entete, Kpi, useC } from "../commun";
 
 export const Formulaire = () => {
-  const { t, n, clients, aller } = useC();
+  const { t, n, clients, aller, session } = useC();
+  const admin = ["OWNER", "ADMIN"].includes(session?.user?.role);
   const [url, setUrl] = useState("");
   const [copie, setCopie] = useState("");
   useEffect(() => {
@@ -18,6 +20,24 @@ export const Formulaire = () => {
   const attente = inscrits.filter((c) => c.data.emailAConfirmer).length;
   const lienHtml = `<a href="${url}" style="display:inline-block;padding:12px 22px;border-radius:9px;background:#c2410c;color:#fff;font-weight:bold;text-decoration:none">${t("boutonInscription")}</a>`;
   const iframe = `<iframe src="${url}" width="460" height="560" style="border:0;max-width:100%"></iframe>`;
+
+  /// Nouveau lien : l'ancien, partagé ou collé sur un site, ne marche plus.
+  const regenerer = async () => {
+    const ok = await modal.confirm({
+      title: t("regenererTitre"),
+      message: t("regenererMessage"),
+      confirmLabel: t("regenerer"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      setUrl((await api.regenererFormulaire()).url);
+      setCopie("regenere");
+      window.setTimeout(() => setCopie(""), 3000);
+    } catch (e) {
+      await modal.alert({ title: t("regenererTitre"), message: e.message, tone: "error" });
+    }
+  };
 
   const copier = async (texte, quoi) => {
     try {
@@ -48,6 +68,12 @@ export const Formulaire = () => {
                 <input readOnly value={url} aria-label={t("lienFormulaire")} onFocus={(e) => e.target.select()} />
                 <Bouton icone={copie === "lien" ? "faCheck" : "faCopy"} disabled={!url} onClick={() => copier(url, "lien")}>{copie === "lien" ? t("copie") : t("copier")}</Bouton>
               </div>
+              {admin ? (
+                <p className="cmpAide">
+                  {copie === "regenere" ? t("regenere") : t("regenererAide")}{" "}
+                  <button type="button" className="cmpRegenerer" onClick={regenerer}>{t("regenerer")}</button>
+                </p>
+              ) : null}
             </Carte>
             <Carte titre={t("surVotreSite")} aide={t("surVotreSiteAide")}>
               <label className="cmpChamp"><span>{t("boutonLien")}</span><textarea readOnly rows={3} value={lienHtml} onFocus={(e) => e.target.select()} /></label>

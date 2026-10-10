@@ -173,21 +173,28 @@ model Tenant {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  users           User[]
-  nodes           FsNode[]
-  installations   Installation[]
-  records         Record[]
-  apps            App[]
-  invitations     Invitation[]
-  auditEvents     AuditEvent[]
-  notifications   Notification[]
-  mailCompteurs   MailCompteur[]
-  automatisations Automatisation[]
+  users                User[]
+  nodes                FsNode[]
+  installations        Installation[]
+  records              Record[]
+  apps                 App[]
+  invitations          Invitation[]
+  auditEvents          AuditEvent[]
+  notifications        Notification[]
+  mailCompteurs        MailCompteur[]
+  automatisations      Automatisation[]
   /// Les membres peuvent-ils créer des liens publics vers des fichiers ?
-  partagePublic   Boolean          @default(true)
+  partagePublic        Boolean          @default(true)
   /// Authentification unique (OpenID Connect) : émetteur, client, secret
   /// chiffré, domaines, obligation. Voir src/sso.js.
-  sso             Json?
+  sso                  Json?
+  /// Entre dans la signature du lien du formulaire d'inscription : le
+  /// changer invalide l'ancien lien (« Régénérer »).
+  selFormulaire        String?
+  /// Domaine à son nom pour les liens publics (ex. liens.entreprise.ci),
+  /// utilisé une fois vérifié. Voir src/espacePublic.js.
+  domainePublic        String?          @unique
+  domainePublicVerifie DateTime?
 
   @@map("tenants")
 }
