@@ -6,6 +6,7 @@ import App from "./App";
 import store from "./reducers";
 import { installerRapportErreurs } from "./utils/rapportErreurs";
 import { registerSW } from "virtual:pwa-register";
+import { EVT_CLOUD } from "./api/tempsReel";
 
 // Les erreurs du navigateur partent au journal de la plateforme — voir
 // src/utils/rapportErreurs.js.
@@ -26,6 +27,10 @@ installerRapportErreurs();
 // de vérification périodique ensuite : un rechargement au milieu d'une
 // saisie ferait plus de tort que d'attendre la prochaine ouverture.
 registerSW({ immediate: true });
+
+// Un fichier du Cloud a changé dans un autre onglet ou chez un collègue :
+// l'Explorateur, le bureau et la corbeille relisent (voir reducers/cloud.js).
+window.addEventListener(EVT_CLOUD, () => store.dispatch({ type: "CLOUD_TOUCH" }));
 
 // Deux gestionnaires d'état, et c'est voulu :
 //

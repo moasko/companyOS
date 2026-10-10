@@ -93,6 +93,11 @@ export default async function evenementRoutes(app) {
         if (evt.u === user.id) envoyer("notification", {});
         return;
       }
+      if (evt.type === "cloud") {
+        // Le Cloud de l'espace est commun à tous ses membres.
+        envoyer("cloud", { client: evt.client });
+        return;
+      }
       if (evt.type === "fiche") {
         if (!(await peutLire(evt.module, evt.collection))) return;
         envoyer("fiche", {
