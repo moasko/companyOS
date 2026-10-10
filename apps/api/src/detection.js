@@ -3,6 +3,7 @@ import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { abonner, publier } from "./evenements.js";
 import { notifier } from "./notifier.js";
+import { declarerCache } from "./caches.js";
 
 /// Détection d'intrusion.
 ///
@@ -247,6 +248,14 @@ export const messageAlerte = (a) => {
 let bloquees = new Map(); // ip → jusqua (ms)
 let lu = 0;
 const RELECTURE_MS = 30_000;
+
+declarerCache("ip-bloquees", {
+  libelle: "Adresses bloquées",
+  description: "La liste des adresses IP bloquées, relue en base toutes les 30 secondes.",
+  taille: () => bloquees.size,
+  // La base fait foi : vider, c'est relire tout de suite.
+  vider: () => relireBlocages(),
+});
 
 const relireBlocages = async () => {
   const lignes = await prisma.ipBloquee.findMany({ where: { jusqua: { gt: new Date() } }, select: { ip: true, jusqua: true } });

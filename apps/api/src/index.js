@@ -33,6 +33,7 @@ import partagesPublicsRoutes from "./routes/partagesPublics.js";
 import ssoRoutes from "./routes/sso.js";
 import publicsRoutes from "./routes/publics.js";
 import { demarrerEspacePublic, filtrerDomainePublic } from "./espacePublic.js";
+import { demarrerCaches } from "./caches.js";
 import { arreterDetection, demarrerDetection, filtrerIntrusions, observerReponse } from "./detection.js";
 import { plateformeSecuriteRoutes, securiteRoutes } from "./routes/securite.js";
 import { arreterEnvoisProgrammes, demarrerEnvoisProgrammes } from "./courriels.js";
@@ -228,6 +229,7 @@ try {
   await demarrerBus();
   demarrerMoteurAutomatisations();
   demarrerEspacePublic();
+  demarrerCaches();
   demarrerDetection();
   // La messagerie : relève IMAP des boîtes reliées et envois programmés —
   // voir src/courrielsSync.js et src/courriels.js.

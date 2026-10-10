@@ -28,6 +28,7 @@ import { env } from "./env.js";
 import { prisma } from "./db.js";
 import { chiffrer, dechiffrer } from "./chiffrement.js";
 import { creerPiloteS3 } from "./stockage-s3.js";
+import { declarerCache } from "./caches.js";
 
 /// Réduit un nom de fichier à quelque chose qui ne peut désigner qu'un
 /// fichier, jamais un chemin.
@@ -215,6 +216,16 @@ export const enregistrerConfig = async ({ stockage, s3 }) => {
 // chercherait le bon objet dans le mauvais compte.
 
 const cacheEspaces = new Map();
+
+declarerCache("stockage", {
+  libelle: "Configuration du stockage",
+  description: "Le stockage objet de la plateforme et celui des espaces qui ont le leur.",
+  taille: () => (cache ? 1 : 0) + cacheEspaces.size,
+  vider: () => {
+    cache = null;
+    cacheEspaces.clear();
+  },
+});
 
 export const invaliderCacheEspace = (tenantId) => {
   if (tenantId) cacheEspaces.delete(tenantId);

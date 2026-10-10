@@ -24,6 +24,9 @@ import { masquer } from "../chiffrement.js";
 import { createReadStream } from "node:fs";
 import { env } from "../env.js";
 import { cheminLocal, sauvegarderBase, sauvegarderFichiers } from "../sauvegardes.js";
+import { etatCaches, nomsCaches, viderCaches } from "../caches.js";
+import { compterDonneesExpirees, etatServeur, purgerDonneesExpirees } from "../maintenance.js";
+import { fluxOuverts } from "./evenements.js";
 
 /// Journalise un geste de l'exploitant **deux fois** : chez lui, comme
 /// toujours, et dans l'espace concerné.
@@ -53,6 +56,14 @@ export default async function plateformeRoutes(app) {
       },
     });
 
+    // La dernière connexion de chaque espace : un client qui ne revient
+    // plus est un client qu'on va perdre, bien avant qu'il ne résilie.
+    const activites = await prisma.$queryRaw`
+      SELECT u."tenantId" AS "tenantId", max(s."vuLe") AS "vuLe"
+      FROM "sessions" s JOIN "users" u ON u."id" = s."userId"
+      GROUP BY u."tenantId"`.catch(() => []);
+    const vuLe = new Map(activites.map((a) => [a.tenantId, a.vuLe]));
+
     const espaces = tenants.map((t) => ({
       id: t.id,
       nom: t.name,
@@ -68,6 +79,7 @@ export default async function plateformeRoutes(app) {
       usedBytes: t.usedBytes,
       quota: t.quota,
       creeLe: t.createdAt,
+      dernierAcces: vuLe.get(t.id) || null,
     }));
 
     return serialize({
@@ -390,6 +402,49 @@ export default async function plateformeRoutes(app) {
     });
     if (!count) return reply.code(404).send({ error: "Erreur introuvable." });
     return { ok: true, resolue };
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Maintenance : caches, ménage, état du serveur
+  // ─────────────────────────────────────────────────────────────────────
+
+  /// L'instance qui répond, ses caches, et ce qu'un ménage supprimerait.
+  /// Derrière un répartiteur, chaque appel peut tomber sur une instance
+  /// différente : les chiffres de mémoire et de caches sont les siens.
+  app.get("/maintenance", async () =>
+    serialize({
+      serveur: await etatServeur(),
+      tempsReel: fluxOuverts(),
+      caches: etatCaches(),
+      expirees: await compterDonneesExpirees(),
+    }),
+  );
+
+  const schemaVidage = z.object({
+    noms: z.array(z.string().max(60)).max(50).default([]),
+    navigateurs: z.boolean().default(false),
+  });
+
+  /// Vider des caches (tous si la liste est vide) sur toutes les instances,
+  /// et, à la demande, faire relire leurs données aux navigateurs ouverts.
+  app.post("/caches/vider", async (request, reply) => {
+    const corps = schemaVidage.safeParse(request.body || {});
+    if (!corps.success) return reply.code(400).send({ error: "Demande de vidage invalide." });
+    const inconnus = corps.data.noms.filter((n) => !nomsCaches().includes(n));
+    if (inconnus.length) return reply.code(400).send({ error: `Cache inconnu : ${inconnus.join(", ")}.` });
+    const resultat = await viderCaches(corps.data);
+    await journaliser(request, "plateforme.caches.vider", corps.data.noms.join(",") || "tous", {
+      entrees: resultat.entrees,
+      navigateurs: corps.data.navigateurs,
+    });
+    return { ...resultat, navigateurs: corps.data.navigateurs, caches: etatCaches() };
+  });
+
+  /// Supprimer tout de suite ce que le ménage périodique supprimerait.
+  app.post("/purge", async (request) => {
+    const resultat = await purgerDonneesExpirees();
+    await journaliser(request, "plateforme.purge", "donnees-expirees", resultat.lignes);
+    return resultat;
   });
 
   app.get("/stockage", async () => {

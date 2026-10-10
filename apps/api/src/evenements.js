@@ -34,7 +34,7 @@ let delaiReprise = 1000;
 
 /// Identifiant de cette instance : elle reçoit aussi ses propres NOTIFY,
 /// qu'elle a déjà diffusés localement.
-const INSTANCE = Math.random().toString(36).slice(2, 10);
+export const INSTANCE = Math.random().toString(36).slice(2, 10);
 
 const diffuser = (evt) => {
   try {

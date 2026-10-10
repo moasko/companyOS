@@ -6,7 +6,8 @@ import App from "./App";
 import store from "./reducers";
 import { installerRapportErreurs } from "./utils/rapportErreurs";
 import { registerSW } from "virtual:pwa-register";
-import { EVT_CLOUD } from "./api/tempsReel";
+import { EVT_CACHES, EVT_CLOUD } from "./api/tempsReel";
+import { viderCachesNavigateur } from "./api/caches";
 
 // Les erreurs du navigateur partent au journal de la plateforme — voir
 // src/utils/rapportErreurs.js.
@@ -58,6 +59,13 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// L'exploitant a vidé les caches de la plateforme : ce navigateur oublie
+// les siens et relit ce qui est affiché (voir src/api/caches.js).
+window.addEventListener(EVT_CACHES, () => {
+  viderCachesNavigateur(queryClient).catch(() => {});
+  store.dispatch({ type: "CLOUD_TOUCH" });
 });
 
 const root = createRoot(document.getElementById("root"));

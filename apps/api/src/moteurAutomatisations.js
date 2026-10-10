@@ -11,6 +11,7 @@ import { abonner, publier, publierFiche } from "./evenements.js";
 import { notifier } from "./notifier.js";
 import { posterJson } from "./web.js";
 import { creerTransporteurEspace, envoyerMail, envoyerVia } from "./mail.js";
+import { declarerCache } from "./caches.js";
 
 /// Le moteur des automatisations entre applications.
 ///
@@ -58,6 +59,13 @@ export const ecritureInterdite = (module, collection) => INTERDITES.has(`${modul
 // ---------------------------------------------------------------------------
 
 const cache = new Map(); // tenantId → { le, regles }
+
+declarerCache("automatisations", {
+  libelle: "Règles d'automatisation",
+  description: "Les règles actives de chaque espace, relues à chaque écriture de fiche.",
+  taille: () => cache.size,
+  vider: () => cache.clear(),
+});
 
 const reglesDe = async (tenantId) => {
   const c = cache.get(tenantId);

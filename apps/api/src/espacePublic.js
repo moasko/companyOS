@@ -3,6 +3,7 @@ import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { abonner, publier } from "./evenements.js";
 import { lireJsonExterne } from "./web.js";
+import { declarerCache } from "./caches.js";
 
 /// Les liens publics d'un espace : sous quelle adresse ils partent, et le
 /// « sel » du lien de son formulaire d'inscription.
@@ -34,6 +35,16 @@ export const normaliserDomaine = (brut) => {
 
 const cache = new Map(); // tenantId → { le, valeur }
 let domaines = { le: 0, ensemble: new Set() };
+
+declarerCache("espaces-publics", {
+  libelle: "Pages et liens publics",
+  description: "Domaine vérifié et clé de formulaire de chaque espace, et la liste des domaines personnalisés.",
+  taille: () => cache.size + domaines.ensemble.size,
+  vider: () => {
+    cache.clear();
+    domaines = { le: 0, ensemble: new Set() };
+  },
+});
 
 export const invaliderEspacePublic = (tenantId) => {
   cache.delete(tenantId);
