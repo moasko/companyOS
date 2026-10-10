@@ -328,7 +328,10 @@ export const Fiche = ({ t, d, ctx, actions, client, membreDe, telephone, mainten
     <section className="crmCarte">
       <header className="crmCarteTete">
         <h2>{t("ongletInfos")}</h2>
-        <button type="button" className="crmLien" onClick={() => actions.editerCompte(client)}>{t("modifier")}</button>
+        <span className="crmEnteteLiens">
+          <button type="button" className="crmLien" onClick={() => actions.historiqueCompte(client)}>{t("historiqueFiche")}</button>
+          <button type="button" className="crmLien" onClick={() => actions.editerCompte(client)}>{t("modifier")}</button>
+        </span>
       </header>
       <dl className="crmInfos">
         {[
@@ -357,9 +360,14 @@ export const Fiche = ({ t, d, ctx, actions, client, membreDe, telephone, mainten
   return (
     <div className="crmFiche">
       <header className="crmFicheTete">
-        <button type="button" className="crmRetour" onClick={actions.fermerCompte}>
-          <Icon fafa="faChevronLeft" width={10} /> {t("retour")}
-        </button>
+        <div className="crmFicheBarre">
+          <button type="button" className="crmRetour" onClick={actions.fermerCompte}>
+            <Icon fafa="faChevronLeft" width={10} /> {t("retour")}
+          </button>
+          <button type="button" className="crmRetour" onClick={() => actions.historiqueCompte(client)}>
+            <Icon fafa="faClockRotateLeft" width={10} /> {t("historiqueModifs")}
+          </button>
+        </div>
         <div className="crmFicheIdentite">
           <Initiales nom={nomDe(client)} taille={telephone ? 46 : 52} carre />
           <div className="crmFicheNom">

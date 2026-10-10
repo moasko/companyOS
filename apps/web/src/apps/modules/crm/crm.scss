@@ -437,6 +437,18 @@
     min-width: 0;
   }
 
+  .crmFicheBarre {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .crmEnteteLiens {
+    display: inline-flex;
+    gap: 12px;
+  }
+
   .crmCarteTete {
     display: flex;
     align-items: center;

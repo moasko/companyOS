@@ -155,9 +155,43 @@ export const envoyerVia = async (
 export const envoyerMail = async (message) =>
   (await envoyerVia(transporteur, message)).envoye;
 
+/// Échappe ce qui vient des utilisateurs (nom d'espace, nom d'une
+/// personne) avant de l'insérer dans un courriel HTML.
+export const echapperHtml = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/// Le courriel de réinitialisation du mot de passe. Le lien est le seul
+/// secret : valable une heure, une seule fois.
+export const mailReinitialisation = ({ nom, lien }) => ({
+  sujet: "Réinitialiser votre mot de passe CompanyOS",
+  texte: [
+    `Bonjour ${nom},`,
+    ``,
+    `Une réinitialisation du mot de passe de votre compte CompanyOS a été demandée.`,
+    `Pour choisir un nouveau mot de passe, ouvrez ce lien (valable une heure, une seule fois) :`,
+    ``,
+    lien,
+    ``,
+    `Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre mot de passe ne change pas.`,
+  ].join("\n"),
+  html: `
+      <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2733">
+        <h2 style="font-size:18px">Réinitialiser votre mot de passe</h2>
+        <p>Bonjour ${echapperHtml(nom)},</p>
+        <p>Une réinitialisation du mot de passe de votre compte CompanyOS a été demandée.</p>
+        <p style="margin:24px 0;text-align:center">
+          <a href="${echapperHtml(lien)}" style="display:inline-block;padding:12px 24px;border-radius:10px;
+            background:#1a73e8;color:#fff;text-decoration:none;font-weight:600">Choisir un nouveau mot de passe</a>
+        </p>
+        <p style="color:#6b7684;font-size:13px">Lien valable une heure, une seule fois. Si vous n'êtes pas à
+        l'origine de cette demande, ignorez ce message : votre mot de passe ne change pas.</p>
+      </div>`,
+});
+
 /// Le courriel d'invitation : le code, qui invite, dans quel espace.
 /// Texte simple d'abord — les clients mail des PME lisent tout.
 export const mailInvitation = ({ espace, invitant, code, role, urlOs }) => {
+  const h = { espace: echapperHtml(espace), invitant: echapperHtml(invitant) };
   const roleLisible = role === "ADMIN" ? "administrateur" : "membre";
   return {
     sujet: `${invitant} vous invite à rejoindre ${espace} sur CompanyOS`,
@@ -167,16 +201,16 @@ export const mailInvitation = ({ espace, invitant, code, role, urlOs }) => {
       `Votre code d'invitation : ${code}`,
       ``,
       urlOs
-        ? `Rendez-vous sur ${urlOs}, choisissez « Rejoindre un espace » et saisissez ce code.`
+        ? `Pour rejoindre l'espace : ${urlOs}/?connexion&code=${encodeURIComponent(code)}`
         : `Ouvrez CompanyOS, choisissez « Rejoindre un espace » et saisissez ce code.`,
       ``,
       `Ce code est personnel et expire dans 14 jours.`,
     ].join("\n"),
     html: `
       <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2733">
-        <h2 style="font-size:18px">Invitation à rejoindre ${espace}</h2>
-        <p>${invitant} vous invite à rejoindre l'espace de travail
-        « <b>${espace}</b> » sur CompanyOS, en tant que ${roleLisible}.</p>
+        <h2 style="font-size:18px">Invitation à rejoindre ${h.espace}</h2>
+        <p>${h.invitant} vous invite à rejoindre l'espace de travail
+        « <b>${h.espace}</b> » sur CompanyOS, en tant que ${roleLisible}.</p>
         <p style="margin:24px 0;text-align:center">
           <span style="display:inline-block;padding:12px 28px;border-radius:10px;
             background:#eef0fb;color:#4338ca;font-size:22px;font-weight:700;
@@ -184,7 +218,7 @@ export const mailInvitation = ({ espace, invitant, code, role, urlOs }) => {
         </p>
         <p>${
           urlOs
-            ? `Rendez-vous sur <a href="${urlOs}">${urlOs}</a>, choisissez`
+            ? `<a href="${echapperHtml(`${urlOs}/?connexion&code=${encodeURIComponent(code)}`)}">Rejoindre l'espace</a> — ou ouvrez ${echapperHtml(urlOs)}, choisissez`
             : "Ouvrez CompanyOS, choisissez"
         } « Rejoindre un espace » et saisissez ce code.</p>
         <p style="color:#6b7684;font-size:13px">Ce code est personnel et

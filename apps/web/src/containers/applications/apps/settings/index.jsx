@@ -31,6 +31,7 @@ import { SectionBureau } from "./Bureau";
 import { SectionApplications } from "./Applications";
 import { SectionStockage } from "./Stockage";
 import { SectionCompte } from "./Compte";
+import { SectionConformite } from "./Conformite";
 import { SectionSecurite } from "./Securite";
 import { SectionEspace } from "./Espace";
 import { SectionEntreprise } from "./Entreprise";
@@ -69,6 +70,7 @@ const SECTIONS = [
   { id: "entreprise", label: "Fiche de l'entreprise", icon: "faIdCard" },
   { id: "formule", label: "Formule et tarifs", icon: "faCreditCard" },
   { id: "journal", label: "Journal d'activité", icon: "faClockRotateLeft" },
+  { id: "conformite", label: "Données et conformité", icon: "faScaleBalanced" },
   { id: "langue", label: "Langue et région", icon: "faLanguage" },
   { id: "apropos", label: "À propos", icon: "faCircleInfo" },
 ];
@@ -90,6 +92,7 @@ const TEXTES = {
     "section.entreprise": "Company profile",
     "section.formule": "Plan and pricing",
     "section.journal": "Activity log",
+    "section.conformite": "Data and compliance",
     "section.langue": "Language and region",
     "section.apropos": "About",
   },
@@ -812,6 +815,7 @@ export const Settings = () => {
 
               {/* ---------- Sécurité ---------- */}
               <SectionSecurite section={section} session={session} flash={flash} />
+              <SectionConformite section={section} session={session} flash={flash} />
 
               {/* ---------- Espace de travail ---------- */}
               <SectionEspace

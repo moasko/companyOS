@@ -3,6 +3,10 @@ import { useSelector } from "react-redux";
 import { ToolBar } from "../utils/general";
 import { useNomApp } from "../utils/nomsApps";
 import { rejouerLienEnAttente } from "./notifications";
+import { estEnLectureSeule } from "./sync";
+import { localeEffective } from "../utils/langue";
+
+const tLecture = () => (localeEffective().startsWith("en") ? "Read only" : "Lecture seule");
 
 /// Chrome de fenêtre commun à tous les modules CompanyOS.
 /// Un module n'a qu'à écrire son contenu :
@@ -52,7 +56,7 @@ export const ModuleWindow = ({ manifest, className = "", children }) => {
         app={wnapp.action}
         icon={wnapp.icon}
         size={wnapp.size}
-        name={nomApp(manifest)}
+        name={estEnLectureSeule(manifest.slug) ? `${nomApp(manifest)} · ${tLecture()}` : nomApp(manifest)}
       />
       <div className="windowScreen flex flex-col" data-dock="true">
         <div className="restWindow flex-grow flex flex-col">{children}</div>

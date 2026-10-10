@@ -73,3 +73,15 @@ test("les collections partagées des RH", () => {
     false,
   );
 });
+
+test("écriture : lecture seule possible, jamais pour un administrateur", () => {
+  const regle = (ecriture) => ({ mode: "membres", ...(ecriture ? { ecriture } : {}) });
+  assert.equal(acces.ecritureSelon(membre, regle()), true, "par défaut, qui lit écrit");
+  assert.equal(acces.ecritureSelon(membre, regle({ mode: "tous" })), true);
+  assert.equal(acces.ecritureSelon(membre, regle({ mode: "admins" })), false);
+  assert.equal(acces.ecritureSelon(admin, regle({ mode: "admins" })), true);
+  assert.equal(acces.ecritureSelon(membre, regle({ mode: "selection", membres: ["m1"] })), true);
+  assert.equal(acces.ecritureSelon(membre, regle({ mode: "selection", membres: ["x"] })), false);
+  // Sans accès, pas d'écriture, quelle que soit la règle d'écriture.
+  assert.equal(acces.ecritureSelon(membre, { mode: "admins", ecriture: { mode: "tous" } }), false);
+});

@@ -3,6 +3,7 @@ import { api } from "../../../../api/client";
 import { modal } from "../../../../apps/modalRequest";
 import { CodesSecours, ConfigurationMfa } from "../../../../components/securite/ConfigurationMfa";
 import { Row, Toggle } from "./commun";
+import { ReglageSso } from "./Sso";
 
 /// Un appareil lisible à partir de l'en-tête User-Agent : assez pour
 /// reconnaître « mon téléphone » d'« un poste inconnu ».
@@ -244,6 +245,8 @@ export const SectionSecurite = ({ section, session, flash: flashParent }) => {
           />
         </Row>
       ) : null}
+
+      {["OWNER", "ADMIN"].includes(session.user?.role) && visible ? <ReglageSso session={session} flash={flash} /> : null}
 
       <div className="setSubTitle">Sessions ouvertes</div>
       <p className="setHint">

@@ -7,6 +7,7 @@ import { FileThumb, oublierApercu } from "./assets/FileThumb";
 import { modal } from "../../../apps/modalRequest";
 import { applicationManquante, ouvrirFichier } from "../../../apps/openRequest";
 import { consommerDemande } from "../../../apps/explorerRequest";
+import { ouvrirPartage, ouvrirVersions } from "../../../apps/fichiersAvances";
 import { menuContextuel } from "../../../apps/menuRequest";
 import { familleDe } from "../../../apps/fileTypes";
 import { moduleBySlug, syncInstalledModules } from "../../../apps/sync";
@@ -556,6 +557,20 @@ export const Explorer = () => {
           icone: "faDownload",
           desactive: !seul,
           action: () => download(node),
+        },
+      !trash &&
+        node.type === "FILE" && {
+          nom: "Partager un lien…",
+          icone: "faLink",
+          desactive: !seul,
+          action: () => ouvrirPartage(node),
+        },
+      !trash &&
+        node.type === "FILE" && {
+          nom: "Versions…",
+          icone: "faClockRotateLeft",
+          desactive: !seul,
+          action: () => ouvrirVersions(node, { onRestaure: refresh }),
         },
       { separateur: true },
       trash

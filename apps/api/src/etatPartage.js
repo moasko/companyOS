@@ -43,6 +43,27 @@ export const lireJeton = async (type, jeton) => {
   return { tenantId: ligne.tenantId, cible: ligne.cible };
 };
 
+/// Lit **et détruit** un jeton : pour ce qui ne doit servir qu'une fois
+/// (réinitialisation de mot de passe, retour d'authentification unique).
+/// La suppression est la vérification : deux requêtes simultanées avec le
+/// même jeton, une seule l'obtient.
+export const consommerJeton = async (type, jeton) => {
+  if (typeof jeton !== "string" || !/^[a-f0-9]{32}$/.test(jeton)) return null;
+  const e = empreinte(jeton);
+  const ligne = await prisma.jetonUrl.findUnique({ where: { empreinte: e } });
+  if (!ligne || ligne.type !== type || ligne.expireLe.getTime() < Date.now()) return null;
+  const { count } = await prisma.jetonUrl.deleteMany({ where: { empreinte: e } });
+  return count ? { tenantId: ligne.tenantId, cible: ligne.cible } : null;
+};
+
+/// Supprime tous les jetons d'un type pour une cible (ex. les liens de
+/// réinitialisation encore valides d'un compte dont le mot de passe vient
+/// de changer).
+export const revoquerJetons = (type, cible) => prisma.jetonUrl.deleteMany({ where: { type, cible } });
+
+export const compterJetons = (type, cible) =>
+  prisma.jetonUrl.count({ where: { type, cible, expireLe: { gt: new Date() } } });
+
 // ---------------------------------------------------------------------------
 // Verrou de connexion par compte
 // ---------------------------------------------------------------------------
@@ -103,6 +124,8 @@ export const effacerEchecs = (cle) => prisma.verrouConnexion.deleteMany({ where:
 // ---------------------------------------------------------------------------
 
 export const purgerEtatPartage = async () => {
+  // L'historique des fiches se purge au même rythme (voir src/versions.js).
+  await import("./versions.js").then((m) => m.purgerVersions()).catch(() => {});
   await prisma.jetonUrl.deleteMany({ where: { expireLe: { lt: new Date() } } });
   await prisma.verrouConnexion.deleteMany({ where: { dernier: { lt: new Date(Date.now() - OUBLI_MS) } } });
 };

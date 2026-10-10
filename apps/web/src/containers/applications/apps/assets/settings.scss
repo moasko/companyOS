@@ -365,7 +365,45 @@
     }
   }
 
+  .setSsoForm {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.74em;
+      color: var(--set-muted);
+    }
+  }
+
+  .setCode {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--set-field);
+    border: 1px solid var(--set-line);
+    user-select: all;
+    overflow-wrap: anywhere;
+  }
+
+  .setConformiteRecherche {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+
+    > input {
+      flex: 1;
+      min-width: 200px;
+    }
+  }
+
   input[type="text"],
+  input.setInput,
   input[type="password"] {
     width: 100%;
     font-size: 0.78em;
@@ -477,6 +515,21 @@
     .setHint {
       margin: 0;
     }
+  }
+
+  .setAccesLigne {
+    grid-column: 1 / -1;
+
+    .setRole {
+      font-size: 12px;
+    }
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.74em;
+    color: var(--set-muted);
+    flex-wrap: wrap;
   }
 
   .setAccesMembre {

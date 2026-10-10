@@ -183,6 +183,11 @@ model Tenant {
   notifications   Notification[]
   mailCompteurs   MailCompteur[]
   automatisations Automatisation[]
+  /// Les membres peuvent-ils créer des liens publics vers des fichiers ?
+  partagePublic   Boolean          @default(true)
+  /// Authentification unique (OpenID Connect) : émetteur, client, secret
+  /// chiffré, domaines, obligation. Voir src/sso.js.
+  sso             Json?
 
   @@map("tenants")
 }
@@ -359,10 +364,12 @@ model FsNode {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent   FsNode?  @relation("FsNodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children FsNode[] @relation("FsNodeChildren")
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner    User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent   FsNode?          @relation("FsNodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children FsNode[]         @relation("FsNodeChildren")
+  versions VersionFichier[]
+  partages LienPartage[]
 
   /// Deux entrées vivantes ne peuvent pas porter le même nom dans le même
   /// dossier — mais un élément à la corbeille ne doit pas réserver son nom.
@@ -635,4 +642,77 @@ model ParametreSysteme {
   modifieLe DateTime @updatedAt
 
   @@map("parametres_systeme")
+}
+
+/// L'état d'une fiche **avant** une modification ou une suppression.
+///
+/// Sans lui, une fiche écrasée par erreur (ou supprimée — il n'y avait pas
+/// de corbeille pour les fiches) était perdue. L'historique permet de
+/// voir qui a changé quoi, et de revenir en arrière ; les fiches
+/// supprimées restent récupérables 180 jours.
+model VersionFiche {
+  id             String   @id @default(cuid())
+  tenantId       String
+  recordId       String
+  module         String
+  collection     String
+  data           Json
+  /// « modification » ou « suppression »
+  action         String
+  /// L'auteur de la fiche (pour la recréer telle quelle).
+  proprietaireId String?
+  /// Qui a fait le changement.
+  auteurId       String?
+  auteurNom      String?
+  creeLe         DateTime @default(now())
+
+  @@index([tenantId, recordId, creeLe])
+  @@index([tenantId, module, collection, action, creeLe])
+  @@map("versions_fiches")
+}
+
+/// Le contenu précédent d'un fichier remplacé (enregistrement depuis Word,
+/// le Classeur, un nouvel import…). Les octets restent dans le stockage et
+/// comptent dans le quota ; 10 versions au plus par fichier.
+model VersionFichier {
+  id         String   @id @default(cuid())
+  tenantId   String
+  nodeId     String
+  storageKey String
+  storage    String   @default("local")
+  size       BigInt   @default(0)
+  mimeType   String?
+  auteurId   String?
+  auteurNom  String?
+  creeLe     DateTime @default(now())
+
+  node FsNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, creeLe])
+  @@map("versions_fichiers")
+}
+
+/// Lien public vers un fichier, pour quelqu'un qui n'a pas de compte.
+/// Seule l'empreinte du jeton est gardée ; expiration obligatoire, mot de
+/// passe et nombre de téléchargements facultatifs, révocable à tout moment.
+model LienPartage {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  nodeId             String
+  empreinte          String    @unique
+  creeParId          String?
+  creeParNom         String?
+  expireLe           DateTime
+  motDePasseHash     String?
+  maxTelechargements Int?
+  telechargements    Int       @default(0)
+  dernierAcces       DateTime?
+  revoqueLe          DateTime?
+  creeLe             DateTime  @default(now())
+
+  node FsNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([tenantId])
+  @@map("liens_partage")
 }

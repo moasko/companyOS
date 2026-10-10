@@ -40,6 +40,9 @@ const REJOUABLES = [
   "20261009120000_sessions_mfa",
   "20261010120000_etat_partage",
   "20261010150000_automatisations_push",
+  "20261010180000_versions_fiches",
+  "20261010200000_fichiers_versions_partages",
+  "20261010210000_sso",
 ];
 
 const prisma = new PrismaClient();

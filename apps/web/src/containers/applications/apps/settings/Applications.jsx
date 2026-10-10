@@ -3,13 +3,33 @@ import { Icon } from "../../../../utils/general";
 import { moduleBySlug } from "../../../../apps/sync";
 
 /// Ce que dit la règle d'accès, en une phrase courte.
-const libelleAcces = (acces) => {
+const libelleOuverture = (acces) => {
   if (!acces || acces.mode === "membres") return "Tous les membres";
   if (acces.mode === "admins") return "Administrateurs seulement";
   const n = acces.membres?.length || 0;
   return n
     ? `Administrateurs et ${n} membre${n > 1 ? "s" : ""} choisi${n > 1 ? "s" : ""}`
     : "Personnes choisies : aucune pour l'instant";
+};
+
+const libelleEcriture = (acces) => {
+  const e = acces?.ecriture;
+  if (!e || e.mode === "tous" || acces?.mode === "admins") return "";
+  if (e.mode === "admins") return " · lecture seule pour les membres";
+  const n = e.membres?.length || 0;
+  return ` · modification : administrateurs${n ? ` et ${n} membre${n > 1 ? "s" : ""}` : ""}`;
+};
+
+const libelleAcces = (acces) => `${libelleOuverture(acces)}${libelleEcriture(acces)}`;
+
+/// Une règle complète, à partir de l'actuelle et d'un changement : ouvrir
+/// à d'autres ne doit pas effacer la règle de modification, et l'inverse.
+const regleAvec = (acces, patch) => {
+  const base = acces || { mode: "membres" };
+  const suivante = { mode: base.mode, ...(base.mode === "selection" ? { membres: base.membres || [] } : {}), ...(base.ecriture ? { ecriture: base.ecriture } : {}), ...patch };
+  if (suivante.mode !== "selection") delete suivante.membres;
+  if (!suivante.ecriture || suivante.ecriture.mode === "tous") delete suivante.ecriture;
+  return suivante;
 };
 
 /// Le choix de la règle, dans la ligne de l'application.
@@ -24,9 +44,7 @@ const ChoixRegle = ({ app, busy, changerAcces }) => {
       onChange={(e) =>
         changerAcces(
           app,
-          e.target.value === "selection"
-            ? { mode: "selection", membres: acces.membres || [] }
-            : { mode: e.target.value },
+          regleAvec(acces, e.target.value === "selection" ? { mode: "selection", membres: acces.membres || [] } : { mode: e.target.value }),
         )
       }
     >
@@ -49,7 +67,7 @@ const ChoixMembres = ({ app, membres, busy, changerAcces }) => {
     const suivants = new Set(choisis);
     if (suivants.has(id)) suivants.delete(id);
     else suivants.add(id);
-    changerAcces(app, { mode: "selection", membres: [...suivants] });
+    changerAcces(app, regleAvec(app.acces, { mode: "selection", membres: [...suivants] }));
   };
 
   return (
@@ -77,6 +95,54 @@ const ChoixMembres = ({ app, membres, busy, changerAcces }) => {
   );
 };
 
+/// Qui peut modifier, parmi ceux qui ont accès : « lecture seule » pour
+/// les autres. Sans objet quand l'app est réservée aux administrateurs.
+const ChoixEcriture = ({ app, membres, busy, changerAcces }) => {
+  const acces = app.acces || { mode: "membres" };
+  const e = acces.ecriture || { mode: "tous" };
+  const simples = membres.filter((m) => m.role === "MEMBER" && (acces.mode !== "selection" || (acces.membres || []).includes(m.id)));
+  const choisis = new Set(e.membres || []);
+  return (
+    <div className="setAccesChoix setAccesEcriture">
+      <label className="setAccesLigne">
+        <span>Modification des données</span>
+        <select
+          className="setRole"
+          value={e.mode}
+          disabled={busy}
+          aria-label={`Qui peut modifier les données de ${app.name}`}
+          onChange={(ev) =>
+            changerAcces(app, regleAvec(acces, { ecriture: ev.target.value === "selection" ? { mode: "selection", membres: e.membres || [] } : { mode: ev.target.value } }))
+          }
+        >
+          <option value="tous">Tous ceux qui y ont accès</option>
+          <option value="admins">Administrateurs (lecture seule pour les autres)</option>
+          <option value="selection">Personnes choisies</option>
+        </select>
+      </label>
+      {e.mode === "selection"
+        ? simples.map((m) => (
+            <label key={m.id} className="setAccesMembre">
+              <input
+                type="checkbox"
+                checked={choisis.has(m.id)}
+                disabled={busy}
+                onChange={() => {
+                  const suivants = new Set(choisis);
+                  if (suivants.has(m.id)) suivants.delete(m.id);
+                  else suivants.add(m.id);
+                  changerAcces(app, regleAvec(acces, { ecriture: { mode: "selection", membres: [...suivants] } }));
+                }}
+              />
+              <span>{m.name}</span>
+              <em>{m.email}</em>
+            </label>
+          ))
+        : null}
+    </div>
+  );
+};
+
 export const SectionApplications = ({
   section,
   parCategorie,
@@ -93,7 +159,7 @@ export const SectionApplications = ({
     <p className="setHint">
       Modules installés dans cet espace de travail.
       {peutGerer
-        ? " Choisissez qui peut ouvrir chacun : les administrateurs y ont toujours accès. La Paie et les RH sont réservées aux administrateurs tant que vous n'en décidez pas autrement."
+        ? " Choisissez qui peut ouvrir chacun, puis qui peut en modifier les données (les autres consultent en lecture seule). Les administrateurs ont toujours tous les droits. La Paie et les RH sont réservées aux administrateurs tant que vous n'en décidez pas autrement."
         : ""}
     </p>
 
@@ -157,6 +223,9 @@ export const SectionApplications = ({
                   busy={busy}
                   changerAcces={changerAcces}
                 />
+              ) : null}
+              {peutGerer && !a.isCore && a.acces?.mode !== "admins" ? (
+                <ChoixEcriture app={a} membres={membres} busy={busy} changerAcces={changerAcces} />
               ) : null}
             </div>
           ))}
