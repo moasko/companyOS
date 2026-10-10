@@ -2,8 +2,32 @@ import { taskApps } from "../utils";
 
 const alignment = localStorage.getItem("taskbar-align") || "center";
 
+/// Applications épinglées : des clés de fenêtre (`id || icon`), dans
+/// l'ordre de la barre. Repris de l'ancienne liste par noms à la première
+/// ouverture, puis retenus — et synchronisés entre appareils avec les
+/// autres préférences (src/apps/preferences.js).
+const CLE_EPINGLES = "taskbar-epingles";
+const lireEpingles = () => {
+  try {
+    const brut = JSON.parse(localStorage.getItem(CLE_EPINGLES) || "null");
+    if (Array.isArray(brut)) return brut.filter((x) => typeof x === "string").slice(0, 40);
+  } catch {
+    // Valeur abîmée : on repart de la liste par défaut.
+  }
+  return taskApps.map((a) => a.id || a.icon);
+};
+const ecrireEpingles = (liste) => {
+  try {
+    localStorage.setItem(CLE_EPINGLES, JSON.stringify(liste));
+  } catch {
+    // Stockage refusé : l'épinglage vaut pour la session.
+  }
+  return liste;
+};
+
 const defState = {
   apps: taskApps,
+  epingles: lireEpingles(),
   prev: false,
   prevApp: "",
   prevPos: 0,
@@ -15,10 +39,24 @@ const defState = {
 const taskReducer = (state = defState, action) => {
   switch (action.type) {
     case "TASKADD":
-      return state;
+    case "TASKPIN": {
+      const cle = action.payload;
+      if (typeof cle !== "string" || state.epingles.includes(cle)) return state;
+      return { ...state, epingles: ecrireEpingles([...state.epingles, cle]) };
+    }
     case "TASKREM":
-      return state;
+    case "TASKUNPIN":
+      if (!state.epingles.includes(action.payload)) return state;
+      return { ...state, epingles: ecrireEpingles(state.epingles.filter((c) => c !== action.payload)) };
+    case "TASKORDER": {
+      // Nouvel ordre après un glisser-déposer : seules les clés déjà
+      // épinglées sont gardées, et aucune ne se perd en route.
+      const voulu = (action.payload || []).filter((c) => state.epingles.includes(c));
+      const reste = state.epingles.filter((c) => !voulu.includes(c));
+      return { ...state, epingles: ecrireEpingles([...voulu, ...reste]) };
+    }
     case "TASKCEN":
+      localStorage.setItem("taskbar-align", "center");
       return {
         ...state,
         align: "center",

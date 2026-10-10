@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "../../utils/general";
 import { changeTheme } from "../../actions";
@@ -15,7 +15,8 @@ import {
 import { activerPush, desactiverPush, etatPush } from "../../apps/push";
 import { modal } from "../../apps/modalRequest";
 import { menuContextuel } from "../../apps/menuRequest";
-import { ouvrirFenetre } from "../../apps/windows";
+import { fermerFenetre, ouvrirFenetre, reduireFenetre } from "../../apps/windows";
+import { useNomApp } from "../../utils/nomsApps";
 import { fuseauEffectif } from "../../utils/heure";
 import { localeEffective } from "../../utils/langue";
 import { useTraduction } from "../../utils/intl";
@@ -46,6 +47,12 @@ const TEXTES = {
     pushRefuse: "Bloquées dans les réglages du navigateur.",
     pushActiver: "Activer",
     pushDesactiver: "Désactiver",
+    ouvrir: "Ouvrir",
+    premierPlan: "Mettre au premier plan",
+    reduire: "Réduire",
+    fermer: "Fermer la fenêtre",
+    epingler: "Épingler à la barre des tâches",
+    desepingler: "Détacher de la barre des tâches",
   },
   en: {
     effacerTitre: "Clear notifications",
@@ -71,6 +78,12 @@ const TEXTES = {
     pushRefuse: "Blocked in your browser settings.",
     pushActiver: "Turn on",
     pushDesactiver: "Turn off",
+    ouvrir: "Open",
+    premierPlan: "Bring to front",
+    reduire: "Minimize",
+    fermer: "Close window",
+    epingler: "Pin to taskbar",
+    desepingler: "Unpin from taskbar",
   },
 };
 
@@ -202,31 +215,20 @@ const Taskbar = () => {
     return state.taskbar;
   });
   const session = useSelector((state) => state.session);
-  // Deux défauts dans la version d'origine, tous deux réels :
-  //
-  //   1. `{ ...state.apps }` est une copie **de surface** : `tmpApps[icon]`
-  //      est le même objet que dans le store. Poser `.task = true` écrivait
-  //      donc dans l'état Redux depuis un sélecteur, hors de tout réducteur,
-  //      et le drapeau n'était jamais remis à false.
-  //   2. Un sélecteur qui rend un nouvel objet à chaque appel force un rendu
-  //      de toute la barre des tâches à **chaque** action, quelle qu'elle
-  //      soit — et il y en a beaucoup, ne serait-ce que le sondage des
-  //      notifications.
-  //
-  // On sélectionne donc les tranches brutes, et on dérive à part.
-  const appsBrutes = useSelector((state) => state.apps);
+  // On sélectionne les tranches brutes et on dérive à part : un sélecteur
+  // qui rend un nouvel objet à chaque appel repeindrait toute la barre à
+  // chaque action Redux.
+  const apps = useSelector((state) => state.apps);
+  const nomApp = useNomApp();
 
-  const apps = useMemo(() => {
-    const derive = {};
-    for (const [cle, valeur] of Object.entries(appsBrutes)) {
-      // `hz` est le compteur de plans, pas une application.
-      derive[cle] = cle === "hz" ? valeur : { ...valeur, task: false };
-    }
-    for (const t of tasks.apps) {
-      if (derive[t.icon]) derive[t.icon].task = true;
-    }
-    return derive;
-  }, [appsBrutes, tasks.apps]);
+  const estFenetre = (cle, a) => cle !== "hz" && cle !== "undefined" && a && typeof a === "object";
+
+  // Épinglées : dans l'ordre choisi. Une app désinstallée depuis disparaît
+  // de la barre sans la casser (elle plantait sur `apps[...]` indéfini).
+  const epinglees = useMemo(
+    () => tasks.epingles.filter((cle) => estFenetre(cle, apps[cle])).map((cle) => [cle, apps[cle]]),
+    [apps, tasks.epingles],
+  );
 
   // Fenêtres ouvertes hors des épinglées, dans l'ordre où on les a
   // ouvertes. Trier sur ce rang — et non sur l'ordre des clés de l'état,
@@ -235,17 +237,9 @@ const Taskbar = () => {
   const ouvertes = useMemo(
     () =>
       Object.entries(apps)
-        .filter(
-          ([cle, a]) =>
-            cle !== "hz" &&
-            cle !== "undefined" &&
-            a &&
-            typeof a === "object" &&
-            !a.task &&
-            !a.hide,
-        )
+        .filter(([cle, a]) => estFenetre(cle, a) && !a.hide && !tasks.epingles.includes(cle))
         .sort((a, b) => (a[1].ouvert || 0) - (b[1].ouvert || 0)),
-    [apps],
+    [apps, tasks.epingles],
   );
   const dispatch = useDispatch();
   const theme = useSelector((state) => state.setting.person.theme);
@@ -270,8 +264,13 @@ const Taskbar = () => {
   useEffect(() => {
     if (!voletOuvert) return;
     const fermer = () => setVoletOuvert(false);
+    const surTouche = (e) => e.key === "Escape" && fermer();
     window.addEventListener("click", fermer);
-    return () => window.removeEventListener("click", fermer);
+    window.addEventListener("keydown", surTouche);
+    return () => {
+      window.removeEventListener("click", fermer);
+      window.removeEventListener("keydown", surTouche);
+    };
   }, [voletOuvert]);
 
   const basculerPleinEcran = () => {
@@ -281,29 +280,73 @@ const Taskbar = () => {
 
   const compteurNonLues = notifs.filter((n) => !n.lue).length;
 
-  const showPrev = (event) => {
-    var ele = event.target;
-    while (ele && ele.getAttribute("value") == null) {
-      ele = ele.parentElement;
-    }
+  // ---- Icônes des applications ---------------------------------------------
 
-    var appPrev = ele.getAttribute("value");
-    var xpos = window.scrollX + ele.getBoundingClientRect().left;
-
-    var offsetx = Math.round((xpos * 10000) / window.innerWidth) / 100;
-
-    dispatch({
-      type: "TASKPSHOW",
-      payload: {
-        app: appPrev,
-        pos: offsetx,
+  /// Menu d'une icône : ce qu'on peut faire de cette application-là,
+  /// plutôt que le menu général de la barre qu'on obtenait partout.
+  const menuIcone = (cle, app) => (e) => {
+    const ouverte = !app.hide;
+    const active = ouverte && app.max && app.z == apps.hz;
+    const epinglee = tasks.epingles.includes(cle);
+    menuContextuel(e, [
+      { titre: nomApp(app) },
+      !ouverte
+        ? { nom: t("ouvrir"), icone: "faArrowUpRightFromSquare", action: () => ouvrirFenetre(cle) }
+        : active
+          ? { nom: t("reduire"), icone: "faWindowMinimize", action: () => reduireFenetre(cle) }
+          : { nom: t("premierPlan"), icone: "faWindowRestore", action: () => ouvrirFenetre(cle) },
+      {
+        nom: epinglee ? t("desepingler") : t("epingler"),
+        icone: "faThumbtack",
+        action: () => dispatch({ type: epinglee ? "TASKUNPIN" : "TASKPIN", payload: cle }),
       },
-    });
+      ouverte && { separateur: true },
+      ouverte && { nom: t("fermer"), icone: "faXmark", action: () => fermerFenetre(cle) },
+    ]);
   };
 
-  const hidePrev = () => {
-    dispatch({ type: "TASKPHIDE" });
+  // Glisser une icône épinglée la déplace dans la rangée ; glisser une
+  // fenêtre ouverte parmi les épinglées l'épingle à cet endroit.
+  // Une référence plutôt qu'un état : `dragover` arrive avant que React
+  // ait repeint après `dragstart`, et un état lu là serait encore vide.
+  const glissee = useRef(null);
+  const deposerSur = (cible) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const cle = glissee.current;
+    glissee.current = null;
+    if (!cle || cle === cible) return;
+    const sans = tasks.epingles.filter((c) => c !== cle);
+    const i = cible ? sans.indexOf(cible) : sans.length;
+    const ordre = [...sans.slice(0, i < 0 ? sans.length : i), cle, ...sans.slice(i < 0 ? sans.length : i)];
+    if (!tasks.epingles.includes(cle)) dispatch({ type: "TASKPIN", payload: cle });
+    dispatch({ type: "TASKORDER", payload: ordre });
   };
+
+  const proprietesIcone = (cle, app) => ({
+    key: cle,
+    value: app.icon,
+    title: nomApp(app),
+    draggable: true,
+    onContextMenu: menuIcone(cle, app),
+    onDragStart: (e) => {
+      glissee.current = cle;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", cle);
+    },
+    onDragEnd: () => {
+      glissee.current = null;
+    },
+    onDragOver: (e) => glissee.current && e.preventDefault(),
+    onDrop: deposerSur(tasks.epingles.includes(cle) ? cle : null),
+    // Clic du milieu sur une fenêtre ouverte : la fermer, comme un onglet.
+    onAuxClick: (e) => {
+      if (e.button === 1 && !app.hide) {
+        e.preventDefault();
+        fermerFenetre(cle);
+      }
+    },
+  });
 
   const clickDispatch = (event) => {
     var action = {
@@ -318,11 +361,24 @@ const Taskbar = () => {
 
   const [time, setTime] = useState(new Date());
 
+  // L'horloge n'affiche que les minutes : un rendu de toute la barre par
+  // seconde ne servait à rien. On se cale sur le début de chaque minute.
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
+    let minuteur;
+    const programmer = () => {
+      const maintenant = new Date();
+      setTime(maintenant);
+      minuteur = setTimeout(programmer, 60_000 - (maintenant.getSeconds() * 1000 + maintenant.getMilliseconds()) + 50);
+    };
+    programmer();
+    // Retour sur l'onglet après une veille : l'heure est remise à jour tout
+    // de suite plutôt qu'à la minute suivante.
+    const surRetour = () => document.visibilityState === "visible" && setTime(new Date());
+    document.addEventListener("visibilitychange", surRetour);
+    return () => {
+      clearTimeout(minuteur);
+      document.removeEventListener("visibilitychange", surRetour);
+    };
   }, []);
 
   return (
@@ -369,7 +425,7 @@ const Taskbar = () => {
             ])
           }
         >
-          <div className="tsbar" onMouseOut={hidePrev}>
+          <div className="tsbar" onDragOver={(e) => glissee.current && e.preventDefault()} onDrop={deposerSur(null)}>
             <Icon
               className="tsIcon"
               src="/img/asset/logo.svg"
@@ -385,42 +441,18 @@ const Taskbar = () => {
                 width={24}
               />
             ) : null}
-            {tasks.apps.map((task) => {
-              var isHidden = apps[task.icon].hide;
-              var isActive = apps[task.icon].z == apps.hz;
+            {[...epinglees, ...ouvertes].map(([cle, app]) => {
+              const { key, ...props } = proprietesIcone(cle, app);
+              const isActive = !app.hide && app.max && app.z == apps.hz;
               return (
-                <div
-                  key={task.icon}
-                  onMouseOver={(!isActive && !isHidden && showPrev) || null}
-                  value={task.icon}
-                >
+                <div key={key} {...props}>
                   <Icon
                     className="tsIcon"
                     width={24}
-                    open={isHidden ? null : true}
-                    click={task.action}
-                    active={isActive}
-                    payload="togg"
-                    src={task.icon}
-                  />
-                </div>
-              );
-            })}
-            {ouvertes.map(([cle, app]) => {
-              const isActive = app.z == apps.hz;
-              return (
-                <div
-                  key={cle}
-                  onMouseOver={(!isActive && showPrev) || null}
-                  value={app.icon}
-                >
-                  <Icon
-                    className="tsIcon"
-                    width={24}
-                    active={isActive}
+                    open={app.hide ? null : true}
                     click={app.action}
+                    active={isActive}
                     payload="togg"
-                    open="true"
                     src={app.icon}
                   />
                 </div>
