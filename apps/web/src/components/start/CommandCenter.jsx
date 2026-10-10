@@ -5,6 +5,8 @@ import { ouvrirFichier } from "../../apps/openRequest";
 import { etatFenetre, ouvrirFenetre } from "../../apps/windows";
 import { Icon } from "../../utils/general";
 import { classerResultats } from "./recherche";
+import { referentiel } from "../../apps/referentiel";
+import { suivreLien } from "../../apps/notifications";
 
 const COMMANDES = [
   {
@@ -63,6 +65,7 @@ const typeFichier = (node) => {
 export const CommandCenter = ({ apps, nomApp, fermer }) => {
   const [requete, setRequete] = useState("");
   const [noeuds, setNoeuds] = useState([]);
+  const [clients, setClients] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [selection, setSelection] = useState(0);
   const champ = useRef(null);
@@ -74,10 +77,18 @@ export const CommandCenter = ({ apps, nomApp, fermer }) => {
       .then((arbre) => actif && setNoeuds(arbre.noeuds || []))
       .catch(() => actif && setNoeuds([]))
       .finally(() => actif && setChargement(false));
+    // Les comptes du CRM : taper « Kouadio » ou « Ivoire Bâtiment » ouvre
+    // directement la fiche, sans passer par l'application.
+    if (apps.some((a) => a.id === "crm")) {
+      referentiel
+        .clients()
+        .then((liste) => actif && setClients(liste || []))
+        .catch(() => {});
+    }
     return () => {
       actif = false;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const elements = useMemo(() => {
     const commandes = COMMANDES.map((commande) => ({
@@ -103,8 +114,17 @@ export const CommandCenter = ({ apps, nomApp, fermer }) => {
       executer: () =>
         node.type === "FOLDER" ? ouvrirDossier(node.id) : ouvrirFichier(node, noeuds),
     }));
-    return [...commandes, ...applications, ...fichiers];
-  }, [apps, noeuds, nomApp]);
+    const comptes = clients.map((c) => ({
+      id: `crm-${c.id}`,
+      titre: c.data?.entreprise || c.data?.nom || "",
+      aide: ["Compte CRM", c.data?.entreprise ? c.data?.nom : "", c.data?.ville].filter(Boolean).join(" · "),
+      mots: `${c.data?.nom || ""} ${c.data?.email || ""} ${c.data?.telephone || ""} ${c.data?.ville || ""}`,
+      genre: "Compte",
+      icone: "people",
+      executer: () => suivreLien({ lien: { app: "crm", params: { client: c.id } } }),
+    }));
+    return [...commandes, ...applications, ...comptes, ...fichiers];
+  }, [apps, noeuds, nomApp, clients]);
 
   const resultats = useMemo(
     () => classerResultats(elements, requete, requete ? 14 : 8),

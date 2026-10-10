@@ -95,6 +95,9 @@ export const SOURCES = [
       // Seules les tâches à échéance sont des rendez-vous à venir ; un appel
       // déjà passé n'a rien à faire dans l'agenda.
       if (d.type !== "tache" || !d.echeance) return [];
+      // Un rendez-vous planifié depuis le CRM est déjà un événement de
+      // l'Agenda : sa tâche de rappel ne s'affiche pas une seconde fois.
+      if (d.evenementId) return [];
       return [
         {
           date: iso(d.echeance),
