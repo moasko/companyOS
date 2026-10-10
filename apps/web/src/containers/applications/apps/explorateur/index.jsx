@@ -148,8 +148,13 @@ export const Explorer = () => {
 
   // ---- Chargement -----------------------------------------------------------
 
+  // Chaque chargement porte un numéro : une réponse partie avant une
+  // écriture (donc périmée) n'écrase jamais l'état mis à jour entre-temps.
+  const generation = useRef(0);
+
   const charger = async () => {
     if (session.status !== "authenticated") return;
+    const numero = ++generation.current;
     try {
       const [liste, use, tout] = await Promise.all([
         lieu.type === "corbeille"
@@ -162,21 +167,69 @@ export const Explorer = () => {
         api.usage(),
         api.arborescence(),
       ]);
+      if (numero !== generation.current) return;
       setNodes(liste || []);
       setUsage(use);
       setArbre(tout?.noeuds || []);
       setErreur("");
     } catch (err) {
-      setErreur(err.message || "Cloud indisponible");
+      if (numero === generation.current) setErreur(err.message || "Cloud indisponible");
     } finally {
       setChargement(false);
     }
   };
 
-  /// Après une écriture : on recharge, et le bureau, la corbeille et les
-  /// autres fenêtres suivent — ils lisent le même cloud.
-  const apresEcriture = async () => {
-    await charger();
+  // ---- Mises à jour locales -------------------------------------------------
+  //
+  // Une action se voit **tout de suite** : la liste et l'arbre sont modifiés
+  // sur place, puis le serveur confirme en arrière-plan. En cas d'échec, le
+  // rechargement qui suit remet l'état réel.
+
+  const patchLocal = (id, patch) => {
+    generation.current += 1;
+    const maj = (l) => l.map((n) => (n.id === id ? { ...n, ...patch } : n));
+    setNodes(maj);
+    setArbre(maj);
+  };
+
+  const retirerLocal = (ids) => {
+    generation.current += 1;
+    const partis = new Set(ids);
+    for (const id of ids) for (const d of descendants(index, id)) partis.add(d.id);
+    setNodes((l) => l.filter((n) => !partis.has(n.id)));
+    setArbre((l) => l.filter((n) => !partis.has(n.id)));
+  };
+
+  const ajouterLocal = (noeuds) => {
+    const liste = (Array.isArray(noeuds) ? noeuds : [noeuds]).filter((n) => n?.id);
+    if (!liste.length) return;
+    generation.current += 1;
+    const fusion = (l, aAjouter) => {
+      const ids = new Set(aAjouter.map((n) => n.id));
+      return [...l.filter((n) => !ids.has(n.id)), ...aAjouter];
+    };
+    setArbre((l) => fusion(l, liste));
+    if (lieu.type === "dossier") setNodes((l) => fusion(l, liste.filter((n) => (n.parentId ?? null) === dossierId)));
+  };
+
+  const deplacerLocal = (ids, cible) => {
+    generation.current += 1;
+    const bouges = new Set(ids);
+    setArbre((l) => l.map((n) => (bouges.has(n.id) ? { ...n, parentId: cible ?? null } : n)));
+    if (lieu.type === "dossier") {
+      setNodes((l) => {
+        const restants = l.filter((n) => !bouges.has(n.id));
+        if ((cible ?? null) !== dossierId) return restants;
+        const arrivants = ids.map((id) => index.parId.get(id)).filter(Boolean).map((n) => ({ ...n, parentId: cible ?? null }));
+        return [...restants, ...arrivants];
+      });
+    }
+  };
+
+  /// Après une écriture : le serveur est relu en arrière-plan, et le
+  /// bureau, la corbeille et les autres fenêtres suivent — ils lisent le
+  /// même cloud (CLOUD_TOUCH relance aussi le chargement ci-dessous).
+  const apresEcriture = () => {
     dispatch({ type: "CLOUD_TOUCH" });
   };
 
@@ -380,7 +433,8 @@ export const Explorer = () => {
     if (!peutEcrire) return;
     try {
       const d = await api.createFolder(nomUnique(nomsIci(), "Nouveau dossier"), dossierId);
-      await apresEcriture();
+      ajouterLocal(d);
+      apresEcriture();
       setSelection([d.id]);
       setAncre(d.id);
       setCourant(d.id);
@@ -395,7 +449,8 @@ export const Explorer = () => {
     try {
       const nom = nomUnique(nomsIci(), "Nouveau document.txt");
       const f = await api.uploadFile(new File([""], nom, { type: "text/plain" }), dossierId);
-      await apresEcriture();
+      ajouterLocal(f);
+      apresEcriture();
       setSelection([f.id]);
       setAncre(f.id);
       setCourant(f.id);
@@ -409,13 +464,16 @@ export const Explorer = () => {
     setEdition(null);
     const nom = String(saisi || "").trim();
     if (!nom || nom === node.name) return;
+    // Le nouveau nom s'affiche aussitôt ; le serveur confirme derrière.
+    patchLocal(node.id, { name: nom });
+    zoneRef.current?.focus();
     try {
       await api.renameNode(node.id, nom);
-      await apresEcriture();
     } catch (err) {
       await modal.alert({ title: "Renommage impossible", message: err.message, tone: "error" });
+    } finally {
+      apresEcriture();
     }
-    zoneRef.current?.focus();
   };
 
   const commencerRenommage = (node = seul) => {
@@ -426,16 +484,18 @@ export const Explorer = () => {
 
   // ---- Corbeille ------------------------------------------------------------
 
-  /// Applique une opération à chaque cible, en s'arrêtant à la première
-  /// erreur — mais en rafraîchissant quand même ce qui a été fait.
+  /// Applique une opération à chaque cible. Les cibles quittent la vue
+  /// tout de suite ; à la première erreur on s'arrête, et le rechargement
+  /// remet en place ce qui n'a pas été fait.
   const surCibles = async (cibles, operation) => {
+    retirerLocal(cibles.map((n) => n.id));
+    viderSelection();
     try {
       for (const node of cibles) await operation(node);
-      viderSelection();
     } catch (err) {
       setErreur(err.message);
     } finally {
-      await apresEcriture();
+      apresEcriture();
     }
   };
 
@@ -499,13 +559,15 @@ export const Explorer = () => {
       danger: true,
     });
     if (!ok) return;
+    generation.current += 1;
+    setNodes([]);
+    viderSelection();
     try {
       await api.emptyTrash();
-      viderSelection();
     } catch (err) {
       setErreur(err.message);
     } finally {
-      await apresEcriture();
+      apresEcriture();
     }
   };
 
@@ -514,6 +576,7 @@ export const Explorer = () => {
   const deplacer = async (ids, cible) => {
     const echecs = [];
     let faits = 0;
+    const valides = [];
     for (const id of ids) {
       const node = noeudPar(id);
       if (!node || (node.parentId ?? null) === (cible ?? null)) continue;
@@ -521,6 +584,11 @@ export const Explorer = () => {
         echecs.push(`${node.name} — un dossier ne peut pas aller dans lui-même`);
         continue;
       }
+      valides.push(node);
+    }
+    // Les éléments changent de place à l'écran sans attendre le serveur.
+    deplacerLocal(valides.map((n) => n.id), cible);
+    for (const node of valides) {
       try {
         await api.moveNode(node.id, cible ?? null);
         faits += 1;
@@ -528,7 +596,7 @@ export const Explorer = () => {
         echecs.push(`${node.name} — ${err.message}`);
       }
     }
-    if (faits) await apresEcriture();
+    if (valides.length) apresEcriture();
     if (echecs.length) {
       await modal.alert({
         title: faits ? "Déplacement partiel" : "Déplacement impossible",
@@ -543,8 +611,8 @@ export const Explorer = () => {
   const copier = async (ids, cible) => {
     setOccupation({ texte: `Copie de ${ids.length} élément${ids.length > 1 ? "s" : ""}…` });
     try {
-      await api.copierFichiers(ids, cible ?? null);
-      await apresEcriture();
+      ajouterLocal(await api.copierFichiers(ids, cible ?? null));
+      apresEcriture();
     } catch (err) {
       await modal.alert({ title: "Copie impossible", message: err.message, tone: "error" });
     } finally {
@@ -624,6 +692,7 @@ export const Explorer = () => {
         if (!d) {
           d = await api.createFolder(chemin[i], parent);
           contenu.push(d);
+          ajouterLocal(d);
         }
         dossiersCrees.set(cle, d.id);
         parent = d.id;
@@ -663,7 +732,11 @@ export const Explorer = () => {
           oublierApercu(existant.id);
         } else {
           const cree = await api.uploadFile(fichier, parent, choix === "garder" ? { conflit: "renommer" } : {});
-          if (cree) contenu.push(cree);
+          if (cree) {
+            contenu.push(cree);
+            // Le fichier apparaît dès qu'il est arrivé, sans attendre la fin du lot.
+            ajouterLocal(cree);
+          }
         }
         faits += 1;
       } catch (err) {
@@ -672,7 +745,7 @@ export const Explorer = () => {
     }
 
     setOccupation(null);
-    await apresEcriture();
+    apresEcriture();
     if (echecs.length) {
       await modal.alert({
         title: faits ? "Import partiel" : "Import impossible",

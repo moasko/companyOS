@@ -7,6 +7,7 @@ import { creerJeton, lireJeton } from "../etatPartage.js";
 import { authenticate, hashPassword } from "../auth.js";
 import { basePublique } from "../espacePublic.js";
 import { journaliser } from "../audit.js";
+import { clientDe, publier } from "../evenements.js";
 import { consommerQuota, ecrireOuNettoyer, piloteEcriture, piloteLecture } from "../storage.js";
 import { typeDeFlux, typeNeutralise } from "../mimetype.js";
 
@@ -164,6 +165,19 @@ export default async function fileRoutes(app) {
     // jamais le jeton de session, qui n'a rien à faire dans une URL.
     if (request.raw.url?.startsWith("/api/files/stream/")) return;
     return authenticate(request, reply);
+  });
+
+  // Toute écriture réussie est annoncée aux autres onglets et aux collègues
+  // de l'espace (flux temps réel) : leur Explorateur, leur bureau et leur
+  // corbeille se rechargent sans attendre. L'événement ne dit rien du
+  // contenu — chacun relit avec ses droits.
+  const SANS_ECRITURE = [/\/zip$/, /\/link$/];
+  app.addHook("onResponse", async (request, reply) => {
+    if (!["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) return;
+    if (reply.statusCode >= 400 || !request.tenantId) return;
+    const chemin = String(request.raw.url || "").split("?")[0];
+    if (SANS_ECRITURE.some((r) => r.test(chemin))) return;
+    publier({ type: "cloud", t: request.tenantId, client: clientDe(request) });
   });
 
   /// Consommation et quota de l'espace de travail.

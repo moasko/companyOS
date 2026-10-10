@@ -18,6 +18,7 @@ import { api, BASE_URL, CLIENT_ID, sessionOuverte } from "./client";
 export const EVT_FICHES = "companyos:fiches";
 export const EVT_NOTIFICATION = "companyos:notification-serveur";
 export const EVT_ETAT = "companyos:temps-reel";
+export const EVT_CLOUD = "companyos:cloud";
 
 let source = null;
 let connecte = false;
@@ -72,6 +73,15 @@ const ouvrir = () => {
     if (!d.module || !d.collection) return;
     api.records.invalider(d.module, d.collection);
     window.dispatchEvent(new CustomEvent(EVT_FICHES, { detail: { ...d, moi: d.client === CLIENT_ID } }));
+  });
+
+  // Un fichier du Cloud a changé ailleurs (autre onglet, collègue). Un
+  // import de cent fichiers en annonce cent : on les regroupe.
+  let attenteCloud = null;
+  source.addEventListener("cloud", (e) => {
+    if (lire(e).client === CLIENT_ID) return;
+    clearTimeout(attenteCloud);
+    attenteCloud = setTimeout(() => window.dispatchEvent(new Event(EVT_CLOUD)), 400);
   });
 
   source.addEventListener("notification", () => {
