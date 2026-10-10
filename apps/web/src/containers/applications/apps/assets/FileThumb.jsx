@@ -43,12 +43,14 @@ export const oublierApercu = (id) => {
 };
 
 /// Icône d'un fichier : vignette pour les images, icône générique sinon.
-export const FileThumb = ({ node }) => {
+/// `apercu={false}` : l'icône de type seule (petites lignes de la vue
+/// détails, où une vignette serait illisible et coûteuse).
+export const FileThumb = ({ node, apercu = true }) => {
   const [url, setUrl] = useState(null);
   const [echec, setEchec] = useState(false);
 
   useEffect(() => {
-    if (!peutEtreAffiche(node)) return;
+    if (!apercu || !peutEtreAffiche(node)) return;
     let vivant = true;
     chargerApercu(node).then((u) => {
       if (!vivant) return;
@@ -60,7 +62,7 @@ export const FileThumb = ({ node }) => {
     };
   }, [node.id]);
 
-  if (url && !echec) {
+  if (apercu && url && !echec) {
     return (
       <div className="thumbBox">
         <img src={url} alt="" draggable={false} />

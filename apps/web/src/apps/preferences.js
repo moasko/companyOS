@@ -15,6 +15,8 @@ const CLES_LOCALES = [
   "companyos-mcp-writes",
   "companyos-code-formatage",
   "companyos-code-theme",
+  // Vue, tri et favoris de l'Explorateur (src/apps/explorateur.js).
+  "companyos-explorateur",
 ];
 
 let arreter = null;

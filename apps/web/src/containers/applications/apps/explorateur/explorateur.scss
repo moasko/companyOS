@@ -1,0 +1,930 @@
+// Explorateur : ruban, volet de navigation, vue détails, volet de détails,
+// dialogues et version téléphone. L'habillage de base (fenêtre, fil
+// d'Ariane, grille d'icônes) reste dans ../assets/fileexpo.scss.
+
+.expFenetre {
+  --exp-accent: #2563eb;
+  --exp-sel: var(--focus-bg, rgb(37 99 235 / 14%));
+  --exp-ligne: rgb(136 136 136 / 18%);
+  min-height: 0;
+}
+
+// ---- Ruban -----------------------------------------------------------------
+
+.expRubans {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--exp-ligne);
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.expRuban {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--txt-col);
+  background: transparent;
+  border: 0;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--hover-bg, rgb(136 136 136 / 16%));
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &[data-actif="true"] {
+    background: var(--exp-sel);
+  }
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.expRubanSep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--exp-ligne);
+  flex-shrink: 0;
+}
+
+.expRubanEspace {
+  flex-grow: 1;
+}
+
+// ---- Barre d'adresse -------------------------------------------------------
+
+.expBarre {
+  align-items: center;
+
+  .navIcon {
+    display: flex;
+    align-items: center;
+    height: 26px;
+  }
+}
+
+.expFil .dncont {
+  cursor: pointer;
+  border-radius: 3px;
+
+  &[data-cible="true"] {
+    background: rgb(37 99 235 / 18%);
+    outline: 1px dashed var(--exp-accent);
+  }
+}
+
+.expRecherche {
+  min-width: 160px;
+  align-items: center;
+
+  input::-webkit-search-cancel-button {
+    cursor: pointer;
+  }
+}
+
+// ---- Corps : volet, contenu, détails ---------------------------------------
+
+.expCorps {
+  min-height: 0;
+  position: relative;
+  flex: 1 1 auto;
+  height: auto;
+}
+
+.expVoletHote {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--exp-ligne);
+  display: flex;
+  min-height: 0;
+}
+
+.expVolet {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 4px 12px;
+  font-size: 12.5px;
+}
+
+.expVTitre {
+  margin: 10px 8px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gray-txt, #888);
+
+  &:first-child {
+    margin-top: 4px;
+  }
+}
+
+.expVSep {
+  height: 1px;
+  margin: 8px 6px;
+  background: var(--exp-ligne);
+}
+
+.expVLigne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding-right: 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: var(--hover-bg, rgb(136 136 136 / 14%));
+  }
+
+  &[data-actif="true"] {
+    background: var(--exp-sel);
+    font-weight: 600;
+  }
+
+  &[data-cible="true"] {
+    background: rgb(37 99 235 / 18%);
+    outline: 1px dashed var(--exp-accent);
+  }
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.expVNom {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expChev {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 3px;
+  color: var(--gray-txt, #888);
+
+  &:hover:not([data-vide="true"]) {
+    background: rgb(136 136 136 / 25%);
+  }
+
+  &[data-vide="true"] {
+    visibility: hidden;
+  }
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.expDefile {
+  align-items: stretch !important;
+}
+
+.expErreur {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #b91c1c;
+  background: rgb(239 68 68 / 10%);
+
+  button {
+    margin-left: auto;
+    display: flex;
+    color: inherit;
+  }
+}
+
+.expBandeau {
+  margin: 8px 12px 0;
+  font-size: 11.5px;
+  color: var(--gray-txt, #888);
+}
+
+.expVide {
+  margin: 28px auto;
+  max-width: 340px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--gray-txt, #888);
+}
+
+// Éléments : sélection au clavier, éléments coupés, cible de dépôt.
+.expFenetre [data-id] {
+  &[data-courant="true"] {
+    outline: 1px solid rgb(37 99 235 / 45%);
+    outline-offset: -1px;
+  }
+
+  &[data-coupe="true"] {
+    opacity: 0.45;
+  }
+
+  &[data-cible="true"] {
+    background: rgb(37 99 235 / 18%) !important;
+    outline: 1px dashed var(--exp-accent);
+  }
+}
+
+// Grille d'icônes : elle n'est plus en position absolue, pour laisser le
+// bandeau de recherche et les messages au-dessus.
+.contentarea .gridshow.expGrille {
+  position: relative;
+  padding-top: 6px;
+  padding-bottom: 16px;
+
+  &[data-size="md"] {
+    --cwidth: 6.4em;
+    grid-column-gap: 0.6em;
+
+    .conticon {
+      padding: 0.2em;
+      margin: 0.4em 0;
+    }
+
+    .thumbIcone,
+    .thumbBox {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
+  .conticon {
+    border-radius: 6px;
+  }
+}
+
+.expVignette {
+  position: relative;
+
+  .expBadge {
+    position: absolute;
+    right: -2px;
+    bottom: 2px;
+  }
+}
+
+.expBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--exp-accent);
+  box-shadow: 0 0 0 2px var(--bg1, #fff);
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.conticon .expNom {
+  width: 100%;
+  max-height: 32px;
+  text-align: center;
+  word-wrap: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.expRenommage {
+  width: 100%;
+  min-width: 80px;
+  padding: 1px 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--txt-col);
+  background: var(--bg1, #fff);
+  border: 1px solid var(--exp-accent);
+  border-radius: 3px;
+  outline: none;
+}
+
+// ---- Vue détails -------------------------------------------------------------
+
+.expDetails {
+  width: 100%;
+  font-size: 12px;
+  padding: 0 6px 16px;
+  box-sizing: border-box;
+}
+
+.expDetTete,
+.expDetLigne {
+  display: grid;
+  grid-template-columns: minmax(180px, 3fr) minmax(110px, 1.2fr) minmax(100px, 1.2fr) minmax(70px, 0.7fr);
+  align-items: center;
+  gap: 8px;
+
+  &[data-emplacement="true"] {
+    grid-template-columns: minmax(160px, 3fr) minmax(100px, 1.1fr) minmax(90px, 1fr) minmax(60px, 0.6fr) minmax(120px, 1.6fr);
+  }
+
+  > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.expDetTete {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--exp-ligne);
+  padding: 0 6px;
+}
+
+.expDetCol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--gray-txt, #777);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--txt-col);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+
+  &[data-tri] {
+    color: var(--txt-col);
+    font-weight: 600;
+  }
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.expDetLigne {
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 4px;
+  cursor: default;
+  color: var(--gray-txt, #666);
+
+  &:hover {
+    background: var(--hover-bg, rgb(136 136 136 / 10%));
+  }
+
+  &[data-focus="true"] {
+    background: var(--exp-sel);
+    color: var(--dark-txt, inherit);
+  }
+}
+
+.expDetNom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--txt-col);
+
+  .expNom {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .expBadge {
+    width: 14px;
+    height: 14px;
+    box-shadow: none;
+  }
+}
+
+.expPetit {
+  display: inline-flex;
+  flex-shrink: 0;
+
+  .thumbIcone {
+    width: 18px;
+    height: 18px;
+    filter: none;
+  }
+}
+
+.expDetTaille {
+  text-align: right;
+}
+
+// ---- Volet de détails ----------------------------------------------------------
+
+.expPanneau {
+  position: relative;
+  width: 250px;
+  flex-shrink: 0;
+  padding: 18px 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--exp-ligne);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.expPDFermer {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  padding: 5px;
+  border-radius: 4px;
+  color: var(--gray-txt, #888);
+
+  &:hover {
+    background: var(--hover-bg, rgb(136 136 136 / 16%));
+  }
+}
+
+.expPDApercu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 140px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: rgb(136 136 136 / 8%);
+
+  .thumbBox {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+  }
+
+  .thumbIcone {
+    width: 84px;
+    height: 84px;
+  }
+}
+
+.expPDMulti {
+  color: var(--gray-txt, #888);
+}
+
+.expPDNom {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.expPDType {
+  color: var(--gray-txt, #888);
+  margin-bottom: 12px;
+}
+
+.expPDAide {
+  color: var(--gray-txt, #888);
+  line-height: 1.5;
+}
+
+.expPDActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--txt-col);
+    background: rgb(136 136 136 / 12%);
+
+    &:hover {
+      background: rgb(136 136 136 / 22%);
+    }
+
+    .uicon {
+      display: flex;
+    }
+  }
+}
+
+.expPDListe {
+  margin: 0;
+  border-top: 1px solid var(--exp-ligne);
+}
+
+.expPDLigne {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--exp-ligne);
+
+  dt {
+    color: var(--gray-txt, #888);
+  }
+
+  dd {
+    margin: 0;
+    word-break: break-word;
+  }
+}
+
+.expPDLien {
+  padding: 0;
+  font: inherit;
+  color: var(--exp-accent);
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+// ---- Barre d'état ------------------------------------------------------------
+
+.expQuota {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  color: var(--gray-txt, #888);
+}
+
+.expQuotaBarre {
+  width: 90px;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgb(136 136 136 / 25%);
+
+  span {
+    display: block;
+    height: 100%;
+    background: var(--exp-accent, #2563eb);
+  }
+}
+
+.expVueBtn {
+  display: flex;
+  border: 0;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--txt-col);
+  background: transparent;
+
+  &[data-open="true"] {
+    background: var(--focus-bg);
+  }
+}
+
+// ---- Dialogues -----------------------------------------------------------------
+
+.expChoix {
+  width: min(440px, 86vw);
+}
+
+.expChoixArbre {
+  height: min(340px, 50vh);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid rgb(136 136 136 / 25%);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.expChoixLigne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding-right: 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: rgb(136 136 136 / 14%);
+  }
+
+  &[data-choisi="true"] {
+    background: rgb(37 99 235 / 16%);
+    font-weight: 600;
+  }
+
+  &[data-off="true"] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.expChoixNom {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expChoixPied {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.expChoixOu {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  opacity: 0.7;
+}
+
+.hstBouton.expPrincipal {
+  color: #fff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.expConflit {
+  width: min(440px, 86vw);
+  font-size: 13px;
+
+  p {
+    margin: 0 0 12px;
+    word-break: break-word;
+  }
+}
+
+.expConflitChoix {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  button {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    text-align: left;
+    color: inherit;
+    border: 1px solid rgb(136 136 136 / 25%);
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+
+    &:hover {
+      border-color: #2563eb;
+      background: rgb(37 99 235 / 6%);
+    }
+
+    .uicon {
+      display: flex;
+      margin-top: 2px;
+    }
+
+    span {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    small {
+      opacity: 0.7;
+      word-break: break-word;
+    }
+  }
+}
+
+.expConflitTous {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+// ---- Téléphone ---------------------------------------------------------------
+
+.expListeMobile {
+  width: 100%;
+  padding: 4px 0 24px;
+}
+
+.expLigneMobile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--exp-ligne);
+
+  &[data-focus="true"] {
+    background: var(--exp-sel);
+  }
+
+  .thumbIcone,
+  .thumbBox {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+  }
+}
+
+.expLigneTexte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .expNom {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    font-size: 11.5px;
+    color: var(--gray-txt, #888);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.expPlus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--gray-txt, #777);
+  background: transparent;
+
+  .uicon {
+    display: flex;
+  }
+}
+
+.expVoile {
+  display: none;
+}
+
+.expFenetre[data-telephone="true"] {
+  .expRuban span {
+    display: none;
+  }
+
+  .expRuban {
+    padding: 8px 10px;
+  }
+
+  .expBarre {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .expFil {
+    min-width: 0;
+    height: 30px;
+  }
+
+  .expRecherche {
+    order: 10;
+    width: 100%;
+    flex-basis: 100%;
+    margin: 0 0.6em;
+    padding: 0.5em 0.2em;
+  }
+
+  .expVoletHote {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: min(280px, 82vw);
+    background: var(--bg1);
+    box-shadow: 8px 0 24px rgb(0 0 0 / 25%);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+
+    &[data-ouvert="true"] {
+      transform: none;
+    }
+  }
+
+  .expVLigne {
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .expVoile {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    background: rgb(0 0 0 / 30%);
+  }
+}
+
+// ---- Ajustements sur l'habillage hérité ------------------------------------
+
+.expBarre .path-bar {
+  align-self: stretch;
+  min-height: 30px;
+}
+
+.expCorps .contentarea {
+  min-width: 0;
+}
+
+.expDetCol,
+.expPDActions button,
+.expPDFermer,
+.expPlus,
+.expErreur button {
+  border: 0;
+}
+
+// `.conticon span` (fileexpo.scss) étire tout span sur la largeur : le
+// badge garde son gabarit.
+.contentarea .conticon .expBadge {
+  width: 16px;
+  max-height: none;
+  display: inline-flex;
+  -webkit-line-clamp: unset;
+}
+
+// Fenêtre étroite : les gestes secondaires du ruban passent en icône seule
+// (le libellé reste dans l'infobulle).
+.expFenetre {
+  container-type: inline-size;
+}
+
+@container (max-width: 1180px) {
+  .expRuban[data-compact="true"] span {
+    display: none;
+  }
+}
+
+.expChoix,
+.expConflit {
+  padding: 14px 18px 16px;
+  box-sizing: border-box;
+  width: min(460px, 90vw);
+}
+
+.expFenetre[data-telephone="true"] .view-opts {
+  display: none;
+}

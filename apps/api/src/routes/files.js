@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Readable } from "node:stream";
+import { zipEnFlux } from "../zip.js";
 import { createHash, randomBytes } from "node:crypto";
 import { prisma, serialize } from "../db.js";
 import { creerJeton, lireJeton } from "../etatPartage.js";
@@ -181,9 +183,12 @@ export default async function fileRoutes(app) {
     const nodes = await prisma.fsNode.findMany({
       where: { tenantId: request.tenantId, parentId, deletedAt: null },
       orderBy: [{ type: "asc" }, { name: "asc" }],
+      // De quoi signaler d'un coup d'œil un fichier partagé publiquement ou
+      // qui a des versions précédentes.
+      include: { _count: { select: { versions: true, partages: { where: { revoqueLe: null, expireLe: { gt: new Date() } } } } } },
     });
 
-    return serialize(nodes);
+    return serialize(nodes.map(({ _count, ...n }) => ({ ...n, nbVersions: _count.versions, nbPartages: _count.partages })));
   });
 
   /// Contenu de la corbeille : uniquement ce que l'utilisateur a
@@ -209,7 +214,7 @@ export default async function fileRoutes(app) {
   app.get("/arborescence", async (request) => {
     const nodes = await prisma.fsNode.findMany({
       where: { tenantId: request.tenantId, deletedAt: null },
-      select: { id: true, name: true, type: true, parentId: true, size: true, mimeType: true },
+      select: { id: true, name: true, type: true, parentId: true, size: true, mimeType: true, updatedAt: true, createdAt: true },
       orderBy: [{ type: "asc" }, { name: "asc" }],
       take: ARBRE_MAX + 1,
     });
@@ -275,6 +280,12 @@ export default async function fileRoutes(app) {
     if (parentId && !(await findOwned(request.tenantId, parentId))) {
       return reply.code(404).send({ error: "Dossier parent introuvable" });
     }
+    // « Garder les deux » : un nom libre (« rapport (2).pdf ») plutôt qu'un
+    // refus. Le champ doit précéder le fichier dans le formulaire.
+    const nomFichier =
+      upload.fields?.conflit?.value === "renommer"
+        ? await nomLibre(request.tenantId, parentId, upload.filename)
+        : upload.filename;
 
     const tenant = await prisma.tenant.findUnique({ where: { id: request.tenantId } });
     if (tenant.usedBytes >= tenant.quota) {
@@ -301,7 +312,7 @@ export default async function fileRoutes(app) {
             tenantId: request.tenantId,
             ownerId: request.user.id,
             parentId,
-            name: upload.filename,
+            name: nomFichier,
             type: "FILE",
             size: BigInt(size),
             mimeType: typeNeutralise(upload.mimetype),
@@ -856,5 +867,155 @@ export default async function fileRoutes(app) {
     await prisma.lienPartage.update({ where: { id: lien.id }, data: { revoqueLe: new Date() } });
     await journaliser(request, "fichier.partage.revocation", lien.node?.name || null);
     return reply.code(204).send();
+  });
+
+  // ---- Récents, copie, archive ZIP ---------------------------------------------
+
+  /// Les fichiers modifiés le plus récemment dans l'espace.
+  app.get("/recents", async (request) => {
+    const nodes = await prisma.fsNode.findMany({
+      where: { tenantId: request.tenantId, deletedAt: null, type: "FILE" },
+      orderBy: { updatedAt: "desc" },
+      take: 40,
+    });
+    return serialize(nodes);
+  });
+
+  const COPIE_MAX = 2000;
+  const selectionSchema = z.object({
+    ids: z.array(z.string().min(1).max(40)).min(1).max(500),
+    parentId: z.string().nullable().optional(),
+  });
+
+  /// Copier des fichiers et des dossiers (récursivement) vers un dossier.
+  /// Les octets sont réellement dupliqués : la copie vit sa vie, ses
+  /// versions et sa corbeille sont les siennes.
+  app.post("/copie", async (request, reply) => {
+    const parsed = selectionSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Sélection invalide" });
+    const parentId = parsed.data.parentId || null;
+    if (parentId) {
+      const cible = await findOwned(request.tenantId, parentId);
+      if (!cible || cible.type !== "FOLDER") return reply.code(404).send({ error: "Dossier de destination introuvable" });
+    }
+    const sources = await prisma.fsNode.findMany({
+      where: { tenantId: request.tenantId, id: { in: parsed.data.ids }, deletedAt: null },
+    });
+    if (!sources.length) return reply.code(404).send({ error: "Éléments introuvables" });
+
+    // Tout le contenu à copier, mesuré avant de commencer : on refuse
+    // d'emblée ce qui ne tient pas, plutôt que de s'arrêter à moitié.
+    const arbres = [];
+    for (const s of sources) {
+      const tous = await collectSubtree(request.tenantId, s, { vivantsSeulement: true });
+      if (parentId && s.type === "FOLDER" && tous.some((n) => n.id === parentId)) {
+        return reply.code(400).send({ error: "Un dossier ne peut pas être copié dans lui-même." });
+      }
+      arbres.push(tous);
+    }
+    const nombre = arbres.reduce((n, a) => n + a.length, 0);
+    if (nombre > COPIE_MAX) return reply.code(400).send({ error: `Copie limitée à ${COPIE_MAX} éléments à la fois.` });
+    const octets = arbres.flat().reduce((t, n) => t + (n.type === "FILE" ? n.size : 0n), 0n);
+    const tenant = await prisma.tenant.findUnique({ where: { id: request.tenantId } });
+    if (tenant.usedBytes + octets > tenant.quota) return reply.code(413).send({ error: "Quota de stockage insuffisant pour cette copie." });
+
+    const pilote = await piloteEcriture(request.tenantId);
+    const copierNoeud = async (n, versParent, nom) => {
+      if (n.type === "FOLDER") {
+        const dossier = await prisma.fsNode.create({
+          data: { tenantId: request.tenantId, ownerId: request.user.id, parentId: versParent, name: nom, type: "FOLDER" },
+        });
+        const enfants = await prisma.fsNode.findMany({ where: { tenantId: request.tenantId, parentId: n.id, deletedAt: null } });
+        for (const e of enfants) await copierNoeud(e, dossier.id, e.name);
+        return dossier;
+      }
+      const cle = pilote.buildKey(request.tenantId, nom);
+      const taille = await ecrireOuNettoyer(pilote, cle, (await piloteLecture(n.storage, request.tenantId)).read(n.storageKey));
+      try {
+        return await prisma.$transaction(async (tx) => {
+          const cree = await tx.fsNode.create({
+            data: {
+              tenantId: request.tenantId,
+              ownerId: request.user.id,
+              parentId: versParent,
+              name: nom,
+              type: "FILE",
+              size: BigInt(taille),
+              mimeType: n.mimeType,
+              storageKey: cle,
+              storage: pilote.nom,
+            },
+          });
+          await consommerQuota(tx, request.tenantId, taille);
+          return cree;
+        });
+      } catch (err) {
+        await pilote.remove(cle).catch(() => {});
+        throw err;
+      }
+    };
+
+    const copies = [];
+    try {
+      for (const s of sources) {
+        copies.push(await copierNoeud(s, parentId, await nomLibre(request.tenantId, parentId, s.name)));
+      }
+    } catch (err) {
+      if (err.code === "QUOTA") return reply.code(413).send({ error: err.message });
+      throw err;
+    }
+    await journaliser(request, "fichier.copie", sources.length === 1 ? sources[0].name : `${sources.length} éléments`, { elements: nombre });
+    return reply.code(201).send(serialize(copies));
+  });
+
+  const ZIP_MAX_OCTETS = 2n * 1024n ** 3n;
+  const ZIP_MAX_ENTREES = 10_000;
+
+  /// Télécharger une sélection (dossiers compris) en une archive ZIP,
+  /// produite au fil de l'eau — voir src/zip.js.
+  app.post("/zip", async (request, reply) => {
+    const parsed = selectionSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Sélection invalide" });
+    const sources = await prisma.fsNode.findMany({
+      where: { tenantId: request.tenantId, id: { in: parsed.data.ids }, deletedAt: null },
+    });
+    if (!sources.length) return reply.code(404).send({ error: "Éléments introuvables" });
+
+    // Chemin de chaque élément dans l'archive, à partir des racines choisies.
+    const entrees = [];
+    const vus = new Set();
+    for (const s of sources) {
+      const tous = await collectSubtree(request.tenantId, s, { vivantsSeulement: true });
+      const chemins = new Map([[s.id, s.name]]);
+      for (const n of tous) {
+        if (n.id !== s.id) chemins.set(n.id, `${chemins.get(n.parentId)}/${n.name}`);
+        if (vus.has(n.id)) continue;
+        vus.add(n.id);
+        entrees.push({ n, chemin: chemins.get(n.id) });
+      }
+    }
+    if (entrees.length > ZIP_MAX_ENTREES) return reply.code(400).send({ error: `Archive limitée à ${ZIP_MAX_ENTREES} éléments.` });
+    const total = entrees.reduce((t, { n }) => t + (n.type === "FILE" ? n.size : 0n), 0n);
+    if (total > ZIP_MAX_OCTETS) return reply.code(400).send({ error: "Archive limitée à 2 Go : téléchargez en plusieurs fois." });
+
+    const tenantId = request.tenantId;
+    const nom = sources.length === 1 ? `${sources[0].name.replace(/\.[^.]+$/, "") || "archive"}.zip` : "fichiers.zip";
+    await journaliser(request, "fichier.archive", nom, { elements: entrees.length, octets: Number(total) });
+    reply
+      .header("Content-Type", "application/zip")
+      .header("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(nom)}`)
+      .header("Cache-Control", "no-store");
+    return reply.send(
+      Readable.from(
+        zipEnFlux(
+          entrees.map(({ n, chemin }) => ({
+            nom: chemin,
+            dossier: n.type === "FOLDER",
+            date: n.updatedAt,
+            ouvrir: n.type === "FILE" ? async () => (await piloteLecture(n.storage, tenantId)).read(n.storageKey) : undefined,
+          })),
+        ),
+      ),
+    );
   });
 }
