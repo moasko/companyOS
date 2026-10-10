@@ -393,6 +393,19 @@ export const api = {
   moveNode: (id, parentId) =>
     request(`/files/${id}`, { method: "PATCH", body: { parentId } }),
 
+  recents: () => request("/files/recents"),
+  copierFichiers: (ids, parentId) => request("/files/copie", { method: "POST", body: { ids, parentId } }),
+  /// Archive ZIP d'une sélection (dossiers compris), en Blob.
+  zipFichiers: async (ids) => {
+    const r = await apiFetch(`${BASE_URL}/api/files/zip`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || `Erreur ${r.status}`);
+    return r.blob();
+  },
+
   /// Met à la corbeille — réversible pendant 30 jours.
   deleteNode: (id) => request(`/files/${id}`, { method: "DELETE" }),
 
@@ -404,9 +417,12 @@ export const api = {
   purgeNode: (id) => request(`/files/trash/${id}`, { method: "DELETE" }),
   emptyTrash: () => request("/files/trash", { method: "DELETE" }),
 
-  uploadFile: (file, parentId = null) => {
+  /// `conflit: "renommer"` : un nom libre si le nom est pris (« Garder les
+  /// deux ») au lieu d'un refus 409.
+  uploadFile: (file, parentId = null, { conflit } = {}) => {
     const form = new FormData();
     if (parentId) form.append("parentId", parentId);
+    if (conflit) form.append("conflit", conflit);
     form.append("file", file);
     return request("/files/upload", { method: "POST", body: form, isForm: true });
   },
