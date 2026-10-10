@@ -44,7 +44,15 @@ export const CAMPAGNE_VIDE = {
   // vides = tous. `achatMois` : a reçu une facture ces N derniers mois (0 =
   // sans condition). `repos` : écarte qui a reçu une campagne ces N
   // derniers jours. `ids` : une liste fermée (relance des non-ouvreurs).
-  filtres: { statut: "tous", villes: [], secteurs: [], etiquettes: [], achatMois: 0, repos: 0, ids: null },
+  filtres: {
+    statut: "tous",
+    villes: [],
+    secteurs: [],
+    etiquettes: [],
+    achatMois: 0,
+    repos: 0,
+    ids: null,
+  },
   // Écartés à la main, pour cette campagne seulement.
   exclus: [],
   statut: "brouillon", // brouillon | programmee | envoi | terminee
@@ -104,7 +112,14 @@ export const normaliserFiltres = (f = {}) => ({
 });
 
 const dansListe = (valeur, liste) =>
-  !liste.length || liste.some((v) => v.toLowerCase() === String(valeur || "").trim().toLowerCase());
+  !liste.length ||
+  liste.some(
+    (v) =>
+      v.toLowerCase() ===
+      String(valeur || "")
+        .trim()
+        .toLowerCase(),
+  );
 
 /// Le contexte que l'audience consulte hors du CRM, calculé une fois :
 ///   • `derniereFacture` : clientId → date ISO de sa dernière facture ;
@@ -115,7 +130,8 @@ export const contexteAudience = ({ factures = [], campagnes = [] } = {}) => {
     const d = f.data || f;
     if (d.type && d.type !== "facture") continue;
     if (d.statut === "brouillon" || d.statut === "annule" || !d.clientId) continue;
-    if (!derniereFacture[d.clientId] || d.date > derniereFacture[d.clientId]) derniereFacture[d.clientId] = d.date;
+    if (!derniereFacture[d.clientId] || d.date > derniereFacture[d.clientId])
+      derniereFacture[d.clientId] = d.date;
   }
   const dernierEnvoi = {};
   for (const c of campagnes) {
@@ -123,24 +139,42 @@ export const contexteAudience = ({ factures = [], campagnes = [] } = {}) => {
     for (const dest of d.destinataires || []) {
       if (dest.statut !== "envoye") continue;
       const le = dest.envoyeLe || d.termineeLe || d.envoyerLe || d.creeLe || "";
-      if (le && (!dernierEnvoi[dest.clientId] || le > dernierEnvoi[dest.clientId])) dernierEnvoi[dest.clientId] = le;
+      if (le && (!dernierEnvoi[dest.clientId] || le > dernierEnvoi[dest.clientId]))
+        dernierEnvoi[dest.clientId] = le;
     }
   }
   return { derniereFacture, dernierEnvoi };
 };
 
-const ilYA = (jours, maintenant) => new Date(new Date(maintenant).getTime() - jours * 86400000).toISOString();
+const ilYA = (jours, maintenant) =>
+  new Date(new Date(maintenant).getTime() - jours * 86400000).toISOString();
 
 /// L'audience détaillée : qui correspond aux critères, et pourquoi les
 /// autres sont écartés. `retenus` est ce qui partira.
-export const segmenter = (clients = [], filtres = {}, { exclus = [], contexte = {}, maintenant = new Date().toISOString() } = {}) => {
+export const segmenter = (
+  clients = [],
+  filtres = {},
+  { exclus = [], contexte = {}, maintenant = new Date().toISOString() } = {},
+) => {
   const f = normaliserFiltres(filtres);
   const ids = f.ids ? new Set(f.ids) : null;
   const ecartes = new Set(exclus);
-  const limiteAchat = f.achatMois ? ilYA(f.achatMois * 30.44, maintenant).slice(0, 10) : null;
+  const limiteAchat = f.achatMois
+    ? ilYA(f.achatMois * 30.44, maintenant).slice(0, 10)
+    : null;
   const limiteRepos = f.repos ? ilYA(f.repos, maintenant) : null;
   const vues = new Set();
-  const out = { correspondants: [], retenus: [], sansEmail: 0, desinscrits: 0, rebonds: 0, aConfirmer: 0, doublons: 0, auRepos: 0, exclus: 0 };
+  const out = {
+    correspondants: [],
+    retenus: [],
+    sansEmail: 0,
+    desinscrits: 0,
+    rebonds: 0,
+    aConfirmer: 0,
+    doublons: 0,
+    auRepos: 0,
+    exclus: 0,
+  };
   const etiquettes = f.etiquettes.map((e) => e.toLowerCase());
 
   for (const c of clients) {
@@ -148,22 +182,47 @@ export const segmenter = (clients = [], filtres = {}, { exclus = [], contexte = 
     if (ids && !ids.has(c.id)) continue;
     if (f.statut !== "tous" && d.statut !== f.statut) continue;
     if (!dansListe(d.ville, f.villes) || !dansListe(d.secteur, f.secteurs)) continue;
-    if (etiquettes.length && !(d.etiquettes || []).some((e) => etiquettes.includes(String(e).toLowerCase()))) continue;
+    if (
+      etiquettes.length &&
+      !(d.etiquettes || []).some((e) => etiquettes.includes(String(e).toLowerCase()))
+    )
+      continue;
     if (limiteAchat && !((contexte.derniereFacture || {})[c.id] >= limiteAchat)) continue;
     out.correspondants.push(c);
 
-    if (!adresseValide(d.email)) { out.sansEmail += 1; continue; }
-    if (d.emailDesinscrit) { out.desinscrits += 1; continue; }
+    if (!adresseValide(d.email)) {
+      out.sansEmail += 1;
+      continue;
+    }
+    if (d.emailDesinscrit) {
+      out.desinscrits += 1;
+      continue;
+    }
     // Une adresse qui a rebondi définitivement n'existe plus : insister
     // dégrade la réputation de l'expéditeur.
-    if (d.emailRebond) { out.rebonds += 1; continue; }
+    if (d.emailRebond) {
+      out.rebonds += 1;
+      continue;
+    }
     // Inscrit par le formulaire mais pas encore confirmé (double opt-in).
-    if (d.emailAConfirmer) { out.aConfirmer += 1; continue; }
+    if (d.emailAConfirmer) {
+      out.aConfirmer += 1;
+      continue;
+    }
     const cle = d.email.trim().toLowerCase();
-    if (vues.has(cle)) { out.doublons += 1; continue; }
+    if (vues.has(cle)) {
+      out.doublons += 1;
+      continue;
+    }
     vues.add(cle);
-    if (limiteRepos && (contexte.dernierEnvoi || {})[c.id] >= limiteRepos) { out.auRepos += 1; continue; }
-    if (ecartes.has(c.id)) { out.exclus += 1; continue; }
+    if (limiteRepos && (contexte.dernierEnvoi || {})[c.id] >= limiteRepos) {
+      out.auRepos += 1;
+      continue;
+    }
+    if (ecartes.has(c.id)) {
+      out.exclus += 1;
+      continue;
+    }
     out.retenus.push(c);
   }
   return out;
@@ -189,12 +248,25 @@ export const santeDe = (clients = []) => {
     else if (d.emailAConfirmer) aConfirmer += 1;
     else joignables += 1;
   }
-  return { total: clients.length, joignables, sansEmail, desinscrits, rebonds, aConfirmer };
+  return {
+    total: clients.length,
+    joignables,
+    sansEmail,
+    desinscrits,
+    rebonds,
+    aConfirmer,
+  };
 };
 
 /// Toutes les étiquettes posées sur les fiches, triées.
 export const etiquettesDe = (clients = []) =>
-  [...new Set(clients.flatMap((c) => (c.data?.etiquettes || []).map((e) => String(e).trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));
+  [
+    ...new Set(
+      clients.flatMap((c) =>
+        (c.data?.etiquettes || []).map((e) => String(e).trim()).filter(Boolean),
+      ),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "fr"));
 
 /// Les valeurs distinctes d'un champ, pour remplir les filtres — triées,
 /// vides écartés.
@@ -203,7 +275,10 @@ export const valeursDe = (clients = [], champ) =>
     (a, b) => a.localeCompare(b, "fr"),
   );
 
-const premierMot = (t) => String(t || "").trim().split(/\s+/)[0] || "";
+const premierMot = (t) =>
+  String(t || "")
+    .trim()
+    .split(/\s+/)[0] || "";
 
 /// L'instantané d'un destinataire, figé au lancement : la campagne
 /// n'oublie personne même si la fiche CRM change ensuite.
@@ -214,7 +289,9 @@ export const destinataireDe = (client) => ({
   contact: client.data.entreprise ? client.data.nom || "" : "",
   // Le prénom de la personne de la fiche — « Awa » pour « Awa Koné » —,
   // vide pour une fiche sans nom de personne.
-  prenom: premierMot(client.data.nom && client.data.nom !== client.data.email ? client.data.nom : ""),
+  prenom: premierMot(
+    client.data.nom && client.data.nom !== client.data.email ? client.data.nom : "",
+  ),
   ville: client.data.ville || "",
   statut: "attente", // attente | envoye | echec | reserve (A/B)
   erreur: null,
@@ -257,7 +334,16 @@ export const VARIABLES = [
 /// pour l'ancien format : c'est le lien n° 0, celui du bouton.
 export const htmlDe = (
   campagne,
-  { entreprise = "", lienCta = "", lienDesinscription = "", pixel = "", logo = "", pied = "", lien, image } = {},
+  {
+    entreprise = "",
+    lienCta = "",
+    lienDesinscription = "",
+    pixel = "",
+    logo = "",
+    pied = "",
+    lien,
+    image,
+  } = {},
 ) =>
   htmlBlocs(campagne, {
     entreprise,
@@ -266,7 +352,10 @@ export const htmlDe = (
     logo,
     pied,
     image,
-    lien: lien || ((i, url) => (lienCta && i === 0 && !(campagne.blocs || []).length ? lienCta : url)),
+    lien:
+      lien ||
+      ((i, url) =>
+        lienCta && i === 0 && !(campagne.blocs || []).length ? lienCta : url),
   });
 
 // ---------------------------------------------------------------------------
@@ -302,7 +391,13 @@ export const resumeDe = (destinataires = []) => {
 /// Un message à envoyer : des blocs avec du texte, ou l'ancien texte.
 export const aUnMessage = (campagne = {}) =>
   (campagne.blocs || []).length
-    ? campagne.blocs.some((b) => String(b.texte || b.label || b.code || "").trim() || (b.produits || []).length || b.url || b.nodeId)
+    ? campagne.blocs.some(
+        (b) =>
+          String(b.texte || b.label || b.code || "").trim() ||
+          (b.produits || []).length ||
+          b.url ||
+          b.nodeId,
+      )
     : Boolean(String(campagne.texte || "").trim());
 
 /// Prête au lancement : un nom, un sujet, un corps, au moins un
@@ -320,7 +415,19 @@ export const prete = (campagne) =>
 // ---------------------------------------------------------------------------
 
 /// Mots qui font tiquer les filtres anti-spam — à éviter dans l'objet.
-const MOTS_A_RISQUE = ["gratuit", "urgent", "gagnez", "gagné", "100%", "cliquez ici", "argent facile", "offre limitée", "promo!!!", "€€€", "sans frais"];
+const MOTS_A_RISQUE = [
+  "gratuit",
+  "urgent",
+  "gagnez",
+  "gagné",
+  "100%",
+  "cliquez ici",
+  "argent facile",
+  "offre limitée",
+  "promo!!!",
+  "€€€",
+  "sans frais",
+];
 
 /// Un avis sur l'objet : longueur, majuscules, ponctuation, mots à risque.
 export const analyseObjet = (objet = "") => {
@@ -328,16 +435,27 @@ export const analyseObjet = (objet = "") => {
   const longueur = t.length;
   const conseils = [];
   const lettres = t.replace(/[^A-Za-zÀ-ÿ]/g, "");
-  if (lettres.length > 8 && lettres === lettres.toUpperCase()) conseils.push("Évitez les objets tout en majuscules.");
+  if (lettres.length > 8 && lettres === lettres.toUpperCase())
+    conseils.push("Évitez les objets tout en majuscules.");
   if (/[!?]{2,}/.test(t)) conseils.push("Une seule ponctuation forte suffit.");
   const mots = MOTS_A_RISQUE.filter((m) => t.toLowerCase().includes(m));
-  if (mots.length) conseils.push(`Mot à risque pour les filtres anti-spam : « ${mots[0]} ».`);
+  if (mots.length)
+    conseils.push(`Mot à risque pour les filtres anti-spam : « ${mots[0]} ».`);
   if (longueur > 70) conseils.push("Objet long : il sera coupé sur mobile.");
-  const ton = !longueur ? "vide" : conseils.length ? "attention" : longueur < 15 ? "court" : "ok";
+  const ton = !longueur
+    ? "vide"
+    : conseils.length
+      ? "attention"
+      : longueur < 15
+        ? "court"
+        : "ok";
   const avis =
-    ton === "vide" ? "À écrire"
-      : ton === "court" ? "Un peu court : dites ce que le client y gagne"
-        : ton === "ok" ? "Bonne longueur"
+    ton === "vide"
+      ? "À écrire"
+      : ton === "court"
+        ? "Un peu court : dites ce que le client y gagne"
+        : ton === "ok"
+          ? "Bonne longueur"
           : conseils[0];
   return { longueur, ton, avis, conseils };
 };
@@ -346,7 +464,8 @@ export const analyseObjet = (objet = "") => {
 /// campagnes.js) : la durée d'un envoi, en minutes, arrondie.
 export const MESSAGES_PAR_PASSAGE = 8;
 export const SECONDES_PAR_PASSAGE = 45;
-export const dureeEnvoi = (n = 0) => Math.max(1, Math.ceil(n / MESSAGES_PAR_PASSAGE) * SECONDES_PAR_PASSAGE / 60);
+export const dureeEnvoi = (n = 0) =>
+  Math.max(1, (Math.ceil(n / MESSAGES_PAR_PASSAGE) * SECONDES_PAR_PASSAGE) / 60);
 export const libelleDuree = (n = 0) => {
   if (!n) return "";
   const minutes = Math.round(dureeEnvoi(n));
@@ -360,11 +479,36 @@ export const libelleDuree = (n = 0) => {
 /// Ce qui manque avant le lancement, dans l'ordre du parcours.
 export const verificationsLancement = (campagne, nbRetenus, testEnvoye = false) => [
   { id: "nom", label: "Un nom interne", ok: Boolean(String(campagne.nom || "").trim()) },
-  { id: "audience", label: nbRetenus ? `Une audience : ${nbRetenus} contact${nbRetenus > 1 ? "s" : ""}` : "Une audience", ok: nbRetenus > 0 },
+  {
+    id: "audience",
+    label: nbRetenus
+      ? `Une audience : ${nbRetenus} contact${nbRetenus > 1 ? "s" : ""}`
+      : "Une audience",
+    ok: nbRetenus > 0,
+  },
   { id: "sujet", label: "Un objet", ok: Boolean(String(campagne.sujet || "").trim()) },
   { id: "texte", label: "Un message", ok: aUnMessage(campagne) },
-  { id: "cta", label: "Un lien valide pour le bouton", ok: (campagne.blocs || []).length ? campagne.blocs.filter((b) => b.type === "bouton").every((b) => b.label && /^https?:\/\//i.test(b.url || "")) : !campagne.cta?.label || /^https?:\/\//i.test(campagne.cta?.url || ""), facultatif: (campagne.blocs || []).length ? !campagne.blocs.some((b) => b.type === "bouton") : !campagne.cta?.label },
-  { id: "ab", label: "Deux objets différents pour le test A/B", ok: !campagne.ab?.actif || (String(campagne.ab.sujetB || "").trim() && campagne.ab.sujetB.trim() !== String(campagne.sujet || "").trim()), facultatif: !campagne.ab?.actif },
+  {
+    id: "cta",
+    label: "Un lien valide pour le bouton",
+    ok: (campagne.blocs || []).length
+      ? campagne.blocs
+          .filter((b) => b.type === "bouton")
+          .every((b) => b.label && /^https?:\/\//i.test(b.url || ""))
+      : !campagne.cta?.label || /^https?:\/\//i.test(campagne.cta?.url || ""),
+    facultatif: (campagne.blocs || []).length
+      ? !campagne.blocs.some((b) => b.type === "bouton")
+      : !campagne.cta?.label,
+  },
+  {
+    id: "ab",
+    label: "Deux objets différents pour le test A/B",
+    ok:
+      !campagne.ab?.actif ||
+      (String(campagne.ab.sujetB || "").trim() &&
+        campagne.ab.sujetB.trim() !== String(campagne.sujet || "").trim()),
+    facultatif: !campagne.ab?.actif,
+  },
   { id: "test", label: "Un test reçu dans votre boîte", ok: testEnvoye, conseil: true },
 ];
 
@@ -376,12 +520,24 @@ export const verificationsLancement = (campagne, nbRetenus, testEnvoye = false) 
 /// d'après l'horodatage enregistré par le pixel.
 export const ouverturesParHeure = (campagne, heures = 24) => {
   const dests = campagne.destinataires || [];
-  const dates = dests.map((d) => d.ouvertLe).filter(Boolean).sort();
-  const debut = campagne.envoyerLe || dests.map((d) => d.envoyeLe).filter(Boolean).sort()[0] || dates[0];
+  const dates = dests
+    .map((d) => d.ouvertLe)
+    .filter(Boolean)
+    .sort();
+  const debut =
+    campagne.envoyerLe ||
+    dests
+      .map((d) => d.envoyeLe)
+      .filter(Boolean)
+      .sort()[0] ||
+    dates[0];
   if (!debut) return { debut: null, cases: [] };
   const t0 = new Date(debut);
   t0.setMinutes(0, 0, 0);
-  const cases = Array.from({ length: heures }, (_, i) => ({ heure: new Date(t0.getTime() + i * 3600000).toISOString(), n: 0 }));
+  const cases = Array.from({ length: heures }, (_, i) => ({
+    heure: new Date(t0.getTime() + i * 3600000).toISOString(),
+    n: 0,
+  }));
   for (const le of dates) {
     const i = Math.floor((new Date(le) - t0) / 3600000);
     if (i >= 0 && i < heures) cases[i].n += 1;
@@ -403,7 +559,9 @@ const copieBlocs = (blocs) => JSON.parse(JSON.stringify(blocs || []));
 /// Une nouvelle campagne pour ceux qui n'ont pas ouvert : même message,
 /// objet à retravailler, audience fermée sur ces seules personnes.
 export const relanceDe = (campagne) => {
-  const ids = (campagne.destinataires || []).filter((d) => d.statut === "envoye" && !d.ouvert && !d.desinscrit).map((d) => d.clientId);
+  const ids = (campagne.destinataires || [])
+    .filter((d) => d.statut === "envoye" && !d.ouvert && !d.desinscrit)
+    .map((d) => d.clientId);
   return {
     ...CAMPAGNE_VIDE,
     nom: `${campagne.nom || "Campagne"} — relance`,
@@ -430,7 +588,11 @@ export const dupliquer = (campagne) => ({
   couleur: campagne.couleur || CAMPAGNE_VIDE.couleur,
   blocs: copieBlocs(campagne.blocs),
   langue: campagne.langue || "fr",
-  ab: { ...CAMPAGNE_VIDE.ab, actif: Boolean(campagne.ab?.actif), sujetB: campagne.ab?.sujetB || "" },
+  ab: {
+    ...CAMPAGNE_VIDE.ab,
+    actif: Boolean(campagne.ab?.actif),
+    sujetB: campagne.ab?.sujetB || "",
+  },
   filtres: normaliserFiltres(campagne.filtres),
 });
 
@@ -440,7 +602,10 @@ export const reessayerEchecs = (campagne) => ({
   statut: "programmee",
   envoyerLe: "",
   destinataires: (campagne.destinataires || []).map((d) =>
-    d.statut === "echec" && !d.desinscrit && d.rebond !== "definitif" ? { ...d, statut: "attente", erreur: null, essais: 0 } : d),
+    d.statut === "echec" && !d.desinscrit && d.rebond !== "definitif"
+      ? { ...d, statut: "attente", erreur: null, essais: 0 }
+      : d,
+  ),
 });
 
 const cellule = (v) => {
@@ -450,16 +615,43 @@ const cellule = (v) => {
 
 /// Les destinataires en CSV (séparateur « ; », que les tableurs français
 /// ouvrent sans import).
-export const csvDe = (campagne, entetes = ["Nom", "E-mail", "Ville", "Statut", "Version", "Ouvert le", "Cliqué le", "Désinscrit", "Erreur"]) => {
+export const csvDe = (
+  campagne,
+  entetes = [
+    "Nom",
+    "E-mail",
+    "Ville",
+    "Statut",
+    "Version",
+    "Ouvert le",
+    "Cliqué le",
+    "Désinscrit",
+    "Erreur",
+  ],
+) => {
   const lignes = [entetes];
   for (const d of campagne.destinataires || []) {
-    lignes.push([d.nom, d.email, d.ville, d.statut, d.variante || "", d.ouvertLe || "", d.cliqueLe || "", d.desinscrit ? "oui" : "", d.erreur || ""]);
+    lignes.push([
+      d.nom,
+      d.email,
+      d.ville,
+      d.statut,
+      d.variante || "",
+      d.ouvertLe || "",
+      d.cliqueLe || "",
+      d.desinscrit ? "oui" : "",
+      d.erreur || "",
+    ]);
   }
   return lignes.map((l) => l.map(cellule).join(";")).join("\r\n");
 };
 
 /// Les chiffres d'ensemble du tableau de bord, sur `jours` jours.
-export const statistiquesGlobales = (campagnes = [], jours = 30, maintenant = new Date().toISOString()) => {
+export const statistiquesGlobales = (
+  campagnes = [],
+  jours = 30,
+  maintenant = new Date().toISOString(),
+) => {
   const limite = ilYA(jours, maintenant);
   let envoyes = 0;
   let nb = 0;
@@ -471,11 +663,17 @@ export const statistiquesGlobales = (campagnes = [], jours = 30, maintenant = ne
     const d = c.data || c;
     const r = resumeDe(d.destinataires);
     const le = d.termineeLe || d.envoyerLe || d.creeLe || "";
-    if (r.envoyes && le >= limite) { envoyes += r.envoyes; nb += 1; }
+    if (r.envoyes && le >= limite) {
+      envoyes += r.envoyes;
+      nb += 1;
+    }
     if (d.statut === "terminee" && r.envoyes) {
       mesurees += 1;
       sommeOuv += r.ouverts / r.envoyes;
-      if (d.cta?.label) { avecClic += 1; sommeClic += r.cliques / r.envoyes; }
+      if (d.cta?.label) {
+        avecClic += 1;
+        sommeClic += r.cliques / r.envoyes;
+      }
     }
   }
   return {
@@ -495,21 +693,38 @@ export const statistiquesGlobales = (campagnes = [], jours = 30, maintenant = ne
 /// (statut « reserve »). Sans test, rien ne change.
 export const repartirAB = (destinataires = [], ab = {}, hasard = Math.random) => {
   if (!ab?.actif) return destinataires;
-  const melanges = destinataires.map((d) => ({ d, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.d);
+  const melanges = destinataires
+    .map((d) => ({ d, k: hasard() }))
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.d);
   const part = Math.min(50, Math.max(5, Number(ab.part) || 20));
   // Au moins deux personnes par version, sinon le test ne mesure rien.
-  const n = Math.min(melanges.length, Math.max(4, Math.round((melanges.length * part) / 100)));
+  const n = Math.min(
+    melanges.length,
+    Math.max(4, Math.round((melanges.length * part) / 100)),
+  );
   return melanges.map((d, i) =>
-    i < n ? { ...d, variante: i % 2 ? "B" : "A" } : { ...d, variante: "", statut: "reserve" });
+    i < n
+      ? { ...d, variante: i % 2 ? "B" : "A" }
+      : { ...d, variante: "", statut: "reserve" },
+  );
 };
 
 /// Les chiffres de chaque version.
 export const resultatsAB = (campagne = {}) => {
   const par = (v) => {
-    const dests = (campagne.destinataires || []).filter((d) => d.variante === v && d.statut === "envoye");
+    const dests = (campagne.destinataires || []).filter(
+      (d) => d.variante === v && d.statut === "envoye",
+    );
     const ouverts = dests.filter((d) => d.ouvert).length;
     const cliques = dests.filter((d) => d.clique).length;
-    return { envoyes: dests.length, ouverts, cliques, tauxOuverture: taux(ouverts, dests.length), tauxClic: taux(cliques, dests.length) };
+    return {
+      envoyes: dests.length,
+      ouverts,
+      cliques,
+      tauxOuverture: taux(ouverts, dests.length),
+      tauxClic: taux(cliques, dests.length),
+    };
   };
   return { A: par("A"), B: par("B"), gagnant: campagne.ab?.gagnant || "" };
 };
@@ -524,24 +739,36 @@ export const decisionAB = (campagne = {}, maintenant = new Date().toISOString())
   // Un destinataire du test en réessai (boîte pleine) ne bloque pas la
   // décision : il a déjà eu sa chance, et attendre pourrait durer un jour.
   if (!test.length || test.some((d) => d.statut === "attente" && !d.essais)) return null;
-  const dernier = test.map((d) => d.envoyeLe || "").sort().pop() || "";
+  const dernier =
+    test
+      .map((d) => d.envoyeLe || "")
+      .sort()
+      .pop() || "";
   const heures = Math.max(1, Number(campagne.ab.heures) || 4);
   if (dernier && new Date(maintenant) - new Date(dernier) < heures * 3600000) return null;
   const r = resultatsAB(campagne);
   // À égalité d'ouvertures, les clics départagent ; puis A, l'objet
   // d'origine.
-  const gagnant = r.B.tauxOuverture > r.A.tauxOuverture || (r.B.tauxOuverture === r.A.tauxOuverture && r.B.tauxClic > r.A.tauxClic) ? "B" : "A";
+  const gagnant =
+    r.B.tauxOuverture > r.A.tauxOuverture ||
+    (r.B.tauxOuverture === r.A.tauxOuverture && r.B.tauxClic > r.A.tauxClic)
+      ? "B"
+      : "A";
   return {
     ...campagne,
     statut: dests.some((d) => d.statut === "reserve") ? "envoi" : campagne.statut,
     ab: { ...campagne.ab, gagnant, decideLe: maintenant },
-    destinataires: dests.map((d) => (d.statut === "reserve" ? { ...d, statut: "attente", variante: gagnant } : d)),
+    destinataires: dests.map((d) =>
+      d.statut === "reserve" ? { ...d, statut: "attente", variante: gagnant } : d,
+    ),
   };
 };
 
 /// L'objet d'un destinataire, selon sa version.
 export const sujetPour = (campagne = {}, destinataire = {}) =>
-  destinataire.variante === "B" && campagne.ab?.sujetB ? campagne.ab.sujetB : campagne.sujet;
+  destinataire.variante === "B" && campagne.ab?.sujetB
+    ? campagne.ab.sujetB
+    : campagne.sujet;
 
 // ---------------------------------------------------------------------------
 // Rebonds
@@ -552,8 +779,18 @@ export const sujetPour = (campagne = {}, destinataire = {}) =>
 /// ou null (relais injoignable : rien à reprocher à l'adresse).
 export const classerErreur = (message = "") => {
   const m = String(message);
-  if (/\b5\.\d\.\d+\b|\b55[0-4]\b|user unknown|no such user|does not exist|mailbox unavailable|ENOTFOUND|domain not found|recipient address rejected/i.test(m)) return "definitif";
-  if (/\b4\.\d\.\d+\b|\b4[2-5]\d\b|mailbox full|over quota|try again later|greylist/i.test(m)) return "temporaire";
+  if (
+    /\b5\.\d\.\d+\b|\b55[0-4]\b|user unknown|no such user|does not exist|mailbox unavailable|ENOTFOUND|domain not found|recipient address rejected/i.test(
+      m,
+    )
+  )
+    return "definitif";
+  if (
+    /\b4\.\d\.\d+\b|\b4[2-5]\d\b|mailbox full|over quota|try again later|greylist/i.test(
+      m,
+    )
+  )
+    return "temporaire";
   return null;
 };
 
@@ -574,7 +811,8 @@ export const clicsParLien = (campagne = {}, nbLiens = 0) => {
   }
   // Les anciennes campagnes ne notaient pas le numéro : leurs clics vont au
   // seul lien qu'elles avaient, le bouton.
-  if (nbLiens && !t.some(Boolean)) t[0] = (campagne.destinataires || []).filter((d) => d.clique).length;
+  if (nbLiens && !t.some(Boolean))
+    t[0] = (campagne.destinataires || []).filter((d) => d.clique).length;
   return t;
 };
 
@@ -582,16 +820,44 @@ export const clicsParLien = (campagne = {}, nbLiens = 0) => {
 /// — ce que la campagne a fait vendre, au sens prudent.
 export const ventesAttribuees = (campagne = {}, factures = [], jours = 7) => {
   const clics = new Map();
-  for (const d of campagne.destinataires || []) if (d.cliqueLe && d.clientId) clics.set(d.clientId, d.cliqueLe);
+  for (const d of campagne.destinataires || [])
+    if (d.cliqueLe && d.clientId) clics.set(d.clientId, d.cliqueLe);
   const out = [];
   for (const f of factures) {
     const d = f.data || f;
-    if (d.type !== "facture" || ["brouillon", "annule"].includes(d.statut) || !clics.has(d.clientId)) continue;
+    if (
+      d.type !== "facture" ||
+      ["brouillon", "annule"].includes(d.statut) ||
+      !clics.has(d.clientId)
+    )
+      continue;
     const clic = clics.get(d.clientId).slice(0, 10);
-    const limite = new Date(new Date(`${clic}T12:00:00Z`).getTime() + jours * 86400000).toISOString().slice(0, 10);
+    const limite = new Date(new Date(`${clic}T12:00:00Z`).getTime() + jours * 86400000)
+      .toISOString()
+      .slice(0, 10);
     if (d.date >= clic && d.date <= limite) {
-      const montant = Number(d.totalTTC ?? d.total ?? d.montant ?? 0) || (d.lignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0) * (1 - (Number(l.remise) || 0) / 100) * (1 + (Number(l.tva) || 0) / 100), 0);
-      out.push({ id: f.id, numero: d.numero, clientId: d.clientId, client: d.clientEntreprise || d.clientNom || "", date: d.date, montant: Math.round(montant), joursApres: Math.round((new Date(`${d.date}T12:00:00Z`) - new Date(`${clic}T12:00:00Z`)) / 86400000) });
+      const montant =
+        Number(d.totalTTC ?? d.total ?? d.montant ?? 0) ||
+        (d.lignes || []).reduce(
+          (s, l) =>
+            s +
+            (Number(l.qte) || 0) *
+              (Number(l.pu) || 0) *
+              (1 - (Number(l.remise) || 0) / 100) *
+              (1 + (Number(l.tva) || 0) / 100),
+          0,
+        );
+      out.push({
+        id: f.id,
+        numero: d.numero,
+        clientId: d.clientId,
+        client: d.clientEntreprise || d.clientNom || "",
+        date: d.date,
+        montant: Math.round(montant),
+        joursApres: Math.round(
+          (new Date(`${d.date}T12:00:00Z`) - new Date(`${clic}T12:00:00Z`)) / 86400000,
+        ),
+      });
     }
   }
   return out.sort((a, b) => b.montant - a.montant);
@@ -604,17 +870,26 @@ export const engagementDe = (campagnes = []) => {
   for (const c of campagnes) {
     for (const d of (c.data || c).destinataires || []) {
       if (d.statut !== "envoye" || !d.clientId) continue;
-      const e = (t[d.clientId] ||= { envoyes: 0, ouverts: 0, cliques: 0, derniereOuverture: "" });
+      const e = (t[d.clientId] ||= {
+        envoyes: 0,
+        ouverts: 0,
+        cliques: 0,
+        derniereOuverture: "",
+      });
       e.envoyes += 1;
       if (d.ouvert) e.ouverts += 1;
       if (d.clique) e.cliques += 1;
-      if (d.ouvertLe && d.ouvertLe > e.derniereOuverture) e.derniereOuverture = d.ouvertLe;
+      if (d.ouvertLe && d.ouvertLe > e.derniereOuverture)
+        e.derniereOuverture = d.ouvertLe;
     }
   }
   for (const e of Object.values(t)) {
     const ouv = e.ouverts / e.envoyes;
     const cli = e.cliques / e.envoyes;
-    e.score = Math.min(5, Math.round(ouv * 3 + cli * 4 + (e.envoyes >= 3 && ouv > 0 ? 0.5 : 0)));
+    e.score = Math.min(
+      5,
+      Math.round(ouv * 3 + cli * 4 + (e.envoyes >= 3 && ouv > 0 ? 0.5 : 0)),
+    );
   }
   return t;
 };
@@ -622,4 +897,8 @@ export const engagementDe = (campagnes = []) => {
 /// Inactif : a reçu au moins trois campagnes et n'en a ouvert aucune
 /// depuis six mois.
 export const estInactif = (e, maintenant = new Date().toISOString()) =>
-  Boolean(e && e.envoyes >= 3 && (!e.derniereOuverture || e.derniereOuverture < ilYA(182, maintenant)));
+  Boolean(
+    e &&
+    e.envoyes >= 3 &&
+    (!e.derniereOuverture || e.derniereOuverture < ilYA(182, maintenant)),
+  );

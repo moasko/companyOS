@@ -22,7 +22,18 @@
 
 import { appliquerModele } from "./courrier.js";
 
-export const TYPES_BLOCS = ["titre", "texte", "image", "bouton", "produits", "colonnes", "promo", "separateur", "reseaux", "signature"];
+export const TYPES_BLOCS = [
+  "titre",
+  "texte",
+  "image",
+  "bouton",
+  "produits",
+  "colonnes",
+  "promo",
+  "separateur",
+  "reseaux",
+  "signature",
+];
 
 const nouvelId = () => Math.random().toString(36).slice(2, 10);
 
@@ -31,22 +42,75 @@ export const blocVide = (type, { langue = "fr" } = {}) => {
   const en = langue === "en";
   const base = { id: nouvelId(), type };
   switch (type) {
-    case "titre": return { ...base, texte: en ? "Your headline" : "Votre titre", taille: "grand", align: "gauche" };
-    case "texte": return { ...base, texte: en ? "Hello {{contact}},\n\nWrite your message here." : "Bonjour {{contact}},\n\nÉcrivez votre message ici." };
-    case "image": return { ...base, url: "", nodeId: "", alt: "", lien: "" };
-    case "bouton": return { ...base, label: en ? "Learn more" : "En savoir plus", url: "", align: "centre" };
-    case "produits": return { ...base, produits: [], afficherPrix: true };
-    case "colonnes": return { ...base, gauche: en ? "**Left column**\nA short text." : "**Colonne de gauche**\nUn texte court.", droite: en ? "**Right column**\nA short text." : "**Colonne de droite**\nUn texte court." };
-    case "promo": return { ...base, code: "RENTREE20", texte: en ? "Your code, valid until the end of the month" : "Votre code, valable jusqu'à la fin du mois" };
-    case "separateur": return { ...base, style: "ligne" };
-    case "reseaux": return { ...base, site: "", whatsapp: "", facebook: "", instagram: "", linkedin: "" };
-    case "signature": return { ...base, texte: en ? "Talk soon,\n{{entreprise}}" : "À très vite,\n{{entreprise}}" };
-    default: return base;
+    case "titre":
+      return {
+        ...base,
+        texte: en ? "Your headline" : "Votre titre",
+        taille: "grand",
+        align: "gauche",
+      };
+    case "texte":
+      return {
+        ...base,
+        texte: en
+          ? "Hello {{contact}},\n\nWrite your message here."
+          : "Bonjour {{contact}},\n\nÉcrivez votre message ici.",
+      };
+    case "image":
+      return { ...base, url: "", nodeId: "", alt: "", lien: "" };
+    case "bouton":
+      return {
+        ...base,
+        label: en ? "Learn more" : "En savoir plus",
+        url: "",
+        align: "centre",
+      };
+    case "produits":
+      return { ...base, produits: [], afficherPrix: true };
+    case "colonnes":
+      return {
+        ...base,
+        gauche: en
+          ? "**Left column**\nA short text."
+          : "**Colonne de gauche**\nUn texte court.",
+        droite: en
+          ? "**Right column**\nA short text."
+          : "**Colonne de droite**\nUn texte court.",
+      };
+    case "promo":
+      return {
+        ...base,
+        code: "RENTREE20",
+        texte: en
+          ? "Your code, valid until the end of the month"
+          : "Votre code, valable jusqu'à la fin du mois",
+      };
+    case "separateur":
+      return { ...base, style: "ligne" };
+    case "reseaux":
+      return {
+        ...base,
+        site: "",
+        whatsapp: "",
+        facebook: "",
+        instagram: "",
+        linkedin: "",
+      };
+    case "signature":
+      return {
+        ...base,
+        texte: en ? "Talk soon,\n{{entreprise}}" : "À très vite,\n{{entreprise}}",
+      };
+    default:
+      return base;
   }
 };
 
 /// Une copie du bloc, avec un nouvel identifiant.
-export const dupliquerBloc = (bloc) => ({ ...JSON.parse(JSON.stringify(bloc)), id: nouvelId() });
+export const dupliquerBloc = (bloc) => ({
+  ...JSON.parse(JSON.stringify(bloc)),
+  id: nouvelId(),
+});
 
 /// Déplace le bloc `id` d'un cran (`sens` = -1 ou +1).
 export const deplacerBloc = (blocs, id, sens) => {
@@ -61,8 +125,16 @@ export const deplacerBloc = (blocs, id, sens) => {
 /// Les blocs d'une ancienne campagne (texte + bouton), pour l'éditeur.
 export const blocsDepuisTexte = (campagne = {}) => {
   const blocs = [];
-  if (String(campagne.texte || "").trim()) blocs.push({ id: nouvelId(), type: "texte", texte: campagne.texte });
-  if (campagne.cta?.label) blocs.push({ id: nouvelId(), type: "bouton", label: campagne.cta.label, url: campagne.cta.url || "", align: "centre" });
+  if (String(campagne.texte || "").trim())
+    blocs.push({ id: nouvelId(), type: "texte", texte: campagne.texte });
+  if (campagne.cta?.label)
+    blocs.push({
+      id: nouvelId(),
+      type: "bouton",
+      label: campagne.cta.label,
+      url: campagne.cta.url || "",
+      align: "centre",
+    });
   return blocs;
 };
 
@@ -88,8 +160,10 @@ export const couleurSure = (valeur, defaut = "#e8590c") => {
 };
 
 /// Seuls http(s) et mailto/tel sont des liens acceptables dans un mail.
-export const urlValide = (valeur) => /^(https?:\/\/[^\s]+|mailto:[^\s]+|tel:[+\d\s]+)$/i.test(String(valeur || "").trim());
-const lienSur = (valeur) => (urlValide(valeur) ? echapperHtml(String(valeur).trim()) : "");
+export const urlValide = (valeur) =>
+  /^(https?:\/\/[^\s]+|mailto:[^\s]+|tel:[+\d\s]+)$/i.test(String(valeur || "").trim());
+const lienSur = (valeur) =>
+  urlValide(valeur) ? echapperHtml(String(valeur).trim()) : "";
 
 /// Un lien WhatsApp depuis un numéro : « +225 07 00 00 00 » → wa.me.
 const lienWhatsapp = (numero) => {
@@ -146,7 +220,10 @@ const neutraliser = (variables) =>
     Object.entries(variables).map(([k, v]) => [
       k,
       typeof v === "string"
-        ? v.replace(/\[/g, "(").replace(/\]/g, ")").replace(/[\r\n]+/g, " ")
+        ? v
+            .replace(/\[/g, "(")
+            .replace(/\]/g, ")")
+            .replace(/[\r\n]+/g, " ")
         : v,
     ]),
   );
@@ -160,7 +237,8 @@ export const personnaliser = (campagne = {}, variables = {}) => {
     texte: appliquerModele(campagne.texte, surs),
     blocs: (campagne.blocs || []).map((b) => {
       const out = { ...b };
-      for (const k of CHAMPS_TEXTE) if (typeof out[k] === "string") out[k] = appliquerModele(out[k], surs);
+      for (const k of CHAMPS_TEXTE)
+        if (typeof out[k] === "string") out[k] = appliquerModele(out[k], surs);
       return out;
     }),
   };
@@ -207,7 +285,8 @@ const enrichir = (texte, ctx, couleur) => {
 const gras = (h) => h.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
 
 const alignDe = (a) => (a === "centre" ? "center" : a === "droite" ? "right" : "left");
-const ligne = (contenu, padding = "8px 32px") => `<tr><td style="padding:${padding}">${contenu}</td></tr>`;
+const ligne = (contenu, padding = "8px 32px") =>
+  `<tr><td style="padding:${padding}">${contenu}</td></tr>`;
 
 const rendreBloc = (b, ctx) => {
   const couleur = ctx.couleur;
@@ -215,7 +294,10 @@ const rendreBloc = (b, ctx) => {
   switch (b.type) {
     case "titre": {
       const taille = b.taille === "moyen" ? 20 : 26;
-      return ligne(`<h1 style="margin:6px 0 4px;font-family:${POLICE};font-size:${taille}px;line-height:1.25;color:#111827;text-align:${alignDe(b.align)}">${echapperHtml(b.texte)}</h1>`, "18px 32px 4px");
+      return ligne(
+        `<h1 style="margin:6px 0 4px;font-family:${POLICE};font-size:${taille}px;line-height:1.25;color:#111827;text-align:${alignDe(b.align)}">${echapperHtml(b.texte)}</h1>`,
+        "18px 32px 4px",
+      );
     }
     case "texte":
       return ligne(enrichir(b.texte, ctx, couleur));
@@ -225,7 +307,11 @@ const rendreBloc = (b, ctx) => {
       const src = lienSur(ctx.image(b));
       if (!src) return "";
       const img = `<img src="${src}" alt="${echapperHtml(b.alt)}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:8px">`;
-      return ligne(urlValide(b.lien) ? `<a href="${lien(b.lien, b.alt || "Image")}">${img}</a>` : img);
+      return ligne(
+        urlValide(b.lien)
+          ? `<a href="${lien(b.lien, b.alt || "Image")}">${img}</a>`
+          : img,
+      );
     }
     case "bouton": {
       if (!b.label || !urlValide(b.url)) return "";
@@ -238,18 +324,31 @@ const rendreBloc = (b, ctx) => {
       if (!items.length) return "";
       const cellules = items.map((p) => {
         const nom = `<b style="font-size:14px;color:#111827">${echapperHtml(p.nom)}</b>`;
-        const prix = b.afficherPrix !== false && p.prix ? `<div style="margin-top:4px;font-size:15px;font-weight:bold;color:${couleur}">${echapperHtml(p.prix)}</div>` : "";
-        const voir = urlValide(p.url) ? `<div style="margin-top:8px"><a href="${lien(p.url, p.nom)}" style="font-size:13px;font-weight:600;color:${couleur}">${echapperHtml(p.lienLabel || "Voir")}</a></div>` : "";
+        const prix =
+          b.afficherPrix !== false && p.prix
+            ? `<div style="margin-top:4px;font-size:15px;font-weight:bold;color:${couleur}">${echapperHtml(p.prix)}</div>`
+            : "";
+        const voir = urlValide(p.url)
+          ? `<div style="margin-top:8px"><a href="${lien(p.url, p.nom)}" style="font-size:13px;font-weight:600;color:${couleur}">${echapperHtml(p.lienLabel || "Voir")}</a></div>`
+          : "";
         return `<td width="50%" valign="top" style="padding:6px"><div style="padding:14px;border:1px solid #edf0f3;border-radius:8px;font-family:${POLICE}">${nom}${prix}${voir}</div></td>`;
       });
       const rangs = [];
-      for (let i = 0; i < cellules.length; i += 2) rangs.push(`<tr>${cellules[i]}${cellules[i + 1] || '<td width="50%"></td>'}</tr>`);
-      return ligne(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rangs.join("")}</table>`, "6px 26px");
+      for (let i = 0; i < cellules.length; i += 2)
+        rangs.push(
+          `<tr>${cellules[i]}${cellules[i + 1] || '<td width="50%"></td>'}</tr>`,
+        );
+      return ligne(
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rangs.join("")}</table>`,
+        "6px 26px",
+      );
     }
     case "colonnes": {
       const g = enrichir(b.gauche, ctx, couleur);
       const d = enrichir(b.droite, ctx, couleur);
-      return ligne(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="50%" valign="top" style="padding-right:10px">${g}</td><td width="50%" valign="top" style="padding-left:10px">${d}</td></tr></table>`);
+      return ligne(
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="50%" valign="top" style="padding-right:10px">${g}</td><td width="50%" valign="top" style="padding-left:10px">${d}</td></tr></table>`,
+      );
     }
     case "promo":
       if (!b.code) return "";
@@ -257,13 +356,25 @@ const rendreBloc = (b, ctx) => {
 <div style="font-size:24px;font-weight:bold;letter-spacing:.12em;color:${couleur}">${echapperHtml(b.code)}</div>
 ${b.texte ? `<div style="margin-top:6px;font-size:13px;color:#4b5563">${echapperHtml(b.texte)}</div>` : ""}</div>`);
     case "separateur":
-      return b.style === "espace" ? ligne("&nbsp;", "10px 32px") : ligne('<div style="border-top:1px solid #edf0f3;font-size:0;line-height:0">&nbsp;</div>', "12px 32px");
+      return b.style === "espace"
+        ? ligne("&nbsp;", "10px 32px")
+        : ligne(
+            '<div style="border-top:1px solid #edf0f3;font-size:0;line-height:0">&nbsp;</div>',
+            "12px 32px",
+          );
     case "reseaux": {
-      const liens = RESEAUX.map((r) => ({ label: r.label, url: r.url(b[r.cle]) })).filter((l) => urlValide(l.url));
+      const liens = RESEAUX.map((r) => ({ label: r.label, url: r.url(b[r.cle]) })).filter(
+        (l) => urlValide(l.url),
+      );
       if (!liens.length) return "";
-      return ligne(`<p style="margin:0;text-align:center;font-family:${POLICE};font-size:14px">${liens
-        .map((l) => `<a href="${lien(l.url, l.label)}" style="color:${couleur};font-weight:600;text-decoration:none">${echapperHtml(l.label)}</a>`)
-        .join(' <span style="color:#c4cad2">·</span> ')}</p>`);
+      return ligne(
+        `<p style="margin:0;text-align:center;font-family:${POLICE};font-size:14px">${liens
+          .map(
+            (l) =>
+              `<a href="${lien(l.url, l.label)}" style="color:${couleur};font-weight:600;text-decoration:none">${echapperHtml(l.label)}</a>`,
+          )
+          .join(' <span style="color:#c4cad2">·</span> ')}</p>`,
+      );
     }
     default:
       return "";
@@ -273,7 +384,10 @@ ${b.texte ? `<div style="margin-top:6px;font-size:13px;color:#4b5563">${echapper
 /// Le rendu d'un seul bloc, en tableau autonome — l'éditeur l'affiche sur
 /// son plan de travail. `debut` : le numéro de son premier lien ; renvoie
 /// aussi les numéros de ses liens (la carte des clics s'en sert).
-export const htmlBloc = (bloc, { couleur = "#e8590c", image = (b) => b.url, debut = 0 } = {}) => {
+export const htmlBloc = (
+  bloc,
+  { couleur = "#e8590c", image = (b) => b.url, debut = 0 } = {},
+) => {
   const liens = [];
   const ctx = {
     couleur: couleurSure(couleur),
@@ -293,8 +407,10 @@ export const htmlBloc = (bloc, { couleur = "#e8590c", image = (b) => b.url, debu
 };
 
 const PIED = {
-  fr: (entreprise) => `Vous recevez ce message parce que vous êtes en relation avec ${entreprise}.`,
-  en: (entreprise) => `You are receiving this email because you are in touch with ${entreprise}.`,
+  fr: (entreprise) =>
+    `Vous recevez ce message parce que vous êtes en relation avec ${entreprise}.`,
+  en: (entreprise) =>
+    `You are receiving this email because you are in touch with ${entreprise}.`,
 };
 const DESABO = { fr: "Se désinscrire", en: "Unsubscribe" };
 
@@ -315,7 +431,10 @@ export const htmlBlocs = (campagne = {}, options = {}) => {
   const langue = campagne.langue === "en" ? "en" : "fr";
   const couleur = couleurSure(campagne.couleur);
   const ctx = { couleur, lien, image, compteur: 0 };
-  const blocs = Array.isArray(campagne.blocs) && campagne.blocs.length ? campagne.blocs : blocsDepuisTexte(campagne);
+  const blocs =
+    Array.isArray(campagne.blocs) && campagne.blocs.length
+      ? campagne.blocs
+      : blocsDepuisTexte(campagne);
   const corps = blocs.map((b) => rendreBloc(b, ctx)).join("\n");
   const preheader = campagne.apercu
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${echapperHtml(campagne.apercu)}</div>`
@@ -346,9 +465,15 @@ ${pix ? `<img src="${pix}" width="1" height="1" alt="" style="display:block">` :
 
 /// La version texte : les clients mail austères, et les filtres anti-spam,
 /// qui se méfient d'un message sans elle.
-export const texteDe = (campagne = {}, { lien = (_i, url) => url, pied = "", lienDesinscription = "", entreprise = "" } = {}) => {
+export const texteDe = (
+  campagne = {},
+  { lien = (_i, url) => url, pied = "", lienDesinscription = "", entreprise = "" } = {},
+) => {
   const langue = campagne.langue === "en" ? "en" : "fr";
-  const blocs = Array.isArray(campagne.blocs) && campagne.blocs.length ? campagne.blocs : blocsDepuisTexte(campagne);
+  const blocs =
+    Array.isArray(campagne.blocs) && campagne.blocs.length
+      ? campagne.blocs
+      : blocsDepuisTexte(campagne);
   // Chaque adresse reprend le numéro que le rendu HTML lui a donné : la
   // version texte et la version HTML comptent les mêmes clics.
   const liste = liensDe(campagne);
@@ -359,24 +484,55 @@ export const texteDe = (campagne = {}, { lien = (_i, url) => url, pied = "", lie
     pris.add(i);
     return lien(i, url);
   };
-  const avecLiens = (t) => String(t || "").replace(LIEN_MD, (tout, label, url) => (urlValide(url) ? `${label} (${suivi(url)})` : tout)).replace(/\*\*([^*]+)\*\*/g, "$1");
+  const avecLiens = (t) =>
+    String(t || "")
+      .replace(LIEN_MD, (tout, label, url) =>
+        urlValide(url) ? `${label} (${suivi(url)})` : tout,
+      )
+      .replace(/\*\*([^*]+)\*\*/g, "$1");
   const morceaux = blocs.map((b) => {
     switch (b.type) {
-      case "titre": return String(b.texte || "").toUpperCase();
-      case "texte": case "signature": return avecLiens(b.texte);
-      case "colonnes": return `${avecLiens(b.gauche)}\n\n${avecLiens(b.droite)}`;
-      case "image": return urlValide(b.lien) ? `${b.alt || "Image"} : ${suivi(b.lien)}` : "";
-      case "bouton": return urlValide(b.url) && b.label ? `${b.label} : ${suivi(b.url)}` : "";
-      case "produits": return (b.produits || []).slice(0, 6).map((p) => [p.nom, b.afficherPrix !== false ? p.prix : "", urlValide(p.url) ? suivi(p.url) : ""].filter(Boolean).join(" — ")).join("\n");
-      case "promo": return b.code ? `${b.code}${b.texte ? ` — ${b.texte}` : ""}` : "";
-      case "separateur": return "—";
-      case "reseaux": return RESEAUX.map((r) => ({ label: r.label, url: r.url(b[r.cle]) })).filter((l) => urlValide(l.url)).map((l) => `${l.label} : ${suivi(l.url)}`).join("\n");
-      default: return "";
+      case "titre":
+        return String(b.texte || "").toUpperCase();
+      case "texte":
+      case "signature":
+        return avecLiens(b.texte);
+      case "colonnes":
+        return `${avecLiens(b.gauche)}\n\n${avecLiens(b.droite)}`;
+      case "image":
+        return urlValide(b.lien) ? `${b.alt || "Image"} : ${suivi(b.lien)}` : "";
+      case "bouton":
+        return urlValide(b.url) && b.label ? `${b.label} : ${suivi(b.url)}` : "";
+      case "produits":
+        return (b.produits || [])
+          .slice(0, 6)
+          .map((p) =>
+            [
+              p.nom,
+              b.afficherPrix !== false ? p.prix : "",
+              urlValide(p.url) ? suivi(p.url) : "",
+            ]
+              .filter(Boolean)
+              .join(" — "),
+          )
+          .join("\n");
+      case "promo":
+        return b.code ? `${b.code}${b.texte ? ` — ${b.texte}` : ""}` : "";
+      case "separateur":
+        return "—";
+      case "reseaux":
+        return RESEAUX.map((r) => ({ label: r.label, url: r.url(b[r.cle]) }))
+          .filter((l) => urlValide(l.url))
+          .map((l) => `${l.label} : ${suivi(l.url)}`)
+          .join("\n");
+      default:
+        return "";
     }
   });
-  const fin = langue === "en"
-    ? `To stop receiving these emails from ${entreprise}:`
-    : `Pour ne plus recevoir ces messages de ${entreprise} :`;
+  const fin =
+    langue === "en"
+      ? `To stop receiving these emails from ${entreprise}:`
+      : `Pour ne plus recevoir ces messages de ${entreprise} :`;
   return `${morceaux.filter(Boolean).join("\n\n")}\n\n—\n${pied}${lienDesinscription ? `\n${fin}\n${lienDesinscription}` : ""}`;
 };
 
@@ -389,9 +545,23 @@ export const verificationsContenu = (campagne = {}) => {
   const html = htmlBlocs(campagne, { lienDesinscription: "https://x.invalid/d" });
   const poids = Math.round(new TextEncoder().encode(html).length / 1024);
   return [
-    { id: "contenu", ok: blocs.some((b) => ["texte", "titre"].includes(b.type) && String(b.texte || "").trim()) },
-    { id: "boutons", ok: boutons.every((b) => b.label && urlValide(b.url)), facultatif: !boutons.length },
-    { id: "images", ok: images.every((b) => (b.url || b.nodeId) && String(b.alt || "").trim()), facultatif: !images.length, conseil: true },
+    {
+      id: "contenu",
+      ok: blocs.some(
+        (b) => ["texte", "titre"].includes(b.type) && String(b.texte || "").trim(),
+      ),
+    },
+    {
+      id: "boutons",
+      ok: boutons.every((b) => b.label && urlValide(b.url)),
+      facultatif: !boutons.length,
+    },
+    {
+      id: "images",
+      ok: images.every((b) => (b.url || b.nodeId) && String(b.alt || "").trim()),
+      facultatif: !images.length,
+      conseil: true,
+    },
     { id: "poids", ok: poids < 100, params: { ko: poids }, conseil: true },
   ];
 };
