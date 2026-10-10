@@ -55,7 +55,11 @@ const rootReducer = (state, action) => {
     ...next,
     apps: windows,
     wallpaper: { ...next.wallpaper, ...(p.wallpaper || {}) },
-    taskbar: { ...next.taskbar, ...(p.taskbar || {}) },
+    taskbar: {
+      ...next.taskbar,
+      ...(p.taskbar || {}),
+      epingles: Array.isArray(p.taskbar?.epingles) ? p.taskbar.epingles : next.taskbar.epingles,
+    },
     desktop: { ...next.desktop, ...(p.desktop || {}), apps: next.desktop.apps },
     deskLayout: {
       ...next.deskLayout,

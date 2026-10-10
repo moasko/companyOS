@@ -63,6 +63,8 @@ const TEXTES = {
     ouvrir: "Ouvrir",
     viderCorbeille: "Vider la corbeille",
     retirerBureau: "Retirer du bureau",
+    epinglerBarre: "Épingler à la barre des tâches",
+    desepinglerBarre: "Détacher de la barre des tâches",
     ouvrirExplorateur: "Ouvrir dans l'Explorateur",
     ouvrirAvec: "Ouvrir avec {app}",
     telecharger: "Télécharger",
@@ -115,6 +117,8 @@ const TEXTES = {
     ouvrir: "Open",
     viderCorbeille: "Empty recycle bin",
     retirerBureau: "Remove from desktop",
+    epinglerBarre: "Pin to taskbar",
+    desepinglerBarre: "Unpin from taskbar",
     ouvrirExplorateur: "Open in Explorer",
     ouvrirAvec: "Open with {app}",
     telecharger: "Download",
@@ -142,6 +146,7 @@ export const DesktopApp = () => {
   // called with the same parameters » — parce que cela rerend le bureau à
   // chaque action, y compris celles qui ne le concernent pas.
   const bureau = useSelector((state) => state.desktop);
+  const epinglesBarre = useSelector((state) => state.taskbar.epingles);
   const t = useTraduction(TEXTES);
   const nomApp = useNomApp();
 
@@ -383,6 +388,15 @@ export const DesktopApp = () => {
             },
           ]
         : [
+            {
+              nom: epinglesBarre.includes(app.id || app.icon) ? t("desepinglerBarre") : t("epinglerBarre"),
+              icone: "faThumbtack",
+              action: () =>
+                dispatch({
+                  type: epinglesBarre.includes(app.id || app.icon) ? "TASKUNPIN" : "TASKPIN",
+                  payload: app.id || app.icon,
+                }),
+            },
             {
               nom: t("retirerBureau"),
               icone: "faEyeSlash",

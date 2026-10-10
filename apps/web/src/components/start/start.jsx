@@ -40,6 +40,8 @@ const TEXTES = {
     redemarrer: "Redémarrer",
     arreter: "Arrêter",
     epinglees: "Épinglées",
+    epinglerBarre: "Épingler à la barre des tâches",
+    desepinglerBarre: "Détacher de la barre des tâches",
     toutesLesApps: "Toutes les apps",
     recommande: "Récents",
     aucunRecent: "Les applications que vous ouvrez apparaîtront ici.",
@@ -74,6 +76,8 @@ const TEXTES = {
     redemarrer: "Restart",
     arreter: "Shut down",
     epinglees: "Pinned",
+    epinglerBarre: "Pin to taskbar",
+    desepinglerBarre: "Unpin from taskbar",
     toutesLesApps: "All apps",
     recommande: "Recent",
     aucunRecent: "Apps you open will show up here.",
@@ -98,7 +102,7 @@ const TEXTES = {
 const tStatique = creerTraducteur(TEXTES);
 
 export const StartMenu = () => {
-  const { align } = useSelector((state) => state.taskbar);
+  const { align, epingles: epinglesBarre } = useSelector((state) => state.taskbar);
   // Ce sélecteur écrivait dans le store à chaque rendu, de trois façons :
   //
   //   — `arr.pnApps.push(…)` ajoutait des cases vides **dans le tableau du
@@ -271,6 +275,23 @@ export const StartMenu = () => {
     },
   ];
 
+  /// Clic droit sur une application du menu : l'ouvrir, ou l'épingler à
+  /// la barre des tâches.
+  const menuAppli = (app) => (e) => {
+    const cle = app.id || app.icon;
+    if (!app.action || !cle) return;
+    const epinglee = epinglesBarre.includes(cle);
+    menuContextuel(e, [
+      { nom: t("ouvrir"), icone: "faArrowUpRightFromSquare", action: () => dispatch({ type: app.action, payload: app.payload || "full" }) },
+      { separateur: true },
+      {
+        nom: epinglee ? t("desepinglerBarre") : t("epinglerBarre"),
+        icone: "faThumbtack",
+        action: () => dispatch({ type: epinglee ? "TASKUNPIN" : "TASKPIN", payload: cle }),
+      },
+    ]);
+  };
+
   const clickDispatch = (event) => {
     var action = {
       type: event.target.dataset.action,
@@ -364,6 +385,7 @@ export const StartMenu = () => {
                         className="prtclk pnApp"
                         value={app.action != null}
                         onClick={clickDispatch}
+                        onContextMenu={menuAppli(app)}
                         data-action={app.action}
                         data-payload={app.payload || "full"}
                       >
@@ -393,6 +415,7 @@ export const StartMenu = () => {
                         className="rnApp"
                         value={app.action != null}
                         onClick={clickDispatch}
+                        onContextMenu={menuAppli(app)}
                         data-action={app.action}
                         data-payload={app.payload || "full"}
                       >
@@ -446,6 +469,7 @@ export const StartMenu = () => {
                         key={app.name}
                         className="allApp prtclk"
                         onClick={clickDispatch}
+                        onContextMenu={menuAppli(app)}
                         data-action={app.action}
                         data-payload={app.payload || "full"}
                       >

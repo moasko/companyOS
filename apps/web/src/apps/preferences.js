@@ -42,7 +42,7 @@ export const instantanePreferences = (state = store.getState()) => ({
   schemaVersion: 1,
   windows: fenetres(state.apps),
   wallpaper: { wps: state.wallpaper.wps, src: state.wallpaper.src },
-  taskbar: { align: state.taskbar.align, search: state.taskbar.search },
+  taskbar: { align: state.taskbar.align, search: state.taskbar.search, epingles: state.taskbar.epingles },
   desktop: {
     hide: state.desktop.hide,
     size: state.desktop.size,
