@@ -6,6 +6,7 @@ import { journaliser, journaliserPour } from "../audit.js";
 import { chiffrer, dechiffrer } from "../chiffrement.js";
 import { consommerJeton, creerJeton } from "../etatPartage.js";
 import { posterFormulaire } from "../web.js";
+import { noterConnexion } from "../detection.js";
 import {
   aleatoire,
   decouvrir,
@@ -184,6 +185,7 @@ export default async function ssoRoutes(app) {
     }
 
     // La double authentification est celle du fournisseur d'identité.
+    await noterConnexion(request, user);
     await ouvrirSession(request, reply, user, { mfa: true });
     await journaliserPour(request, user, "session.connexion.sso");
     return versShell(reply, { sso: "ok" });

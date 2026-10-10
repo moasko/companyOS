@@ -44,6 +44,7 @@ const REJOUABLES = [
   "20261010200000_fichiers_versions_partages",
   "20261010210000_sso",
   "20261010230000_liens_publics",
+  "20261011120000_detection_intrusion",
 ];
 
 const prisma = new PrismaClient();

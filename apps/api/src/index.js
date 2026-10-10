@@ -33,6 +33,8 @@ import partagesPublicsRoutes from "./routes/partagesPublics.js";
 import ssoRoutes from "./routes/sso.js";
 import publicsRoutes from "./routes/publics.js";
 import { demarrerEspacePublic, filtrerDomainePublic } from "./espacePublic.js";
+import { arreterDetection, demarrerDetection, filtrerIntrusions, observerReponse } from "./detection.js";
+import { plateformeSecuriteRoutes, securiteRoutes } from "./routes/securite.js";
 
 const app = Fastify({
   logger: true,
@@ -41,8 +43,9 @@ const app = Fastify({
   // requêtes du monde comme venant d'une seule IP, et le journal d'audit
   // enregistrerait la même adresse pour tout le monde. Avec ce réglage,
   // Fastify lit `X-Forwarded-For` **lui-même**, en ne faisant confiance
-  // qu'au nombre de sauts déclaré — ce qui empêche un client de maquiller
-  // son adresse en envoyant l'en-tête à la main.
+  // qu'aux relais déclarés et situés sur le réseau privé — ce qui empêche
+  // un client de maquiller son adresse en envoyant l'en-tête à la main.
+  // Voir src/reseau.js.
   trustProxy: env.trustProxy,
 });
 
@@ -57,6 +60,10 @@ const app = Fastify({
 // que l'API et doit pouvoir afficher les images et les vidéos servies par
 // `/api/files`. Le contrôle d'accès reste porté par le jeton, pas par
 // l'en-tête.
+// Détection d'intrusion — voir src/detection.js. En premier : une adresse
+// bloquée ne va pas plus loin, pas même jusqu'à la limitation de débit.
+app.addHook("onRequest", filtrerIntrusions);
+app.addHook("onResponse", observerReponse);
 // Domaines personnalisés des espaces (liens publics) : seules les routes
 // publiques y répondent — voir src/espacePublic.js.
 app.addHook("onRequest", filtrerDomainePublic);
@@ -158,6 +165,8 @@ await app.register(conformiteRoutes, { prefix: "/api/conformite" });
 await app.register(partagesPublicsRoutes, { prefix: "/api/public/partages" });
 await app.register(ssoRoutes, { prefix: "/api/auth/sso" });
 await app.register(publicsRoutes, { prefix: "/api/public" });
+await app.register(securiteRoutes, { prefix: "/api/securite" });
+await app.register(plateformeSecuriteRoutes, { prefix: "/api/plateforme/securite" });
 
 /// Dit, dans les journaux du conteneur, si chaque adresse de
 /// PLATFORM_ADMINS a bien un compte qui lui ouvrira la console. « Je suis
@@ -191,6 +200,7 @@ const diagnostiquerExploitants = async () => {
 
 const shutdown = async () => {
   await app.close();
+  arreterDetection();
   await arreterBus();
   await prisma.$disconnect();
   process.exit(0);
@@ -214,6 +224,7 @@ try {
   await demarrerBus();
   demarrerMoteurAutomatisations();
   demarrerEspacePublic();
+  demarrerDetection();
   diagnostiquerExploitants();
 } catch (err) {
   app.log.error(err);

@@ -848,3 +848,74 @@ body[data-theme="dark"] .pltApp {
 @media (max-width: 640px) {
   .pltApp .pltErreurDate { display: none; }
 }
+
+// ---- Sécurité (détection d'intrusion) ---------------------------------------
+
+.pltApp .pltSecSemaine {
+  margin-top: 10px;
+}
+
+.pltApp .pltSecFiltres {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+
+  button {
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 6px;
+    font-size: 12px;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+
+    &[data-actif="true"] {
+      font-weight: 600;
+      background: var(--plt-line, var(--app-line, #e3e6eb));
+    }
+  }
+}
+
+.pltApp .pltSecAlerte {
+  max-width: 460px;
+
+  strong {
+    display: block;
+    font-weight: 600;
+  }
+
+  small {
+    display: block;
+    opacity: 0.75;
+    white-space: normal;
+    line-height: 1.4;
+  }
+}
+
+.pltApp .pltSecBloquer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 10px;
+
+  input,
+  select {
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--plt-line, var(--app-line, #e3e6eb));
+    font: inherit;
+    font-size: 13px;
+    color: inherit;
+    background: transparent;
+  }
+
+  input:first-child {
+    flex: 1 1 180px;
+  }
+
+  input:nth-child(3) {
+    flex: 2 1 220px;
+  }
+}

@@ -38,6 +38,7 @@ import {
 import jwt from "jsonwebtoken";
 import { creerEspace } from "../espaces.js";
 import { journaliser, journaliserPour } from "../audit.js";
+import { noterConnexion, noterEchecConnexion, noterEchecMfa } from "../detection.js";
 import { formuleDe } from "../formules.js";
 import { envoyerMail, mailInvitation, mailReinitialisation } from "../mail.js";
 import { refusMotDePasse } from "../motsDePasse.js";
@@ -210,6 +211,8 @@ export default async function authRoutes(app) {
       : await comparerFactice(password);
     if (!valide) {
       await noterEchec(cle);
+      // Détection d'intrusion : force brute, bourrage d'identifiants.
+      await noterEchecConnexion(request, { email: cle, user });
       return reply.code(401).send({ error: "Identifiants incorrects" });
     }
     await effacerEchecs(cle);
@@ -258,6 +261,9 @@ export default async function authRoutes(app) {
   /// `jeton: true` dans le corps : un outil (le serveur MCP) demande un
   /// jeton porteur au lieu d'un cookie.
   const terminerConnexion = async (request, reply, user, { mfa, jeton = request.body?.jeton }) => {
+    // Avant d'ouvrir la session : « nouvel appareil » se juge sur les
+    // sessions déjà connues, pas sur celle qu'on va créer.
+    await noterConnexion(request, user);
     const { token } = await ouvrirSession(request, reply, user, {
       mfa,
       type: jeton ? "api" : "navigateur",
@@ -307,6 +313,7 @@ export default async function authRoutes(app) {
     if (!resultat) {
       await noterEchec(cle);
       await journaliserPour(request, user, "session.mfa.echec");
+      await noterEchecMfa(request, user);
       return reply.code(401).send({ error: "Code incorrect." });
     }
     await effacerEchecs(cle);

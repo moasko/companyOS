@@ -49,6 +49,7 @@ import { Vide } from "../../ui";
 import { montant as fcfa } from "../../../utils/monnaie";
 import { Stockage } from "./Stockage";
 import { Sante } from "./Sante";
+import { Securite } from "./Securite";
 import "./plateforme.scss";
 import { manifest as descriptif } from "./manifest";
 
@@ -66,6 +67,7 @@ const SECTIONS = [
   { id: "espaces", label: "Espaces clients", icone: "faBuilding" },
   { id: "stockage", label: "Stockage", icone: "faCloud" },
   { id: "sante", label: "Santé", icone: "faHeartPulse" },
+  { id: "securite", label: "Sécurité", icone: "faShieldHalved" },
 ];
 
 /// Les colonnes triables de la table. `valeur` extrait ce sur quoi on
@@ -107,6 +109,7 @@ function PlateformeApp() {
   const [donnees, setDonnees] = useState(null);
   const [stockage, setStockage] = useState(null);
   const [sante, setSante] = useState(null);
+  const [securite, setSecurite] = useState(null);
   const [refus, setRefus] = useState(false);
   const [section, setSection] = useState("bord");
   const [recherche, setRecherche] = useState("");
@@ -120,17 +123,20 @@ function PlateformeApp() {
 
   const charger = useCallback(async () => {
     try {
-      const [tableau, config, etatSante] = await Promise.all([
+      const [tableau, config, etatSante, etatSecurite] = await Promise.all([
         api.plateforme(),
         // La configuration du stockage est secondaire : si sa table
         // n'existe pas encore, la console doit quand même s'ouvrir.
         api.plateformeStockageLire().catch(() => null),
         // La santé aussi : une API d'avant les sauvegardes n'a pas la route.
         api.plateformeSante().catch(() => null),
+        // Détection d'intrusion : même tolérance.
+        api.plateformeSecurite().catch(() => null),
       ]);
       setDonnees(tableau);
       setStockage(config);
       setSante(etatSante);
+      setSecurite(etatSecurite);
       setRefus(false);
     } catch (e) {
       if (e.status === 403) setRefus(true);
@@ -407,6 +413,18 @@ function PlateformeApp() {
                         <Vide
                           icone="faHeartPulse"
                           titre="État de santé indisponible"
+                          aide="Le serveur n'a pas répondu, ou la migration de base n'est pas appliquée. Relancez l'API, puis rouvrez cette console."
+                        />
+                      )
+                    ) : null}
+
+                    {section === "securite" ? (
+                      securite ? (
+                        <Securite securite={securite} onRecharger={etat.rafraichir} />
+                      ) : (
+                        <Vide
+                          icone="faShieldHalved"
+                          titre="Détection d'intrusion indisponible"
                           aide="Le serveur n'a pas répondu, ou la migration de base n'est pas appliquée. Relancez l'API, puis rouvrez cette console."
                         />
                       )

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { confianceProxy } from "./reseau.js";
 
 const required = (key) => {
   const value = process.env[key];
@@ -59,11 +60,10 @@ export const env = {
   // Nombre de sauts de reverse-proxy à qui faire confiance pour lire
   // l'adresse du client dans `X-Forwarded-For`. 0 = aucun (développement,
   // le serveur est joint directement). 1 = un proxy devant, le cas normal
-  // en production. Ne jamais mettre `true` : cela reviendrait à croire
-  // n'importe quel client qui envoie l'en-tête lui-même, ce qui permet de
-  // maquiller son adresse dans le journal d'audit et de contourner la
-  // limitation de débit.
-  trustProxy: Number(process.env.TRUST_PROXY || 0),
+  // en production. Accepte aussi une liste d'adresses ou de plages. Jamais
+  // `true` : cela reviendrait à croire n'importe quel client qui envoie
+  // l'en-tête lui-même. Voir src/reseau.js.
+  trustProxy: confianceProxy(process.env.TRUST_PROXY),
 
   // Taille maximale d'un fichier importé. 512 Mo était la valeur d'origine,
   // mais le pilote S3 assemble l'objet en mémoire avant de l'envoyer :
@@ -102,6 +102,16 @@ export const env = {
   plateformeAdmins: (process.env.PLATFORM_ADMINS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+
+  // Détection d'intrusion — voir src/detection.js.
+  //   IDS_ACTIF=false        coupe la détection et les blocages (débogage) ;
+  //   IDS_IPS_CONFIANCE      adresses jamais bloquées automatiquement, séparées
+  //                          par des virgules (supervision, sortie du siège…).
+  idsActif: process.env.IDS_ACTIF !== "false",
+  idsIpsConfiance: (process.env.IDS_IPS_CONFIANCE || "")
+    .split(",")
+    .map((e) => e.trim())
     .filter(Boolean),
 
   // Sauvegardes automatiques — voir src/sauvegardes.js.

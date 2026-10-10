@@ -331,6 +331,19 @@ export const api = {
     }),
 
   plateformeStockageLire: () => request("/plateforme/stockage"),
+  /// Détection d'intrusion (voir apps/api/src/detection.js).
+  plateformeSecurite: (filtres = {}) =>
+    request(`/plateforme/securite?${new URLSearchParams(filtres)}`),
+  plateformeSecuriteTraiter: (id) =>
+    request(`/plateforme/securite/alertes/${id}/traiter`, { method: "POST", body: {} }),
+  plateformeBloquerIp: (blocage) =>
+    request("/plateforme/securite/blocages", { method: "POST", body: blocage }),
+  plateformeDebloquerIp: (ip) =>
+    request(`/plateforme/securite/blocages/${encodeURIComponent(ip)}`, { method: "DELETE" }),
+  /// Alertes de sécurité de l'espace (administrateurs).
+  securiteAlertes: (filtres = {}) => request(`/securite/alertes?${new URLSearchParams(filtres)}`),
+  securiteTraiter: (id) => request(`/securite/alertes/${id}/traiter`, { method: "POST", body: {} }),
+  securiteTraiterTout: () => request("/securite/alertes/traiter-tout", { method: "POST", body: {} }),
   /// Santé de la plateforme : sauvegardes et erreurs.
   plateformeSante: () => request("/plateforme/sante"),
   plateformeSauvegarder: (type) =>
