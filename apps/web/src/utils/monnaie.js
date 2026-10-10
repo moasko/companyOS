@@ -71,6 +71,20 @@ export const montantDans = (n, code = "XOF") => {
 /// Un montant en franc CFA, affiché dans la devise d'affichage de
 /// l'espace : converti à l'indicatif pour l'euro et le dollar, tel quel
 /// en FCFA. C'est le formateur que tous les modules délèguent.
+/// Montant abrégé dans la devise d'affichage, pour les cartes et les
+/// indicateurs : « 18,4 M » en FCFA, « $28 k » en dollars.
+export const montantAbrege = (nXof) => {
+  const code = deviseEffective();
+  const v = (Number(nXof) || 0) * (code === "XOF" ? 1 : TAUX[code]);
+  const a = Math.abs(v);
+  const fmt = (x) => x.toLocaleString(code === "USD" ? "en-US" : "fr-FR", { maximumFractionDigits: 1 });
+  const corps =
+    a >= 1e9 ? `${fmt(v / 1e9)} Md` : a >= 1e6 ? `${fmt(v / 1e6)} M` : a >= 1e3 ? `${fmt(Math.round(v / 1e3))} k` : `${Math.round(v)}`;
+  if (code === "USD") return `$${corps}`;
+  if (code === "EUR") return `${corps} €`;
+  return corps;
+};
+
 export const montant = (nXof) => {
   const code = deviseEffective();
   if (code === "XOF") return montantDans(nXof, "XOF");

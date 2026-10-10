@@ -26,12 +26,18 @@ const jourDe = (iso) => String(iso || "").slice(0, 10);
 const plusJours = (iso, n) => new Date(new Date(iso).getTime() + n * JOUR).toISOString();
 const FENETRE = 60; // jours : un événement plus ancien n'est jamais rattrapé
 
-const docs = (ctx) => (ctx.documents || []).map((r) => ({ id: r.id, ...(r.data || {}), creeLe: r.createdAt }));
+const docs = (ctx) =>
+  (ctx.documents || []).map((r) => ({
+    id: r.id,
+    ...(r.data || {}),
+    creeLe: r.createdAt,
+  }));
 
 const derniereFactureParClient = (ctx) => {
   const t = {};
   for (const d of docs(ctx)) {
-    if (d.type !== "facture" || ["brouillon", "annule"].includes(d.statut) || !d.clientId) continue;
+    if (d.type !== "facture" || ["brouillon", "annule"].includes(d.statut) || !d.clientId)
+      continue;
     if (!t[d.clientId] || d.date > t[d.clientId]) t[d.clientId] = d.date;
   }
   return t;
@@ -51,7 +57,10 @@ export const RECETTES = [
         .filter((c) => c.createdAt && c.createdAt >= depuis)
         .map((c) => ({ cle: `client:${c.id}`, clientId: c.id })),
     contenu: {
-      sujet: texte("Bienvenue chez {{entreprise}}, {{prenom}}", "Welcome to {{entreprise}}, {{prenom}}"),
+      sujet: texte(
+        "Bienvenue chez {{entreprise}}, {{prenom}}",
+        "Welcome to {{entreprise}}, {{prenom}}",
+      ),
       apercu: texte("Ce que nous pouvons faire pour vous", "What we can do for you"),
       texte: texte(
         "Bonjour {{prenom}},\n\nMerci de votre confiance. Voici en quelques lignes qui nous sommes et comment nous joindre.\n\nRépondez simplement à ce message pour toute question.",
@@ -65,15 +74,29 @@ export const RECETTES = [
     delai: 7,
     candidats: (ctx, depuis) =>
       docs(ctx)
-        .filter((d) => d.type === "devis" && d.statut === "envoye" && d.clientId && d.date >= jourDe(depuis))
-        .map((d) => ({ cle: `devis:${d.id}`, clientId: d.clientId, extra: { numero: d.numero || "" }, objet: d.id })),
+        .filter(
+          (d) =>
+            d.type === "devis" &&
+            d.statut === "envoye" &&
+            d.clientId &&
+            d.date >= jourDe(depuis),
+        )
+        .map((d) => ({
+          cle: `devis:${d.id}`,
+          clientId: d.clientId,
+          extra: { numero: d.numero || "" },
+          objet: d.id,
+        })),
     // Le devis a bougé (accepté, refusé, annulé) ou a disparu : on se tait.
     sortie: (ctx, inscrit) => {
       const d = docs(ctx).find((x) => x.id === inscrit.objet);
       return !d || d.statut !== "envoye";
     },
     contenu: {
-      sujet: texte("Votre devis {{numero}} vous attend", "Your quote {{numero}} is waiting"),
+      sujet: texte(
+        "Votre devis {{numero}} vous attend",
+        "Your quote {{numero}} is waiting",
+      ),
       apercu: texte("Une question ? Nous sommes là.", "Any question? We are here."),
       texte: texte(
         "Bonjour {{prenom}},\n\nNous vous avons adressé le devis {{numero}} il y a quelques jours. Avez-vous pu le regarder ?\n\nS'il manque une précision ou si vous souhaitez l'ajuster, répondez simplement à ce message.",
@@ -87,10 +110,24 @@ export const RECETTES = [
     delai: 1,
     candidats: (ctx, depuis) =>
       docs(ctx)
-        .filter((d) => d.type === "facture" && !["brouillon", "annule"].includes(d.statut) && d.clientId && d.date >= jourDe(depuis))
-        .map((d) => ({ cle: `facture:${d.id}`, clientId: d.clientId, extra: { numero: d.numero || "" }, objet: d.id })),
+        .filter(
+          (d) =>
+            d.type === "facture" &&
+            !["brouillon", "annule"].includes(d.statut) &&
+            d.clientId &&
+            d.date >= jourDe(depuis),
+        )
+        .map((d) => ({
+          cle: `facture:${d.id}`,
+          clientId: d.clientId,
+          extra: { numero: d.numero || "" },
+          objet: d.id,
+        })),
     contenu: {
-      sujet: texte("Merci pour votre confiance, {{prenom}}", "Thank you for your trust, {{prenom}}"),
+      sujet: texte(
+        "Merci pour votre confiance, {{prenom}}",
+        "Thank you for your trust, {{prenom}}",
+      ),
       apercu: texte("Votre avis compte pour nous", "Your opinion matters to us"),
       texte: texte(
         "Bonjour {{prenom}},\n\nMerci pour votre achat. Toute l'équipe de {{entreprise}} reste à votre disposition.\n\nÀ très bientôt.",
@@ -113,12 +150,20 @@ export const RECETTES = [
         const f = parId.get(id);
         if (!f?.clientId || vus.has(id)) continue;
         vus.add(id);
-        out.push({ cle: `livraison:${id}`, clientId: f.clientId, extra: { numero: f.numero || "" }, objet: id });
+        out.push({
+          cle: `livraison:${id}`,
+          clientId: f.clientId,
+          extra: { numero: f.numero || "" },
+          objet: id,
+        });
       }
       return out;
     },
     contenu: {
-      sujet: texte("Votre commande est arrivée ? Dites-nous tout", "Did your order arrive? Tell us"),
+      sujet: texte(
+        "Votre commande est arrivée ? Dites-nous tout",
+        "Did your order arrive? Tell us",
+      ),
       apercu: texte("Une minute pour nous aider", "One minute to help us"),
       texte: texte(
         "Bonjour {{prenom}},\n\nVotre commande {{numero}} vous a été livrée. Tout est-il conforme ?\n\nVotre retour nous aide à mieux vous servir : répondez simplement à ce message.",
@@ -135,12 +180,19 @@ export const RECETTES = [
       const out = [];
       for (const [clientId, date] of Object.entries(derniere)) {
         const seuil = jourDe(plusJours(`${date}T12:00:00Z`, 90));
-        if (seuil <= jourDe(maintenant) && seuil >= jourDe(depuis)) out.push({ cle: `endormi:${clientId}:${date}`, clientId, extra: { derniereFacture: date } });
+        if (seuil <= jourDe(maintenant) && seuil >= jourDe(depuis))
+          out.push({
+            cle: `endormi:${clientId}:${date}`,
+            clientId,
+            extra: { derniereFacture: date },
+          });
       }
       return out;
     },
     // Il a racheté entre-temps : plus besoin de le réveiller.
-    sortie: (ctx, inscrit) => (derniereFactureParClient(ctx)[inscrit.clientId] || "") > (inscrit.extra?.derniereFacture || ""),
+    sortie: (ctx, inscrit) =>
+      (derniereFactureParClient(ctx)[inscrit.clientId] || "") >
+      (inscrit.extra?.derniereFacture || ""),
     contenu: {
       sujet: texte("{{prenom}}, cela fait longtemps !", "{{prenom}}, it's been a while!"),
       apercu: texte("Voici ce qui a changé chez nous", "Here is what's new with us"),
@@ -165,14 +217,25 @@ export const RECETTES = [
         const date = `${annee}${c.createdAt.slice(4, 10)}`;
         // Le jour même, ou dans les trois derniers jours (un serveur
         // arrêté un dimanche ne fait pas rater l'anniversaire).
-        if (date <= aujourdhui && date >= jourDe(plusJours(`${aujourdhui}T12:00:00Z`, -3)) && date >= jourDe(depuis)) {
-          out.push({ cle: `anniversaire:${c.id}:${annee}`, clientId: c.id, extra: { annees: String(annee - debut) } });
+        if (
+          date <= aujourdhui &&
+          date >= jourDe(plusJours(`${aujourdhui}T12:00:00Z`, -3)) &&
+          date >= jourDe(depuis)
+        ) {
+          out.push({
+            cle: `anniversaire:${c.id}:${annee}`,
+            clientId: c.id,
+            extra: { annees: String(annee - debut) },
+          });
         }
       }
       return out;
     },
     contenu: {
-      sujet: texte("{{annees}} an(s) ensemble, merci {{prenom}} !", "{{annees}} year(s) together, thank you {{prenom}}!"),
+      sujet: texte(
+        "{{annees}} an(s) ensemble, merci {{prenom}} !",
+        "{{annees}} year(s) together, thank you {{prenom}}!",
+      ),
       apercu: texte("Un petit mot pour vous", "A little note for you"),
       texte: texte(
         "Bonjour {{prenom}},\n\nIl y a {{annees}} an(s), nous commencions à travailler ensemble. Merci pour votre fidélité !",
@@ -198,7 +261,14 @@ export const automatisationDe = (recetteId, langue = "fr", nom = "") => {
     apercu: r?.contenu.apercu[l] || "",
     couleur: "#c2410c",
     langue: l,
-    blocs: [{ id: "t1", type: "texte", texte: r?.contenu.texte[l] || "" }, { id: "s1", type: "signature", texte: l === "en" ? "Talk soon,\n{{entreprise}}" : "À très vite,\n{{entreprise}}" }],
+    blocs: [
+      { id: "t1", type: "texte", texte: r?.contenu.texte[l] || "" },
+      {
+        id: "s1",
+        type: "signature",
+        texte: l === "en" ? "Talk soon,\n{{entreprise}}" : "À très vite,\n{{entreprise}}",
+      },
+    ],
     regles: { joursOuvres: true, sortie: true },
     inscrits: [],
   };
@@ -216,8 +286,15 @@ export const prochainCreneau = (iso, { joursOuvres = true } = {}) => {
       d.setUTCHours(8, 0, 0, 0);
       continue;
     }
-    if (d.getUTCHours() < 8) { d.setUTCHours(8, 0, 0, 0); break; }
-    if (d.getUTCHours() >= 18) { d.setUTCDate(d.getUTCDate() + 1); d.setUTCHours(8, 0, 0, 0); continue; }
+    if (d.getUTCHours() < 8) {
+      d.setUTCHours(8, 0, 0, 0);
+      break;
+    }
+    if (d.getUTCHours() >= 18) {
+      d.setUTCDate(d.getUTCDate() + 1);
+      d.setUTCHours(8, 0, 0, 0);
+      continue;
+    }
     break;
   }
   return d.toISOString();
@@ -228,7 +305,10 @@ export const prochainCreneau = (iso, { joursOuvres = true } = {}) => {
 export const inscrire = (auto, ctx, maintenant = new Date().toISOString()) => {
   const r = recetteDe(auto.recette);
   if (!r || !auto.actif || !auto.activeLe) return { auto, nouveaux: 0 };
-  const depuis = auto.activeLe > plusJours(maintenant, -FENETRE) ? auto.activeLe : plusJours(maintenant, -FENETRE);
+  const depuis =
+    auto.activeLe > plusJours(maintenant, -FENETRE)
+      ? auto.activeLe
+      : plusJours(maintenant, -FENETRE);
   const connues = new Set((auto.inscrits || []).map((i) => i.cle));
   const parId = new Map((ctx.clients || []).map((c) => [c.id, c]));
   const ajouts = [];
@@ -236,7 +316,13 @@ export const inscrire = (auto, ctx, maintenant = new Date().toISOString()) => {
     if (connues.has(cand.cle)) continue;
     const c = parId.get(cand.clientId);
     const d = c?.data || {};
-    if (!adresseValide(d.email) || d.emailDesinscrit || d.emailRebond || d.emailAConfirmer) continue;
+    if (
+      !adresseValide(d.email) ||
+      d.emailDesinscrit ||
+      d.emailRebond ||
+      d.emailAConfirmer
+    )
+      continue;
     connues.add(cand.cle);
     ajouts.push({
       cle: cand.cle,
@@ -246,14 +332,26 @@ export const inscrire = (auto, ctx, maintenant = new Date().toISOString()) => {
       email: String(d.email).trim().toLowerCase(),
       nom: d.entreprise || d.nom || d.email,
       contact: d.entreprise ? d.nom || "" : "",
-      prenom: String(d.nom && d.nom !== d.email ? d.nom : "").trim().split(/\s+/)[0] || "",
+      prenom:
+        String(d.nom && d.nom !== d.email ? d.nom : "")
+          .trim()
+          .split(/\s+/)[0] || "",
       ville: d.ville || "",
       entreLe: maintenant,
-      prevuLe: prochainCreneau(plusJours(maintenant, Number(auto.delaiJours) || 0), auto.regles),
+      prevuLe: prochainCreneau(
+        plusJours(maintenant, Number(auto.delaiJours) || 0),
+        auto.regles,
+      ),
       statut: "attente",
     });
   }
-  return { auto: { ...auto, inscrits: elaguer([...(auto.inscrits || []), ...ajouts], maintenant) }, nouveaux: ajouts.length };
+  return {
+    auto: {
+      ...auto,
+      inscrits: elaguer([...(auto.inscrits || []), ...ajouts], maintenant),
+    },
+    nouveaux: ajouts.length,
+  };
 };
 
 /// Ceux dont le tour est venu. Les sortants (devis signé…) sont marqués.
@@ -262,7 +360,8 @@ export const echeances = (auto, ctx, maintenant = new Date().toISOString()) => {
   const prets = [];
   const inscrits = (auto.inscrits || []).map((i) => {
     if (i.statut !== "attente" || i.prevuLe > maintenant) return i;
-    if (auto.regles?.sortie !== false && r?.sortie && r.sortie(ctx, i)) return { ...i, statut: "sorti", sortiLe: maintenant };
+    if (auto.regles?.sortie !== false && r?.sortie && r.sortie(ctx, i))
+      return { ...i, statut: "sorti", sortiLe: maintenant };
     prets.push(i.cle);
     return i;
   });
@@ -274,7 +373,9 @@ export const echeances = (auto, ctx, maintenant = new Date().toISOString()) => {
 /// terminé est oublié — la fenêtre des candidats est plus courte.
 export const elaguer = (inscrits = [], maintenant = new Date().toISOString()) => {
   const limite = plusJours(maintenant, -120);
-  const gardes = inscrits.filter((i) => i.statut === "attente" || (i.entreLe || "") >= limite);
+  const gardes = inscrits.filter(
+    (i) => i.statut === "attente" || (i.entreLe || "") >= limite,
+  );
   return gardes.slice(-2000);
 };
 

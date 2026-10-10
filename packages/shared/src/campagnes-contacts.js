@@ -15,7 +15,7 @@ import { adresseValide } from "./courrier.js";
 /// Lit un CSV : séparateur deviné (« ; », « , » ou tabulation), guillemets
 /// et retours à la ligne dans les champs, BOM retiré.
 export const lireCsv = (texte = "") => {
-  const brut = String(texte).replace(/^﻿/, "");
+  const brut = String(texte).replace(/^\uFEFF/, "");
   const premiere = brut.split(/\r?\n/)[0] || "";
   const compte = (c) => premiere.split(c).length - 1;
   const separateur = [";", ",", "\t"].sort((a, b) => compte(b) - compte(a))[0];
@@ -26,12 +26,16 @@ export const lireCsv = (texte = "") => {
   for (let i = 0; i < brut.length; i += 1) {
     const c = brut[i];
     if (guillemets) {
-      if (c === '"' && brut[i + 1] === '"') { champ += '"'; i += 1; }
-      else if (c === '"') guillemets = false;
+      if (c === '"' && brut[i + 1] === '"') {
+        champ += '"';
+        i += 1;
+      } else if (c === '"') guillemets = false;
       else champ += c;
     } else if (c === '"') guillemets = true;
-    else if (c === separateur) { ligne.push(champ); champ = ""; }
-    else if (c === "\n" || c === "\r") {
+    else if (c === separateur) {
+      ligne.push(champ);
+      champ = "";
+    } else if (c === "\n" || c === "\r") {
       if (c === "\r" && brut[i + 1] === "\n") i += 1;
       ligne.push(champ);
       if (ligne.some((x) => x.trim())) lignes.push(ligne);
@@ -46,9 +50,22 @@ export const lireCsv = (texte = "") => {
 };
 
 /// Les champs de fiche qu'une colonne peut remplir.
-export const CHAMPS_IMPORT = ["ignorer", "entreprise", "nom", "email", "telephone", "ville", "secteur", "etiquettes"];
+export const CHAMPS_IMPORT = [
+  "ignorer",
+  "entreprise",
+  "nom",
+  "email",
+  "telephone",
+  "ville",
+  "secteur",
+  "etiquettes",
+];
 
-const sansAccent = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const sansAccent = (t) =>
+  String(t || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
 
 /// Le champ le plus probable pour chaque en-tête.
 export const devinerColonnes = (entetes = []) => {
@@ -71,16 +88,38 @@ export const devinerColonnes = (entetes = []) => {
   });
 };
 
-const decouperEtiquettes = (v) => String(v || "").split(/[,;|]/).map((x) => x.trim()).filter(Boolean);
+const decouperEtiquettes = (v) =>
+  String(v || "")
+    .split(/[,;|]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 
 /// Ce que l'import va faire, avant de le faire. Rien n'est écrit ici.
 ///
 /// Renvoie { nouveaux: [data], misAJour: [{ id, data }], doublons,
 /// invalides, desinscrits, total }.
-export const planImport = ({ lignes = [], colonnes = [], clients = [], etiquettes = [], consentement = null, statut = "prospect" } = {}) => {
-  const parEmail = new Map(clients.filter((c) => c.data?.email).map((c) => [String(c.data.email).trim().toLowerCase(), c]));
+export const planImport = ({
+  lignes = [],
+  colonnes = [],
+  clients = [],
+  etiquettes = [],
+  consentement = null,
+  statut = "prospect",
+} = {}) => {
+  const parEmail = new Map(
+    clients
+      .filter((c) => c.data?.email)
+      .map((c) => [String(c.data.email).trim().toLowerCase(), c]),
+  );
   const vus = new Set();
-  const out = { nouveaux: [], misAJour: [], doublons: 0, invalides: 0, desinscrits: 0, total: lignes.length };
+  const out = {
+    nouveaux: [],
+    misAJour: [],
+    doublons: 0,
+    invalides: 0,
+    desinscrits: 0,
+    total: lignes.length,
+  };
   const enPlus = etiquettes.map((e) => String(e).trim()).filter(Boolean);
 
   for (const ligne of lignes) {
@@ -89,22 +128,35 @@ export const planImport = ({ lignes = [], colonnes = [], clients = [], etiquette
       if (!champ || champ === "ignorer") return;
       const x = String(ligne[i] ?? "").trim();
       if (!x) return;
-      if (champ === "etiquettes") v.etiquettes = [...(v.etiquettes || []), ...decouperEtiquettes(x)];
+      if (champ === "etiquettes")
+        v.etiquettes = [...(v.etiquettes || []), ...decouperEtiquettes(x)];
       else if (!v[champ]) v[champ] = x;
     });
-    const email = String(v.email || "").trim().toLowerCase();
-    if (!adresseValide(email)) { out.invalides += 1; continue; }
-    if (vus.has(email)) { out.doublons += 1; continue; }
+    const email = String(v.email || "")
+      .trim()
+      .toLowerCase();
+    if (!adresseValide(email)) {
+      out.invalides += 1;
+      continue;
+    }
+    if (vus.has(email)) {
+      out.doublons += 1;
+      continue;
+    }
     vus.add(email);
     const tags = [...new Set([...(v.etiquettes || []), ...enPlus])];
     const existant = parEmail.get(email);
 
     if (existant) {
-      if (existant.data.emailDesinscrit) { out.desinscrits += 1; continue; }
+      if (existant.data.emailDesinscrit) {
+        out.desinscrits += 1;
+        continue;
+      }
       // On complète, on n'écrase pas : la fiche du CRM a été tenue à la
       // main, elle a raison sur le fichier.
       const data = { ...existant.data };
-      for (const k of ["entreprise", "nom", "telephone", "ville", "secteur"]) if (!data[k] && v[k]) data[k] = v[k];
+      for (const k of ["entreprise", "nom", "telephone", "ville", "secteur"])
+        if (!data[k] && v[k]) data[k] = v[k];
       data.etiquettes = [...new Set([...(data.etiquettes || []), ...tags])];
       if (consentement && !data.consentement) data.consentement = consentement;
       out.misAJour.push({ id: existant.id, data });

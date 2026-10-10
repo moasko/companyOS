@@ -17,7 +17,7 @@ import { FicheEntreprise } from "../../entreprise/FicheEntreprise";
 import { imageSignature } from "../signature/domaine";
 import { ID_EDITEUR, prendreDemande, surDemande } from "../../editeurFacturesRequest";
 import { montantDans } from "../../../utils/monnaie";
-import { etatPaiement } from "@companyos/shared/facturation";
+import { etatPaiement, prochainNumero } from "@companyos/shared/facturation";
 import {
   CONDITIONS,
   FREQUENCES,
@@ -364,9 +364,20 @@ function EditeurFactures() {
     if (demande.client) {
       const c = demande.client;
       const base = factureVide(reglages);
+      // Depuis le CRM : un devis (ou une facture) déjà intitulé et chiffré
+      // d'après l'affaire, et qui garde le lien vers elle.
+      const type = demande.type === "devis" ? "devis" : "facture";
+      const liste = docs || documents;
       setFacture({
         ...base,
-        numero: numeroSuivant(docs || documents, base.date),
+        type,
+        numero: type === "devis"
+          ? prochainNumero(liste, "devis", Number(String(base.date).slice(0, 4)))
+          : numeroSuivant(liste, base.date),
+        ...(demande.objet
+          ? { lignes: [{ ...ligneVide(), designation: demande.objet, pu: Number(demande.montant) || 0 }] }
+          : {}),
+        ...(demande.opportuniteId ? { opportuniteId: demande.opportuniteId } : {}),
         clientId: c.id,
         clientNom: c.data?.nom || "",
         clientEntreprise: c.data?.entreprise || "",
