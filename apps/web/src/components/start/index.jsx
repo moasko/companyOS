@@ -7,7 +7,7 @@ import { GRID } from "../../reducers/deskLayout";
 import { api } from "../../api/client";
 import { ensureRootFolder } from "../../apps/cloud";
 import { applicationManquante, ouvrirFichier } from "../../apps/openRequest";
-import { moduleById } from "../../apps/registry";
+import { moduleById, modulesSysteme } from "../../apps/registry";
 import { ouvrirCorbeille } from "../../apps/explorerRequest";
 import { modal } from "../../apps/modalRequest";
 import { menuContextuel } from "../../apps/menuRequest";
@@ -150,8 +150,20 @@ export const DesktopApp = () => {
   const t = useTraduction(TEXTES);
   const nomApp = useNomApp();
 
+  // Les outils d'administration (Automatisations) n'ont pas d'icône de
+  // bureau par défaut : les administrateurs ne les trouvaient que par la
+  // recherche ou « Toutes les apps ». Ils apparaissent ici, comme sur
+  // l'écran d'accueil du téléphone (Lanceur.jsx).
+  const role = useSelector((state) => state.session.user?.role);
+  const estAdmin = role === "OWNER" || role === "ADMIN";
+
   const deskApps = useMemo(() => {
-    const apps = [...bureau.apps];
+    const outils = estAdmin
+      ? modulesSysteme
+          .filter((m) => m.admin && !bureau.apps.some((b) => b.action === m.action || b.name === m.name))
+          .map((m) => ({ id: m.id, name: m.name, icon: m.icon, action: m.action, type: "app" }))
+      : [];
+    const apps = [...bureau.apps, ...outils];
     if (bureau.sort === "name") {
       apps.sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
     }
@@ -160,7 +172,7 @@ export const DesktopApp = () => {
     // qui donnait un ordre arbitraire. Mieux vaut l'ordre d'ajout qu'un
     // classement qui a l'air d'en être un sans l'être.
     return { ...bureau, apps };
-  }, [bureau]);
+  }, [bureau, estAdmin]);
 
   const dispatch = useDispatch();
 
