@@ -261,3 +261,22 @@ envoie `X-Accel-Buffering: no`) et laisser les connexions ouvertes au moins
 Plusieurs instances de l'API peuvent tourner côte à côte : les événements
 passent par PostgreSQL (`LISTEN/NOTIFY`), les jetons d'URL et le verrou de
 connexion sont en base. Une seule base, aucun Redis à ajouter.
+
+## Pack entreprise : adresses à renseigner
+
+| Variable | Sert à |
+|---|---|
+| `PUBLIC_URL` | lien des courriels de réinitialisation de mot de passe et d'invitation (`https://app.exemple.fr`) |
+| `PUBLIC_API_URL` | adresse des liens de partage de fichiers et **adresse de redirection SSO** à déclarer chez le fournisseur d'identité : `https://api.exemple.fr/api/auth/sso/retour` |
+
+**Authentification unique (OpenID Connect).** Le propriétaire de l'espace la
+configure dans Paramètres › Sécurité : émetteur (ex.
+`https://login.microsoftonline.com/<id-locataire>/v2.0`), identifiant et
+secret client (chiffré en base), domaines de messagerie. Un domaine doit
+être celui d'au moins un membre de l'espace et n'appartenir à aucun autre
+espace. En mode « obligatoire », seul le propriétaire garde la connexion
+par mot de passe (accès de secours).
+
+**Historique des fiches** : 50 versions par fiche, fiches supprimées
+récupérables 180 jours (purge automatique). **Versions de fichiers** : 10
+par fichier, comptées dans le quota.

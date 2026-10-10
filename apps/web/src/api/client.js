@@ -114,6 +114,7 @@ const envoyer = async (path, { method = "GET", body, isForm = false } = {}) => {
     // Le code HTTP permet de distinguer une session refusée (401) d'une
     // panne passagère : seul le premier cas doit déconnecter l'utilisateur.
     error.status = response.status;
+    if (payload?.sso) error.sso = true;
     if (payload?.mfaAConfigurer) {
       error.mfaAConfigurer = true;
       window.dispatchEvent(new Event(MFA_REQUISE));
@@ -166,6 +167,15 @@ export const api = {
     }
   },
   me: () => request("/auth/me"),
+  motDePasseOublie: (email) => request("/auth/mot-de-passe/oubli", { method: "POST", body: { email } }),
+  reinitialiserMotDePasse: (jeton, motDePasse) =>
+    request("/auth/mot-de-passe/reinit", { method: "POST", body: { jeton, motDePasse } }),
+  /// Adresse de départ de l'authentification unique : une navigation,
+  /// pas un appel (le fournisseur d'identité prend la page).
+  configSso: () => request("/auth/sso/config"),
+  enregistrerSso: (config) => request("/auth/sso/config", { method: "PUT", body: config }),
+  supprimerSso: () => request("/auth/sso/config", { method: "DELETE" }),
+  urlSso: (email) => `${BASE_URL}/api/auth/sso/debut?email=${encodeURIComponent(email || "")}`,
   preferences: () => request("/auth/preferences"),
   enregistrerPreferences: (preferences) =>
     request("/auth/preferences", { method: "PUT", body: { preferences } }),
@@ -226,6 +236,21 @@ export const api = {
   lireToutesNotifications: () => request("/notifications/lu", { method: "PUT" }),
   supprimerNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
   viderNotifications: () => request("/notifications", { method: "DELETE" }),
+  // Conformité RGPD (voir apps/api/src/routes/conformite.js).
+  urlMesDonnees: () => `${BASE_URL}/api/conformite/mes-donnees`,
+  urlExportEspace: () => `${BASE_URL}/api/conformite/export`,
+  reglagesConformite: () => request("/conformite/reglages"),
+  enregistrerReglagesConformite: (r) => request("/conformite/reglages", { method: "PUT", body: r }),
+  // Versions et liens de partage des fichiers.
+  versionsFichier: (id) => request(`/files/${id}/versions`),
+  urlVersionFichier: (id, vid) => `${BASE_URL}/api/files/${id}/versions/${vid}/download`,
+  restaurerVersionFichier: (id, vid) => request(`/files/${id}/versions/${vid}/restaurer`, { method: "POST", body: {} }),
+  partagesFichier: (id) => request(`/files/${id}/partages`),
+  partagerFichier: (id, reglages) => request(`/files/${id}/partages`, { method: "POST", body: reglages }),
+  revoquerPartage: (pid) => request(`/files/partages/${pid}`, { method: "DELETE" }),
+  rechercherPersonne: (valeur) => request("/conformite/personne/recherche", { method: "POST", body: { valeur } }),
+  anonymiserPersonne: (valeur) => request("/conformite/personne/anonymiser", { method: "POST", body: { valeur } }),
+
   // Push : l'appareil est prévenu onglet fermé (voir src/apps/push.js).
   pushCle: () => request("/notifications/push/cle"),
   pushAbonner: (abonnement) => request("/notifications/push", { method: "POST", body: abonnement }),
@@ -436,6 +461,19 @@ export const api = {
     remove: async (module, collection, id) => {
       try {
         return await request(`/records/${module}/${collection}/${id}`, { method: "DELETE" });
+      } finally {
+        listes.invalider(module, collection);
+      }
+    },
+    /// Historique d'une fiche (états précédents) et fiches supprimées.
+    historique: (module, collection, id) => request(`/records/${module}/${collection}/${id}/historique`),
+    corbeille: (module, collection) => request(`/records/${module}/${collection}/corbeille/liste`),
+    restaurer: async (module, collection, id, versionId) => {
+      try {
+        return await request(`/records/${module}/${collection}/${id}/historique/${versionId}/restaurer`, {
+          method: "POST",
+          body: {},
+        });
       } finally {
         listes.invalider(module, collection);
       }

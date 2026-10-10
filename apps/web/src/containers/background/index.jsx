@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon, Image } from "../../utils/general";
-import { api } from "../../api/client";
+import { api, noterSession } from "../../api/client";
 import { syncInstalledModules, detachAllModules } from "../../apps/sync";
 import { appliquerApparence, reinitialiserApparence } from "../../apps/appearance";
 import { demarrerPreferences } from "../../apps/preferences";
@@ -29,7 +29,6 @@ const TEXTES = {
     votreNom: "Votre nom",
     email: "Adresse e-mail",
     motDePasse: "Mot de passe",
-    motDePasseMin: "Mot de passe (8 caractères min.)",
     seConnecter: "Se connecter",
     creerEspace: "Créer mon espace",
     rejoindre: "Rejoindre",
@@ -37,6 +36,23 @@ const TEXTES = {
     versConnexion: "Déjà un compte ? Se connecter",
     retourConnexion: "Retour à la connexion",
     jaiUnCode: "On m'a invité — j'ai un code",
+    motDePasseMin: "Mot de passe (10 caractères min.)",
+    oublie: "Mot de passe oublié ?",
+    titreOubli: "Mot de passe oublié",
+    aideOubli: "Indiquez l'adresse de votre compte : vous recevrez un lien pour choisir un nouveau mot de passe.",
+    envoyerLien: "Envoyer le lien",
+    lienEnvoye: "Si un compte existe pour cette adresse, un lien vient d'y être envoyé. Il est valable une heure.",
+    titreReinit: "Nouveau mot de passe",
+    aideReinit: "10 caractères au moins. Toutes vos sessions ouvertes seront fermées.",
+    nouveauMdp: "Nouveau mot de passe",
+    confirmerMdp: "Confirmer le mot de passe",
+    mdpDifferents: "Les deux mots de passe ne correspondent pas.",
+    enregistrerMdp: "Enregistrer",
+    mdpChange: "Mot de passe changé. Connectez-vous avec le nouveau.",
+    sso: "Authentification unique (SSO)",
+    titreSso: "Authentification unique",
+    aideSso: "Votre entreprise utilise Microsoft, Google ou un autre fournisseur d'identité : saisissez votre adresse professionnelle.",
+    continuer: "Continuer",
   },
   en: {
     connexionImpossible: "Could not sign in",
@@ -55,7 +71,6 @@ const TEXTES = {
     votreNom: "Your name",
     email: "Email address",
     motDePasse: "Password",
-    motDePasseMin: "Password (8 characters min.)",
     seConnecter: "Sign in",
     creerEspace: "Create my workspace",
     rejoindre: "Join",
@@ -63,6 +78,23 @@ const TEXTES = {
     versConnexion: "Already have an account? Sign in",
     retourConnexion: "Back to sign-in",
     jaiUnCode: "I was invited — I have a code",
+    motDePasseMin: "Password (10 characters min.)",
+    oublie: "Forgot password?",
+    titreOubli: "Forgot password",
+    aideOubli: "Enter your account's email address: you'll receive a link to choose a new password.",
+    envoyerLien: "Send the link",
+    lienEnvoye: "If an account exists for this address, a link has just been sent. It's valid for one hour.",
+    titreReinit: "New password",
+    aideReinit: "At least 10 characters. All your open sessions will be closed.",
+    nouveauMdp: "New password",
+    confirmerMdp: "Confirm password",
+    mdpDifferents: "The two passwords don't match.",
+    enregistrerMdp: "Save",
+    mdpChange: "Password changed. Sign in with the new one.",
+    sso: "Single sign-on (SSO)",
+    titreSso: "Single sign-on",
+    aideSso: "Your company uses Microsoft, Google or another identity provider: enter your work email.",
+    continuer: "Continue",
   },
 };
 
@@ -137,19 +169,38 @@ export const LockScreen = (props) => {
   //
   // Le troisième cas n'est pas un détail : sans lui, inviter quelqu'un
   // ne mène nulle part.
-  const [mode, setMode] = useState("login");
+  // Arrivée par un lien : réinitialisation de mot de passe (?reinit=…),
+  // invitation (?code=…) ou retour d'authentification unique en échec.
+  const [parametres] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const lu = { reinit: p.get("reinit"), code: p.get("code"), erreurSso: p.get("sso_erreur"), ssoOk: p.get("sso") === "ok" };
+      if (lu.reinit || lu.code || lu.erreurSso || lu.ssoOk) {
+        // Le jeton ne reste pas dans l'adresse (historique, captures d'écran).
+        window.history.replaceState(null, "", `${window.location.pathname}?connexion`);
+      }
+      return lu;
+    } catch {
+      return {};
+    }
+  });
+  const [mode, setMode] = useState(() =>
+    /^[a-f0-9]{32}$/.test(parametres.reinit || "") ? "reinit" : parametres.code ? "join" : "login",
+  );
   const [form, setForm] = useState({
     company: "",
     name: "",
     email: "",
     password: "",
-    code: "",
+    password2: "",
+    code: (parametres.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32),
     otp: "",
   });
+  const [info, setInfo] = useState("");
   // Défi rendu par la première étape quand le compte a la double
   // authentification : seul le code le transforme en session.
   const [defi, setDefi] = useState(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(parametres.erreurSso ? String(parametres.erreurSso).slice(0, 200) : "");
   const [busy, setBusy] = useState(false);
   const dispatch = useDispatch();
 
@@ -185,6 +236,30 @@ export const LockScreen = (props) => {
     proceed();
   };
 
+  // Retour du fournisseur d'identité : la session est déjà ouverte côté
+  // serveur (cookie) ; on la reprend sans rien demander.
+  useEffect(() => {
+    if (!parametres.ssoOk) return;
+    let vivant = true;
+    (async () => {
+      setBusy(true);
+      try {
+        const moi = await api.me();
+        noterSession();
+        if (vivant) await terminer(moi);
+      } catch (err) {
+        if (vivant) setError(err.message || t("connexionImpossible"));
+      } finally {
+        if (vivant) setBusy(false);
+      }
+    })();
+    return () => {
+      vivant = false;
+    };
+    // Une seule fois, à l'arrivée.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const submit = async () => {
     if (busy) return;
     setBusy(true);
@@ -193,6 +268,28 @@ export const LockScreen = (props) => {
       if (mode === "mfa") {
         await terminer(await api.loginMfa(defi, form.otp));
         setDefi(null);
+        return;
+      }
+      if (mode === "oubli") {
+        await api.motDePasseOublie(form.email);
+        setInfo(t("lienEnvoye"));
+        return;
+      }
+      if (mode === "reinit") {
+        if (form.password !== form.password2) {
+          setError(t("mdpDifferents"));
+          return;
+        }
+        await api.reinitialiserMotDePasse(parametres.reinit, form.password);
+        setForm((f) => ({ ...f, password: "", password2: "" }));
+        setMode("login");
+        setInfo(t("mdpChange"));
+        return;
+      }
+      if (mode === "sso") {
+        // Le fournisseur d'identité prend la main ; il nous renverra
+        // ici, session ouverte.
+        window.location.assign(api.urlSso(form.email));
         return;
       }
       const result =
@@ -210,6 +307,8 @@ export const LockScreen = (props) => {
       await terminer(result);
     } catch (err) {
       setError(err.message || t("connexionImpossible"));
+      // Espace en SSO obligatoire : on propose directement le bon chemin.
+      if (err.sso) setMode("sso");
     } finally {
       setBusy(false);
     }
@@ -230,6 +329,7 @@ export const LockScreen = (props) => {
   const changerMode = (suivant) => {
     setMode(suivant);
     setError("");
+    setInfo("");
   };
 
   const authenticated = session.status === "authenticated";
@@ -295,7 +395,34 @@ export const LockScreen = (props) => {
             </div>
           </>
         ) : (
-          mode === "mfa" ? (
+          mode === "oubli" || mode === "reinit" || mode === "sso" ? (
+          <div className="authForm mt-4">
+            <div className="text-xl font-medium text-gray-200 mb-1">
+              {{ oubli: t("titreOubli"), reinit: t("titreReinit"), sso: t("titreSso") }[mode]}
+            </div>
+            <div className="text-xs text-gray-300 mb-2 authAide">
+              {{ oubli: t("aideOubli"), reinit: t("aideReinit"), sso: t("aideSso") }[mode]}
+            </div>
+            {mode === "reinit" ? (
+              <>
+                <input type="password" autoComplete="new-password" placeholder={t("nouveauMdp")} value={form.password} onChange={field("password")} onKeyDown={onKey} autoFocus />
+                <input type="password" autoComplete="new-password" placeholder={t("confirmerMdp")} value={form.password2} onChange={field("password2")} onKeyDown={onKey} />
+              </>
+            ) : (
+              <input type="email" autoComplete="email" placeholder={t("email")} value={form.email} onChange={field("email")} onKeyDown={onKey} autoFocus />
+            )}
+            {error ? <div className="authError">{error}</div> : null}
+            {info ? <div className="authInfo">{info}</div> : null}
+            {!info || mode !== "oubli" ? (
+              <div className="flex items-center mt-4 signInBtn" onClick={submit}>
+                {busy ? "…" : { oubli: t("envoyerLien"), reinit: t("enregistrerMdp"), sso: t("continuer") }[mode]}
+              </div>
+            ) : null}
+            <div className="text-xs text-gray-400 mt-4 handcr" onClick={() => changerMode("login")}>
+              {t("retourConnexion")}
+            </div>
+          </div>
+          ) : mode === "mfa" ? (
           <div className="authForm mt-4">
             <div className="text-xl font-medium text-gray-200 mb-1">{t("titreMfa")}</div>
             <div className="text-xs text-gray-300 mb-3 authAide">{t("aideMfa")}</div>
@@ -390,7 +517,13 @@ export const LockScreen = (props) => {
               onChange={field("password")}
               onKeyDown={onKey}
             />
+            {mode === "login" ? (
+              <div className="text-xs text-gray-400 mt-2 handcr authOubli" onClick={() => changerMode("oubli")}>
+                {t("oublie")}
+              </div>
+            ) : null}
             {error ? <div className="authError">{error}</div> : null}
+            {info ? <div className="authInfo">{info}</div> : null}
             <div className="flex items-center mt-4 signInBtn" onClick={submit}>
               {busy
                 ? "…"
@@ -400,6 +533,11 @@ export const LockScreen = (props) => {
                     join: t("rejoindre"),
                   }[mode]}
             </div>
+            {mode === "login" ? (
+              <div className="flex items-center mt-2 signInBtn authSso" onClick={() => changerMode("sso")}>
+                {t("sso")}
+              </div>
+            ) : null}
             <div
               className="text-xs text-gray-400 mt-4 handcr"
               onClick={() => changerMode(mode === "login" ? "register" : "login")}

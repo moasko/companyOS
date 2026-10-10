@@ -35,6 +35,13 @@ import { auMoins } from "./auth.js";
 
 export const MODES = ["membres", "admins", "selection"];
 
+/// Qui peut **modifier** les données d'une application, parmi ceux qui
+/// peuvent l'ouvrir. Par défaut, tous : la lecture seule est un choix.
+///   tous      — quiconque a accès
+///   admins    — les administrateurs seulement (les autres consultent)
+///   selection — une liste de membres
+export const MODES_ECRITURE = ["tous", "admins", "selection"];
+
 /// La règle d'une application tant qu'aucun administrateur n'en a décidé.
 /// Ce qui touche aux salaires est fermé d'office : l'ouvrir doit être un
 /// choix, pas un oubli.
@@ -84,6 +91,17 @@ export const autoriseSelon = (user, regle) => {
   return false;
 };
 
+/// Cette personne peut-elle créer, modifier ou supprimer des fiches de
+/// l'application ? Il faut d'abord pouvoir l'ouvrir.
+export const ecritureSelon = (user, regle) => {
+  if (!autoriseSelon(user, regle)) return false;
+  if (auMoins(user?.role, "ADMIN")) return true;
+  const e = regle?.ecriture;
+  if (!e?.mode || e.mode === "tous") return true;
+  if (e.mode === "selection") return (e.membres || []).includes(user?.id);
+  return false;
+};
+
 /// La règle d'accès d'un module pour la requête en cours.
 ///
 /// Un module sans installation (désinstallé, ou qui n'est pas une app du
@@ -98,7 +116,7 @@ export const accesModule = async (request, module) => {
     select: { acces: true },
   });
   const regle = regleDe(module, installation);
-  return { regle, autorise: autoriseSelon(request.user, regle) };
+  return { regle, autorise: autoriseSelon(request.user, regle), ecrit: ecritureSelon(request.user, regle) };
 };
 
 const partageDe = (names) => PARTAGES[`${names.module}/${names.collection}`] || null;

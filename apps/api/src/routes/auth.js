@@ -1,7 +1,16 @@
 ﻿import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { prisma, serialize } from "../db.js";
-import { effacerEchecs, noterEchec, verrouDe } from "../etatPartage.js";
+import { createHash } from "node:crypto";
+import {
+  compterJetons,
+  consommerJeton,
+  creerJeton,
+  effacerEchecs,
+  noterEchec,
+  revoquerJetons,
+  verrouDe,
+} from "../etatPartage.js";
 import { env } from "../env.js";
 import {
   authenticate,
@@ -30,7 +39,8 @@ import jwt from "jsonwebtoken";
 import { creerEspace } from "../espaces.js";
 import { journaliser, journaliserPour } from "../audit.js";
 import { formuleDe } from "../formules.js";
-import { envoyerMail, mailInvitation } from "../mail.js";
+import { envoyerMail, mailInvitation, mailReinitialisation } from "../mail.js";
+import { refusMotDePasse } from "../motsDePasse.js";
 
 const registerSchema = z.object({
   company: z.string().min(2),
@@ -134,6 +144,8 @@ export default async function authRoutes(app) {
     }
     const { company, name, password } = parsed.data;
     const email = normaliserEmail(parsed.data.email);
+    const refusMdp = refusMotDePasse(password, { email, nom: name });
+    if (refusMdp) return reply.code(400).send({ error: refusMdp });
 
     // Même réponse pour une adresse réservée que pour une adresse prise :
     // inutile d'indiquer à un inconnu quelles adresses ouvrent la console.
@@ -211,6 +223,16 @@ export default async function authRoutes(app) {
         error: "Cet espace de travail est suspendu.",
         motif: user.tenant.motifSuspension || null,
         suspendu: true,
+      });
+    }
+
+    // L'espace impose l'authentification unique : le mot de passe ne
+    // suffit plus, sauf au propriétaire (accès de secours si le
+    // fournisseur d'identité tombe ou est mal configuré).
+    if (user.tenant?.sso?.actif && user.tenant.sso.obligatoire && user.role !== "OWNER") {
+      return reply.code(403).send({
+        error: "Votre entreprise impose la connexion par authentification unique (SSO).",
+        sso: true,
       });
     }
 
@@ -338,6 +360,8 @@ export default async function authRoutes(app) {
     if (!ok) {
       return reply.code(401).send({ error: "Mot de passe actuel incorrect" });
     }
+    const refusMdp = refusMotDePasse(parsed.data.next, { email: request.user.email, nom: request.user.name });
+    if (refusMdp) return reply.code(400).send({ error: refusMdp });
 
     // Changer de mot de passe, c'est souvent réagir à un doute : les
     // sessions ouvertes ailleurs — un poste partagé, un téléphone perdu, un
@@ -348,6 +372,7 @@ export default async function authRoutes(app) {
       data: { passwordHash: await hashPassword(parsed.data.next) },
     });
     await revoquerSessions(request.user.id, { sauf: request.session.id });
+    await revoquerJetons("reinit", request.user.id);
 
     await journaliser(request, "compte.motdepasse");
 
@@ -1016,6 +1041,71 @@ export default async function authRoutes(app) {
     },
   );
 
+  // ---- Mot de passe oublié ------------------------------------------------
+  //
+  // Un lien à usage unique, valable une heure, envoyé à l'adresse du
+  // compte. La réponse est **la même** que le compte existe ou non, et le
+  // courriel part après la réponse : ni le message ni la durée ne disent
+  // quelles adresses ont un compte.
+
+  app.post("/mot-de-passe/oubli", { config: LIMITE_SENSIBLE }, async (request, reply) => {
+    const parsed = z.object({ email: z.string().email().max(200) }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Adresse e-mail invalide." });
+    const email = normaliserEmail(parsed.data.email);
+    reply.send({ ok: true });
+
+    setImmediate(async () => {
+      try {
+        const user = await compteParEmail(email, { include: { tenant: true } });
+        if (!user || user.tenant?.suspendu) return;
+        // Pas de mot de passe à réinitialiser quand l'espace impose le SSO.
+        if (user.tenant?.sso?.actif && user.tenant.sso.obligatoire && user.role !== "OWNER") return;
+        // Trois liens valides au plus par compte : pas de bombardement de
+        // la boîte de quelqu'un.
+        if ((await compterJetons("reinit", user.id)) >= 3) return;
+        const jeton = await creerJeton("reinit", user.tenantId, user.id, 60 * 60 * 1000);
+        const base = env.urlPublique || "";
+        const lien = `${base}/?connexion&reinit=${jeton}`;
+        await envoyerMail({ a: user.email, ...mailReinitialisation({ nom: user.name, lien }) });
+        await journaliserPour(request, user, "compte.motdepasse.demande");
+      } catch (err) {
+        request.log.error({ err }, "réinitialisation : envoi impossible");
+      }
+    });
+  });
+
+  app.post("/mot-de-passe/reinit", { config: LIMITE_SENSIBLE }, async (request, reply) => {
+    const parsed = z
+      .object({ jeton: z.string().regex(/^[a-f0-9]{32}$/), motDePasse: z.string().max(400) })
+      .safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Lien invalide ou expiré." });
+    // Le mot de passe est jugé avant de consommer le lien : un refus de
+    // politique ne doit pas obliger à redemander un courriel.
+    const apercu = await prisma.jetonUrl.findUnique({
+      where: { empreinte: createHash("sha256").update(parsed.data.jeton).digest("hex") },
+      select: { cible: true, type: true },
+    });
+    const cible = apercu?.type === "reinit" ? await prisma.user.findUnique({ where: { id: apercu.cible } }) : null;
+    if (cible) {
+      const refus = refusMotDePasse(parsed.data.motDePasse, { email: cible.email, nom: cible.name });
+      if (refus) return reply.code(400).send({ error: refus });
+    }
+    const jeton = await consommerJeton("reinit", parsed.data.jeton);
+    if (!jeton) return reply.code(400).send({ error: "Lien invalide ou expiré. Demandez-en un nouveau." });
+    const user = await prisma.user.findUnique({ where: { id: jeton.cible } });
+    if (!user) return reply.code(400).send({ error: "Lien invalide ou expiré. Demandez-en un nouveau." });
+
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(parsed.data.motDePasse) } });
+    // Toutes les sessions tombent : si le compte était compromis, l'intrus
+    // en est sorti. Les autres liens de réinitialisation aussi.
+    await revoquerSessions(user.id);
+    await revoquerJetons("reinit", user.id);
+    await effacerEchecs(normaliserEmail(user.email));
+    await journaliserPour(request, user, "compte.motdepasse.reinitialisation");
+    // La double authentification reste exigée à la prochaine connexion.
+    return { ok: true };
+  });
+
   /// Rejoindre un espace avec un code. Route publique : la personne
   /// invitée n'a pas encore de compte.
   app.post("/join", { config: LIMITE_SENSIBLE }, async (request, reply) => {
@@ -1048,6 +1138,8 @@ export default async function authRoutes(app) {
         error: "Un compte existe déjà avec cette adresse. Connectez-vous.",
       });
     }
+    const refusMdp = refusMotDePasse(parsed.data.password, { email: invitation.email, nom: parsed.data.name });
+    if (refusMdp) return reply.code(400).send({ error: refusMdp });
 
     const user = await prisma.$transaction(async (tx) => {
       const cree = await tx.user.create({

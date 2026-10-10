@@ -52,7 +52,10 @@ export const Comptes = ({ t, d, ctx, actions, membreDe, telephone, reglages, vue
       <header className="crmEntete">
         <div>
           <h1>{vue ? vue.nom : t("navComptes")}</h1>
-          <p className="crmSous">{t("nbComptes", { n: liste.length })}</p>
+          <p className="crmSous">
+            {t("nbComptes", { n: liste.length })} ·{" "}
+            <button type="button" className="crmLien" onClick={actions.comptesSupprimes}>{t("comptesSupprimes")}</button>
+          </p>
         </div>
         <div className="crmFiltres">
           <label className="crmRecherche">

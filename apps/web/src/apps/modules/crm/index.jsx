@@ -3,6 +3,7 @@ import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
 import { api } from "../../../api/client";
+import { ouvrirCorbeilleFiches, ouvrirHistorique } from "../../historique";
 import { saveAs } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { envoyerA } from "../../notifications";
@@ -673,6 +674,10 @@ function CrmApp() {
     enregistrerReglages, enregistrerVue, supprimerVue,
     exporterComptes, importerComptes,
     allerA: (v) => { setCompteId(null); setVue(v); },
+    // Historique et corbeille (communs à l'OS — voir src/apps/historique.jsx).
+    historiqueCompte: (c) =>
+      ouvrirHistorique({ module: manifest.slug, collection: "clients", id: c.id, titre: nomDe(c), actuel: c.data, onRestaure: rafraichir }),
+    comptesSupprimes: () => ouvrirCorbeilleFiches({ module: manifest.slug, collection: "clients", titre: t("navComptes"), onRestaure: rafraichir }),
     ouvrirApp: (id) => ouvrirFenetre(id),
   };
 

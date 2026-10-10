@@ -21,7 +21,8 @@ import {
   lireRecherche,
 } from "../pagination.js";
 import { clientDe, publierFiche } from "../evenements.js";
-import { ecoute, planifier } from "../moteurAutomatisations.js";
+import { planifier } from "../moteurAutomatisations.js";
+import { DUREE_CORBEILLE_JOURS, noterVersion } from "../versions.js";
 
 /// CRUD générique des modules métier. Un module range ses données dans
 /// des collections nommées : /api/records/crm/clients, etc.
@@ -160,6 +161,14 @@ const refuserAcces = (reply, names) =>
     acces: false,
   });
 
+/// Accès en lecture, mais pas en écriture (règle « lecture seule »).
+const refuserEcriture = (reply, names) =>
+  reply.code(403).send({
+    error: `Lecture seule : vous pouvez consulter « ${names.module} » mais pas en modifier les données. Demandez-le à un administrateur de l'espace.`,
+    acces: true,
+    ecriture: false,
+  });
+
 const validateParams = (params, reply) => {
   const module = nameSchema.safeParse(params.module);
   const collection = nameSchema.safeParse(params.collection);
@@ -293,8 +302,10 @@ export default async function recordRoutes(app) {
 
     // Sans accès, on ne dépose qu'une demande (un congé, par exemple), que
     // quelqu'un qui a accès tranchera.
-    const { autorise } = await accesModule(request, names.module);
-    if (!autorise && !creationPartagee(names, data)) return refuserAcces(reply, names);
+    const { autorise, ecrit } = await accesModule(request, names.module);
+    if (!ecrit && !creationPartagee(names, data)) {
+      return autorise ? refuserEcriture(reply, names) : refuserAcces(reply, names);
+    }
     const refusCreation = refusValidation(names, request.user, data, null);
     if (refusCreation) return reply.code(403).send({ error: refusCreation });
 
@@ -346,8 +357,9 @@ export default async function recordRoutes(app) {
     if (!data) return;
 
     // Modifier, c'est trancher : jamais sans accès à l'application.
-    if (!(await accesModule(request, names.module)).autorise) {
-      return refuserAcces(reply, names);
+    const droitsPut = await accesModule(request, names.module);
+    if (!droitsPut.ecrit) {
+      return droitsPut.autorise ? refuserEcriture(reply, names) : refuserAcces(reply, names);
     }
 
     if (validationDe(names)) {
@@ -369,16 +381,13 @@ export default async function recordRoutes(app) {
     });
     data = execution.valeurs;
 
-    // L'état d'avant, pour les automatisations qui guettent un changement
-    // (« quand l'étape devient Gagnée ») — lu seulement si l'une écoute.
-    const avant = (await ecoute(request.tenantId, names.module, names.collection))
-      ? (
-          await prisma.record.findFirst({
-            where: { id: request.params.id, tenantId: request.tenantId, ...names },
-            select: { data: true },
-          })
-        )?.data ?? null
-      : null;
+    // L'état d'avant : pour l'historique de la fiche, et pour les
+    // automatisations qui guettent un changement (« quand l'étape devient
+    // Gagnée »).
+    const precedente = await prisma.record.findFirst({
+      where: { id: request.params.id, tenantId: request.tenantId, ...names },
+    });
+    const avant = precedente?.data ?? null;
 
     // updateMany + filtre tenant : impossible de toucher la ligne d'un autre client.
     const revision = request.body?.updatedAt;
@@ -399,6 +408,9 @@ export default async function recordRoutes(app) {
     }
 
     const record = await prisma.record.findUnique({ where: { id: request.params.id } });
+    if (precedente) {
+      await noterVersion({ tenantId: request.tenantId, record: precedente, action: "modification", auteur: request.user }).catch(() => {});
+    }
     apresEcriture(request, names, { id: record.id, action: "modification", fiche: record.data, avant });
     if (execution.declenchees.length) {
       await journaliser(request, "nocode.automatisation", execution.app, {
@@ -436,9 +448,9 @@ export default async function recordRoutes(app) {
 
     // Sans accès à l'application, on ne retire que sa propre demande encore
     // en attente.
-    const { autorise } = await accesModule(request, names.module);
-    if (!autorise && !suppressionPartagee(names, record, request.user)) {
-      return refuserAcces(reply, names);
+    const { autorise, ecrit } = await accesModule(request, names.module);
+    if (!ecrit && !suppressionPartagee(names, record, request.user)) {
+      return autorise ? refuserEcriture(reply, names) : refuserAcces(reply, names);
     }
 
     // Chacun peut défaire sa propre saisie ; effacer celle d'un autre
@@ -459,6 +471,7 @@ export default async function recordRoutes(app) {
       });
     }
 
+    await noterVersion({ tenantId: request.tenantId, record, action: "suppression", auteur: request.user });
     await prisma.record.delete({ where: { id: record.id } });
     apresEcriture(request, names, { id: record.id, action: "suppression", fiche: record.data, avant: record.data });
 
@@ -474,5 +487,115 @@ export default async function recordRoutes(app) {
     );
 
     return reply.code(204).send();
+  });
+
+  // ---- Historique et corbeille des fiches ---------------------------------
+
+  /// L'historique d'une fiche : ses états successifs, les plus récents
+  /// d'abord. Il se lit avec les mêmes droits que la fiche.
+  app.get("/:module/:collection/:id/historique", async (request, reply) => {
+    const names = validateParams(request.params, reply);
+    if (!names) return;
+    if (!(await accesModule(request, names.module)).autorise) return refuserAcces(reply, names);
+    const versions = await prisma.versionFiche.findMany({
+      where: { tenantId: request.tenantId, ...names, recordId: request.params.id },
+      orderBy: { creeLe: "desc" },
+      take: 50,
+      select: { id: true, action: true, auteurNom: true, creeLe: true, data: true },
+    });
+    return serialize(versions);
+  });
+
+  /// Les fiches supprimées de cette collection, encore récupérables.
+  app.get("/:module/:collection/corbeille/liste", async (request, reply) => {
+    const names = validateParams(request.params, reply);
+    if (!names) return;
+    if (!(await accesModule(request, names.module)).autorise) return refuserAcces(reply, names);
+    const supprimees = await prisma.versionFiche.findMany({
+      where: {
+        tenantId: request.tenantId,
+        ...names,
+        action: "suppression",
+        creeLe: { gt: new Date(Date.now() - DUREE_CORBEILLE_JOURS * 86400_000) },
+      },
+      orderBy: { creeLe: "desc" },
+      take: 200,
+      select: { id: true, recordId: true, auteurNom: true, creeLe: true, data: true },
+    });
+    // Une fiche déjà restaurée n'est plus à la corbeille.
+    const vivantes = new Set(
+      (
+        await prisma.record.findMany({
+          where: { tenantId: request.tenantId, id: { in: supprimees.map((v) => v.recordId) } },
+          select: { id: true },
+        })
+      ).map((r) => r.id),
+    );
+    const vues = new Set();
+    return serialize(
+      supprimees.filter((v) => !vivantes.has(v.recordId) && !vues.has(v.recordId) && vues.add(v.recordId)),
+    );
+  });
+
+  /// Revenir à une version : la fiche reprend ces données (l'état courant
+  /// devient lui-même une version), ou renaît si elle avait été supprimée.
+  /// Mêmes règles qu'une modification — et, pour une fiche d'un autre,
+  /// mêmes règles qu'une suppression : son auteur ou un administrateur.
+  app.post("/:module/:collection/:id/historique/:versionId/restaurer", async (request, reply) => {
+    const names = validateParams(request.params, reply);
+    if (!names) return;
+    if (exigeAdmin(names) && !auMoins(request.user?.role, "ADMIN")) {
+      return reply.code(403).send({ error: "Seul un administrateur peut restaurer dans cette collection." });
+    }
+    const droitsResto = await accesModule(request, names.module);
+    if (!droitsResto.ecrit) {
+      return droitsResto.autorise ? refuserEcriture(reply, names) : refuserAcces(reply, names);
+    }
+    const version = await prisma.versionFiche.findFirst({
+      where: { id: request.params.versionId, tenantId: request.tenantId, ...names, recordId: request.params.id },
+    });
+    if (!version) return reply.code(404).send({ error: "Version introuvable" });
+
+    const courante = await prisma.record.findFirst({
+      where: { id: request.params.id, tenantId: request.tenantId, ...names },
+    });
+    const proprietaire = courante?.userId ?? version.proprietaireId;
+    const admin = auMoins(request.user?.role, "ADMIN");
+    if (!admin && proprietaire !== request.user.id) {
+      return reply.code(403).send({ error: "Seul l'auteur de la fiche ou un administrateur peut la restaurer." });
+    }
+    if (validationDe(names) && !admin) {
+      return reply.code(403).send({ error: "Seul un administrateur peut restaurer une demande." });
+    }
+
+    let record;
+    if (courante) {
+      await noterVersion({ tenantId: request.tenantId, record: courante, action: "modification", auteur: request.user });
+      record = await prisma.record.update({
+        where: { id: courante.id },
+        data: { data: version.data, updatedById: request.user.id },
+      });
+      apresEcriture(request, names, { id: record.id, action: "modification", fiche: record.data, avant: courante.data });
+    } else {
+      record = await prisma.record.create({
+        data: {
+          id: request.params.id,
+          tenantId: request.tenantId,
+          userId: version.proprietaireId || request.user.id,
+          updatedById: request.user.id,
+          ...names,
+          data: version.data,
+        },
+      });
+      apresEcriture(request, names, { id: record.id, action: "creation", fiche: record.data });
+    }
+    await journaliser(request, "donnees.restauration", version.data?.nom || version.data?.titre || version.data?.libelle || null, {
+      module: names.module,
+      collection: names.collection,
+      recordId: record.id,
+      depuis: courante ? "historique" : "corbeille",
+    });
+    const avecAuteur = (await auteurs(request.tenantId, [record]))[0];
+    return serialize(avecAuteur);
   });
 }

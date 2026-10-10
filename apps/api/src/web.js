@@ -252,6 +252,70 @@ export const posterJson = async (entree, corps, entetes = {}) => {
   });
 };
 
+/// Lit un corps de réponse JSON, borné en taille.
+const lireCorpsJson = async (reponse, max = 1024 * 1024) => {
+  const morceaux = [];
+  let taille = 0;
+  for await (const m of reponse) {
+    taille += m.length;
+    if (taille > max) {
+      reponse.destroy();
+      throw new ErreurWeb("Réponse trop volumineuse.", 502);
+    }
+    morceaux.push(m);
+  }
+  try {
+    return JSON.parse(Buffer.concat(morceaux).toString("utf8"));
+  } catch {
+    throw new ErreurWeb("Réponse illisible (JSON attendu).", 502);
+  }
+};
+
+/// GET d'un document JSON externe (configuration OpenID, clés publiques),
+/// avec les gardes de `ouvrir` et https obligatoire.
+export const lireJsonExterne = async (entree) => {
+  const url = analyserUrl(entree);
+  if (url.protocol !== "https:") throw new ErreurWeb("Adresse https:// requise.");
+  const { reponse } = await ouvrir(url.href);
+  if (reponse.statusCode < 200 || reponse.statusCode >= 300) {
+    reponse.resume();
+    throw new ErreurWeb(`Le serveur a répondu ${reponse.statusCode}.`, 502);
+  }
+  return lireCorpsJson(reponse);
+};
+
+/// POST d'un formulaire (échange de code OAuth) vers une adresse externe,
+/// https, sans redirection ; rend { statut, json }.
+export const posterFormulaire = async (entree, champs, entetes = {}) => {
+  const url = analyserUrl(entree);
+  if (url.protocol !== "https:") throw new ErreurWeb("Adresse https:// requise.");
+  const adresses = await resoudre(url.hostname);
+  const charge = Buffer.from(new URLSearchParams(champs).toString(), "utf8");
+  const reponse = await new Promise((resolve, reject) => {
+    const req = https.request(
+      url,
+      {
+        method: "POST",
+        lookup: (_host, options, cb) =>
+          options?.all ? cb(null, adresses) : cb(null, adresses[0].address, adresses[0].family),
+        headers: {
+          "user-agent": "CompanyOS/1.0",
+          accept: "application/json",
+          "content-type": "application/x-www-form-urlencoded",
+          "content-length": charge.length,
+          ...entetes,
+        },
+        timeout: 10_000,
+      },
+      resolve,
+    );
+    req.on("timeout", () => req.destroy(new ErreurWeb("Le serveur n'a pas répondu à temps.", 504)));
+    req.on("error", (err) => reject(err instanceof ErreurWeb ? err : new ErreurWeb("Serveur injoignable.", 502)));
+    req.end(charge);
+  });
+  return { statut: reponse.statusCode, json: await lireCorpsJson(reponse).catch(() => null) };
+};
+
 /// Un site peut refuser d'être affiché dans un cadre, et la plupart le
 /// font. Le dire avant d'essayer vaut mieux qu'une fenêtre blanche dont
 /// l'utilisateur ne peut rien déduire.

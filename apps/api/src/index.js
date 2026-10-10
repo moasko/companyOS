@@ -28,6 +28,9 @@ import { arreterBus, demarrerBus } from "./evenements.js";
 import { demarrerMoteurAutomatisations } from "./moteurAutomatisations.js";
 import evenementRoutes from "./routes/evenements.js";
 import automatisationRoutes from "./routes/automatisations.js";
+import conformiteRoutes from "./routes/conformite.js";
+import partagesPublicsRoutes from "./routes/partagesPublics.js";
+import ssoRoutes from "./routes/sso.js";
 
 const app = Fastify({
   logger: true,
@@ -145,6 +148,9 @@ await app.register(plateformeRoutes, { prefix: "/api/plateforme" });
 await app.register(erreursRoutes, { prefix: "/api/erreurs" });
 await app.register(evenementRoutes, { prefix: "/api/evenements" });
 await app.register(automatisationRoutes, { prefix: "/api/automatisations" });
+await app.register(conformiteRoutes, { prefix: "/api/conformite" });
+await app.register(partagesPublicsRoutes, { prefix: "/api/public/partages" });
+await app.register(ssoRoutes, { prefix: "/api/auth/sso" });
 
 /// Dit, dans les journaux du conteneur, si chaque adresse de
 /// PLATFORM_ADMINS a bien un compte qui lui ouvrira la console. « Je suis

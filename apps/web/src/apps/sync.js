@@ -89,6 +89,12 @@ export const attachSystemModules = () => {
 
 /// Aligne le shell sur la liste d'installations de l'espace de travail.
 /// Appelée à l'ouverture de session et après chaque (dés)installation.
+/// Les applications que cette personne peut ouvrir mais pas modifier
+/// (règle « lecture seule », voir src/acces.js côté API). Le serveur refuse
+/// les écritures ; la fenêtre l'annonce dans sa barre de titre.
+let lectureSeule = new Set();
+export const estEnLectureSeule = (slug) => lectureSeule.has(slug);
+
 export const syncInstalledModules = async () => {
   attachSystemModules();
 
@@ -98,6 +104,7 @@ export const syncInstalledModules = async () => {
   // d'ouvrir une fenêtre qui ne montrerait qu'un refus.
   const installed = (await api.installedApps()).filter((a) => a.autorise !== false);
   const installedSlugs = new Set(installed.map((a) => a.slug));
+  lectureSeule = new Set(installed.filter((a) => a.ecrit === false).map((a) => a.slug));
 
   // Modules métier livrés dans le dépôt.
   for (const mod of modules) {

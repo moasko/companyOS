@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma, serialize } from "../db.js";
 import { authenticate, estExploitant, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
-import { MODES, autoriseSelon, regleDe } from "../acces.js";
+import { MODES, MODES_ECRITURE, autoriseSelon, ecritureSelon, regleDe } from "../acces.js";
 
 // Deux origines d'applications cohabitent :
 //   - le catalogue global (tenantId null), offert à tous les espaces ;
@@ -36,7 +36,7 @@ const CHAMPS_SECRETS =
 ///
 /// On conserve la **présence** du secret (`true`/`false`) : l'écran a
 /// besoin de savoir qu'un relais est configuré, jamais avec quoi.
-const sansSecrets = (valeur) => {
+export const sansSecrets = (valeur) => {
   if (Array.isArray(valeur)) return valeur.map(sansSecrets);
   if (!valeur || typeof valeur !== "object") return valeur;
   return Object.fromEntries(
@@ -426,6 +426,8 @@ export default async function appRoutes(app) {
           i.app.slug === "plateforme"
             ? exploitant
             : autoriseSelon(request.user, regleDe(i.app.slug, i)),
+        // Peut-elle aussi modifier ? (sinon : lecture seule)
+        ecrit: i.app.slug === "plateforme" ? exploitant : ecritureSelon(request.user, regleDe(i.app.slug, i)),
         installedAt: i.installedAt,
         // Ce qui est en place, à distinguer de `version` qui est ce que le
         // catalogue propose. C'est l'écart entre les deux qui fait une
@@ -646,6 +648,12 @@ export default async function appRoutes(app) {
         .object({
           mode: z.enum(MODES),
           membres: z.array(z.string().min(1).max(40)).max(500).optional(),
+          ecriture: z
+            .object({
+              mode: z.enum(MODES_ECRITURE),
+              membres: z.array(z.string().min(1).max(40)).max(500).optional(),
+            })
+            .optional(),
         })
         .safeParse(request.body);
       if (!parsed.success) {
@@ -684,10 +692,29 @@ export default async function appRoutes(app) {
         }
       }
 
-      const acces =
-        parsed.data.mode === "selection"
-          ? { mode: "selection", membres }
-          : { mode: parsed.data.mode };
+      // Qui peut modifier, parmi ceux qui ont accès.
+      let ecriture = null;
+      const e = parsed.data.ecriture;
+      if (e && e.mode !== "tous") {
+        let ecrivains = [];
+        if (e.mode === "selection") {
+          const demandes = [...new Set(e.membres || [])];
+          const trouves = await prisma.user.findMany({
+            where: { id: { in: demandes }, tenantId: request.tenantId },
+            select: { id: true },
+          });
+          ecrivains = trouves.map((u) => u.id);
+          if (ecrivains.length !== demandes.length) {
+            return reply.code(400).send({ error: "La sélection contient une personne étrangère à l'espace." });
+          }
+        }
+        ecriture = e.mode === "selection" ? { mode: "selection", membres: ecrivains } : { mode: e.mode };
+      }
+
+      const acces = {
+        ...(parsed.data.mode === "selection" ? { mode: "selection", membres } : { mode: parsed.data.mode }),
+        ...(ecriture ? { ecriture } : {}),
+      };
       const avant = regleDe(target.slug, installation);
 
       await prisma.installation.update({
@@ -700,6 +727,7 @@ export default async function appRoutes(app) {
         avant: avant.mode,
         apres: acces.mode,
         membres: membres.length || undefined,
+        ecriture: acces.ecriture?.mode || "tous",
       });
 
       return { slug: target.slug, acces };

@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { createHash, randomBytes } from "node:crypto";
 import { prisma, serialize } from "../db.js";
 import { creerJeton, lireJeton } from "../etatPartage.js";
-import { authenticate } from "../auth.js";
+import { authenticate, hashPassword } from "../auth.js";
+import { env } from "../env.js";
 import { journaliser } from "../audit.js";
 import { consommerQuota, ecrireOuNettoyer, piloteEcriture, piloteLecture } from "../storage.js";
 import { typeDeFlux, typeNeutralise } from "../mimetype.js";
@@ -47,7 +49,12 @@ const collectSubtree = async (tenantId, node, { vivantsSeulement = false } = {})
 /// La cascade Prisma retire les descendants, d'où la suppression de la
 /// seule racine — mais le quota et le stockage se règlent sur tout le lot.
 const purgerGroupe = async (tenantId, racine, tous) => {
-  const liberes = tous.reduce((somme, n) => somme + n.size, 0n);
+  // Les versions précédentes partent avec le fichier : leurs octets aussi.
+  const versions = await prisma.versionFichier.findMany({
+    where: { tenantId, nodeId: { in: tous.map((n) => n.id) } },
+  });
+  const liberes =
+    tous.reduce((somme, n) => somme + n.size, 0n) + versions.reduce((somme, v) => somme + v.size, 0n);
 
   await prisma.$transaction(async (tx) => {
     await tx.fsNode.delete({ where: { id: racine.id } });
@@ -59,11 +66,29 @@ const purgerGroupe = async (tenantId, racine, tous) => {
     }
   });
 
-  for (const n of tous) {
+  for (const n of [...tous, ...versions]) {
     if (n.storageKey) await (await piloteLecture(n.storage, tenantId)).remove(n.storageKey);
   }
 
   return liberes;
+};
+
+/// Versions d'un fichier au-delà de la limite : les plus anciennes partent,
+/// octets et quota compris.
+const VERSIONS_MAX = 10;
+const elaguerVersions = async (tenantId, nodeId) => {
+  const enTrop = await prisma.versionFichier.findMany({
+    where: { tenantId, nodeId },
+    orderBy: { creeLe: "desc" },
+    skip: VERSIONS_MAX,
+  });
+  if (!enTrop.length) return;
+  const liberes = enTrop.reduce((s, v) => s + v.size, 0n);
+  await prisma.$transaction(async (tx) => {
+    await tx.versionFichier.deleteMany({ where: { id: { in: enTrop.map((v) => v.id) } } });
+    if (liberes > 0n) await tx.tenant.update({ where: { id: tenantId }, data: { usedBytes: { decrement: liberes } } });
+  });
+  for (const v of enTrop) await (await piloteLecture(v.storage, tenantId)).remove(v.storageKey).catch(() => {});
 };
 
 /// Purge paresseuse : pas de tâche planifiée, on nettoie ce qui a dépassé
@@ -505,9 +530,9 @@ export default async function fileRoutes(app) {
     const tenant = await prisma.tenant.findUnique({
       where: { id: request.tenantId },
     });
-    // Le quota se juge sur la différence : remplacer 2 Mo par 2,1 Mo ne
-    // demande que 0,1 Mo d'espace libre.
-    const difference = BigInt(taille) - node.size;
+    // L'ancien contenu est gardé en version : le nouveau s'ajoute au quota
+    // en entier.
+    const difference = BigInt(taille);
     if (tenant.usedBytes + difference > tenant.quota) {
       await pilote.remove(cle);
       return reply.code(413).send({ error: "Quota de stockage dépassé" });
@@ -534,6 +559,20 @@ export default async function fileRoutes(app) {
         });
         if (resultat.count !== 1) throw Object.assign(new Error("Conflit de version"), { code: "FILE_VERSION_CONFLICT" });
         await consommerQuota(tx, request.tenantId, difference);
+        if (ancienne) {
+          await tx.versionFichier.create({
+            data: {
+              tenantId: request.tenantId,
+              nodeId: node.id,
+              storageKey: ancienne,
+              storage: node.storage,
+              size: node.size,
+              mimeType: node.mimeType,
+              auteurId: request.user.id,
+              auteurNom: request.user.name,
+            },
+          });
+        }
         return tx.fsNode.findUnique({ where: { id: node.id } });
       });
     } catch (erreur) {
@@ -548,7 +587,7 @@ export default async function fileRoutes(app) {
       throw erreur;
     }
 
-    await (await piloteLecture(node.storage, request.tenantId)).remove(ancienne);
+    await elaguerVersions(request.tenantId, node.id);
     await journaliser(request, "fichier.modification", node.name, {
       octets: taille,
     });
@@ -684,5 +723,138 @@ export default async function fileRoutes(app) {
     });
 
     return reply.send(serialize({ liberes }));
+  });
+
+  // ---- Versions ------------------------------------------------------------
+
+  app.get("/:id/versions", async (request, reply) => {
+    const node = await findOwned(request.tenantId, request.params.id);
+    if (!node || node.type !== "FILE") return reply.code(404).send({ error: "Fichier introuvable" });
+    const versions = await prisma.versionFichier.findMany({
+      where: { tenantId: request.tenantId, nodeId: node.id },
+      orderBy: { creeLe: "desc" },
+      select: { id: true, size: true, mimeType: true, auteurNom: true, creeLe: true },
+    });
+    return serialize({ actuelle: { size: node.size, updatedAt: node.updatedAt }, versions });
+  });
+
+  app.get("/:id/versions/:vid/download", async (request, reply) => {
+    const node = await findOwned(request.tenantId, request.params.id);
+    const v = node
+      ? await prisma.versionFichier.findFirst({ where: { id: request.params.vid, nodeId: node.id, tenantId: request.tenantId } })
+      : null;
+    if (!v) return reply.code(404).send({ error: "Version introuvable" });
+    const date = v.creeLe.toISOString().slice(0, 16).replace(/[T:]/g, "-");
+    const point = node.name.lastIndexOf(".");
+    const nom = point > 0 ? `${node.name.slice(0, point)} (${date})${node.name.slice(point)}` : `${node.name} (${date})`;
+    reply
+      .header("Content-Type", v.mimeType || "application/octet-stream")
+      .header("X-Content-Type-Options", "nosniff")
+      .header("Content-Disposition", `attachment; filename="${encodeURIComponent(nom)}"`);
+    return reply.send((await piloteLecture(v.storage, request.tenantId)).read(v.storageKey));
+  });
+
+  /// Revenir à une version : elle redevient le contenu du fichier, et le
+  /// contenu actuel devient une version (rien n'est perdu).
+  app.post("/:id/versions/:vid/restaurer", async (request, reply) => {
+    const node = await findOwned(request.tenantId, request.params.id);
+    const v = node
+      ? await prisma.versionFichier.findFirst({ where: { id: request.params.vid, nodeId: node.id, tenantId: request.tenantId } })
+      : null;
+    if (!v) return reply.code(404).send({ error: "Version introuvable" });
+    const maj = await prisma.$transaction(async (tx) => {
+      await tx.versionFichier.delete({ where: { id: v.id } });
+      await tx.versionFichier.create({
+        data: {
+          tenantId: request.tenantId,
+          nodeId: node.id,
+          storageKey: node.storageKey,
+          storage: node.storage,
+          size: node.size,
+          mimeType: node.mimeType,
+          auteurId: request.user.id,
+          auteurNom: request.user.name,
+        },
+      });
+      return tx.fsNode.update({
+        where: { id: node.id },
+        data: { storageKey: v.storageKey, storage: v.storage, size: v.size, mimeType: v.mimeType },
+      });
+    });
+    await journaliser(request, "fichier.version.restauration", node.name, { version: v.creeLe });
+    return serialize(maj);
+  });
+
+  // ---- Liens de partage ------------------------------------------------------
+
+  const partageSchema = z.object({
+    joursValidite: z.number().int().min(1).max(90),
+    motDePasse: z.string().min(6).max(200).optional(),
+    maxTelechargements: z.number().int().min(1).max(10000).optional(),
+  });
+
+  const enLien = (l) => ({
+    id: l.id,
+    expireLe: l.expireLe,
+    protege: !!l.motDePasseHash,
+    maxTelechargements: l.maxTelechargements,
+    telechargements: l.telechargements,
+    dernierAcces: l.dernierAcces,
+    creeParNom: l.creeParNom,
+    creeLe: l.creeLe,
+    actif: !l.revoqueLe && l.expireLe > new Date() && (!l.maxTelechargements || l.telechargements < l.maxTelechargements),
+  });
+
+  app.get("/:id/partages", async (request, reply) => {
+    const node = await findOwned(request.tenantId, request.params.id);
+    if (!node || node.type !== "FILE") return reply.code(404).send({ error: "Fichier introuvable" });
+    const liens = await prisma.lienPartage.findMany({
+      where: { tenantId: request.tenantId, nodeId: node.id, revoqueLe: null },
+      orderBy: { creeLe: "desc" },
+    });
+    return serialize(liens.map(enLien));
+  });
+
+  /// Crée un lien public. Le jeton n'est montré qu'une fois : la base n'en
+  /// garde que l'empreinte.
+  app.post("/:id/partages", async (request, reply) => {
+    const node = await findOwned(request.tenantId, request.params.id);
+    if (!node || node.type !== "FILE") return reply.code(404).send({ error: "Fichier introuvable" });
+    const parsed = partageSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Réglages du lien invalides (validité de 1 à 90 jours, mot de passe de 6 caractères au moins)." });
+    const tenant = await prisma.tenant.findUnique({ where: { id: request.tenantId }, select: { partagePublic: true } });
+    if (tenant?.partagePublic === false) {
+      return reply.code(403).send({ error: "Les liens publics sont désactivés dans cet espace." });
+    }
+    const jeton = randomBytes(24).toString("base64url");
+    const lien = await prisma.lienPartage.create({
+      data: {
+        tenantId: request.tenantId,
+        nodeId: node.id,
+        empreinte: createHash("sha256").update(jeton).digest("hex"),
+        creeParId: request.user.id,
+        creeParNom: request.user.name,
+        expireLe: new Date(Date.now() + parsed.data.joursValidite * 86400_000),
+        motDePasseHash: parsed.data.motDePasse ? await hashPassword(parsed.data.motDePasse) : null,
+        maxTelechargements: parsed.data.maxTelechargements ?? null,
+      },
+    });
+    await journaliser(request, "fichier.partage.creation", node.name, {
+      jours: parsed.data.joursValidite,
+      protege: !!parsed.data.motDePasse,
+    });
+    const base = env.apiPublique || `${request.protocol}://${request.headers.host}`;
+    return reply.code(201).send(serialize({ ...enLien(lien), url: `${base.replace(/\/+$/, "")}/api/public/partages/${jeton}` }));
+  });
+
+  app.delete("/partages/:pid", async (request, reply) => {
+    const lien = await prisma.lienPartage.findFirst({
+      where: { id: request.params.pid, tenantId: request.tenantId, revoqueLe: null },
+      include: { node: { select: { name: true } } },
+    });
+    if (!lien) return reply.code(404).send({ error: "Lien introuvable" });
+    await prisma.lienPartage.update({ where: { id: lien.id }, data: { revoqueLe: new Date() } });
+    await journaliser(request, "fichier.partage.revocation", lien.node?.name || null);
+    return reply.code(204).send();
   });
 }

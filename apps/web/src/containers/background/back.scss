@@ -175,6 +175,24 @@
       color: rgb(229 231 235 / 85%);
     }
 
+    .authInfo {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #c8f7d4;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .authOubli {
+      align-self: flex-end;
+    }
+
+    .authSso {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      font-size: 12px;
+    }
+
     .authError {
       margin-top: 10px;
       font-size: 12px;
