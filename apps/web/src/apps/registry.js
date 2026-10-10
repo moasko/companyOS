@@ -5,6 +5,8 @@
 //
 //   { id, slug, name, icon, action, Window, systeme }
 //
+// (le descriptif sans `Window` vit dans manifest.js, à côté)
+//
 //   id      — identifiant de la fenêtre, UNIQUE dans l'OS (défaut : icon)
 //   slug    — identifiant du catalogue serveur (seed.js), pour l'installation
 //   icon    — nom d'un PNG de public/img/icon (plusieurs apps peuvent
@@ -17,14 +19,39 @@
 //
 // Ce fichier découvre les dossiers tout seul : en créer un suffit.
 // Les dossiers préfixés par _ (comme _template) sont ignorés.
+//
+// CHARGEMENT À LA DEMANDE
+//
+// Le shell n'a besoin, au démarrage, que du descriptif de chaque
+// application (nom, icône, slug) : il est dans `manifest.js`, minuscule.
+// Le code de la fenêtre — `index.jsx` et tout ce qu'il importe — n'est
+// téléchargé qu'à la première ouverture. Avant, les trente-quatre
+// applications partaient dans le lot principal (≈ 2 Mo) : ouvrir
+// CompanyOS sur un téléphone en 4G coûtait le Classeur, l'Atelier Image
+// et la Comptabilité, même pour ne regarder que ses notifications.
+//
+// `manifest.Window` reste un composant : un `React.lazy` qui charge le
+// module et rend sa fenêtre. Le shell l'enveloppe d'un `Suspense`.
 
-const found = import.meta.glob(
-  ["./modules/*/index.jsx", "!./modules/_*/index.jsx"],
+import { lazy } from "react";
+
+const descriptifs = import.meta.glob(
+  ["./modules/*/manifest.js", "!./modules/_*/manifest.js"],
   { eager: true },
 );
+const chargeurs = import.meta.glob(["./modules/*/index.jsx", "!./modules/_*/index.jsx"]);
 
-const tous = Object.values(found)
-  .map((mod) => mod.manifest)
+const tous = Object.entries(descriptifs)
+  .map(([chemin, mod]) => {
+    const charger = chargeurs[chemin.replace(/manifest\.js$/, "index.jsx")];
+    if (!mod.manifest || !charger) return null;
+    return {
+      ...mod.manifest,
+      /// Télécharge le module sans l'afficher (préchargement au survol).
+      precharger: charger,
+      Window: lazy(() => charger().then((m) => ({ default: m.manifest.Window }))),
+    };
+  })
   .filter(Boolean);
 
 /// Applications système : le socle de l'OS.

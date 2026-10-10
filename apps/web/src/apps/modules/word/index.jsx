@@ -52,14 +52,9 @@ import { Contenu, useChargement } from "../../chargement";
 import { MIME_DOCX, documentVierge } from "./gabarit";
 import "./word.scss";
 import { echapperHtml } from "../../../utils/securite.js";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  slug: "word",
-  name: "Traitement de texte",
-  icon: "winWord",
-  action: "WORDAPP",
-  Window: WordApp,
-};
+export const manifest = { ...descriptif, Window: WordApp };
 
 /// Dossier du cloud où vivent les documents.
 const DOSSIER = "Documents";

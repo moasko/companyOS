@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useSelector } from "react-redux";
 import { ToolBar } from "../utils/general";
 import { useNomApp } from "../utils/nomsApps";
+import { rejouerLienEnAttente } from "./notifications";
 
 /// Chrome de fenêtre commun à tous les modules CompanyOS.
 /// Un module n'a qu'à écrire son contenu :
@@ -17,6 +18,15 @@ export const ModuleWindow = ({ manifest, className = "", children }) => {
   const wnapp = useSelector((state) => state.apps[manifest.id || manifest.icon]);
   // Le titre suit la langue de l'OS ; le nom du manifeste reste l'identité.
   const nomApp = useNomApp();
+  const idApp = manifest.id || manifest.icon;
+
+  // Un lien suivi pendant que l'application se chargeait : on le rejoue
+  // une fois ses propres écouteurs posés (les effets du module parent
+  // passent après celui-ci ; le délai nul les laisse s'installer).
+  useEffect(() => {
+    const t = setTimeout(() => rejouerLienEnAttente(idApp), 0);
+    return () => clearTimeout(t);
+  }, [idApp]);
 
   // Module non installé : l'état n'existe pas, la fenêtre non plus.
   //

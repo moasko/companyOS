@@ -39,14 +39,9 @@ import { subscribeVisionneuse } from "../../openRequest";
 import { Contenu, useChargement } from "../../chargement";
 import { MIME_PPTX, MODELES_PRESENTATION, diaporamaVierge } from "./gabarit";
 import "./presentation.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  slug: "presentation",
-  name: "Présentations",
-  icon: "presentation",
-  action: "PRESENTATIONAPP",
-  Window: PresentationApp,
-};
+export const manifest = { ...descriptif, Window: PresentationApp };
 
 /// Dossier du cloud où vivent les présentations.
 const DOSSIER = "Présentations";

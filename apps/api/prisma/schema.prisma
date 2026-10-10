@@ -320,6 +320,8 @@ model Record {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, module, collection])
+  /// Lecture page par page : l'ordre de la liste, curseur compris.
+  @@index([tenantId, module, collection, createdAt(sort: Desc), id(sort: Desc)])
   @@map("records")
 }
 
@@ -521,4 +523,34 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+/// Jeton d'URL à courte durée de vie : lecture d'un fichier en flux
+/// (<video> ne sait pas envoyer d'en-tête), lien de la vue web. En base
+/// et non en mémoire, pour que n'importe quelle instance de l'API le
+/// reconnaisse. Seule l'empreinte SHA-256 est gardée : une copie de la
+/// table ne donne aucun lien valide.
+model JetonUrl {
+  empreinte String   @id
+  /// « flux » (fichier) ou « web » (page)
+  type      String
+  tenantId  String
+  /// L'identifiant du fichier, ou l'adresse de la page.
+  cible     String
+  expireLe  DateTime
+
+  @@index([expireLe])
+  @@map("jetons_url")
+}
+
+/// Échecs de connexion par compte (voir routes/auth.js), partagés entre
+/// les instances : changer de serveur ne remet pas le compteur à zéro.
+model VerrouConnexion {
+  cle     String    @id
+  echecs  Int       @default(0)
+  dernier DateTime  @default(now())
+  jusqua  DateTime?
+
+  @@index([dernier])
+  @@map("verrous_connexion")
 }

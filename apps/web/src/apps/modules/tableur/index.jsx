@@ -52,15 +52,9 @@ import { Bouton, Vide } from "../../ui";
 import { useTraduction } from "../../../utils/intl";
 import * as D from "./domaine";
 import "./tableur.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "tableur",
-  slug: "tableur",
-  name: "Tableur CSV",
-  icon: "tableur",
-  action: "TABLEURAPP",
-  Window: TableurApp,
-};
+export const manifest = { ...descriptif, Window: TableurApp };
 
 const DOSSIER = "Tableurs";
 const HAUTEUR_LIGNE = 28;

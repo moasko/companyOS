@@ -53,6 +53,7 @@ import {
   FormVue,
 } from "./vues/Formulaires";
 import "./crm.scss";
+import { manifest as descriptif } from "./manifest";
 
 // CRM 3 : la relation client, reliée à tout CompanyOS.
 //
@@ -69,24 +70,7 @@ import "./crm.scss";
 // courriels envoyés (Courrier), campagnes (ouvertures, clics), cartes de
 // Projets. La fiche d'un compte en fait une seule chronologie.
 
-export const manifest = {
-  id: "crm",
-  slug: "crm",
-  version: "3.0.0",
-  nouveautes: [
-    { version: "3.0.0", texte: "Ma journée, affaires qui stagnent, fiche 360° reliée à la Facturation, au Courrier, aux Campagnes et aux Projets, leads notés, prévisions et objectifs, version mobile." },
-    { version: "2.0.0", texte: "Pipeline commercial, suivi des échanges, relances datées et chiffre d'affaires par client." },
-    { version: "1.1.0", texte: "Responsable de compte, prévenu à l'attribution." },
-  ],
-  name: "CRM",
-  icon: "people",
-  action: "CRMAPP",
-  capacites: {
-    lit: ["facturation:factures", "facturation:reglements", "courrier:envois", "campagnes:campagnes", "projets:cartes"],
-    ecrit: ["agenda:evenements", "projets:tableaux", "projets:cartes"],
-  },
-  Window: CrmApp,
-};
+export const manifest = { ...descriptif, Window: CrmApp };
 
 const NAV = [
   { id: "journee", icone: "faHouse", cle: "navJournee" },
@@ -184,6 +168,10 @@ function CrmApp() {
     } else if (p.vue) setVue(p.vue);
     lienEnAttente.current = null;
   }, [d.clients, d.opportunites]);
+  // Le lien a pu arriver avant les données (ouverture à la demande).
+  useEffect(() => {
+    appliquerLien();
+  }, [appliquerLien]);
 
   useEffect(() => {
     const aller = (e) => {

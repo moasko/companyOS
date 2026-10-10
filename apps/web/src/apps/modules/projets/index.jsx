@@ -26,6 +26,7 @@ import { Liste } from "./vues/Liste";
 import { PanneauCarte } from "./vues/PanneauCarte";
 import { Planche } from "./vues/Planche";
 import "./projets.scss";
+import { manifest as descriptif } from "./manifest";
 
 // Gestion de projet de CompanyOS — tableaux kanban.
 //
@@ -45,28 +46,7 @@ import "./projets.scss";
 // Ce fichier tient l'état, les écritures et l'assemblage ; chaque écran est
 // dans `vues/`, et les règles de calcul dans `board.js`.
 
-export const manifest = {
-  id: "projets",
-  slug: "projets",
-  version: "1.1.0",
-  /// Annoncé dans la Boutique quand une mise à jour est disponible.
-  /// Seules les entrées postérieures à la version installée sont montrées.
-  nouveautes: [
-    { version: "1.1.0", texte: "Notification à l'attribution d'une tâche." },
-  ],
-  name: "Projets",
-  icon: "todo",
-  action: "PROJETSAPP",
-  // Ce que l'application va chercher hors de chez elle. Déclaré ici, montré
-  // à l'utilisateur avant l'installation, et vérifié en développement par
-  // `accesDonnees`. Voir src/apps/donnees.js pour ce que cela garantit —
-  // et surtout pour ce que cela ne garantit pas.
-  capacites: {
-    lit: ["crm:clients", "facturation:factures"],
-    ecrit: ["facturation:factures"],
-  },
-  Window: ProjetsApp,
-};
+export const manifest = { ...descriptif, Window: ProjetsApp };
 
 /// Accès aux données de l'application, borné par les capacités ci-dessus.
 const donnees = accesDonnees(manifest);
@@ -157,6 +137,10 @@ function ProjetsApp() {
     };
     window.addEventListener("companyos:lien", aller);
     return () => window.removeEventListener("companyos:lien", aller);
+  }, [cartes]);
+  // Le lien a pu arriver avant les données (ouverture à la demande).
+  useEffect(() => {
+    appliquerLien();
   }, [cartes]);
 
   const appliquerLien = () => {

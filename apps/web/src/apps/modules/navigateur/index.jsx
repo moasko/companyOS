@@ -51,18 +51,9 @@ import {
   tailleLisible,
 } from "./domaine";
 import "./navigateur.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "navigateur",
-  slug: "browser",
-  name: "Navigateur",
-  icon: "navigateur",
-  // L'icône du bureau ouvre encore la fenêtre par une action Redux : sans
-  // ce champ, l'application apparaît sur le bureau et le double-clic ne
-  // fait rien.
-  action: "NAVIGATEURAPP",
-  Window: NavigateurApp,
-};
+export const manifest = { ...descriptif, Window: NavigateurApp };
 
 /// Dossier du cloud où atterrissent les téléchargements. Toujours le même,
 /// pour qu'on sache où regarder sans avoir à chercher.

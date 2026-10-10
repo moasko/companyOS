@@ -50,15 +50,9 @@ import { montant as fcfa } from "../../../utils/monnaie";
 import { Stockage } from "./Stockage";
 import { Sante } from "./Sante";
 import "./plateforme.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "plateforme",
-  slug: "plateforme",
-  name: "Plateforme",
-  icon: "plateforme",
-  action: "PLATEFORMEAPP",
-  Window: PlateformeApp,
-};
+export const manifest = { ...descriptif, Window: PlateformeApp };
 
 const formatOctets = (n) => {
   const v = Number(n) || 0;

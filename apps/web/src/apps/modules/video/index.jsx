@@ -13,16 +13,10 @@ import {
   useRaccourcis,
   useVisionneuse,
 } from "../_visionneuse/commun";
+import { manifest as descriptif } from "./manifest";
 
 /// Lecteur vidéo du socle.
-export const manifest = {
-  id: "movies",
-  name: "Vidéo",
-  icon: "movies",
-  action: "VIDEOAPP",
-  systeme: true,
-  Window: VideoApp,
-};
+export const manifest = { ...descriptif, Window: VideoApp };
 
 // ---------------------------------------------------------------------------
 // Vidéo

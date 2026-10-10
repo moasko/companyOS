@@ -28,15 +28,9 @@ import { Contenu, useChargement } from "../../chargement";
 import { Bouton, Champ, Notice, Vide } from "../../ui";
 import * as D from "@companyos/shared/courrier";
 import "./courrier.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "courrier",
-  slug: "courrier",
-  name: "Courrier",
-  icon: "courrier",
-  action: "COURRIERAPP",
-  Window: CourrierApp,
-};
+export const manifest = { ...descriptif, Window: CourrierApp };
 
 const BROUILLON_VIDE = {
   a: "",

@@ -20,11 +20,11 @@
 import { z } from "zod";
 import { Transform } from "node:stream";
 import { prisma, serialize } from "../db.js";
+import { creerJetons, lireJeton } from "../etatPartage.js";
 import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { consommerQuota, piloteEcriture } from "../storage.js";
 import { typeNeutralise } from "../mimetype.js";
-import { randomUUID } from "node:crypto";
 import {
   ErreurWeb,
   ouvrir,
@@ -154,43 +154,26 @@ const repondreErreur = (reply, err) => {
 // aussi ce qu'un jeton égaré permet : lire une page publique.
 
 const VUE_DUREE_MS = 60 * 60 * 1000;
-const vues = new Map();
 
 /// Plafonds de la vue de lecture. Une page de 4 Mo peut contenir des
 /// centaines de milliers de liens : sans limite, une seule requête
-/// remplissait la mémoire et bloquait le serveur pour tous les espaces
-/// (la purge parcourait toute la table à chaque lien — un coût
-/// quadratique).
-const VUES_MAX = 50_000;
+/// créait autant de jetons.
 const LIENS_PAR_PAGE = 1500;
 const URL_VUE_MAX = 2048;
 
-// La purge des vues échues passe à intervalle régulier, jamais par lien.
-setInterval(() => {
-  const maintenant = Date.now();
-  for (const [cle, valeur] of vues) {
-    if (valeur.expire < maintenant) vues.delete(cle);
-  }
-}, 5 * 60 * 1000).unref();
-
-const creerVue = (url, tenantId) => {
-  if (url.length > URL_VUE_MAX) return null;
-  // Table pleine : les plus anciennes cèdent la place (une Map garde
-  // l'ordre d'insertion).
-  while (vues.size >= VUES_MAX) vues.delete(vues.keys().next().value);
-  const jeton = randomUUID().replace(/-/g, "");
-  vues.set(jeton, { url, tenantId, expire: Date.now() + VUE_DUREE_MS });
-  return jeton;
+/// Les jetons vivent en base (voir src/etatPartage.js) : la page servie
+/// par une instance de l'API reste lisible si le clic suivant tombe sur
+/// une autre.
+const creerVues = async (urls, tenantId) => {
+  const valides = urls.filter((u) => u.length <= URL_VUE_MAX);
+  const jetons = await creerJetons("web", tenantId, valides, VUE_DUREE_MS);
+  const parUrl = new Map(valides.map((u, i) => [u, jetons[i]]));
+  return urls.map((u) => parUrl.get(u) || null);
 };
 
-const lireVue = (jeton) => {
-  const vue = vues.get(jeton);
-  if (!vue) return null;
-  if (vue.expire < Date.now()) {
-    vues.delete(jeton);
-    return null;
-  }
-  return vue;
+const lireVue = async (jeton) => {
+  const j = await lireJeton("web", jeton);
+  return j ? { url: j.cible, tenantId: j.tenantId } : null;
 };
 
 export default async function webRoutes(app) {
@@ -204,7 +187,7 @@ export default async function webRoutes(app) {
   /// dans un cadre malgré son refus. Voir ../lecture.js pour ce que cela
   /// implique — et pour ce que le client doit faire de son côté.
   app.get("/voir/:jeton", { config: LIMITE_VUE }, async (request, reply) => {
-    const vue = lireVue(request.params.jeton);
+    const vue = await lireVue(request.params.jeton);
     if (!vue) {
       return reply
         .code(410)
@@ -254,15 +237,21 @@ export default async function webRoutes(app) {
 
     // Au-delà du plafond, un lien garde son adresse d'origine : il sortira
     // du cadre au clic, mais la page reste lisible.
+    // Deux passes : la première relève les liens, pour créer leurs jetons
+    // en une seule requête ; la seconde les réécrit.
+    const source = decoder(Buffer.concat(morceaux), type);
+    const cibles = [];
+    preparer(source, finale.href, (cible) => {
+      if (cibles.length < LIENS_PAR_PAGE) cibles.push(cible);
+      return cible;
+    });
+    const jetons = await creerVues([...new Set(cibles)], vue.tenantId);
+    const jetonDe = new Map([...new Set(cibles)].map((c, i) => [c, jetons[i]]));
     let liens = 0;
-    const html = preparer(
-      decoder(Buffer.concat(morceaux), type),
-      finale.href,
-      (cible) => {
-        const jeton = ++liens <= LIENS_PAR_PAGE ? creerVue(cible, vue.tenantId) : null;
-        return jeton ? `/api/web/voir/${jeton}` : cible;
-      },
-    );
+    const html = preparer(source, finale.href, (cible) => {
+      const jeton = ++liens <= LIENS_PAR_PAGE ? jetonDe.get(cible) : null;
+      return jeton ? `/api/web/voir/${jeton}` : cible;
+    });
 
     return (
       reply
@@ -345,6 +334,11 @@ export default async function webRoutes(app) {
     const longueur = Number(entetes["content-length"]);
     const refus = refusDeCadre(entetes);
 
+    // Une adresse trop longue n'a pas de jeton : pas de vue proposée.
+    const jetonVue =
+      estPage && refus && reponse.statusCode < 400
+        ? (await creerVues([finale.href], request.tenantId))[0]
+        : null;
     return {
       url: finale.href,
       statut: reponse.statusCode,
@@ -360,10 +354,7 @@ export default async function webRoutes(app) {
       raison: refus,
       // Un jeton de vue de lecture accompagne toute page refusée : le
       // client peut l'afficher sans un aller-retour de plus.
-      vue:
-        estPage && refus && reponse.statusCode < 400
-          ? `/api/web/voir/${creerVue(finale.href, request.tenantId)}`
-          : null,
+      vue: jetonVue ? `/api/web/voir/${jetonVue}` : null,
     };
   });
 

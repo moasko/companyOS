@@ -84,28 +84,14 @@ const ABSENCE_VIDE = {
 };
 
 import { montant as money } from "../../../utils/monnaie";
+import { manifest as descriptif } from "./manifest";
 
 // La photo voyage dans l'enregistrement, comme celle des produits : petite,
 // affichée en liste, et disponible sans requête supplémentaire.
 const PHOTO_COTE = 180;
 const PHOTO_MAX = 40000;
 
-export const manifest = {
-  id: "rh",
-  slug: "rh",
-  version: "1.0.0",
-  nouveautes: [
-    {
-      version: "1.0.0",
-      texte:
-        "Dossiers du personnel, congés et absences avec soldes calculés, alertes de fin de contrat.",
-    },
-  ],
-  name: "Ressources humaines",
-  icon: "rh",
-  action: "RHAPP",
-  Window: RhApp,
-};
+export const manifest = { ...descriptif, Window: RhApp };
 
 function RhApp() {
   const wnapp = useSelector((state) => state.apps[manifest.id]);
@@ -168,6 +154,10 @@ function RhApp() {
     };
     window.addEventListener("companyos:lien", aller);
     return () => window.removeEventListener("companyos:lien", aller);
+  }, [salaries]);
+  // Le lien a pu arriver avant les données (ouverture à la demande).
+  useEffect(() => {
+    appliquerLien();
   }, [salaries]);
 
   const appliquerLien = () => {

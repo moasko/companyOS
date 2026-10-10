@@ -39,15 +39,9 @@ import {
 } from "../rh/domaine";
 import * as D from "./domaine";
 import "./conges.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "conges",
-  slug: "conges",
-  name: "Congés",
-  icon: "conges",
-  action: "CONGESAPP",
-  Window: CongesApp,
-};
+export const manifest = { ...descriptif, Window: CongesApp };
 
 const TEXTES = {
   fr: {

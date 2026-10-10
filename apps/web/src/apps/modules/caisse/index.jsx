@@ -45,15 +45,9 @@ import {
 } from "../../referentiel";
 import * as D from "./domaine";
 import "./caisse.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "caisse",
-  slug: "caisse",
-  name: "Caisse",
-  icon: "caisse",
-  action: "CAISSEAPP",
-  Window: CaisseApp,
-};
+export const manifest = { ...descriptif, Window: CaisseApp };
 
 const TICKET_VIDE = () => ({ lignes: [], remiseGlobale: 0, date: D.today() });
 

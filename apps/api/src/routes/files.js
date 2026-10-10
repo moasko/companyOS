@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
 import { prisma, serialize } from "../db.js";
+import { creerJeton, lireJeton } from "../etatPartage.js";
 import { authenticate } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { consommerQuota, ecrireOuNettoyer, piloteEcriture, piloteLecture } from "../storage.js";
@@ -116,33 +116,16 @@ const nomLibre = async (tenantId, parentId, nom) => {
 // acceptée par Fastify (100 caractères), ce qui renvoyait « 414 URI Too
 // Long » et faisait échouer la lecture.
 //
-// La table vit dans le processus : un redémarrage du serveur invalide les
-// liens en cours, et le client en redemande un. En production multi-nœuds,
-// c'est cette table qu'il faudra déporter (Redis).
+// Les jetons vivent en base (voir src/etatPartage.js) : n'importe quelle
+// instance de l'API reconnaît un lien créé par une autre.
 
 const LIEN_DUREE_MS = 2 * 60 * 60 * 1000;
-const liens = new Map();
 
-const creerLien = (fid, tid) => {
-  // Purge à l'occasion : la table reste petite sans tâche planifiée.
-  const maintenant = Date.now();
-  for (const [cle, valeur] of liens) {
-    if (valeur.expire < maintenant) liens.delete(cle);
-  }
+const creerLien = (fid, tid) => creerJeton("flux", tid, fid, LIEN_DUREE_MS);
 
-  const jeton = randomUUID().replace(/-/g, "");
-  liens.set(jeton, { fid, tid, expire: maintenant + LIEN_DUREE_MS });
-  return jeton;
-};
-
-const lireLien = (jeton) => {
-  const lien = liens.get(jeton);
-  if (!lien) return null;
-  if (lien.expire < Date.now()) {
-    liens.delete(jeton);
-    return null;
-  }
-  return lien;
+const lireLien = async (jeton) => {
+  const j = await lireJeton("flux", jeton);
+  return j ? { fid: j.cible, tid: j.tenantId } : null;
 };
 
 export default async function fileRoutes(app) {
@@ -330,7 +313,7 @@ export default async function fileRoutes(app) {
       return reply.code(404).send({ error: "Fichier introuvable" });
     }
 
-    return { url: `/api/files/stream/${creerLien(node.id, request.tenantId)}` };
+    return { url: `/api/files/stream/${await creerLien(node.id, request.tenantId)}` };
   });
 
   /// Lecture en flux, avec gestion des plages d'octets.
@@ -341,7 +324,7 @@ export default async function fileRoutes(app) {
   /// entier avant la première image — 32 Mo d'attente pour une vidéo
   /// courte, et aucun déplacement possible.
   app.get("/stream/:token", async (request, reply) => {
-    const lien = lireLien(request.params.token);
+    const lien = await lireLien(request.params.token);
     if (!lien) {
       return reply.code(401).send({ error: "Lien de lecture expiré" });
     }

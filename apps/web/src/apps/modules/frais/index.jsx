@@ -32,15 +32,9 @@ import { useDevise, useTraduction } from "../../../utils/intl";
 import { salarieDe } from "../conges/domaine";
 import * as D from "./domaine";
 import "./frais.scss";
+import { manifest as descriptif } from "./manifest";
 
-export const manifest = {
-  id: "frais",
-  slug: "frais",
-  name: "Notes de frais",
-  icon: "frais",
-  action: "FRAISAPP",
-  Window: FraisApp,
-};
+export const manifest = { ...descriptif, Window: FraisApp };
 
 const TEXTES = {
   fr: {
