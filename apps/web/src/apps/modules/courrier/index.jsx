@@ -77,7 +77,8 @@ function CourrierApp() {
     setBrouillons(b.sort(parDate));
     setModeles(m.sort((x, y) => (x.data.nom || "").localeCompare(y.data.nom || "")));
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["courrier/*"] });
 
   // Un brouillon poussé par une autre app ouvre directement la composition.
   useEffect(() => {

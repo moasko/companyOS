@@ -83,8 +83,19 @@ export const surMfaRequise = (rappel) => {
   return () => window.removeEventListener(MFA_REQUISE, rappel);
 };
 
+/// Identifiant de cet onglet, joint à chaque écriture : le flux temps réel
+/// le renvoie avec l'événement qui en découle, et l'onglet sait que c'est
+/// sa propre modification (il l'a déjà à l'écran).
+export const CLIENT_ID = (() => {
+  try {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+  } catch {
+    return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  }
+})();
+
 const envoyer = async (path, { method = "GET", body, isForm = false } = {}) => {
-  const headers = { "X-CompanyOS": "1" };
+  const headers = { "X-CompanyOS": "1", "X-Client-Id": CLIENT_ID };
   if (body && !isForm) headers["Content-Type"] = "application/json";
 
   const response = await fetch(`${BASE_URL}/api${path}`, {
@@ -215,6 +226,22 @@ export const api = {
   lireToutesNotifications: () => request("/notifications/lu", { method: "PUT" }),
   supprimerNotification: (id) => request(`/notifications/${id}`, { method: "DELETE" }),
   viderNotifications: () => request("/notifications", { method: "DELETE" }),
+  // Push : l'appareil est prévenu onglet fermé (voir src/apps/push.js).
+  pushCle: () => request("/notifications/push/cle"),
+  pushAbonner: (abonnement) => request("/notifications/push", { method: "POST", body: abonnement }),
+  pushDesabonner: (endpoint) => request("/notifications/push", { method: "DELETE", body: { endpoint } }),
+
+  // Automatisations entre applications (administrateurs).
+  automatisations: {
+    list: () => request("/automatisations"),
+    create: (a) => request("/automatisations", { method: "POST", body: a }),
+    update: (id, a) => request(`/automatisations/${id}`, { method: "PUT", body: a }),
+    activer: (id, active) => request(`/automatisations/${id}/active`, { method: "PUT", body: { active } }),
+    remove: (id) => request(`/automatisations/${id}`, { method: "DELETE" }),
+    historique: (id) => request(`/automatisations/${id}/historique`),
+    secret: (id) => request(`/automatisations/${id}/secret`),
+    essai: (automatisation, ficheId) => request("/automatisations/essai", { method: "POST", body: { automatisation, ficheId } }),
+  },
 
   // Journal d'activité — administrateurs seulement, le serveur le vérifie.
   audit: ({ action, auteur, avant, limite } = {}) => {

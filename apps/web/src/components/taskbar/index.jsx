@@ -12,6 +12,7 @@ import {
   toutMarquerLu,
   viderNotifications,
 } from "../../apps/notifications";
+import { activerPush, desactiverPush, etatPush } from "../../apps/push";
 import { modal } from "../../apps/modalRequest";
 import { menuContextuel } from "../../apps/menuRequest";
 import { ouvrirFenetre } from "../../apps/windows";
@@ -39,6 +40,12 @@ const TEXTES = {
     themeClair: "Passer en thème clair",
     themeSombre: "Passer en thème sombre",
     nonConnecte: "Non connecté",
+    pushTitre: "Sur cet appareil",
+    pushActif: "Vous êtes prévenu même CompanyOS fermé.",
+    pushInactif: "Être prévenu même CompanyOS fermé.",
+    pushRefuse: "Bloquées dans les réglages du navigateur.",
+    pushActiver: "Activer",
+    pushDesactiver: "Désactiver",
   },
   en: {
     effacerTitre: "Clear notifications",
@@ -58,6 +65,12 @@ const TEXTES = {
     themeClair: "Switch to light theme",
     themeSombre: "Switch to dark theme",
     nonConnecte: "Not signed in",
+    pushTitre: "On this device",
+    pushActif: "You're notified even when CompanyOS is closed.",
+    pushInactif: "Get notified even when CompanyOS is closed.",
+    pushRefuse: "Blocked in your browser settings.",
+    pushActiver: "Turn on",
+    pushDesactiver: "Turn off",
   },
 };
 
@@ -73,6 +86,48 @@ const effacerTout = async (t) => {
     danger: true,
   });
   if (ok) viderNotifications();
+};
+
+/// Le push sur cet appareil : s'affiche seulement si le navigateur sait
+/// le recevoir (et que le service worker est là — pas en développement).
+const ReglagePush = ({ t }) => {
+  const [etat, setEtat] = useState(null);
+  const [erreur, setErreur] = useState("");
+  const [occupe, setOccupe] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    etatPush().then((e) => vivant && setEtat(e));
+    return () => {
+      vivant = false;
+    };
+  }, []);
+  if (!etat || etat === "indisponible") return null;
+  const basculer = async () => {
+    setOccupe(true);
+    setErreur("");
+    try {
+      setEtat(etat === "actif" ? await desactiverPush() : await activerPush());
+    } catch (e) {
+      setErreur(e.message);
+      setEtat(await etatPush());
+    } finally {
+      setOccupe(false);
+    }
+  };
+  return (
+    <div className="tbPush">
+      <Icon fafa={etat === "actif" ? "faBell" : "faBellSlash"} width={14} />
+      <div className="tbPushTexte">
+        <strong>{t("pushTitre")}</strong>
+        <span>{erreur || t(etat === "actif" ? "pushActif" : etat === "refuse" ? "pushRefuse" : "pushInactif")}</span>
+      </div>
+      {etat !== "refuse" ? (
+        <button type="button" className="tbPushBouton" disabled={occupe} onClick={basculer}>
+          {t(etat === "actif" ? "pushDesactiver" : "pushActiver")}
+        </button>
+      ) : null}
+    </div>
+  );
 };
 
 const VoletNotifications = ({ liste, onFermer }) => {
@@ -136,6 +191,7 @@ const VoletNotifications = ({ liste, onFermer }) => {
         ))
       )}
     </div>
+    <ReglagePush t={t} />
   </div>
   );
 };

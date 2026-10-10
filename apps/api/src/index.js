@@ -24,6 +24,10 @@ import erreursRoutes from "./routes/erreurs.js";
 import { consigner, gestionnaireErreurs } from "./erreurs.js";
 import { demarrerSauvegardes } from "./sauvegardes.js";
 import { demarrerPurgeEtatPartage } from "./etatPartage.js";
+import { arreterBus, demarrerBus } from "./evenements.js";
+import { demarrerMoteurAutomatisations } from "./moteurAutomatisations.js";
+import evenementRoutes from "./routes/evenements.js";
+import automatisationRoutes from "./routes/automatisations.js";
 
 const app = Fastify({
   logger: true,
@@ -139,6 +143,8 @@ await app.register(campagnesRoutes, { prefix: "/api/campagnes" });
 await app.register(espaceRoutes, { prefix: "/api/espace" });
 await app.register(plateformeRoutes, { prefix: "/api/plateforme" });
 await app.register(erreursRoutes, { prefix: "/api/erreurs" });
+await app.register(evenementRoutes, { prefix: "/api/evenements" });
+await app.register(automatisationRoutes, { prefix: "/api/automatisations" });
 
 /// Dit, dans les journaux du conteneur, si chaque adresse de
 /// PLATFORM_ADMINS a bien un compte qui lui ouvrira la console. « Je suis
@@ -172,6 +178,7 @@ const diagnostiquerExploitants = async () => {
 
 const shutdown = async () => {
   await app.close();
+  await arreterBus();
   await prisma.$disconnect();
   process.exit(0);
 };
@@ -189,6 +196,10 @@ try {
   demarrerSauvegardes();
   // Jetons d'URL échus et vieux compteurs d'échecs — voir src/etatPartage.js.
   demarrerPurgeEtatPartage();
+  // Le bus temps réel entre instances (LISTEN/NOTIFY) et les
+  // automatisations entre apps — voir src/evenements.js.
+  await demarrerBus();
+  demarrerMoteurAutomatisations();
   diagnostiquerExploitants();
 } catch (err) {
   app.log.error(err);

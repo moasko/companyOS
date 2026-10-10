@@ -173,15 +173,16 @@ model Tenant {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  users         User[]
-  nodes         FsNode[]
-  installations Installation[]
-  records       Record[]
-  apps          App[]
-  invitations   Invitation[]
-  auditEvents   AuditEvent[]
-  notifications Notification[]
-  mailCompteurs MailCompteur[]
+  users           User[]
+  nodes           FsNode[]
+  installations   Installation[]
+  records         Record[]
+  apps            App[]
+  invitations     Invitation[]
+  auditEvents     AuditEvent[]
+  notifications   Notification[]
+  mailCompteurs   MailCompteur[]
+  automatisations Automatisation[]
 
   @@map("tenants")
 }
@@ -217,11 +218,12 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nodes         FsNode[]
-  installations Installation[]
-  notifications Notification[]
-  sessions      Session[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nodes           FsNode[]
+  installations   Installation[]
+  notifications   Notification[]
+  sessions        Session[]
+  abonnementsPush AbonnementPush[]
 
   @@index([tenantId])
   @@map("users")
@@ -553,4 +555,84 @@ model VerrouConnexion {
 
   @@index([dernier])
   @@map("verrous_connexion")
+}
+
+/// Automatisation entre applications : « quand une fiche change dans une
+/// app, faire quelque chose dans une autre ». La définition (déclencheur,
+/// conditions, actions) suit packages/shared/src/automatisations.js ; le
+/// déclencheur est recopié en colonnes pour trouver vite les règles
+/// concernées par une écriture.
+model Automatisation {
+  id                String    @id @default(cuid())
+  tenantId          String
+  nom               String
+  active            Boolean   @default(true)
+  definition        Json
+  module            String
+  collection        String
+  evenement         String
+  /// La recette d'origine, si elle vient du catalogue.
+  recette           String?
+  creeParId         String?
+  creeLe            DateTime  @default(now())
+  modifieLe         DateTime  @updatedAt
+  derniereExecution DateTime?
+  executions        Int       @default(0)
+  echecs            Int       @default(0)
+
+  tenant     Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  historique ExecutionAutomatisation[]
+
+  @@index([tenantId, module, collection])
+  @@map("automatisations")
+}
+
+/// Une exécution : ce qui l'a déclenchée, ce que chaque action a donné.
+/// Les plus anciennes sont purgées (voir src/moteurAutomatisations.js).
+model ExecutionAutomatisation {
+  id               String   @id @default(cuid())
+  automatisationId String
+  tenantId         String
+  /// « ok », « erreur » (au moins une action en échec)
+  statut           String
+  evenement        Json
+  resultats        Json
+  dureeMs          Int
+  creeLe           DateTime @default(now())
+
+  automatisation Automatisation @relation(fields: [automatisationId], references: [id], onDelete: Cascade)
+
+  @@index([automatisationId, creeLe])
+  @@index([tenantId, creeLe])
+  @@map("executions_automatisations")
+}
+
+/// Un appareil qui accepte les notifications push (onglet fermé).
+/// `endpoint` est l'adresse du service de push du navigateur ; seuls les
+/// grands services connus sont acceptés (voir src/push.js).
+model AbonnementPush {
+  id       String   @id @default(cuid())
+  tenantId String
+  userId   String
+  endpoint String   @unique
+  p256dh   String
+  auth     String
+  agent    String?
+  creeLe   DateTime @default(now())
+  vuLe     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("abonnements_push")
+}
+
+/// Réglages propres à la plateforme, créés par le serveur lui-même (clés
+/// VAPID du push, chiffrées).
+model ParametreSysteme {
+  cle       String   @id
+  valeur    Json
+  modifieLe DateTime @updatedAt
+
+  @@map("parametres_systeme")
 }

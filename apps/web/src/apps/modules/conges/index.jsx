@@ -225,7 +225,8 @@ function CongesApp() {
     setReglages({ ...REGLAGES_DEFAUT, ...(r[0]?.data || {}) });
     setMembres(m);
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["rh/absences", "rh/salaries", "conges/*"] });
 
   // Le salarié derrière la session — par l'email, la seule clé commune.
   const moi = useMemo(

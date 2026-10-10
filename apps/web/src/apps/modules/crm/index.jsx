@@ -138,7 +138,8 @@ function CrmApp() {
     setD({ clients, contacts, opportunites, activites, reglagesRec: reglages[0] || null, documents, reglements, envois, campagnes, cartes, membres });
   };
 
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["crm/*", "facturation/factures", "facturation/reglements", "projets/cartes", "campagnes/campagnes"] });
 
   /// Le fichier client est partagé : prévenir le reste de l'OS après une
   /// écriture, sinon la Facturation ouverte à côté propose une liste périmée.

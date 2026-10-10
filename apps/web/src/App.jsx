@@ -25,6 +25,7 @@ import { HoteMenuContextuel } from "./apps/MenuContextuel";
 import { ecouterLesCopies } from "./apps/clipboard";
 import { intercepterMailto } from "./apps/mailto";
 import { demarrerSyncNotifications } from "./apps/notifications";
+import { ecouterLiensPush } from "./apps/push";
 import { demarrerGardeFenetres } from "./apps/gardeFenetres";
 import { fermerFenetre } from "./apps/windows";
 import store from "./reducers";
@@ -180,6 +181,7 @@ function App() {
   // fois pour toutes : sans session elle ne fait rien, et la connexion la
   // relance d'elle-même — voir src/apps/notifications.js.
   useEffect(() => demarrerSyncNotifications(), []);
+  useEffect(() => ecouterLiensPush(), []);
 
   // Aucune fenêtre ne garde ses boutons hors de l'écran (voir gardeFenetres.js).
   useEffect(() => demarrerGardeFenetres(store), []);

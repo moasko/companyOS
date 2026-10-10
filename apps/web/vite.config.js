@@ -78,6 +78,8 @@ const config = ({ mode }) => {
           // Relever le plafond ne fait pas rentrer les gros fichiers dans
           // le cache : ils en sont écartés par leur nom, juste au-dessus.
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+          // Réception et clic des notifications push (onglet fermé).
+          importScripts: ["push-sw.js"],
         },
       }),
     ],

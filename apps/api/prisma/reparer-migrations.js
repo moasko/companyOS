@@ -39,6 +39,7 @@ const REJOUABLES = [
   "20261008180000_emails_minuscules",
   "20261009120000_sessions_mfa",
   "20261010120000_etat_partage",
+  "20261010150000_automatisations_push",
 ];
 
 const prisma = new PrismaClient();

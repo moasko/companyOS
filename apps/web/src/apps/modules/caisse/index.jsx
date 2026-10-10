@@ -79,7 +79,8 @@ function CaisseApp() {
     setSessions(s);
     setTickets(t);
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["caisse/*", "stock/articles", "stock/mouvements"] });
 
   /// La session ouverte, s'il y en a une. Une seule à la fois : deux
   /// caisses ouvertes en parallèle rendraient tout comptage ininterprétable.

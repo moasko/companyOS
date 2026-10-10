@@ -170,7 +170,8 @@ function ComptabiliteApp() {
       inventaires: inv,
     });
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["comptabilite/*", "facturation/*", "achats/*", "paie/*", "frais/notes", "caisse/*"] });
 
   // Une autre application peut ouvrir la Comptabilité sur un écran précis
   // (« voir l'écriture de cette facture »).

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ouvrirCorbeille } from "../../apps/explorerRequest";
 import { fenetre } from "../../apps/windows";
+import { modulesSysteme } from "../../apps/registry";
 import { Icon } from "../../utils/general";
 import { useNomApp } from "../../utils/nomsApps";
 import { useTelephone } from "../../utils/telephone";
@@ -95,6 +96,15 @@ export const Lanceur = () => {
 
   const prenom = (session.user?.name || "").split(" ")[0];
 
+  // Les outils d'administration (Automatisations…) n'ont pas d'icône de
+  // bureau : sur ordinateur on les trouve par la recherche et le menu
+  // Démarrer, absents du téléphone. Les administrateurs les retrouvent ici.
+  const admin = ["OWNER", "ADMIN"].includes(session.user?.role);
+  const outils = admin
+    ? modulesSysteme.filter((m) => m.admin && !bureau.some((b) => b.action === m.action))
+    : [];
+  const grille = [...bureau, ...outils];
+
   return (
     <>
       <div className="telLanceur" data-masque={auPremierPlan.length > 0}>
@@ -114,7 +124,7 @@ export const Lanceur = () => {
         ) : null}
 
         <nav className="telGrille" aria-label="Applications">
-          {bureau.map((app) => (
+          {grille.map((app) => (
             <button
               key={app.name}
               type="button"

@@ -140,7 +140,8 @@ function RhApp() {
     }
   };
 
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["rh/*"] });
 
   // ---- Arrivée depuis une notification ------------------------------------
 

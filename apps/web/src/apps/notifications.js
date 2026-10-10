@@ -18,6 +18,7 @@
 // Le magasin est hors Redux, comme `saveRequest` et `modalRequest`.
 
 import { api, sessionOuverte } from "../api/client";
+import { EVT_NOTIFICATION, synchroniserTempsReel, tempsReelConnecte } from "../api/tempsReel";
 import { ouvrirFenetre } from "./windows";
 import { creerTraducteur } from "../utils/intl";
 import { localeEffective } from "../utils/langue";
@@ -25,6 +26,9 @@ import { localeEffective } from "../utils/langue";
 const CLE = "notifications";
 const MAX = 50;
 const PERIODE_MS = 20000;
+/// Avec le flux temps réel, l'interrogation n'est plus qu'un filet de
+/// sécurité (événement perdu pendant une coupure).
+const PERIODE_EN_DIRECT_MS = 120000;
 
 let locales = [];
 let distantes = [];
@@ -207,8 +211,10 @@ export const rejouerLienEnAttente = (app) => {
 // ---------------------------------------------------------------------------
 
 let minuteur = null;
+let dernierTour = 0;
 
 const rafraichir = async () => {
+  dernierTour = Date.now();
   if (!sessionOuverte()) {
     if (distantes.length) {
       distantes = [];
@@ -227,14 +233,20 @@ const rafraichir = async () => {
 
 /// Démarre la synchronisation. Appelée une fois par `App.jsx`.
 ///
-/// Interrogation périodique plutôt que WebSocket : un espace de travail
-/// compte quelques dizaines de personnes, une requête toutes les 20
-/// secondes coûte moins qu'une connexion permanente à maintenir. Le jour
-/// où cela ne suffira plus, seul ce bloc change.
+/// Le serveur signale chaque nouvelle notification par le flux temps réel
+/// (voir src/api/tempsReel.js) : elle s'affiche à l'instant. L'ancienne
+/// interrogation toutes les 20 secondes ne sert plus que si le flux est
+/// coupé ; sinon elle passe toutes les deux minutes, par sécurité.
 export const demarrerSyncNotifications = () => {
   if (minuteur) return;
+  synchroniserTempsReel();
   rafraichir();
-  minuteur = setInterval(rafraichir, PERIODE_MS);
+  minuteur = setInterval(() => {
+    const periode = tempsReelConnecte() ? PERIODE_EN_DIRECT_MS : PERIODE_MS;
+    if (Date.now() - dernierTour >= periode - 1000) rafraichir();
+  }, PERIODE_MS);
+
+  window.addEventListener(EVT_NOTIFICATION, rafraichir);
 
   // Revenir sur l'onglet est le moment où l'on regarde ses notifications :
   // autant qu'elles soient à jour avant même le prochain tour.
@@ -245,7 +257,10 @@ export const demarrerSyncNotifications = () => {
 
 /// À appeler après une connexion ou une déconnexion, sans attendre le
 /// prochain tour de synchronisation.
-export const resynchroniserNotifications = rafraichir;
+export const resynchroniserNotifications = () => {
+  synchroniserTempsReel();
+  return rafraichir();
+};
 
 /// Un horodatage lisible : « à l'instant », « il y a 5 min », puis l'heure.
 const DEPUIS = {

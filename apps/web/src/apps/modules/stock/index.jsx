@@ -158,7 +158,8 @@ function StockApp() {
     ]);
     setD({ articles, categories, mouvements, fournisseurs, entrepots, inventaires, documents, commandes, receptions, membres });
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["stock/*", "achats/*"] });
   const { entreprise } = useEntreprise(ouvert);
 
   /// Après toute écriture : on relit, et on prévient le reste de l'OS que

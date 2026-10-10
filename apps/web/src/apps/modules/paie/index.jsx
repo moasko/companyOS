@@ -106,7 +106,8 @@ function PaieApp() {
     ]);
     setDonnees({ salaries, absences, notes, bulletins, reglages: reglages[0] || null, cycles });
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["paie/*", "rh/salaries", "frais/notes"] });
 
   const { salaries, absences, notes, bulletins, cycles } = donnees;
   const reglages = useMemo(() => D.completer(donnees.reglages?.data || {}), [donnees.reglages]);

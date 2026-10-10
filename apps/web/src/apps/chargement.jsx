@@ -29,6 +29,7 @@
 // l'écran avec un bouton.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { correspond, EVT_FICHES } from "../api/tempsReel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../utils/general";
 import { creerTraducteur } from "../utils/intl";
@@ -66,6 +67,46 @@ const lisible = (e) => {
   return m || tMsg("impossible");
 };
 
+/// Recharge quand quelqu'un d'autre modifie l'une des collections `ecoute`
+/// (« crm/* », « projets/cartes ») — signalé par le flux temps réel.
+/// Les rafales sont regroupées ; un onglet caché attend d'être revu.
+export const useEnDirect = (actif, ecoute, recharger) => {
+  const fn = useRef(recharger);
+  fn.current = recharger;
+  const motifs = ecoute ? ecoute.join("|") : "";
+  useEffect(() => {
+    if (!actif || !motifs) return undefined;
+    const liste = motifs.split("|");
+    let minuteur = null;
+    let enAttente = false;
+    const tour = () => {
+      minuteur = null;
+      if (document.hidden) {
+        enAttente = true;
+        return;
+      }
+      enAttente = false;
+      fn.current();
+    };
+    const surFiche = (e) => {
+      const d = e.detail || {};
+      if (d.moi || !correspond(liste, d.module, d.collection)) return;
+      clearTimeout(minuteur);
+      minuteur = setTimeout(tour, 700);
+    };
+    const surVisible = () => {
+      if (!document.hidden && enAttente) tour();
+    };
+    window.addEventListener(EVT_FICHES, surFiche);
+    document.addEventListener("visibilitychange", surVisible);
+    return () => {
+      clearTimeout(minuteur);
+      window.removeEventListener(EVT_FICHES, surFiche);
+      document.removeEventListener("visibilitychange", surVisible);
+    };
+  }, [actif, motifs]);
+};
+
 /// Charge les données d'une fenêtre dès qu'elle devient utilisable.
 ///
 ///   const { chargement, erreur, recharger } = useChargement(ouvert, charger);
@@ -73,7 +114,12 @@ const lisible = (e) => {
 /// `charger` doit poser les états du module ; le hook ne s'occupe que du
 /// cycle. `recharger()` refait un tour sans vider l'écran — c'est ce qu'on
 /// appelle après une écriture.
-export const useChargement = (actif, charger) => {
+///
+/// `ecoute` : les collections affichées (« crm/* », « facturation/factures »).
+/// Quand quelqu'un d'autre en modifie une, le flux temps réel le signale
+/// et la fenêtre se recharge en silence — regroupé, et seulement une fois
+/// revenue au premier plan si l'onglet est caché.
+export const useChargement = (actif, charger, { ecoute = null } = {}) => {
   // `premier` distingue « la fenêtre s'ouvre, il n'y a encore rien » de
   // « les données sont là, on les rafraîchit ». Le premier cas mérite un
   // squelette, le second ne doit rien faire clignoter.
@@ -107,6 +153,8 @@ export const useChargement = (actif, charger) => {
   useEffect(() => {
     if (actif) lancer();
   }, [actif, lancer]);
+
+  useEnDirect(actif, ecoute, () => lancer({ silencieux: true }));
 
   return {
     /// Vrai pendant un chargement, quel qu'il soit.
