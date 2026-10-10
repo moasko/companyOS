@@ -189,7 +189,8 @@ function FraisApp() {
     setSalaries(s);
     setMembres(m);
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["frais/*", "rh/salaries"] });
 
   const moi = useMemo(
     () => salarieDe(salaries, session.user?.email),

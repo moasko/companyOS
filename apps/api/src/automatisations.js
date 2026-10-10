@@ -1,4 +1,5 @@
 import { prisma } from "./db.js";
+import { notifier } from "./notifier.js";
 
 const conditionValide = (condition, valeurs) => {
   const valeur = valeurs?.[condition.champ];
@@ -54,16 +55,12 @@ export const executerAutomatisations = async ({
     declenchees.push(regle.nom || "Règle sans nom");
   }
 
-  if (notifications.length) {
-    await prisma.notification.createMany({
-      data: notifications.map((notification) => ({
-        tenantId,
-        userId,
-        source: module,
-        titre: notification.titre,
-        message: notification.message,
-        lien: { app: module },
-      })),
+  for (const notification of notifications) {
+    await notifier(tenantId, [userId], {
+      source: module,
+      titre: notification.titre,
+      message: notification.message,
+      lien: { app: module },
     });
   }
 

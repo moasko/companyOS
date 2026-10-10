@@ -1,0 +1,774 @@
+// Automatisations — voir index.jsx. Jetons : src/apps/ui/theme.scss
+// (clair et sombre déjà prévus).
+
+.autApp {
+  background: var(--app-bg);
+  color: var(--app-text);
+
+  &.floatTab[data-size="mini"] {
+    width: 72%;
+    height: 82%;
+    top: 8%;
+    left: 14%;
+    min-width: 760px;
+    min-height: 540px;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+    font-size: 0.85em;
+    color: var(--app-text);
+    background: var(--app-champ);
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    padding: 7px 9px;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: 2px solid var(--app-accent);
+      outline-offset: -1px;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .autMuted {
+    color: var(--app-muted);
+  }
+
+  .autPetit {
+    font-size: 0.75em;
+  }
+
+  .autEspace {
+    flex: 1;
+  }
+
+  .autLien {
+    background: none;
+    border: 0;
+    padding: 2px 4px;
+    color: var(--app-accent);
+    cursor: pointer;
+    font-size: 0.8em;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .autLienDanger {
+    color: var(--app-danger);
+  }
+
+  .autIcone {
+    border: 0;
+    background: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--app-muted);
+    flex-shrink: 0;
+
+    &:hover {
+      background: var(--app-panneau);
+      color: var(--app-danger);
+    }
+  }
+
+  .autPuce {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  // ---- Accueil -------------------------------------------------------------
+
+  .autCoquille {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .autEntete {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px 24px 8px;
+
+    > div {
+      flex: 1;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25em;
+    }
+
+    p {
+      margin: 4px 0 0;
+      font-size: 0.82em;
+    }
+  }
+
+  .autOnglets {
+    display: flex;
+    gap: 4px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--app-line);
+  }
+
+  .autOnglet {
+    border: 0;
+    background: none;
+    padding: 10px 12px;
+    font-size: 0.82em;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--app-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    &[aria-selected="true"] {
+      color: var(--app-text);
+      border-bottom-color: var(--app-accent);
+      font-weight: 600;
+    }
+  }
+
+  .autCompte {
+    font-size: 0.8em;
+    background: var(--app-panneau);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-weight: 500;
+  }
+
+  .autInfo {
+    padding: 10px 24px 0;
+  }
+
+  .autCorps {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 24px 24px;
+  }
+
+  .autIntro {
+    margin: 0 0 14px;
+    font-size: 0.82em;
+  }
+
+  .autListe {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 900px;
+  }
+
+  .autCarte {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon-large);
+    background: var(--app-carte);
+    overflow: hidden;
+
+    &[data-active="false"] .autCarteCorps strong {
+      color: var(--app-muted);
+    }
+  }
+
+  .autCarteTete {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px 6px;
+  }
+
+  .autCarteCorps {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+
+    strong {
+      font-size: 0.9em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      font-size: 0.78em;
+    }
+  }
+
+  .autActionsIcones {
+    display: flex;
+    gap: 4px;
+  }
+
+  .autCartePied {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px 10px 62px;
+    font-size: 0.78em;
+    flex-wrap: wrap;
+
+    .autLien {
+      font-size: 1em;
+    }
+  }
+
+  .autEchec {
+    color: var(--app-danger);
+    font-weight: 600;
+  }
+
+  // Interrupteur actif / en pause.
+  .autBascule {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    border: 0;
+    background: var(--app-line);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+
+    span {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+      transition: transform 0.15s;
+    }
+
+    &[aria-checked="true"] {
+      background: var(--app-ok);
+
+      span {
+        transform: translateX(16px);
+      }
+    }
+  }
+
+  .autHist {
+    list-style: none;
+    margin: 0;
+    padding: 10px 14px 12px 62px;
+    border-top: 1px solid var(--app-line);
+    background: var(--app-panneau);
+    font-size: 0.78em;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    > li[data-statut="erreur"] .autHistTete svg {
+      color: var(--app-danger);
+    }
+
+    > li[data-statut="ok"] .autHistTete svg {
+      color: var(--app-ok);
+    }
+  }
+
+  .autHistTete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .autHistActions {
+    list-style: none;
+    margin: 4px 0 0 18px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    li {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    li[data-ok="false"] {
+      color: var(--app-danger);
+    }
+  }
+
+  .autRecettes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+  }
+
+  .autRecette {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon-large);
+    background: var(--app-carte);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    strong {
+      font-size: 0.88em;
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.78em;
+      flex: 1;
+    }
+  }
+
+  .autRecetteApps {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--app-muted);
+    margin-bottom: 2px;
+  }
+
+  .autRecettePied {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 0.78em;
+  }
+
+  // ---- Éditeur ---------------------------------------------------------------
+
+  .autEditeur {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+  }
+
+  .autEditeurBarre {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--app-line);
+
+    .autNom {
+      flex: 1;
+      font-size: 1em;
+      font-weight: 600;
+      border-color: transparent;
+      background: transparent;
+
+      &:hover,
+      &:focus {
+        border-color: var(--app-line);
+        background: var(--app-champ);
+      }
+    }
+  }
+
+  .autEditeurCorps {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .autEditeurCentre {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 16px 22px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .autEditeurCote {
+    width: 290px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    border-left: 1px solid var(--app-line);
+    background: var(--app-panneau);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    h3 {
+      margin: 0 0 4px;
+      font-size: 0.82em;
+    }
+
+    p {
+      margin: 0 0 8px;
+    }
+  }
+
+  .autEtape {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon-large);
+    background: var(--app-carte);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    h2 {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85em;
+    }
+
+    > p {
+      margin: 0;
+      font-size: 0.8em;
+    }
+  }
+
+  .autEtapeMot {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.82em;
+    color: var(--app-accent);
+    font-weight: 700;
+  }
+
+  .autGrille {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+
+  .autChamp {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+
+    > span:first-child {
+      font-size: 0.74em;
+      color: var(--app-muted);
+      font-weight: 600;
+    }
+  }
+
+  .autChampPlein {
+    grid-column: 1 / -1;
+  }
+
+  .autCase {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8em;
+
+    input {
+      width: auto;
+    }
+  }
+
+  .autChoix {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .autPastille {
+    border: 1px solid var(--app-line);
+    background: var(--app-champ);
+    border-radius: 16px;
+    padding: 5px 12px;
+    font-size: 0.78em;
+    cursor: pointer;
+
+    &[aria-checked="true"] {
+      border-color: var(--app-accent);
+      background: var(--app-accent-soft);
+      color: var(--app-accent);
+      font-weight: 600;
+    }
+  }
+
+  .autCondition {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr) 26px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .autAction {
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    padding: 10px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .autActionTete {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.84em;
+  }
+
+  .autNumero {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--app-accent);
+    color: #fff;
+    font-size: 0.78em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+
+  .autAjoutAction select {
+    width: auto;
+    color: var(--app-accent);
+    cursor: pointer;
+  }
+
+  .autPaires {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+  }
+
+  .autPaire {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 26px;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .autMembres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .autMembre {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78em;
+    border: 1px solid var(--app-line);
+    border-radius: 14px;
+    padding: 3px 10px 3px 6px;
+    cursor: pointer;
+
+    input {
+      width: auto;
+    }
+
+    &[data-coche="true"] {
+      border-color: var(--app-accent);
+      background: var(--app-accent-soft);
+    }
+  }
+
+  .autSecret {
+    font-size: 0.78em;
+    background: var(--app-panneau);
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    padding: 6px 8px;
+    user-select: all;
+    overflow-wrap: anywhere;
+  }
+
+  .autBalises {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .autBalise {
+    border: 1px solid var(--app-line);
+    background: var(--app-carte);
+    border-radius: 5px;
+    padding: 3px 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7em;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--app-accent);
+      color: var(--app-accent);
+    }
+  }
+
+  .autEssai {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .autEssaiConds {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.76em;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    li {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    li[data-vraie="true"] svg {
+      color: var(--app-ok);
+    }
+
+    li[data-vraie="false"] svg {
+      color: var(--app-danger);
+    }
+  }
+
+  .autApercu {
+    background: var(--app-carte);
+    border: 1px solid var(--app-line);
+    border-radius: var(--app-rayon);
+    padding: 8px 10px;
+    font-size: 0.76em;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    overflow-wrap: anywhere;
+
+    dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 2px 8px;
+      margin: 2px 0 0;
+    }
+
+    dt {
+      color: var(--app-muted);
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+}
+
+// ---- Téléphone ---------------------------------------------------------------
+
+@media (max-width: 640px) {
+  .autApp {
+    .autEntete {
+      padding: 14px 14px 6px;
+      flex-wrap: wrap;
+
+      > div {
+        flex-basis: 100%;
+      }
+    }
+
+    .autOnglets,
+    .autInfo {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    .autCorps {
+      padding: 12px 14px 20px;
+    }
+
+    .autCartePied {
+      padding-left: 14px;
+    }
+
+    .autHist {
+      padding-left: 14px;
+    }
+
+    .autEditeurBarre {
+      flex-wrap: wrap;
+      padding: 10px 12px;
+
+      .autNom {
+        order: 3;
+        flex-basis: 100%;
+      }
+    }
+
+    .autEditeurCorps {
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .autEditeurCentre {
+      overflow: visible;
+      padding: 12px;
+    }
+
+    .autEditeurCote {
+      width: auto;
+      border-left: 0;
+      border-top: 1px solid var(--app-line);
+      overflow: visible;
+    }
+
+    .autGrille {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .autCondition {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 26px;
+
+      .autCondValeur {
+        grid-column: 1 / 3;
+      }
+    }
+  }
+}

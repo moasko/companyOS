@@ -110,7 +110,8 @@ function CampagnesApp() {
     campagnes.sort((a, b) => (b.data.creeLe || "").localeCompare(a.data.creeLe || ""));
     setD({ campagnes, automatisations, modeles, anciensModeles, clients, factures, articles, membres });
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["campagnes/*", "crm/clients"] });
 
   // Un envoi en cours : la page se rafraîchit toute seule.
   useEffect(() => {

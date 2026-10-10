@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { prisma, serialize } from "../db.js";
 import { authenticate } from "../auth.js";
+import { notifier } from "../notifier.js";
+import { clesVapid, endpointAccepte } from "../push.js";
 
 /// Notifications internes.
 ///
@@ -23,6 +25,12 @@ const envoiSchema = z.object({
     .object({ app: z.string().min(1).max(40), params: z.record(z.any()).optional() })
     .optional(),
 });
+
+const abonnementSchema = z.object({
+  endpoint: z.string().url().max(1000),
+  keys: z.object({ p256dh: z.string().min(16).max(200), auth: z.string().min(8).max(100) }),
+});
+const PUSH_MAX_APPAREILS = 10;
 
 export default async function notificationRoutes(app) {
   app.addHook("preHandler", authenticate);
@@ -78,18 +86,11 @@ export default async function notificationRoutes(app) {
         ? destinataires.filter((u) => u.id !== request.user.id)
         : destinataires;
 
-    await prisma.notification.createMany({
-      data: cibles.map((u) => ({
-        tenantId: request.tenantId,
-        userId: u.id,
-        auteurId: request.user.id,
-        auteurNom: request.user.name,
-        source,
-        titre,
-        message: message || null,
-        lien: lien ?? undefined,
-      })),
-    });
+    await notifier(
+      request.tenantId,
+      cibles.map((u) => u.id),
+      { auteurId: request.user.id, auteurNom: request.user.name, source, titre, message, lien },
+    );
 
     return reply.code(201).send({ envoyees: cibles.length });
   });
@@ -128,4 +129,50 @@ export default async function notificationRoutes(app) {
     });
     return { supprimees: count };
   });
+
+  // ---- Push (appareil prévenu onglet fermé) --------------------------------
+
+  /// La clé publique VAPID, pour que le navigateur s'abonne chez nous.
+  app.get("/push/cle", async () => ({ cle: (await clesVapid()).publicKey }));
+
+  /// Abonner cet appareil. L'adresse est celle du service de push du
+  /// navigateur : seuls les services connus sont acceptés (voir src/push.js).
+  app.post("/push", async (request, reply) => {
+    const parsed = abonnementSchema.safeParse(request.body);
+    if (!parsed.success || !endpointAccepte(parsed.data.endpoint)) {
+      return reply.code(400).send({ error: "Abonnement push invalide." });
+    }
+    const { endpoint, keys } = parsed.data;
+    const agent = String(request.headers["user-agent"] || "").slice(0, 200) || null;
+    // Un appareil passé d'un compte à l'autre : l'abonnement suit la
+    // personne connectée, jamais les deux.
+    await prisma.abonnementPush.upsert({
+      where: { endpoint },
+      create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, agent, userId: request.user.id, tenantId: request.tenantId },
+      update: { p256dh: keys.p256dh, auth: keys.auth, agent, userId: request.user.id, tenantId: request.tenantId, vuLe: new Date() },
+    });
+    // Plafond par personne : les plus anciens appareils cèdent la place.
+    const miens = await prisma.abonnementPush.findMany({
+      where: { userId: request.user.id },
+      orderBy: { vuLe: "desc" },
+      select: { id: true },
+    });
+    if (miens.length > PUSH_MAX_APPAREILS) {
+      await prisma.abonnementPush.deleteMany({ where: { id: { in: miens.slice(PUSH_MAX_APPAREILS).map((a) => a.id) } } });
+    }
+    return reply.code(201).send({ ok: true });
+  });
+
+  app.delete("/push", async (request) => {
+    const endpoint = String(request.body?.endpoint || "");
+    const { count } = await prisma.abonnementPush.deleteMany({
+      where: { userId: request.user.id, ...(endpoint ? { endpoint } : {}) },
+    });
+    return { supprimes: count };
+  });
+
+  /// Combien d'appareils reçoivent mes notifications.
+  app.get("/push", async (request) => ({
+    appareils: await prisma.abonnementPush.count({ where: { userId: request.user.id } }),
+  }));
 }

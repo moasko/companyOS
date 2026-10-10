@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./src/index.js",
+    "./automatisations": "./src/automatisations.js",
     "./campagnes": "./src/campagnes.js",
     "./courrier": "./src/courrier.js",
     "./facturation": "./src/facturation.js"

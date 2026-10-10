@@ -12,6 +12,7 @@
 /// Icônes disponibles dans public/img/icon/cos/, sans l'extension.
 export const ICONES_COS = new Set([
   // socle
+  "automatisations",
   "demarrer",
   "recherche",
   "parametres",

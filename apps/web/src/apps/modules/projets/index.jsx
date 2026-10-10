@@ -6,6 +6,7 @@ import { saveAs, saveToCloud } from "../../cloud";
 import { modal } from "../../modalRequest";
 import { accesDonnees } from "../../donnees";
 import { envoyerA } from "../../notifications";
+import { useEnDirect } from "../../chargement";
 import {
   COLONNES_PAR_DEFAUT,
   FILTRE_VIDE,
@@ -119,6 +120,8 @@ function ProjetsApp() {
   useEffect(() => {
     if (ouvert) charger();
   }, [ouvert]);
+  // Un tableau se partage : la carte déplacée par un collègue bouge ici aussi.
+  useEnDirect(ouvert, ["projets/*", "crm/clients"], charger);
 
   // Arrivée depuis une notification : « Awa vous a attribué une tâche »
   // doit ouvrir *cette* carte, pas la fenêtre au hasard où on l'avait

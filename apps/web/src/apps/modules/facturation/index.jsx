@@ -140,7 +140,8 @@ function FacturationApp() {
     setMembres(gens);
   };
 
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["facturation/*", "crm/clients"] });
 
   // ---- Arrivée depuis une notification ------------------------------------
 

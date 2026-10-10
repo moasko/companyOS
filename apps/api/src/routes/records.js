@@ -20,6 +20,8 @@ import {
   lireLimite,
   lireRecherche,
 } from "../pagination.js";
+import { clientDe, publierFiche } from "../evenements.js";
+import { ecoute, planifier } from "../moteurAutomatisations.js";
 
 /// CRUD générique des modules métier. Un module range ses données dans
 /// des collections nommées : /api/records/crm/clients, etc.
@@ -209,6 +211,29 @@ const auteurs = async (tenantId, records) => {
   }));
 };
 
+/// Après une écriture : prévenir les navigateurs ouverts (bus temps réel)
+/// et passer la main aux automatisations, sans retarder la réponse.
+const apresEcriture = (request, names, { id, action, fiche, avant = null }) => {
+  publierFiche({
+    tenantId: request.tenantId,
+    ...names,
+    id,
+    action,
+    par: request.user.id,
+    client: clientDe(request),
+  });
+  planifier({
+    tenantId: request.tenantId,
+    ...names,
+    evenement: action,
+    id,
+    fiche,
+    avant,
+    auteur: { id: request.user.id, nom: request.user.name },
+    profondeur: 0,
+  });
+};
+
 export default async function recordRoutes(app) {
   app.addHook("preHandler", authenticate);
 
@@ -299,6 +324,7 @@ export default async function recordRoutes(app) {
         recordId: record.id,
       });
     }
+    apresEcriture(request, names, { id: record.id, action: "creation", fiche: record.data });
     const avecAuteur = (await auteurs(request.tenantId, [record]))[0];
     return reply
       .code(201)
@@ -343,6 +369,17 @@ export default async function recordRoutes(app) {
     });
     data = execution.valeurs;
 
+    // L'état d'avant, pour les automatisations qui guettent un changement
+    // (« quand l'étape devient Gagnée ») — lu seulement si l'une écoute.
+    const avant = (await ecoute(request.tenantId, names.module, names.collection))
+      ? (
+          await prisma.record.findFirst({
+            where: { id: request.params.id, tenantId: request.tenantId, ...names },
+            select: { data: true },
+          })
+        )?.data ?? null
+      : null;
+
     // updateMany + filtre tenant : impossible de toucher la ligne d'un autre client.
     const revision = request.body?.updatedAt;
     if (revision && Number.isNaN(new Date(revision).getTime())) {
@@ -362,6 +399,7 @@ export default async function recordRoutes(app) {
     }
 
     const record = await prisma.record.findUnique({ where: { id: request.params.id } });
+    apresEcriture(request, names, { id: record.id, action: "modification", fiche: record.data, avant });
     if (execution.declenchees.length) {
       await journaliser(request, "nocode.automatisation", execution.app, {
         collection: names.collection,
@@ -422,6 +460,7 @@ export default async function recordRoutes(app) {
     }
 
     await prisma.record.delete({ where: { id: record.id } });
+    apresEcriture(request, names, { id: record.id, action: "suppression", fiche: record.data, avant: record.data });
 
     // Une suppression de donnée métier est irréversible — il n'y a pas de
     // corbeille pour les fiches. Elle a sa place au journal.

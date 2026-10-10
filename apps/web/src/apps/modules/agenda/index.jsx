@@ -87,7 +87,8 @@ function AgendaApp() {
     );
     setPropres(D.evenementsPropres(evenements));
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["agenda/*", "crm/activites", "projets/cartes", "rh/absences"] });
 
   // Tous les événements, filtrés par familles masquées.
   const evenements = useMemo(

@@ -71,7 +71,8 @@ function AchatsApp() {
     setFournisseurs(four);
     setCatalogue(ref);
   }, []);
-  const etat = useChargement(ouvert, charger);
+  // Rechargement en direct quand un collègue modifie ces collections.
+  const etat = useChargement(ouvert, charger, { ecoute: ["achats/*", "stock/articles"] });
 
   const stats = useMemo(
     () => D.statistiques(commandes, receptions, factures, paiements),

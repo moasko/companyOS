@@ -213,6 +213,45 @@ export const ouvrir = async (entree, { methode = "GET" } = {}) => {
   throw new ErreurWeb("Ce lien renvoie en boucle vers lui-même.", 508);
 };
 
+/// Poste un corps JSON vers une adresse externe (webhook d'automatisation).
+///
+/// Mêmes gardes que `ouvrir` — https uniquement, adresses publiques
+/// seulement, connexion épinglée sur l'IP vérifiée — mais **aucune
+/// redirection suivie** : un webhook qui redirige est refusé plutôt que de
+/// rejouer le corps ailleurs. Rend le code HTTP ; la réponse est ignorée.
+export const posterJson = async (entree, corps, entetes = {}) => {
+  const url = analyserUrl(entree);
+  if (url.protocol !== "https:") throw new ErreurWeb("Un webhook doit utiliser https://.");
+  const adresses = await resoudre(url.hostname);
+  const charge = Buffer.from(JSON.stringify(corps), "utf8");
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      url,
+      {
+        method: "POST",
+        lookup: (_host, options, cb) =>
+          options?.all ? cb(null, adresses) : cb(null, adresses[0].address, adresses[0].family),
+        headers: {
+          "user-agent": "CompanyOS-Webhook/1.0",
+          "content-type": "application/json",
+          "content-length": charge.length,
+          ...entetes,
+        },
+        timeout: 10_000,
+      },
+      (reponse) => {
+        reponse.resume();
+        resolve(reponse.statusCode);
+      },
+    );
+    req.on("timeout", () => req.destroy(new ErreurWeb("Le webhook n'a pas répondu à temps.", 504)));
+    req.on("error", (err) =>
+      reject(err instanceof ErreurWeb ? err : new ErreurWeb("Impossible de joindre le webhook.", 502)),
+    );
+    req.end(charge);
+  });
+};
+
 /// Un site peut refuser d'être affiché dans un cadre, et la plupart le
 /// font. Le dire avant d'essayer vaut mieux qu'une fenêtre blanche dont
 /// l'utilisateur ne peut rien déduire.

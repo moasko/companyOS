@@ -43,6 +43,7 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `UPLOAD_MAX_OCTETS` | `134217728` (défaut, 128 Mo) | taille maximale d'un fichier importé |
 | `MAIL_QUOTA_JOUR` | `500` (défaut) | plafond d'envoi par espace et par 24 h |
 | `PLATFORM_ADMINS` | `vous@companyos.fr` | les comptes exploitants (console Plateforme) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | vide (défaut : générées et rangées en base) | clés des notifications push ; `npx web-push generate-vapid-keys` pour les fixer |
 
 > `VITE_API_URL` est cuite **au build** — et les images sont construites
 > par GitHub Actions (`.github/workflows/images.yml`), pas par Dokploy. Sa
@@ -247,3 +248,16 @@ volumes traversent les redéploiements intacts.
 - **`migrate deploy` échoue** : la base n'était pas prête ; le
   `depends_on: service_healthy` l'attend, mais un premier démarrage très
   lent peut nécessiter un simple redéploiement.
+
+## Temps réel et plusieurs instances
+
+L'API ouvre un flux Server-Sent Events par onglet (`/api/evenements`) :
+notifications instantanées, rechargement des apps quand un collègue
+modifie une fiche. Rien à configurer derrière Traefik ; derrière un autre
+proxy, ne pas mettre en tampon les réponses `text/event-stream` (l'API
+envoie `X-Accel-Buffering: no`) et laisser les connexions ouvertes au moins
+60 s (un battement passe toutes les 25 s).
+
+Plusieurs instances de l'API peuvent tourner côte à côte : les événements
+passent par PostgreSQL (`LISTEN/NOTIFY`), les jetons d'URL et le verrou de
+connexion sont en base. Une seule base, aucun Redis à ajouter.
