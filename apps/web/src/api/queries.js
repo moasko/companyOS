@@ -54,7 +54,7 @@ export const cles = {
   usage: () => ["usage"],
   membres: () => ["membres"],
   notifications: () => ["notifications"],
-  appsInstallees: () => ["apps", "installees"],
+  appsInstallees: (espace) => ["apps", "installees", espace ?? null],
   catalogue: () => ["apps", "catalogue"],
 };
 
@@ -163,9 +163,13 @@ export const useNotifications = () =>
     refetchInterval: 60_000,
   });
 
-export const useAppsInstallees = () =>
+// La liste dépend de la session : avant la connexion la requête échouerait
+// et resterait en cache, et le panneau « Aujourd'hui » n'apparaissait
+// qu'après un rechargement. On l'attache donc à la personne et à l'espace.
+export const useAppsInstallees = ({ userId, tenantId } = {}) =>
   useQuery({
-    queryKey: cles.appsInstallees(),
+    queryKey: cles.appsInstallees(userId && tenantId ? `${tenantId}:${userId}` : null),
     queryFn: () => api.installedApps(),
+    enabled: Boolean(userId && tenantId),
     staleTime: 5 * 60_000,
   });
