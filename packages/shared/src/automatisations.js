@@ -42,6 +42,32 @@ export const TYPES_ACTION = [
   "tache",
   "courriel",
   "webhook",
+  {
+    id: "courriel-devis",
+    titre: "Demande de devis reçue → tâche dans Projets",
+    description:
+      "Un courriel reçu dont l'objet parle de devis crée une tâche de suivi et prévient les administrateurs.",
+    apps: ["courrier", "projets"],
+    automatisation: {
+      nom: "Demandes de devis par courriel",
+      declencheur: { module: "courrier", collection: "recus", evenement: "creation" },
+      conditions: [{ champ: "sujet", operateur: "contient", valeur: "devis" }],
+      actions: [
+        {
+          type: "tache",
+          titre: "Devis demandé — {{fiche.deNom}}",
+          description: "Courriel de {{fiche.deEmail}} : « {{fiche.sujet}} ». Répondre sous 48 h.",
+          echeance: "{{date:+2}}",
+        },
+        {
+          type: "notifier",
+          destinataires: { mode: "admins" },
+          titre: "Demande de devis de {{fiche.deNom}}",
+          message: "{{fiche.sujet}}",
+        },
+      ],
+    },
+  },
 ];
 
 /// À qui s'adresse une notification ou un courriel.
@@ -546,6 +572,12 @@ export const COLLECTIONS = [
     collection: "mouvements",
     libelle: "Stock · Mouvements",
     champs: ["articleId", "quantite", "sens", "entrepotId", "date"],
+  },
+  {
+    module: "courrier",
+    collection: "recus",
+    libelle: "Courrier · Courriels reçus",
+    champs: ["deEmail", "deNom", "sujet", "texte", "boite", "adresseBoite", "pieces"],
   },
 ];
 

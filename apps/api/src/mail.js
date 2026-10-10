@@ -28,7 +28,7 @@ import { resoudre } from "./web.js";
 /// Un secret chiffré illisible — clé de chiffrement changée — vaut chaîne
 /// vide : l'authentification échouera proprement plutôt que d'envoyer le
 /// chiffré comme mot de passe au relais.
-const motDePasseClair = (pass) => {
+export const motDePasseClair = (pass) => {
   if (!pass) return "";
   if (!String(pass).startsWith("v1.")) return String(pass);
   return dechiffrer(pass) ?? "";
@@ -129,7 +129,7 @@ export const mailActif = () => transporteur !== null;
 /// annuler.
 export const envoyerVia = async (
   transport,
-  { de, a, cc, sujet, texte, html, piecesJointes, entetes },
+  { de, a, cc, cci, sujet, texte, html, piecesJointes, entetes, messageId, inReplyTo, references, repondreA },
 ) => {
   if (!transport) return { envoye: false, erreur: "Aucun relais SMTP configuré." };
   try {
@@ -137,12 +137,19 @@ export const envoyerVia = async (
       from: de || env.mailFrom,
       to: a,
       cc: cc || undefined,
+      bcc: cci || undefined,
       subject: sujet,
       text: texte,
       html,
       attachments: piecesJointes,
       // En-têtes propres à l'envoi de masse (List-Unsubscribe…).
       headers: entetes || undefined,
+      // Fil de discussion : le destinataire range la réponse sous le
+      // message d'origine, et sa propre réponse revient dans le bon fil.
+      messageId: messageId || undefined,
+      inReplyTo: inReplyTo || undefined,
+      references: references?.length ? references : undefined,
+      replyTo: repondreA || undefined,
     });
     return { envoye: true };
   } catch (err) {

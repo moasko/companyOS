@@ -45,6 +45,7 @@ const REJOUABLES = [
   "20261010210000_sso",
   "20261010230000_liens_publics",
   "20261011120000_detection_intrusion",
+  "20261011150000_courriels",
 ];
 
 const prisma = new PrismaClient();

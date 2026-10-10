@@ -33,7 +33,12 @@ export const classerResultats = (elements, requete, limite = 12) =>
     .map((element, ordre) => ({
       ...element,
       ordre,
-      score: scoreRecherche(requete, `${element.titre} ${element.mots || ""}`),
+      // Le titre prime : sinon une app « Courrier » (mots-clés en plus)
+      // passerait derrière un dossier nommé exactement « Courrier ».
+      score: Math.max(
+        scoreRecherche(requete, element.titre || ""),
+        scoreRecherche(requete, `${element.titre} ${element.mots || ""}`) - 1,
+      ),
     }))
     .filter((element) => element.score > 0)
     .sort((a, b) => b.score - a.score || a.ordre - b.ordre)

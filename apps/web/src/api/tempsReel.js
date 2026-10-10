@@ -19,6 +19,7 @@ export const EVT_FICHES = "companyos:fiches";
 export const EVT_NOTIFICATION = "companyos:notification-serveur";
 export const EVT_ETAT = "companyos:temps-reel";
 export const EVT_CLOUD = "companyos:cloud";
+export const EVT_COURRIER = "companyos:courrier";
 
 let source = null;
 let connecte = false;
@@ -82,6 +83,11 @@ const ouvrir = () => {
     if (lire(e).client === CLIENT_ID) return;
     clearTimeout(attenteCloud);
     attenteCloud = setTimeout(() => window.dispatchEvent(new Event(EVT_CLOUD)), 400);
+  });
+
+  // Nouveaux courriels, ou une boîte modifiée ailleurs.
+  source.addEventListener("courrier", (e) => {
+    window.dispatchEvent(new CustomEvent(EVT_COURRIER, { detail: lire(e) }));
   });
 
   source.addEventListener("notification", () => {

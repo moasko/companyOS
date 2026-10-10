@@ -292,6 +292,29 @@ export const api = {
   courrierEnregistrerReglages: (data) =>
     request("/courrier/reglages", { method: "PUT", body: data }),
   courrierEnvoyer: (data) => request("/courrier/envoyer", { method: "POST", body: data }),
+  /// Messagerie (voir apps/api/src/routes/messagerie.js).
+  messagerie: {
+    boites: () => request("/courrier/boites"),
+    creerBoite: (b) => request("/courrier/boites", { method: "POST", body: b }),
+    modifierBoite: (id, b) => request(`/courrier/boites/${id}`, { method: "PUT", body: b }),
+    supprimerBoite: (id) => request(`/courrier/boites/${id}`, { method: "DELETE" }),
+    synchroniser: (id) => request(`/courrier/boites/${id}/synchroniser`, { method: "POST", body: {} }),
+    tester: (imap) => request("/courrier/boites/tester", { method: "POST", body: imap }),
+    conversations: (filtres = {}) =>
+      request(`/courrier/courriels?${new URLSearchParams(Object.entries(filtres).filter(([, v]) => v != null && v !== ""))}`),
+    fil: (filId) => request(`/courrier/fils/${encodeURIComponent(filId)}`),
+    courriel: (id) => request(`/courrier/courriels/${id}`),
+    maj: (corps) => request("/courrier/courriels", { method: "PATCH", body: corps }),
+    supprimer: (id) => request(`/courrier/courriels/${id}`, { method: "DELETE" }),
+    viderCorbeille: () => request("/courrier/corbeille", { method: "DELETE" }),
+    compteurs: () => request("/courrier/compteurs"),
+    lier: (id, lien) => request(`/courrier/courriels/${id}/liens`, { method: "POST", body: lien }),
+    creerBrouillon: (m) => request("/courrier/brouillons", { method: "POST", body: m }),
+    majBrouillon: (id, m) => request(`/courrier/brouillons/${id}`, { method: "PUT", body: m }),
+    envoyer: (m) => request("/courrier/messages", { method: "POST", body: m }),
+    contexte: (email) => request(`/courrier/contexte?email=${encodeURIComponent(email)}`),
+    contacts: (q = "") => request(`/courrier/contacts?q=${encodeURIComponent(q)}`),
+  },
 
   // Campagnes — e-mail de test (vrai rendu, membres de l'équipe), pause et
   // reprise d'un envoi, adresse du formulaire d'inscription public.
