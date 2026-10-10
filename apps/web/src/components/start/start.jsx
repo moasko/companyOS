@@ -23,6 +23,10 @@ const NOMS_SHELL = new Set(icones.map((a) => a.name));
 /// Les visionneuses (photos, PDF, vidéo…) : montées pour ouvrir les
 /// fichiers, jamais proposées comme des applications.
 const IDS_SYSTEME = new Set(modulesSysteme.map(cleApp));
+/// Outils d'administration parmi elles (Automatisations) : épinglés pour
+/// les administrateurs, qui sinon ne les trouvaient que dans « Toutes les
+/// apps ».
+const IDS_ADMIN = new Set(modulesSysteme.filter((m) => m.admin).map(cleApp));
 const MAX_EPINGLEES = 18;
 
 const TEXTES = {
@@ -115,6 +119,8 @@ export const StartMenu = () => {
   // Tout cela se calcule ici, à partir des tranches brutes, sans y toucher.
   const menu = useSelector((state) => state.startmenu);
   const appsBrutes = useSelector((state) => state.apps);
+  const role = useSelector((state) => state.session.user?.role);
+  const estAdmin = role === "OWNER" || role === "ADMIN";
 
   const t = useTraduction(TEXTES);
   const nomApp = useNomApp();
@@ -132,7 +138,7 @@ export const StartMenu = () => {
     // le Gestionnaire de tâches, et aucune des applications pour lesquelles
     // on paie l'abonnement.
     const metier = fenetres
-      .filter((a) => !IDS_SYSTEME.has(a.id) && !NOMS_SHELL.has(a.name))
+      .filter((a) => (!IDS_SYSTEME.has(a.id) || (estAdmin && IDS_ADMIN.has(a.id))) && !NOMS_SHELL.has(a.name))
       .sort(parNom);
     const socle = SOCLE_EPINGLE.map((nom) => fenetres.find((a) => a.name === nom)).filter(
       Boolean,
@@ -149,7 +155,7 @@ export const StartMenu = () => {
     // plus récente à la plus ancienne. « Recommandé » recopiait jusqu'ici
     // la liste épinglée, mot pour mot.
     const rcApps = fenetres
-      .filter((a) => a.ouvert && !IDS_SYSTEME.has(a.id))
+      .filter((a) => a.ouvert && (!IDS_SYSTEME.has(a.id) || IDS_ADMIN.has(a.id)))
       .sort((a, b) => b.ouvert - a.ouvert)
       .slice(0, 6)
       .map((app) => ({
@@ -174,7 +180,7 @@ export const StartMenu = () => {
     }
 
     return { ...menu, pnApps, rcApps, contApps: parLettre, allApps: toutes };
-  }, [menu, appsBrutes, nomApp, langue]);
+  }, [menu, appsBrutes, nomApp, langue, estAdmin]);
 
   const dispatch = useDispatch();
   const [centreCle, setCentreCle] = useState(0);

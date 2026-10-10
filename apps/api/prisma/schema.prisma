@@ -723,3 +723,61 @@ model LienPartage {
   @@index([tenantId])
   @@map("liens_partage")
 }
+
+/// Détection d'intrusion (src/detection.js) : une alerte levée par une
+/// règle — force brute sur un compte, bourrage d'identifiants, codes de
+/// double authentification en échec, sondes d'attaque, balayage, accès
+/// refusés en rafale, nouvel appareil. `tenantId` vide : l'alerte concerne
+/// la plateforme (une IP qui sonde le serveur), pas un espace.
+model AlerteSecurite {
+  id        String    @id @default(cuid())
+  tenantId  String?
+  userId    String?
+  email     String?
+  type      String
+  /// info | moyenne | haute | critique
+  gravite   String
+  ip        String?
+  agent     String?
+  details   Json?
+  creeLe    DateTime  @default(now())
+  traiteLe  DateTime?
+  traitePar String?
+
+  @@index([tenantId, creeLe])
+  @@index([creeLe])
+  @@index([ip, creeLe])
+  @@map("alertes_securite")
+}
+
+/// Signaux bruts (échecs de connexion, codes erronés) gardés 24 h : les
+/// règles les comptent sur une fenêtre, toutes instances confondues.
+model SignalSecurite {
+  id       String   @id @default(cuid())
+  type     String
+  ip       String?
+  cle      String?
+  tenantId String?
+  existe   Boolean  @default(true)
+  creeLe   DateTime @default(now())
+
+  @@index([type, cle, creeLe])
+  @@index([type, ip, creeLe])
+  @@index([creeLe])
+  @@map("signaux_securite")
+}
+
+/// Adresses bloquées : automatiquement par une règle, ou à la main par
+/// l'exploitant. Une récidive allonge le blocage suivant.
+model IpBloquee {
+  ip        String   @id
+  motif     String
+  jusqua    DateTime
+  manuel    Boolean  @default(false)
+  parEmail  String?
+  recidives Int      @default(0)
+  creeLe    DateTime @default(now())
+
+  @@index([jusqua])
+  @@map("ips_bloquees")
+}

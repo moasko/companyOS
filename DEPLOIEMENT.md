@@ -43,6 +43,8 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `UPLOAD_MAX_OCTETS` | `134217728` (défaut, 128 Mo) | taille maximale d'un fichier importé |
 | `MAIL_QUOTA_JOUR` | `500` (défaut) | plafond d'envoi par espace et par 24 h |
 | `PLATFORM_ADMINS` | `vous@companyos.fr` | les comptes exploitants (console Plateforme) |
+| `IDS_ACTIF` | `true` (défaut) | détection d'intrusion et blocage automatique des adresses ; `false` pour la couper |
+| `IDS_IPS_CONFIANCE` | vide (défaut) | adresses jamais bloquées automatiquement (supervision, sortie Internet du siège), séparées par des virgules |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | vide (défaut : générées et rangées en base) | clés des notifications push ; `npx web-push generate-vapid-keys` pour les fixer |
 
 > `VITE_API_URL` est cuite **au build** — et les images sont construites
@@ -69,6 +71,34 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 > maquiller les adresses du journal d'audit et contourner la limitation de
 > débit. Laissé à `0`, c'est l'inverse : toutes les requêtes comptent comme
 > venant du proxy, donc d'une seule IP.
+>
+> Depuis Fastify 5.12, un nombre seul passé à `trustProxy` est ignoré :
+> l'API voyait alors l'adresse du proxy pour tout le monde. `TRUST_PROXY=1`
+> est désormais interprété par l'API elle-même (`src/reseau.js`) : un saut
+> de confiance, **à condition** qu'il vienne d'un réseau privé (le réseau
+> Docker de Traefik). On peut aussi donner une liste d'adresses ou de
+> plages (`10.0.0.0/8,172.16.0.0/12`).
+
+## Détection d'intrusion
+
+L'API repère les tentatives d'intrusion (`apps/api/src/detection.js`) :
+
+| Règle | Seuil | Réaction |
+|---|---|---|
+| Mots de passe en série sur un compte | 5 en 15 min | alerte haute, administrateurs et personne visée prévenus |
+| Bourrage d'identifiants | une IP échoue sur 10 comptes (dont 5 inexistants) en 15 min | alerte critique, IP bloquée |
+| Codes de double authentification erronés | 3 en 15 min | alerte haute : le mot de passe est connu de quelqu'un |
+| Connexion juste après une série d'échecs | — | alerte critique |
+| Nouvel appareil | IP et navigateur jamais vus depuis 90 jours | alerte info, la personne est prévenue |
+| Recherche de failles (`/.env`, `/.git`, `wp-admin`, `../`, injection SQL…) | 5 en 10 min | IP bloquée |
+| Balayage (404) | 40 en 1 min | alerte |
+| Accès refusés en série (401/403) | 30 en 5 min pour un compte | alerte |
+
+Un blocage dure 1 h, puis 6 h, 24 h et 7 jours en cas de récidive ; il est
+partagé par toutes les instances. Les alertes se lisent dans **Plateforme ›
+Sécurité** (toute la plateforme, blocage et déblocage manuels) et dans
+**Paramètres › Sécurité** (alertes de l'espace, pour ses administrateurs).
+Les signaux bruts sont gardés 24 h, les alertes 180 jours.
 
 ## 4. Domaines
 

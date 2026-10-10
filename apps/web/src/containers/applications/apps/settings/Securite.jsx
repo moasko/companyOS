@@ -35,6 +35,111 @@ const appareil = (agent = "") => {
 const quand = (date) =>
   new Date(date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
+const GRAVITES = {
+  critique: "Critique",
+  haute: "Haute",
+  moyenne: "Moyenne",
+  info: "Info",
+};
+
+/// Détection d'intrusion, vue de l'espace : les tentatives qui visent ses
+/// comptes (mots de passe en série, codes erronés, nouveaux appareils,
+/// refus en rafale). Les alertes graves sont aussi envoyées en
+/// notification aux administrateurs. Voir apps/api/src/detection.js.
+const AlertesSecurite = ({ flash }) => {
+  const [donnees, setDonnees] = useState(null);
+  const [toutes, setToutes] = useState(false);
+
+  const charger = useCallback(async () => {
+    try {
+      setDonnees(await api.securiteAlertes(toutes ? {} : { etat: "ouvertes" }));
+    } catch (err) {
+      flash(err.message);
+    }
+  }, [toutes, flash]);
+  useEffect(() => {
+    charger();
+  }, [charger]);
+
+  const traiter = async (a) => {
+    try {
+      await api.securiteTraiter(a.id);
+      await charger();
+    } catch (err) {
+      flash(err.message);
+    }
+  };
+  const toutTraiter = async () => {
+    try {
+      const r = await api.securiteTraiterTout();
+      flash(`${r.traitees} alerte${r.traitees > 1 ? "s" : ""} marquée${r.traitees > 1 ? "s" : ""} comme traitée${r.traitees > 1 ? "s" : ""}`);
+      await charger();
+    } catch (err) {
+      flash(err.message);
+    }
+  };
+
+  const alertes = donnees?.alertes || [];
+  const jour = donnees?.resume?.jour || {};
+  const graves = (jour.haute || 0) + (jour.critique || 0);
+
+  return (
+    <>
+      <div className="setSubTitle">Alertes de sécurité</div>
+      <p className="setHint">
+        Tentatives d'intrusion visant les comptes de l'espace : mots de passe essayés en série,
+        codes de double authentification erronés, connexions depuis un nouvel appareil, accès
+        refusés en rafale. Les adresses qui attaquent sont bloquées automatiquement.
+      </p>
+      <Row
+        title={
+          graves
+            ? `${graves} alerte${graves > 1 ? "s" : ""} grave${graves > 1 ? "s" : ""} ces dernières 24 h`
+            : "Aucune alerte grave ces dernières 24 h"
+        }
+        desc={`${Object.values(jour).reduce((t, n) => t + n, 0)} alerte(s) au total sur 24 h`}
+      >
+        <div className="setActionsRow">
+          <div className="setBtnGhost handcr" onClick={() => setToutes((v) => !v)}>
+            {toutes ? "À traiter seulement" : "Voir l'historique"}
+          </div>
+          {!toutes && alertes.length ? (
+            <div className="setBtnGhost handcr" onClick={toutTraiter}>
+              Tout marquer comme traité
+            </div>
+          ) : null}
+        </div>
+      </Row>
+      <div className="setList">
+        {alertes.map((a) => (
+          <div className="setRow setAlerte" key={a.id} data-gravite={a.gravite} data-traitee={!!a.traiteLe}>
+            <div className="setRowText">
+              <div className="setRowTitle">
+                {a.titre} <span className="setBadge setGravite" data-gravite={a.gravite}>{GRAVITES[a.gravite] || a.gravite}</span>
+              </div>
+              <div className="setRowDesc">{a.message}</div>
+              <div className="setRowDesc">
+                {quand(a.creeLe)}
+                {a.traiteLe ? ` · traitée par ${a.traitePar || "?"}` : ""}
+              </div>
+            </div>
+            {!a.traiteLe ? (
+              <div className="setBtnGhost handcr" onClick={() => traiter(a)}>
+                Traitée
+              </div>
+            ) : null}
+          </div>
+        ))}
+        {donnees && !alertes.length ? (
+          <div className="setRow">
+            <div className="setRowDesc">{toutes ? "Aucune alerte enregistrée." : "Rien à traiter."}</div>
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+};
+
 /// Paramètres → Sécurité : double authentification, sessions ouvertes,
 /// jetons d'outils, et (propriétaire) obligation dans tout l'espace.
 export const SectionSecurite = ({ section, session, flash: flashParent }) => {
@@ -247,6 +352,8 @@ export const SectionSecurite = ({ section, session, flash: flashParent }) => {
       ) : null}
 
       {["OWNER", "ADMIN"].includes(session.user?.role) && visible ? <ReglageSso session={session} flash={flash} /> : null}
+
+      {["OWNER", "ADMIN"].includes(session.user?.role) && visible ? <AlertesSecurite flash={flash} /> : null}
 
       <div className="setSubTitle">Sessions ouvertes</div>
       <p className="setHint">

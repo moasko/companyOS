@@ -131,6 +131,16 @@ export const Settings = () => {
   const [fondsPerso, setFondsPerso] = useState([]);
 
   const [section, setSection] = useState("systeme");
+
+  // Une notification « Sécurité » ouvre directement la bonne rubrique
+  // (voir suivreLien dans src/apps/notifications.js).
+  useEffect(() => {
+    const surLien = (e) => {
+      if (e.detail?.app === "settings" && e.detail.params?.section) setSection(e.detail.params.section);
+    };
+    window.addEventListener("companyos:lien", surLien);
+    return () => window.removeEventListener("companyos:lien", surLien);
+  }, []);
   const [installed, setInstalled] = useState([]);
   const [usage, setUsage] = useState(null);
   const [dossiers, setDossiers] = useState([]);

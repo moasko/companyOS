@@ -1050,3 +1050,27 @@ body[data-theme="dark"] .setRetirer:hover {
   color: var(--set-muted);
   font-style: italic;
 }
+
+// Alertes de sécurité (Paramètres › Sécurité) : la gravité se lit à la
+// couleur de la pastille, une alerte traitée s'efface.
+.settingsApp {
+  .setGravite[data-gravite="critique"],
+  .setGravite[data-gravite="haute"] {
+    background: rgb(217 48 37 / 12%);
+    color: #c5221f;
+  }
+
+  .setGravite[data-gravite="moyenne"] {
+    background: rgb(176 96 0 / 12%);
+    color: #b06000;
+  }
+
+  .setGravite[data-gravite="info"] {
+    background: rgb(26 115 232 / 10%);
+    color: #1a73e8;
+  }
+
+  .setAlerte[data-traitee="true"] {
+    opacity: 0.6;
+  }
+}
