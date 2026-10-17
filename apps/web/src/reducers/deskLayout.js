@@ -4,7 +4,7 @@
 // deux entreprises qui partagent un poste ne se renvoient pas leurs
 // dispositions à la figure.
 
-export const GRID = { x: 82, y: 92, top: 12, left: 12 };
+export const GRID = { x: 88, y: 96, top: 14, left: 12 };
 
 const cle = (tenantId) => `desktop-layout:${tenantId || "anonyme"}`;
 

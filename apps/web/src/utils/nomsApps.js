@@ -122,3 +122,63 @@ export const useNomApp = () => {
   const code = useLangue();
   return useMemo(() => (app) => nomAppDans(app, code), [code]);
 };
+
+// ---------------------------------------------------------------------------
+// Noms courts des icônes
+// ---------------------------------------------------------------------------
+//
+// Sous une icône (bureau, écran d'accueil du téléphone), le nom tient sur
+// une seule ligne d'environ douze caractères. Les noms longs y sont
+// remplacés par un nom court ; le nom complet reste celui des fenêtres,
+// des menus et de l'infobulle de l'icône.
+const COURTS_FR = {
+  explorer: "Fichiers",
+  taskmanager: "Moniteur",
+  rh: "RH",
+  frais: "Frais",
+  automatisations: "Automatiser",
+  word: "Texte",
+  winWord: "Texte",
+  presentation: "Diapos",
+  qrcode: "QR Code",
+  "editeur-factures": "Facture pro",
+  editeurFactures: "Facture pro",
+  clipboard: "Copies",
+  pressepapiers: "Copies",
+  imageEditor: "Images",
+  comptabilite: "Compta",
+  tableur: "CSV",
+  pdf: "PDF",
+  objet3d: "3D",
+  mcp: "MCP",
+};
+const COURTS_EN = {
+  explorer: "Files",
+  taskmanager: "Monitor",
+  rh: "HR",
+  automatisations: "Automate",
+  word: "Docs",
+  winWord: "Docs",
+  presentation: "Slides",
+  qrcode: "QR Code",
+  "editeur-factures": "Invoice pro",
+  editeurFactures: "Invoice pro",
+  clipboard: "Clipboard",
+  imageEditor: "Images",
+  caisse: "POS",
+  tableur: "CSV",
+  pdf: "PDF",
+  objet3d: "3D",
+  mcp: "MCP",
+};
+const COURTS = { fr: COURTS_FR, en: COURTS_EN };
+
+/// Le nom court d'une icône dans une langue donnée (le nom d'affichage
+/// complet s'il est déjà court).
+export const nomCourtDans = (app, code) => COURTS[code]?.[cle(app)] || nomAppDans(app, code);
+
+/// Version réactive du nom court.
+export const useNomCourt = () => {
+  const code = useLangue();
+  return useMemo(() => (app) => nomCourtDans(app, code), [code]);
+};

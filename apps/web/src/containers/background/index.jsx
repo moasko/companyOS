@@ -98,10 +98,53 @@ const TEXTES = {
   },
 };
 
+/// Fonds livrés clairs : le nom des icônes s'y écrit en foncé.
+const FONDS_CLAIRS = ["clair/", "prairie/", "ambre/"];
+
+/// Luminosité moyenne d'une image (0 à 1), ou null si elle est illisible
+/// (image d'une autre origine sans CORS : le canevas refuse de la lire).
+const luminosite = (url) =>
+  new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = 16;
+        c.height = 16;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const { data } = ctx.getImageData(0, 0, 16, 16);
+        let somme = 0;
+        for (let i = 0; i < data.length; i += 4) somme += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        resolve(somme / (data.length / 4) / 255);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+
 export const Background = () => {
   const wall = useSelector((state) => state.wallpaper);
   // Un fond importé par l'utilisateur prime sur les fonds livrés.
   const perso = useSelector((state) => state.appearance.wallUrl);
+
+  // Le bureau dit si son fond est clair ou sombre : les noms des icônes
+  // n'ont plus de pastille, leur couleur suit donc le fond (voir
+  // startmenu.scss, [data-fond]).
+  useEffect(() => {
+    let actif = true;
+    const poser = (clair) => {
+      if (actif) document.documentElement.dataset.fond = clair ? "clair" : "sombre";
+    };
+    if (perso) luminosite(perso).then((l) => poser(l != null && l > 0.6));
+    else poser(FONDS_CLAIRS.some((f) => String(wall.src || "").startsWith(f)));
+    return () => {
+      actif = false;
+    };
+  }, [perso, wall.src]);
 
   return (
     <div

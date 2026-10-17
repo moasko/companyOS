@@ -129,8 +129,8 @@
 .dskApp {
   position: absolute;
   // La taille suit le réglage « Taille des icônes » des Paramètres.
-  height: calc(84px * var(--dskScale, 1));
-  width: calc(74px * var(--dskScale, 1));
+  height: calc(86px * var(--dskScale, 1));
+  width: calc(82px * var(--dskScale, 1));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -165,35 +165,40 @@
 
   .dskIcon img {
     object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgb(0 0 0 / 22%));
   }
 
-  // Le nom doit se lire sur n'importe quel fond d'écran. Du texte blanc
-  // avec une ombre légère disparaissait sur les fonds clairs (celui par
-  // défaut compris). Une pastille sombre translucide derrière le texte,
-  // comme les noms d'icônes de macOS, le rend lisible partout ; l'ombre
-  // renforcée garde le relief sur les fonds sombres.
+  // Le nom : une seule ligne, petit, sans pastille — comme sur un
+  // téléphone. Il reste lisible sur un fond clair grâce à une ombre
+  // portée double (nette + diffuse). Un nom trop long se termine par des
+  // points de suspension ; il est entier dans l'infobulle.
   .appName {
-    max-width: 100%;
+    width: 100%;
+    margin-top: 6px;
+    padding: 0 2px;
+    box-sizing: border-box;
     text-align: center;
     color: #fff;
-    margin-top: 5px;
-    padding: 1px 6px;
-    border-radius: 6px;
-    background: rgb(15 20 30 / 42%);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    text-shadow: 0 1px 2px rgb(0 0 0 / 55%);
-    line-height: 1.3;
-    // Un nom d'un seul mot plus large que la case (« Automatisations »)
-    // débordait de sa pastille : il se coupe avec un trait d'union.
-    overflow-wrap: break-word;
-    hyphens: auto;
+    font-size: calc(11.5px * var(--dskScale, 1));
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow:
+      0 1px 2px rgb(0 0 0 / 70%),
+      0 0 8px rgb(0 0 0 / 35%);
   }
+}
 
-  &:focus .appName,
-  &[data-selected="true"] .appName {
-    background: rgb(20 90 180 / 75%);
-  }
+// Fond d'écran clair : nom en encre foncée, halo blanc pour les zones
+// colorées du fond.
+:root[data-fond="clair"] .dskApp .appName {
+  color: #1d2433;
+  text-shadow:
+    0 1px 1px rgb(255 255 255 / 80%),
+    0 0 10px rgb(255 255 255 / 70%);
 }
 
 .startMenu {

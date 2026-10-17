@@ -19,7 +19,7 @@ import {
   oublierApercu,
 } from "../../containers/applications/apps/assets/FileThumb";
 import { useTraduction } from "../../utils/intl";
-import { useNomApp } from "../../utils/nomsApps";
+import { useNomApp, useNomCourt } from "../../utils/nomsApps";
 import { localeEffective } from "../../utils/langue";
 import { Calendrier } from "./Calendrier";
 import "./searchpane.scss";
@@ -149,6 +149,7 @@ export const DesktopApp = () => {
   const epinglesBarre = useSelector((state) => state.taskbar.epingles);
   const t = useTraduction(TEXTES);
   const nomApp = useNomApp();
+  const nomCourt = useNomCourt();
 
   // Les outils d'administration (Automatisations) n'ont pas d'icône de
   // bureau par défaut : les administrateurs ne les trouvaient que par la
@@ -680,10 +681,10 @@ export const DesktopApp = () => {
                 }
                 payload={app.payload || "full"}
                 pr
-                width={Math.round(deskApps.size * 36)}
+                width={Math.round(deskApps.size * 42)}
                 menu="app"
               />
-              <div className="appName">{nomApp(app)}</div>
+              <div className="appName" title={nomApp(app)}>{nomCourt(app)}</div>
             </div>
           );
         })}
