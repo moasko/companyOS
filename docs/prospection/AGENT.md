@@ -5,6 +5,15 @@ L'agent tourne chaque jour ouvré. Il travaille avec la boîte
 consigne chaque envoi dans [`envois.csv`](envois.csv). Toute personne qui
 reprend la main sur la prospection lit ce fichier d'abord.
 
+## Les agents en service (créés le 17/10/2026)
+
+| Agent | Quand | Ce qu'il fait |
+| --- | --- | --- |
+| **Écoute boîte CompanyOS** | Toutes les 2 h, de 8 h à 20 h, tous les jours (heure d'Abidjan) | Lit les messages entrants : rebonds, « stop », réponses. Alerte l'utilisateur sur son téléphone à chaque vraie réponse et propose un texte de réponse. N'envoie rien. |
+| **Prospection CompanyOS** | Du lundi au vendredi, à 8 h 53 | Relances J+4 et J+10, puis jusqu'à 10 nouveaux prospects, et un rapport. |
+
+Les deux agents tournent dans la session Claude Code qui les a créés. Pour les mettre en pause ou les arrêter : demander « mets en pause la prospection » dans cette session, ou passer par la liste des tâches planifiées de claude.ai.
+
 ## Ce que fait chaque passage, dans cet ordre
 
 1. **Lire la boîte de réception** depuis le dernier passage.
