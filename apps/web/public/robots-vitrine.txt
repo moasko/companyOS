@@ -1,0 +1,13 @@
+# CompanyOS — vitrine (companyos.fr). Servi à la place de robots.txt sur
+# le domaine nu par nginx.conf : seule la page de présentation et ses
+# images ont vocation à être indexées. L'application vit sur app.
+# et garde le robots.txt qui interdit tout.
+
+User-agent: *
+Allow: /$
+Allow: /landing.html
+Allow: /img/landing/
+Allow: /favicon.png
+Disallow: /
+
+Sitemap: https://companyos.fr/sitemap.xml

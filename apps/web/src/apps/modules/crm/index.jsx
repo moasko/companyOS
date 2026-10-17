@@ -636,7 +636,7 @@ function CrmApp() {
   const importerComptes = async (fichier) => {
     if (!fichier) return;
     const texte = await fichier.text();
-    const [entetes = [], ...lignes] = lireCsv(texte);
+    const { entetes = [], lignes = [] } = lireCsv(texte);
     const colonnes = devinerColonnes(entetes);
     const existants = [...d.clients];
     let crees = 0;
