@@ -9,6 +9,8 @@ recherche web.
 | [`prospects.csv`](prospects.csv) | Liste de cibles, importable telle quelle dans le CRM de CompanyOS |
 | [`emails.md`](emails.md) | Emails et messages WhatsApp prêts à envoyer, par segment, avec relances |
 | [`envois-vague-1.md`](envois-vague-1.md) | Les 10 premiers emails, entièrement rédigés pour chaque destinataire |
+| [`envois.csv`](envois.csv) | Journal de chaque email envoyé : date, adresse, étape, statut |
+| [`AGENT.md`](AGENT.md) | Règles de l'agent de prospection automatique |
 | [`partenaires.md`](partenaires.md) | Programme partenaire pour cabinets comptables et intégrateurs |
 | [`contenu.md`](contenu.md) | Publications LinkedIn et Facebook, fiche Google, communiqué de presse |
 
