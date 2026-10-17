@@ -7,6 +7,7 @@ import { modal } from "../../modalRequest";
 import { accesDonnees } from "../../donnees";
 import { envoyerA } from "../../notifications";
 import { useEnDirect } from "../../chargement";
+import { plusJours, prochainNumero, today } from "@companyos/shared/facturation";
 import {
   COLONNES_PAR_DEFAUT,
   FILTRE_VIDE,
@@ -508,14 +509,9 @@ function ProjetsApp() {
     const clientId = carteOuverte?.data.liens?.clientId;
     if (!clientId) return flash("Rattachez d'abord un client à cette carte.");
 
-    const numeros = factures
-      .map((f) => f.data.numero)
-      .filter((n) => /^\d{4}-\d+$/.test(n || ""));
-    const annee = new Date().getFullYear();
-    const suivant = numeros.length
-      ? Math.max(...numeros.map((n) => Number(n.split("-")[1]))) + 1
-      : 1;
-    const numero = `${annee}-${String(suivant).padStart(3, "0")}`;
+    // Même numérotation que la Facturation (FAC-AAAA-NNNN), et des lignes
+    // au format qu'elle lit (qte, pu HT, tva) : sinon la facture affichait 0 F.
+    const numero = prochainNumero(factures, "facture");
 
     const ok = await modal.confirm({
       title: "Créer la facture",
@@ -529,13 +525,20 @@ function ProjetsApp() {
 
     try {
       const facture = await donnees.creer("facturation", "factures", {
+        type: "facture",
         numero,
         clientId,
+        clientNom: clientDe(clientId)?.data.nom || "",
+        clientEntreprise: clientDe(clientId)?.data.entreprise || "",
+        clientEmail: clientDe(clientId)?.data.email || "",
+        clientVille: clientDe(clientId)?.data.ville || "",
+        clientTelephone: clientDe(clientId)?.data.telephone || "",
         statut: "brouillon",
-        date: new Date().toISOString().slice(0, 10),
-        lignes: [
-          { designation: carteOuverte.data.titre, quantite: 1, prix: 0 },
-        ],
+        date: today(),
+        echeance: plusJours(30),
+        devise: "XOF",
+        remiseGlobale: 0,
+        lignes: [{ designation: carteOuverte.data.titre, qte: 1, pu: 0, remise: 0, tva: 18 }],
       });
       await majCarte(carteOuverte, {
         liens: { ...carteOuverte.data.liens, factureId: facture.id },
