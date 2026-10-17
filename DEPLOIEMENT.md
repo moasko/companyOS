@@ -205,6 +205,9 @@ commerciale, chef de projet, magasinier, caissière) partagent le même mot
 de passe, pour montrer les droits de chacun. Sans `--mot-de-passe`, un mot
 de passe est tiré au hasard et affiché.
 
+En local (depuis la racine du projet, avec `apps/api/.env` renseigné et
+la base démarrée) : `npm run demo -- --mot-de-passe "Choisissez-en-un"`.
+
 Les dates suivent le jour de création : relancez avec `--reinitialiser`
 avant une présentation pour repartir d'une démo propre et datée du jour.
 La commande refuse d'effacer un espace qui ne s'appelle pas « Akwaba
