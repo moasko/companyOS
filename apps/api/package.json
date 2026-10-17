@@ -9,6 +9,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "exploitant": "node src/exploitant.js",
+    "demo": "node src/demo/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "node prisma/reparer-migrations.js && prisma migrate deploy",

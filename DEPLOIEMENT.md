@@ -187,6 +187,30 @@ puis changez-le dans Paramètres → Compte. Relancée sur un compte existant,
 elle remplace son mot de passe et ferme toutes ses sessions — c'est la
 procédure de reprise en cas de mot de passe perdu.
 
+### Espace de démonstration (présentations)
+
+Un espace complet et réaliste, « Akwaba Distribution » (grossiste à
+Abidjan), se crée depuis le même terminal :
+
+```bash
+node src/demo/index.js --email demo@companyos.fr --mot-de-passe "Choisissez-en-un"
+```
+
+Toutes les applications sont installées et remplies : six mois de
+factures et de règlements, caisse et stock, CRM (comptes, affaires,
+tâches du jour), comptabilité tenue et TVA déclarée, paie de trois mois,
+congés, notes de frais, achats, agenda, projets, campagnes, courriels,
+fichiers du cloud, automatisations. Six comptes (gérante, comptable,
+commerciale, chef de projet, magasinier, caissière) partagent le même mot
+de passe, pour montrer les droits de chacun. Sans `--mot-de-passe`, un mot
+de passe est tiré au hasard et affiché.
+
+Les dates suivent le jour de création : relancez avec `--reinitialiser`
+avant une présentation pour repartir d'une démo propre et datée du jour.
+La commande refuse d'effacer un espace qui ne s'appelle pas « Akwaba
+Distribution ». Les adresses des clients sont fictives et rien n'est
+envoyé (campagnes terminées ou en brouillon, relances éteintes).
+
 ## 8. Données et sauvegardes
 
 L'état de la plateforme vit dans la base PostgreSQL (comptes et toutes les
