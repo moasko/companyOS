@@ -27,6 +27,8 @@ reprend la main sur la prospection lit ce fichier d'abord.
 - **Jamais** une adresse Gmail, Yahoo ou Hotmail au nom d'une personne, une adresse deviné à partir d'un format (`prenom.nom@`), ou une adresse masquée sur ZoomInfo, RocketReach ou ContactOut.
 - **Jamais de particuliers**, et jamais de grande entreprise ou de groupe coté : CompanyOS vise les PME.
 - **Avant tout envoi**, chercher l'adresse dans `envois.csv` et dans le dossier `INBOX.Sent`. Si l'entreprise ou son domaine a déjà été contacté, on n'envoie pas.
+- Commencer chaque passage par les adresses de [`file-attente.csv`](file-attente.csv) (prospects déjà trouvés mais pas encore contactés), puis les retirer de ce fichier une fois envoyés.
+- Une première campagne vers des agences françaises a eu lieu le 15/10 (voir `envois.csv`) : ne pas les recontacter avec les arguments ivoiriens.
 
 ## Comment on écrit
 
