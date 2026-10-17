@@ -15,7 +15,8 @@
     "./courrier": "./src/courrier.js",
     "./facturation": "./src/facturation.js",
     "./paie": "./src/paie.js",
-    "./paie-cycle": "./src/paie-cycle.js"
+    "./paie-cycle": "./src/paie-cycle.js",
+    "./livraisons": "./src/livraisons.js"
   },
   "files": [
     "src"

@@ -20,6 +20,7 @@ import { totaux as totauxFacture } from "@companyos/shared/facturation";
 import { RECETTES, validerAutomatisation } from "@companyos/shared/automatisations";
 import { ecritureDeBulletin } from "@companyos/shared/paie";
 import { calculer, saisieInitiale } from "@companyos/shared/paie-cycle";
+import { depuisFacture, ordonnerArrets, COMMUNES } from "@companyos/shared/livraisons";
 import { arrondi, calendrier, csv, hasard, id, pdfTexte } from "./outils.js";
 import { CACHET_PNG, LOGO_PNG, vignette } from "./images.js";
 
@@ -510,10 +511,23 @@ export const construireDemo = ({ tenantId, membres, maintenant = new Date() }) =
     extra: { editeur: true, mode: "standard", modele: "officiel", couleur: "", conditions: "net30", conditionsTexte: "Paiement à 30 jours", moyenPaiement: "virement", afficherLogo: true, afficherSignature: true, montantEnLettres: true },
   });
 
+  // Les cinq dernières factures émises ne sont pas encore livrées : trois
+  // partent en tournée aujourd'hui (app Livraisons), deux attendent d'être
+  // planifiées (« factures à livrer »). Leur stock sortira à la remise.
+  const nonLivrees = factures
+    .filter((f) => f.data.type === "facture" && !["brouillon", "annule"].includes(f.data.statut) && !f.data.editeur && f.data.lignes.some((l) => l.articleId))
+    // Rien qui contienne l'article en rupture : on ne promet pas ce qu'on n'a plus.
+    .filter((f) => !f.data.lignes.some((l) => articles.find((a) => a.id === l.articleId)?.cible === 0))
+    .sort((a, b) => b.data.date.localeCompare(a.data.date))
+    .slice(0, 5)
+    // Assinie (80 km) ne part pas au tricycle : elle reste « à livrer ».
+    .sort((a, b) => Number(a.data.clientVille === "Assinie") - Number(b.data.clientVille === "Assinie"));
+
   // Sorties de stock des factures émises (hors brouillons, annulées, devis).
   for (const f of factures) {
     const d = f.data;
     if (d.type === "devis" || d.statut === "brouillon" || d.statut === "annule") continue;
+    if (nonLivrees.includes(f)) continue;
     for (const l of d.lignes) {
       const a = articles.find((x) => x.id === l.articleId);
       if (!a) continue;
@@ -589,7 +603,10 @@ export const construireDemo = ({ tenantId, membres, maintenant = new Date() }) =
   for (const a of articles) {
     const somme = mouvements.filter((m) => m.ref === a.reference).reduce((s, m) => s + m.delta, 0);
     const pertes = a.reference === casse.ref ? casse.perdus : 0;
-    const depart = Math.max(0, a.cible - somme + pertes);
+    // Les marchandises des factures pas encore livrées sont encore au
+    // dépôt : le stock visé est celui d'après leur livraison.
+    const aLivrer = nonLivrees.reduce((s, f) => s + f.data.lignes.filter((l) => l.articleId === a.id).reduce((t, l) => t + Number(l.qte), 0), 0);
+    const depart = Math.max(0, a.cible - somme + pertes + aLivrer);
     const lot = a.suiviLot ? { lot: `L${C.jour(-200).slice(2, 4)}${C.jour(-200).slice(5, 7)}-${a.reference.slice(0, 3)}`, peremption: C.jour(a.reference === "LAI-40" ? 21 : 200) } : {};
     mouvements.push({ date: C.jour(-200), ref: a.reference, delta: depart, data: { sens: "entree", quantite: depart, motif: "Stock initial (inventaire d'ouverture)", prixUnitaire: a.prixAchat, ...lot } });
   }
@@ -653,6 +670,140 @@ export const construireDemo = ({ tenantId, membres, maintenant = new Date() }) =
   for (const m of EQUIPE) embaucher({ ...m, userId: membres[m.cle].id, userEmail: membres[m.cle].email });
   for (const p of AUTRES_SALARIES) embaucher(p);
   const sal = (prenom) => salaries.find((s) => s.data.prenom === prenom);
+
+  // ---------------------------------------------------------------- Livraisons
+  // Deux livreurs (Fatou à moto, Ibrahim au tricycle), une fourgonnette
+  // dont l'assurance expire bientôt. Aujourd'hui : la tournée de Fatou est
+  // en cours, celle d'Ibrahim (trois factures) prête à partir, et quelques
+  // livraisons attendent d'être planifiées. Derrière, deux semaines
+  // d'historique pour les chiffres de performance.
+  {
+    const fatou = sal("Fatou");
+    const ibrahim = sal("Ibrahim");
+    const depot = { nom: "Dépôt Yopougon", commune: "Yopougon", adresse: "Zone industrielle, lot 112" };
+    ajouter("livraisons", "reglages", { depot }, { jour: -60, par: proprio.id });
+    const moto = ajouter("livraisons", "vehicules", { nom: "Moto 1 — Haojue", type: "moto", immatriculation: "4521 GH 01", livreurId: fatou.id, statut: "disponible", assuranceFin: C.jour(160), visiteFin: C.jour(95), kilometrage: 18450, prochaineVidange: 20000, notes: "" }, { jour: -90 });
+    const tricycle = ajouter("livraisons", "vehicules", { nom: "Tricycle — Apsonic", type: "tricycle", immatriculation: "7712 FK 01", livreurId: ibrahim.id, statut: "disponible", assuranceFin: C.jour(220), visiteFin: C.jour(40), kilometrage: 9620, prochaineVidange: 10000, notes: "" }, { jour: -90 });
+    ajouter("livraisons", "vehicules", { nom: "Fourgonnette — Toyota Hiace", type: "fourgonnette", immatriculation: "2290 EB 01", livreurId: "", statut: "disponible", assuranceFin: C.jour(12), visiteFin: C.jour(-4), kilometrage: 86300, prochaineVidange: 85000, notes: "" }, { jour: -300 });
+
+    const nom = (s) => `${s.data.prenom} ${s.data.nom}`;
+    const an = C.annee;
+    let nLiv = 0;
+    let nTrn = 0;
+    const numero = (p) => `${p}-${an}-${String(p === "LIV" ? ++nLiv : ++nTrn).padStart(4, "0")}`;
+    const signature = (k) => ({ traits: [Array.from({ length: 18 }, (_, i) => ({ x: 6 + i * 7, y: Math.round(30 + Math.sin(i / 2 + k) * 14) })), Array.from({ length: 8 }, (_, i) => ({ x: 40 + i * 9, y: 52 + (i % 2) * 3 }))], largeur: 136, hauteur: 64 });
+    const histo = (etapes) => etapes.map(([statut, jour, heure, par, note]) => ({ statut, le: C.instant(jour, heure, H.entier(0, 59)).toISOString(), par, ...(note ? { note } : {}) }));
+    const LIBRES = [
+      ["Mme Adjoua Konan", "Cocody", "Riviera 3, cité Les Rosiers villa 14", "Face à la pharmacie des Rosiers", [["Pack eau minérale 1,5 L × 6", 4]], 9200],
+      ["Restaurant Chez Ambroise", "Marcory", "Rue Paul Langevin", "Derrière la station Shell", [["Riz parfumé 25 kg", 2], ["Huile végétale 5 L", 3]], 0],
+      ["M. Diomandé Lassina", "Yopougon", "Sideci, rue 12", "Après le marché, portail vert", [["Savon de Marseille × 12", 2]], 7800],
+      ["Boutique Awa Shop", "Adjamé", "Marché Gouro, allée C", "Boutique n° 58", [["Sucre en morceaux 1 kg", 20]], 21000],
+      ["Mlle Kouadio Prisca", "Deux-Plateaux", "Rue des Jardins, résidence Lys", "Immeuble bleu, 3e étage", [["Jus de bissap 1 L × 6", 2]], 11500],
+      ["Pâtisserie Le Fournil", "Plateau", "Avenue Chardy", "En face de la BICICI", [["Farine de blé 1 kg", 25], ["Lait en poudre 400 g", 10]], 0],
+      ["M. Gnahoré Didier", "Koumassi", "Remblais, rue 6", "À côté de l'école primaire", [["Pack eau minérale 1,5 L × 6", 6]], 13800],
+      ["Mme Touré Salimata", "Angré", "8e tranche, villa 211", "Près du château d'eau", [["Café moulu 250 g", 6], ["Sucre en morceaux 1 kg", 4]], 16400],
+      ["Bureau Ivoire Services", "Plateau", "Immeuble Alpha 2000, 9e", "Accueil, demander Mme Kra", [["Ramette papier A4", 10]], 0],
+      ["Maquis Le Bon Coin", "Treichville", "Avenue 16, rue 21", "À l'angle, enseigne rouge", [["Jus de bissap 1 L × 6", 5]], 24500],
+      ["M. Bakayoko Issa", "Abobo", "Abobo Baoulé, près du rond-point", "Maison jaune, appeler en arrivant", [["Riz parfumé 25 kg", 1]], 18500],
+      ["Mme Ehouman Laure", "Bingerville", "Cité Feh Kessé", "Derrière l'église Saint-Joseph", [["Huile végétale 5 L", 2], ["Savon de Marseille × 12", 1]], 15200],
+    ];
+    const telLibre = (i) => `+225 0${[5, 7, 1][i % 3]} ${String(11 + i * 3).padStart(2, "0")} ${String(40 + i * 5).slice(-2)} ${String(20 + i * 7).slice(-2)} ${String(60 + i).slice(-2)}`;
+    const MOYENS_LIV = ["especes", "orange", "wave", "especes", "mtn", "wave"];
+    const livraisonLibre = (i, extra) => {
+      const [clientNom, commune, adresse, repere, colis, montant] = LIBRES[i % LIBRES.length];
+      return { type: "livraison", statut: "a_planifier", date: C.jour(0), creneau: { debut: "08:00", fin: "18:00" }, priorite: "normale", clientId: "", clientNom, contact: clientNom.replace(/^(Restaurant|Boutique|Pâtisserie|Bureau|Maquis)\s/, "") === clientNom ? clientNom : "", telephone: telLibre(i), commune, adresse, repere, gps: null, colis: colis.map(([designation, qte]) => ({ designation, qte, articleId: "" })), factureId: "", factureNumero: "", montantAEncaisser: montant, instructions: "", tourneeId: "", ordre: 0, livreurId: "", historique: [], ...extra };
+    };
+
+    // Historique : 12 jours ouvrés, une ou deux tournées par jour.
+    let k = 0;
+    for (let j = -14; j <= -1; j++) {
+      if (C.jourSemaine(j) === 0) continue;
+      for (const [s, v] of [[fatou, moto], [ibrahim, tricycle]]) {
+        if (s === ibrahim && j % 3 !== 0) continue;
+        const tid = id();
+        const nb = s === fatou ? 3 + (Math.abs(j) % 3) : 2;
+        const arrets = Array.from({ length: nb }, () => livraisonLibre(k++, {}));
+        const ordonnes = ordonnerArrets(arrets, COMMUNES[depot.commune]);
+        ordonnes.forEach((l, i) => {
+          const echec = (k + i) % 11 === 0;
+          const moyen = MOYENS_LIV[(k + i) % MOYENS_LIV.length];
+          const h = 9 + i;
+          Object.assign(l, {
+            numero: numero("LIV"),
+            date: C.jour(j),
+            statut: echec ? "echec" : "livree",
+            tourneeId: tid,
+            livreurId: s.id,
+            ordre: i + 1,
+            ...(echec
+              ? { echec: { motif: (k + i) % 2 ? "absent" : "injoignable", note: "", le: C.instant(j, h, 20).toISOString() } }
+              : {
+                  preuve: { recuPar: l.contact || l.clientNom, signature: signature(i), photo: null, note: "", le: C.instant(j, h, 25).toISOString() },
+                  ...(l.montantAEncaisser ? { encaissement: { montant: l.montantAEncaisser, moyen, reference: moyen === "especes" ? "" : `${moyen.toUpperCase()}${String(48213 + k * 7 + i).padStart(6, "0")}`, le: C.instant(j, h, 25).toISOString() } } : {}),
+                }),
+            historique: histo([["a_planifier", j - 1, 16, "Esther N'Guessan"], ["planifiee", j, 8, "Aïcha Koné"], ["en_route", j, 8, nom(s)], [echec ? "echec" : "livree", j, h, nom(s)]]),
+          });
+          ajouter("livraisons", "livraisons", l, { jour: j - 1, heure: 16, par: membres.esther.id });
+        });
+        ajouter("livraisons", "tournees", { numero: numero("TRN"), date: C.jour(j), livreurId: s.id, vehiculeId: v, statut: "terminee", notes: "", demarreeLe: C.instant(j, 8, 10).toISOString(), termineeLe: C.instant(j, 9 + nb, 40).toISOString() }, { jour: j, heure: 7, par: proprio.id, rid: tid });
+      }
+    }
+
+    // Aujourd'hui — Fatou, en tournée : deux arrêts faits, deux à faire.
+    const tFatou = id();
+    const arretsFatou = ordonnerArrets([0, 4, 7, 2].map((i) => livraisonLibre(i, {})), COMMUNES[depot.commune]);
+    arretsFatou.forEach((l, i) => {
+      const fait = i < 2;
+      Object.assign(l, {
+        numero: numero("LIV"),
+        statut: fait ? "livree" : "en_route",
+        tourneeId: tFatou,
+        livreurId: fatou.id,
+        ordre: i + 1,
+        creneau: i === 2 ? { debut: "12:00", fin: "17:00" } : { debut: "08:00", fin: "12:00" },
+        ...(fait
+          ? {
+              preuve: { recuPar: l.contact || l.clientNom, signature: signature(i), photo: null, note: "", le: C.instant(0, 9 + i, 15).toISOString() },
+              ...(l.montantAEncaisser ? { encaissement: { montant: l.montantAEncaisser, moyen: i ? "wave" : "orange", reference: `MP${String(260001 + i)}`, le: C.instant(0, 9 + i, 15).toISOString() } } : {}),
+            }
+          : {}),
+        historique: histo([["a_planifier", -1, 15, "Esther N'Guessan"], ["planifiee", 0, 7, "Aïcha Koné"], ["en_route", 0, 8, nom(fatou)], ...(fait ? [["livree", 0, 9 + i, nom(fatou)]] : [])]),
+      });
+      ajouter("livraisons", "livraisons", l, { jour: -1, heure: 15, par: membres.esther.id });
+    });
+    ajouter("livraisons", "tournees", { numero: numero("TRN"), date: C.jour(0), livreurId: fatou.id, vehiculeId: moto, statut: "en_cours", notes: "Récupérer les cartons vides chez Awa Shop.", demarreeLe: C.instant(0, 8, 5).toISOString() }, { jour: 0, heure: 7, par: proprio.id, rid: tFatou });
+
+    // Aujourd'hui — Ibrahim, prêt à partir avec trois factures.
+    const tIbrahim = id();
+    const deFactures = nonLivrees.slice(0, 3).map((f) => {
+      const c = clients.find((x) => x.id === f.data.clientId);
+      return { ...depuisFacture(f, { client: c ? { data: c } : null, reglements, jour: C.jour(0) }), _f: f };
+    });
+    ordonnerArrets(deFactures, COMMUNES[depot.commune]).forEach((l, i) => {
+      delete l._f;
+      Object.assign(l, {
+        numero: numero("LIV"),
+        statut: "planifiee",
+        tourneeId: tIbrahim,
+        livreurId: ibrahim.id,
+        ordre: i + 1,
+        commune: l.commune || "Marcory",
+        repere: i === 0 ? "Entrée fournisseurs, côté parking" : "",
+        instructions: i === 0 ? "Livrer au magasin, demander le chef de rang." : "",
+        historique: histo([["a_planifier", -1, 17, "Yao Kouassi"], ["planifiee", 0, 7, "Aïcha Koné"]]),
+      });
+      ajouter("livraisons", "livraisons", l, { jour: -1, heure: 17, par: membres.yao.id });
+    });
+    ajouter("livraisons", "tournees", { numero: numero("TRN"), date: C.jour(0), livreurId: ibrahim.id, vehiculeId: tricycle, statut: "planifiee", notes: "" }, { jour: 0, heure: 7, par: proprio.id, rid: tIbrahim });
+
+    // À planifier : trois commandes reçues ce matin, dont une urgente et une
+    // d'hier non livrée.
+    [[3, {}], [9, { priorite: "urgente", creneau: { debut: "12:00", fin: "14:00" }, instructions: "Pour le service de midi." }], [10, { date: C.jour(-1) }]].forEach(([i, extra]) => {
+      const l = livraisonLibre(i, { numero: numero("LIV"), ...extra });
+      l.historique = histo(extra.date ? [["a_planifier", -2, 16, "Esther N'Guessan"], ["planifiee", -1, 8, "Aïcha Koné"], ["echec", -1, 15, "Fatou Ouattara", "Client absent"], ["a_planifier", -1, 17, "Aïcha Koné", "Reprogrammée"]] : [["a_planifier", 0, 8, "Esther N'Guessan"]]);
+      ajouter("livraisons", "livraisons", l, { jour: extra.date ? -2 : 0, heure: 8, par: membres.esther.id });
+    });
+  }
 
   ajouter("rh", "reglages", { acquisParMois: 2.2, joursOuvres: [1, 2, 3, 4, 5, 6], feries: [`${C.annee}-01-01`, `${C.annee}-05-01`, `${C.annee}-08-07`, `${C.annee}-08-15`, `${C.annee}-11-01`, `${C.annee}-11-15`, `${C.annee}-12-25`] }, { jour: -300 });
   const absences = [];
