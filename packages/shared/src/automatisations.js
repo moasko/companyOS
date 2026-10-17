@@ -548,6 +548,12 @@ export const COLLECTIONS = [
     champs: ["articleId", "quantite", "sens", "entrepotId", "date"],
   },
   {
+    module: "livraisons",
+    collection: "livraisons",
+    libelle: "Livraisons",
+    champs: ["numero", "statut", "date", "clientNom", "telephone", "commune", "livreurId", "montantAEncaisser", "factureId"],
+  },
+  {
     module: "courrier",
     collection: "recus",
     libelle: "Courrier · Courriels reçus",

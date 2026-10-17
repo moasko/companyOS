@@ -206,6 +206,14 @@ const apps = [
     kind: "NATIVE",
   },
   {
+    slug: "livraisons",
+    name: "Livraisons",
+    description: "Tournées et livreurs, preuve de livraison, encaissement mobile money, WhatsApp.",
+    icon: "livraison",
+    category: "Gestion",
+    kind: "NATIVE",
+  },
+  {
     slug: "rh",
     name: "Ressources humaines",
     description: "Salariés, contrats, congés et absences.",
