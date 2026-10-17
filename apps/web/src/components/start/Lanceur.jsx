@@ -4,7 +4,7 @@ import { ouvrirCorbeille } from "../../apps/explorerRequest";
 import { fenetre } from "../../apps/windows";
 import { modulesSysteme } from "../../apps/registry";
 import { Icon } from "../../utils/general";
-import { useNomApp } from "../../utils/nomsApps";
+import { useNomApp, useNomCourt } from "../../utils/nomsApps";
 import { useTelephone } from "../../utils/telephone";
 import { Ligne, dateDuJour, useLignesDuJour } from "./Aujourdhui";
 import "./lanceur.scss";
@@ -54,6 +54,7 @@ export const Lanceur = () => {
   const telephone = useTelephone();
   const dispatch = useDispatch();
   const nomApp = useNomApp();
+  const nomCourt = useNomCourt();
   const connecte = useSelector((s) => s.session.status === "authenticated");
   const verrouille = useSelector((s) => s.wallpaper.locked);
   const session = useSelector((s) => s.session);
@@ -132,7 +133,7 @@ export const Lanceur = () => {
               onClick={() => ouvrir(app)}
             >
               <Icon src={app.name === "Corbeille" ? "bin0" : app.icon} width={46} />
-              <span>{nomApp(app)}</span>
+              <span title={nomApp(app)}>{nomCourt(app)}</span>
             </button>
           ))}
         </nav>
