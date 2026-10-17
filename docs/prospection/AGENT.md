@@ -31,10 +31,11 @@ reprend la main sur la prospection lit ce fichier d'abord.
 ## Comment on écrit
 
 - Expéditeur affiché : « L'équipe CompanyOS ». Signature : `L'équipe CompanyOS` · `https://companyos.fr · team@companyos.fr`.
-- Texte brut, 120 à 200 mots, vouvoiement. **Une phrase sur l'entreprise** tirée de sa page (quartier, activité, ancienneté), puis 3 ou 4 bénéfices choisis pour son secteur, puis **une seule demande** : 15 minutes de démo.
+- Texte brut, 150 à 250 mots, vouvoiement. **Une phrase sur l'entreprise** tirée de sa page (quartier, activité, ancienneté), puis 3 ou 4 bénéfices choisis pour son secteur, puis **une seule demande** : 15 minutes de démo.
 - Modèles par segment : [`emails.md`](emails.md) et [`envois-vague-1.md`](envois-vague-1.md).
+- **Deux blocs obligatoires** dans chaque email, premier comme relance : « Vos données sont à vous » (sécurité, sauvegarde, aucune donnée vendue ni partagée, export) et « Le cercle CompanyOS » (invitation choisie, 50 places, avantages). Le texte est dans `emails.md` § 7. Ne jamais aller au-delà de ce qui y est écrit.
 - Pied de page obligatoire : « Vous ne souhaitez plus recevoir de message de notre part ? Répondez « stop », nous ne vous écrirons plus. »
-- **Offres autorisées** (validées le 17/10/2026) : formule Découverte gratuite ; Pro à 15 000 F/mois pour 15 utilisateurs ; 6 mois de Pro offerts aux structures d'accompagnement et à leurs entrepreneurs ; commission de 20 % récurrente pour les cabinets et agences partenaires ; atelier gratuit. **Aucune autre promesse** : pas de remise, pas de fonction qui n'existe pas dans le dépôt.
+- **Offres autorisées** (validées le 17/10/2026) : formule Découverte gratuite ; Pro à 15 000 F/mois pour 15 utilisateurs ; 6 mois de Pro offerts aux structures d'accompagnement et à leurs entrepreneurs ; commission de 20 % récurrente pour les cabinets et agences partenaires ; atelier gratuit ; Cercle des entreprises fondatrices (50 places, avantages de `emails.md` § 7). **Aucune autre promesse** : pas de remise, pas de fonction qui n'existe pas dans le dépôt.
 - N'affirmer une fonction que si elle existe dans `apps/web/src/apps/modules/`.
 
 ## Fin de passage

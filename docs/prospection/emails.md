@@ -208,3 +208,69 @@ du produit, et chaque réponse se rattache à la fiche du CRM. Gardez des
 envois **un par un ou par petits lots** (30 à 50 par jour), avec les
 variables de personnalisation. Une campagne de masse vers des inconnus
 ruine la réputation du domaine.
+
+---
+
+## 7. Blocs communs à placer dans chaque email (depuis le 17/10/2026)
+
+Chaque email de prospection contient ces deux blocs, adaptés en une ou deux
+phrases au secteur. On ne promet que ce qui est vrai dans le produit : voir
+`docs/SECURITE.md` et `DEPLOIEMENT.md` § 8.
+
+### Bloc « Vos données sont à vous »
+
+> Vos données restent les vôtres. Chaque entreprise dispose d'un espace
+> cloisonné, et les droits de chaque utilisateur sont contrôlés sur nos
+> serveurs. Les connexions sont chiffrées et les mots de passe ne sont jamais
+> stockés en clair. Chaque action est inscrite dans un journal que personne
+> ne peut réécrire. La base est sauvegardée chaque jour, et chaque copie est
+> vérifiée. Nous ne vendons ni ne partageons aucune de vos données. Vous
+> pouvez tout exporter à tout moment, et même faire héberger CompanyOS chez
+> vous.
+
+Version courte (une ligne) :
+
+> Vos données vous appartiennent : espace cloisonné, sauvegarde quotidienne
+> vérifiée, aucune donnée vendue ni partagée, export complet à tout moment.
+
+### Bloc « Le cercle CompanyOS »
+
+> Nous ne démarchons pas tout le monde. Nous choisissons des entreprises en
+> développement, à fort potentiel, et nous les invitons à rejoindre le
+> **Cercle des entreprises fondatrices de CompanyOS**, limité à 50
+> entreprises :
+> - une ligne directe avec l'équipe, et un support prioritaire ;
+> - un accès en avant-première aux nouvelles applications ;
+> - votre avis pèse sur nos priorités de développement ;
+> - une mise en avant de votre entreprise auprès de notre réseau de partenaires, si vous le souhaitez.
+
+> ⚠️ Ces avantages engagent CompanyOS : la limite de 50 places doit être
+> réelle (tenir la liste dans le CRM, étiquette `cercle`), et le support
+> prioritaire doit être assuré.
+
+### Relance J+4 (avec les deux blocs)
+
+**Objet :** Re: [objet du premier email]
+
+> Bonjour,
+>
+> Je me permets de revenir vers vous au sujet de CompanyOS. Deux points
+> reviennent souvent chez les dirigeants que nous rencontrons, alors je
+> préfère les préciser.
+>
+> **Vos données restent les vôtres.** Chaque entreprise a son espace
+> cloisonné, la base est sauvegardée chaque jour avec vérification de chaque
+> copie, et chaque action est tracée dans un journal inaltérable. Nous ne
+> vendons ni ne partageons aucune donnée, et vous pouvez tout exporter à
+> tout moment.
+>
+> **Nous ne contactons pas tout le monde.** [Entreprise] fait partie des
+> entreprises en développement que nous invitons dans le Cercle des
+> entreprises fondatrices de CompanyOS, limité à 50 entreprises : ligne
+> directe avec l'équipe, accès en avant-première aux nouvelles applications,
+> et votre avis compte dans nos priorités.
+>
+> 15 minutes de démonstration cette semaine, est-ce possible ?
+>
+> L'équipe CompanyOS
+> https://companyos.fr · team@companyos.fr
