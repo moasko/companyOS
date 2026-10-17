@@ -166,15 +166,17 @@ $barre: 62px;
     pointer-events: none;
   }
 
+  // Une seule ligne, comme sur un téléphone : un nom long se termine
+  // par des points de suspension.
   span {
-    max-width: 100%;
-    font-size: 12px;
+    width: 100%;
+    font-size: 11.5px;
+    font-weight: 500;
     line-height: 1.2;
     text-align: center;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
     text-shadow: 0 1px 3px rgb(0 0 0 / 50%);
   }
 

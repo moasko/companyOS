@@ -680,10 +680,10 @@ export const DesktopApp = () => {
                 }
                 payload={app.payload || "full"}
                 pr
-                width={Math.round(deskApps.size * 36)}
+                width={Math.round(deskApps.size * 42)}
                 menu="app"
               />
-              <div className="appName">{nomApp(app)}</div>
+              <div className="appName" title={nomApp(app)}>{nomApp(app)}</div>
             </div>
           );
         })}
