@@ -131,6 +131,12 @@ export const Settings = () => {
   const [fondsPerso, setFondsPerso] = useState([]);
 
   const [section, setSection] = useState("systeme");
+  // Serveur auto-hébergé : pas de formule à choisir, la rubrique disparaît.
+  const [autoHeberge, setAutoHeberge] = useState(false);
+  useEffect(() => {
+    api.serveur().then((x) => setAutoHeberge(!!x?.autoHeberge)).catch(() => {});
+  }, []);
+  const sections = autoHeberge ? SECTIONS.filter((x) => x.id !== "formule") : SECTIONS;
 
   // Une notification « Sécurité » ouvre directement la bonne rubrique
   // (voir suivreLien dans src/apps/notifications.js).
@@ -733,7 +739,7 @@ export const Settings = () => {
                 </div>
               </div>
 
-              {SECTIONS.map((s) => (
+              {sections.map((s) => (
                 <div
                   key={s.id}
                   className="setNavItem handcr"
@@ -829,6 +835,7 @@ export const Settings = () => {
 
               {/* ---------- Espace de travail ---------- */}
               <SectionEspace
+                autoHeberge={autoHeberge}
                 section={section}
                 setSection={setSection}
                 session={session}

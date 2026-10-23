@@ -4,6 +4,7 @@ import { Avatar } from "../../../../apps/Avatar";
 import { PLANS, ROLES, Row, formatBytes } from "./commun";
 
 export const SectionEspace = ({
+  autoHeberge,
   section,
   setSection,
   session,
@@ -32,6 +33,9 @@ export const SectionEspace = ({
     <p className="setHint">Identité de l'entreprise et abonnement</p>
 
     <Row title="Identifiant" desc={session.tenant?.slug || "—"} />
+    {autoHeberge ? (
+      <Row title="Stockage" desc={usage ? `${formatBytes(usage.usedBytes)} utilisés — limité par le disque du serveur` : "—"} />
+    ) : (
     <Row
       title="Formule"
       desc={`${PLANS[session.tenant?.plan] || "—"} · ${
@@ -46,6 +50,7 @@ export const SectionEspace = ({
         {PLANS[session.tenant?.plan] || "—"}
       </div>
     </Row>
+    )}
 
     <div className="setSubTitle">Nom de l'entreprise</div>
     {session.user?.role === "OWNER" ? (
