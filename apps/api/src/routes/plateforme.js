@@ -15,7 +15,13 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import { z } from "zod";
-import { prisma, serialize } from "../db.js";
+import os from "node:os";
+import { statfs } from "node:fs/promises";
+import { dansBase, listerBases, prisma, principal, serialize } from "../db.js";
+import { creerEntreprise, supprimerEntreprise } from "../entreprises.js";
+import { oublierAiguillage } from "../aiguillage.js";
+import { hashPassword, normaliserEmail } from "../auth.js";
+import { randomBytes } from "node:crypto";
 import { authenticate, exigerExploitant, revoquerSessions } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { FORMULES, formuleDe } from "../formules.js";
@@ -539,5 +545,97 @@ export default async function plateformeRoutes(app) {
       bucket: parsed.data.s3?.bucket,
     });
     return serialize({ actif: config.stockage, utilisable: config.utilisable });
+  });
+
+  // --- Serveur : la machine et ses entreprises (installation install.sh) --
+
+  /// La machine qui fait tourner CompanyOS : processeur, mémoire, disque —
+  /// ce qu'affiche « companyos statut », lisible depuis la console.
+  /// Les chiffres sont ceux de l'hôte (un conteneur partage son noyau).
+  app.get("/serveur", async () => {
+    const disque = await statfs(env.storageLocalPath).catch(() => null);
+    return {
+      version: process.env.COMPANYOS_VERSION || null,
+      domaine: env.domaine || null,
+      inscriptionOuverte: env.inscriptionOuverte,
+      systeme: {
+        coeurs: os.cpus().length,
+        charge: os.loadavg(),
+        memoireTotale: os.totalmem(),
+        memoireLibre: os.freemem(),
+        enLigneDepuis: os.uptime(),
+      },
+      disque: disque ? { total: disque.blocks * disque.bsize, libre: disque.bavail * disque.bsize } : null,
+    };
+  });
+
+  /// Toutes les entreprises du serveur : la principale, puis une par base.
+  /// Pour chacune : sa base et sa taille, ses membres, ses fiches, son
+  /// stockage, son adresse.
+  app.get("/entreprises", async () => {
+    const decrire = async (base) =>
+      dansBase(base, async () => {
+        const [taille] = await prisma.$queryRaw`SELECT pg_database_size(current_database())::bigint AS octets, current_database() AS nom`;
+        const tenants = await prisma.tenant.findMany({ select: { id: true, name: true, slug: true, usedBytes: true, createdAt: true }, orderBy: { createdAt: "asc" } });
+        const [membres, fiches] = await Promise.all([prisma.user.count(), prisma.record.count()]);
+        return {
+          slug: base?.slug ?? null,
+          principale: !base,
+          nom: base?.nom ?? tenants[0]?.name ?? "Entreprise principale",
+          espaces: tenants.length,
+          adresse: env.domaine ? `https://${base ? `${base.slug}.` : ""}${env.domaine}` : null,
+          base: taille.nom,
+          tailleBase: taille.octets,
+          stockage: tenants.reduce((n, t) => n + Number(t.usedBytes || 0), 0),
+          membres,
+          fiches,
+          creeLe: base?.creeLe ?? tenants[0]?.createdAt ?? null,
+        };
+      });
+    const lignes = [await decrire(null)];
+    for (const b of await listerBases()) {
+      lignes.push(await decrire(b).catch((e) => ({ slug: b.slug, nom: b.nom, base: b.nomBase, erreur: e.message })));
+    }
+    return serialize(lignes);
+  });
+
+  const schemaEntreprise = z.object({
+    nom: z.string().trim().min(2).max(80),
+    email: z.string().trim().email().max(160),
+    admin: z.string().trim().min(2).max(80),
+    slug: z.string().trim().max(40).regex(/^[a-z0-9-]*$/).optional(),
+  });
+
+  /// Ajoute une entreprise : sa base, son sous-domaine, son administrateur.
+  /// Le mot de passe de l'administrateur n'est rendu qu'une fois.
+  app.post("/entreprises", { config: { rateLimit: { max: 10, timeWindow: "1 hour" } } }, async (request, reply) => {
+    const parsed = schemaEntreprise.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Nom, adresse e-mail et nom de l'administrateur sont requis." });
+    const { nom, admin, slug } = parsed.data;
+    const email = normaliserEmail(parsed.data.email);
+    const motDePasse = randomBytes(18).toString("base64url");
+    const { base } = await creerEntreprise({ nom, slug: slug || undefined, email, nomAdmin: admin, passwordHash: await hashPassword(motDePasse) });
+    oublierAiguillage();
+    await journaliser(request, "plateforme.entreprise.creation", nom, { slug: base.slug, base: base.nomBase });
+    return reply.code(201).send({
+      slug: base.slug,
+      adresse: env.domaine ? `https://${base.slug}.${env.domaine}` : null,
+      email,
+      motDePasse,
+    });
+  });
+
+  /// Supprime une entreprise et sa base. Le corps doit répéter le
+  /// sous-domaine : un clic de travers ne suffit pas. Toutes les bases sont
+  /// sauvegardées juste avant.
+  app.delete("/entreprises/:slug", async (request, reply) => {
+    const slug = String(request.params.slug);
+    if (request.body?.confirmer !== slug) return reply.code(400).send({ error: "Confirmez en saisissant le sous-domaine de l'entreprise." });
+    if (!(await principal.baseEspace.findUnique({ where: { slug } }))) return reply.code(404).send({ error: "Entreprise inconnue." });
+    await sauvegarderBase("manuelle");
+    const b = await supprimerEntreprise(slug);
+    oublierAiguillage();
+    await journaliser(request, "plateforme.entreprise.suppression", b.nom, { slug, base: b.nomBase });
+    return { ok: true };
   });
 }

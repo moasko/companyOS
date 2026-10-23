@@ -382,6 +382,11 @@ export const api = {
   plateformeSante: () => request("/plateforme/sante"),
   /// Maintenance : état du serveur, caches, données expirées.
   plateformeMaintenance: () => request("/plateforme/maintenance"),
+  // Serveur (installation install.sh) : la machine et ses entreprises.
+  plateformeServeur: () => request("/plateforme/serveur"),
+  plateformeEntreprises: () => request("/plateforme/entreprises"),
+  plateformeCreerEntreprise: (data) => request("/plateforme/entreprises", { method: "POST", body: data }),
+  plateformeSupprimerEntreprise: (slug) => request(`/plateforme/entreprises/${encodeURIComponent(slug)}`, { method: "DELETE", body: { confirmer: slug } }),
   plateformeViderCaches: ({ noms = [], navigateurs = false } = {}) =>
     request("/plateforme/caches/vider", { method: "POST", body: { noms, navigateurs } }),
   plateformePurge: () => request("/plateforme/purge", { method: "POST", body: {} }),

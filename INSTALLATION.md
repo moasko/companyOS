@@ -132,6 +132,27 @@ sauvegardes de la nuit couvrent toutes les bases (`base-<date>.dump` pour
 la principale, `base-<sous-domaine>-<date>.dump` pour les autres), et
 `companyos restaurer <fichier>` restaure la bonne base d'après le nom.
 
+## La console du serveur
+
+Le compte administrateur créé à l'installation ouvre l'application
+**Plateforme** (double authentification obligatoire), onglet **Serveur** :
+
+- **la machine** : processeur, mémoire, disque, avec alerte au-delà de
+  90 % ; volume total des bases et des fichiers ;
+- **les entreprises** : pour chacune, son adresse, sa base de données et sa
+  taille, ses membres, ses fiches, ses fichiers ;
+- **ajouter une entreprise** en remplissant quatre champs (base,
+  sous-domaine et administrateur créés en une vingtaine de secondes, mot
+  de passe affiché une fois) ; **supprimer** une entreprise (sauvegarde de
+  toutes les bases juste avant, sous-domaine à retaper pour confirmer).
+
+Les onglets Santé, Sécurité et Maintenance donnent les sauvegardes, les
+tentatives d'intrusion et les caches. Mise à jour, restauration et
+journaux restent sur le serveur (`companyos …`) : l'application n'a
+volontairement aucun accès à Docker. La console ne s'ouvre que depuis le
+domaine principal : un compte d'une autre entreprise, même avec la même
+adresse e-mail, n'y a pas accès.
+
 ## Envoi des e-mails
 
 Facultatif : sans relais SMTP, les invitations fonctionnent par code.

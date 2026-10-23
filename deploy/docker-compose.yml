@@ -80,6 +80,7 @@ services:
       PUBLIC_URL: https://${DOMAINE}
       PUBLIC_API_URL: https://${DOMAINE}
       PLATFORM_ADMINS: ${ADMIN_EMAIL}
+      COMPANYOS_VERSION: ${COMPANYOS_VERSION:-latest}
       # Serveur privé : les espaces se créent depuis la console, pas par
       # inscription libre. `true` pour ouvrir l'inscription au public.
       INSCRIPTION_OUVERTE: ${INSCRIPTION_OUVERTE:-false}
