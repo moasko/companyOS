@@ -51,6 +51,7 @@ import { Stockage } from "./Stockage";
 import { Sante } from "./Sante";
 import { Securite } from "./Securite";
 import { Maintenance } from "./Maintenance";
+import { Serveur } from "./Serveur";
 import "./plateforme.scss";
 import { manifest as descriptif } from "./manifest";
 
@@ -65,6 +66,7 @@ const formatOctets = (n) => {
 
 const SECTIONS = [
   { id: "bord", label: "Tableau de bord", icone: "faGaugeHigh" },
+  { id: "serveur", label: "Serveur", icone: "faServer" },
   { id: "espaces", label: "Espaces clients", icone: "faBuilding" },
   { id: "stockage", label: "Stockage", icone: "faCloud" },
   { id: "sante", label: "Santé", icone: "faHeartPulse" },
@@ -460,6 +462,7 @@ function PlateformeApp() {
                     ) : null}
 
                     {section === "maintenance" ? <Maintenance /> : null}
+                    {section === "serveur" ? <Serveur /> : null}
 
                     {section === "stockage" ? (
                       stockage ? (

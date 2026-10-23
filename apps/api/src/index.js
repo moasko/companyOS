@@ -4,7 +4,8 @@ import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "./env.js";
-import { prisma } from "./db.js";
+import { deconnecterTout, prisma } from "./db.js";
+import { aiguillerRequete } from "./aiguillage.js";
 import { idDuJeton } from "./auth.js";
 import authRoutes from "./routes/auth.js";
 import appRoutes from "./routes/apps.js";
@@ -63,6 +64,11 @@ const app = Fastify({
 // que l'API et doit pouvoir afficher les images et les vidéos servies par
 // `/api/files`. Le contrôle d'accès reste porté par le jeton, pas par
 // l'en-tête.
+// Une base par entreprise — voir src/db.js et src/aiguillage.js. Tout ce
+// qui suit (crochets et routes) s'exécute dans la base de l'entreprise de
+// l'adresse visitée.
+app.addHook("onRequest", aiguillerRequete);
+
 // Détection d'intrusion — voir src/detection.js. En premier : une adresse
 // bloquée ne va pas plus loin, pas même jusqu'à la limitation de débit.
 app.addHook("onRequest", filtrerIntrusions);
@@ -207,7 +213,7 @@ const shutdown = async () => {
   arreterSynchroCourriel();
   arreterEnvoisProgrammes();
   await arreterBus();
-  await prisma.$disconnect();
+  await deconnecterTout();
   process.exit(0);
 };
 

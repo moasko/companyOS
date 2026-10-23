@@ -25,7 +25,7 @@
 // peuvent pas diverger d'un centime.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { prisma } from "./db.js";
+import { pourChaqueBase, prisma } from "./db.js";
 import { env } from "./env.js";
 import { creerTransporteur, creerTransporteurEspace, envoyerVia } from "./mail.js";
 import { journaliser } from "./audit.js";
@@ -246,6 +246,6 @@ const relancerEspace = async (installation) => {
 /// Démarre le moteur : un passage peu après le démarrage — le temps que
 /// tout soit en place — puis toutes les six heures.
 export const demarrerRelances = () => {
-  setTimeout(() => passerLesRelances().catch(() => {}), 30 * 1000);
-  setInterval(() => passerLesRelances().catch(() => {}), 6 * 60 * 60 * 1000);
+  setTimeout(() => pourChaqueBase(passerLesRelances).catch(() => {}), 30 * 1000);
+  setInterval(() => pourChaqueBase(passerLesRelances).catch(() => {}), 6 * 60 * 60 * 1000);
 };

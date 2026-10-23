@@ -21,6 +21,9 @@ name: Images
 on:
   push:
     branches: [master, main]
+    # Une étiquette v1.2.0 publie aussi les images 1.2.0 et 1.2 : une
+    # installation peut s'y fixer (install.sh --version v1.2.0).
+    tags: ["v*"]
   # Permet de reconstruire à la demande — utile après un changement de
   # domaine, puisque l'URL de l'API est figée dans le build du shell.
   workflow_dispatch:
@@ -72,8 +75,10 @@ jobs:
         with:
           images: ${{ steps.nom.outputs.image }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
 
       - uses: docker/build-push-action@v6
         with:

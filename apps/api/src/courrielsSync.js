@@ -1,7 +1,7 @@
 import net from "node:net";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
-import { prisma } from "./db.js";
+import { pourChaqueBase, prisma } from "./db.js";
 import { env } from "./env.js";
 import { resoudre } from "./web.js";
 import { motDePasseClair } from "./mail.js";
@@ -292,8 +292,8 @@ export const releverTout = async () => {
 
 export const demarrerSynchroCourriel = () => {
   if (minuteur || process.env.COURRIER_RELEVE === "false") return;
-  setTimeout(() => releverTout().catch(() => {}), 20_000).unref?.();
-  minuteur = setInterval(() => releverTout().catch((e) => console.error("Relève du courrier :", e.message)), RELEVE_MS);
+  setTimeout(() => pourChaqueBase(releverTout).catch(() => {}), 20_000).unref?.();
+  minuteur = setInterval(() => pourChaqueBase(releverTout).catch((e) => console.error("Relève du courrier :", e.message)), RELEVE_MS);
   minuteur.unref?.();
 };
 

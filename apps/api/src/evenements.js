@@ -1,7 +1,8 @@
 import { EventEmitter } from "node:events";
 import pg from "pg";
 import { env } from "./env.js";
-import { prisma } from "./db.js";
+// Propre au serveur, pas à une entreprise : toujours la base principale.
+import { principal as prisma } from "./db.js";
 
 /// Le bus d'événements de l'espace : « une fiche a changé », « vous avez
 /// une notification », « les automatisations ont été modifiées ».

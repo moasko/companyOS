@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
-import { BASE_URL, api, apiFetch } from "../../../api/client";
+import { BASE_URL, ORIGINE_API, api, apiFetch } from "../../../api/client";
 import { modal } from "../../modalRequest";
 import "./mcp.scss";
 import { manifest as descriptif } from "./manifest";
@@ -86,7 +86,7 @@ function McpApp() {
           args: [serveurPath],
           startup_timeout_sec: 30,
           env: {
-            COMPANYOS_API_URL: BASE_URL,
+            COMPANYOS_API_URL: ORIGINE_API,
             COMPANYOS_TOKEN: jetonAffiche,
             COMPANYOS_ALLOW_WRITES: ecriture ? "1" : "0",
           },
@@ -101,8 +101,8 @@ function McpApp() {
     null,
     2,
   );
-  const toml = `[mcp_servers.companyos]\ncommand = '${nodePath}'\nargs = ['${serveurPath}']\nstartup_timeout_sec = 30\n\n[mcp_servers.companyos.env]\nCOMPANYOS_API_URL = '${BASE_URL}'\nCOMPANYOS_TOKEN = '${jetonAffiche}'\nCOMPANYOS_ALLOW_WRITES = '${ecriture ? "1" : "0"}'`;
-  const commande = `codex mcp add companyos --env COMPANYOS_API_URL=${BASE_URL} --env COMPANYOS_TOKEN=${jetonAffiche} --env COMPANYOS_ALLOW_WRITES=${ecriture ? "1" : "0"} -- "${nodePath}" "${serveurPath}"`;
+  const toml = `[mcp_servers.companyos]\ncommand = '${nodePath}'\nargs = ['${serveurPath}']\nstartup_timeout_sec = 30\n\n[mcp_servers.companyos.env]\nCOMPANYOS_API_URL = '${ORIGINE_API}'\nCOMPANYOS_TOKEN = '${jetonAffiche}'\nCOMPANYOS_ALLOW_WRITES = '${ecriture ? "1" : "0"}'`;
+  const commande = `codex mcp add companyos --env COMPANYOS_API_URL=${ORIGINE_API} --env COMPANYOS_TOKEN=${jetonAffiche} --env COMPANYOS_ALLOW_WRITES=${ecriture ? "1" : "0"} -- "${nodePath}" "${serveurPath}"`;
   const proteger = (texte) => (token ? texte.replaceAll(token, masquer(token)) : texte);
 
   const changerEcriture = (value) => {
@@ -150,7 +150,7 @@ function McpApp() {
                 <strong data-ok={etat.api}>
                   {etat.api ? "En ligne" : "Injoignable"}
                 </strong>
-                <small>{BASE_URL}</small>
+                <small>{ORIGINE_API}</small>
               </article>
               <article className="mcpCard">
                 <span>Authentification</span>

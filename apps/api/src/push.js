@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { prisma } from "./db.js";
+import { prisma, principal } from "./db.js";
 import { chiffrer, dechiffrer } from "./chiffrement.js";
 
 /// Notifications push : l'appareil est prévenu même onglet fermé.
@@ -51,7 +51,7 @@ export const clesVapid = async () => {
     return cles;
   }
   const lire = async () => {
-    const ligne = await prisma.parametreSysteme.findUnique({ where: { cle: CLE_VAPID } });
+    const ligne = await principal.parametreSysteme.findUnique({ where: { cle: CLE_VAPID } });
     const privateKey = ligne && dechiffrer(ligne.valeur?.prive);
     return privateKey ? { publicKey: ligne.valeur.public, privateKey } : null;
   };
@@ -60,7 +60,7 @@ export const clesVapid = async () => {
   const neuves = webpush.generateVAPIDKeys();
   // Deux instances qui démarrent ensemble : la première écrit, la seconde
   // relit ce que la première a écrit.
-  await prisma.parametreSysteme
+  await principal.parametreSysteme
     .create({ data: { cle: CLE_VAPID, valeur: { public: neuves.publicKey, prive: chiffrer(neuves.privateKey) } } })
     .catch(() => {});
   cles = await lire();

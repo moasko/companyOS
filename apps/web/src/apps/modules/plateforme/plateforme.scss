@@ -1161,6 +1161,180 @@ body[data-theme="dark"] .pltApp {
   .pltApp .pltActions > * { flex: 1 1 100%; }
 }
 
+// ---- Serveur : la machine et ses entreprises (Serveur.jsx) ------------------
+
+.pltApp .pltJauge {
+  display: block;
+  height: 6px;
+  margin: 4px 0 2px;
+  border-radius: 3px;
+  background: var(--pl-line);
+  overflow: hidden;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: #188038;
+    transition: width 0.3s;
+  }
+
+  &[data-ton="attention"] i { background: #b06000; }
+  &[data-ton="danger"] i { background: var(--pl-danger); }
+}
+
+.pltApp .pltFormEntreprise {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+
+  label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+
+    > span {
+      font-size: 12px;
+      font-weight: 600;
+    }
+  }
+
+  input {
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid var(--pl-line);
+    border-radius: 8px;
+    background: var(--pl-bg);
+    color: var(--pl-text);
+    font: inherit;
+    width: 100%;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--pl-fort);
+      box-shadow: 0 0 0 3px rgb(26 115 232 / 15%);
+    }
+  }
+}
+
+.pltApp .pltSuffixe {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--pl-line);
+  border-radius: 8px;
+  overflow: hidden;
+
+  input {
+    border: 0 !important;
+    box-shadow: none !important;
+    min-width: 0;
+  }
+
+  em {
+    padding: 0 10px;
+    color: var(--pl-muted);
+    font-style: normal;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+.pltApp .pltTableEnv {
+  overflow-x: auto;
+  border: 1px solid var(--pl-line);
+  border-radius: 9px;
+}
+
+.pltApp .pltTableEnv .pltTable {
+  th,
+  td {
+    padding: 10px 14px;
+    text-align: left;
+  }
+
+  th {
+    background: var(--pl-panel);
+    color: var(--pl-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  td small {
+    color: var(--pl-muted);
+    font-size: 11px;
+  }
+
+  td .pltPastilleEtat {
+    margin-left: 8px;
+  }
+
+  [data-droite] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    color: var(--pl-fort);
+  }
+}
+
+.pltApp .pltCode {
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--pl-panel);
+  border: 1px solid var(--pl-line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.pltApp .pltIconeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--pl-muted);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--pl-panel);
+    color: var(--pl-danger);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.pltApp .pltCommandes {
+  font-size: 12.5px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+
+    span {
+      color: var(--pl-muted);
+      font-size: 12px;
+    }
+  }
+}
+
 // ---- Téléphone : les sections passent en onglets au-dessus du contenu -------
 
 @media (max-width: 720px) {

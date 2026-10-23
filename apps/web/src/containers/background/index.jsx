@@ -254,6 +254,12 @@ export const LockScreen = (props) => {
     }, 1000);
   };
 
+  // Serveur privé (install.sh) : pas d'inscription libre, le lien disparaît.
+  const [inscriptionOuverte, setInscriptionOuverte] = useState(true);
+  useEffect(() => {
+    api.serveur().then((s) => setInscriptionOuverte(s?.inscriptionOuverte !== false)).catch(() => {});
+  }, []);
+
   const field = (key) => (e) => {
     setForm({ ...form, [key]: e.target.value });
     setError("");
@@ -581,12 +587,14 @@ export const LockScreen = (props) => {
                 {t("sso")}
               </div>
             ) : null}
-            <div
-              className="text-xs text-gray-400 mt-4 handcr"
-              onClick={() => changerMode(mode === "login" ? "register" : "login")}
-            >
-              {mode === "login" ? t("versInscription") : t("versConnexion")}
-            </div>
+            {inscriptionOuverte || mode !== "login" ? (
+              <div
+                className="text-xs text-gray-400 mt-4 handcr"
+                onClick={() => changerMode(mode === "login" ? "register" : "login")}
+              >
+                {mode === "login" ? t("versInscription") : t("versConnexion")}
+              </div>
+            ) : null}
             <div
               className="text-xs text-gray-400 mt-2 handcr"
               onClick={() => changerMode(mode === "join" ? "login" : "join")}

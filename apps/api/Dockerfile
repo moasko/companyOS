@@ -68,4 +68,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
 
 # `reparer-migrations.js` débloque une migration rejouable restée en échec
 # (erreur P3009), sinon le conteneur redémarrerait en boucle.
-CMD ["sh", "-c", "node prisma/reparer-migrations.js && npx prisma migrate deploy && node prisma/seed.js && node src/index.js"]
+CMD ["sh", "-c", "node prisma/reparer-migrations.js && npx prisma migrate deploy && node prisma/seed.js && node src/outils/migrer-bases.js && node src/index.js"]

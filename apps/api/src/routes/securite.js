@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { prisma, serialize } from "../db.js";
+import { prisma, principal, serialize } from "../db.js";
 import { authenticate, exigerExploitant, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { GRAVITES, bloquerIp, debloquerIp, messageAlerte, titreAlerte } from "../detection.js";
@@ -30,9 +30,9 @@ const filtres = (query) => {
 const resume = async (where) => {
   const depuis = (h) => new Date(Date.now() - h * 3600_000);
   const [jour, semaine, ouvertes] = await Promise.all([
-    prisma.alerteSecurite.groupBy({ by: ["gravite"], where: { ...where, creeLe: { gt: depuis(24) } }, _count: true }),
-    prisma.alerteSecurite.groupBy({ by: ["type"], where: { ...where, creeLe: { gt: depuis(24 * 7) } }, _count: true }),
-    prisma.alerteSecurite.count({ where: { ...where, traiteLe: null, gravite: { in: ["haute", "critique"] } } }),
+    principal.alerteSecurite.groupBy({ by: ["gravite"], where: { ...where, creeLe: { gt: depuis(24) } }, _count: true }),
+    principal.alerteSecurite.groupBy({ by: ["type"], where: { ...where, creeLe: { gt: depuis(24 * 7) } }, _count: true }),
+    principal.alerteSecurite.count({ where: { ...where, traiteLe: null, gravite: { in: ["haute", "critique"] } } }),
   ]);
   return {
     jour: Object.fromEntries(jour.map((l) => [l.gravite, l._count])),
@@ -48,14 +48,14 @@ export async function securiteRoutes(app) {
   app.get("/alertes", async (request) => {
     const where = { tenantId: request.tenantId, ...filtres(request.query || {}) };
     const [alertes, synthese] = await Promise.all([
-      prisma.alerteSecurite.findMany({ where, orderBy: { creeLe: "desc" }, take: 200 }),
+      principal.alerteSecurite.findMany({ where, orderBy: { creeLe: "desc" }, take: 200 }),
       resume({ tenantId: request.tenantId }),
     ]);
     return serialize({ alertes: alertes.map(vue), resume: synthese });
   });
 
   app.post("/alertes/:id/traiter", async (request, reply) => {
-    const { count } = await prisma.alerteSecurite.updateMany({
+    const { count } = await principal.alerteSecurite.updateMany({
       where: { id: request.params.id, tenantId: request.tenantId, traiteLe: null },
       data: { traiteLe: new Date(), traitePar: request.user.email },
     });
@@ -65,7 +65,7 @@ export async function securiteRoutes(app) {
   });
 
   app.post("/alertes/traiter-tout", async (request) => {
-    const { count } = await prisma.alerteSecurite.updateMany({
+    const { count } = await principal.alerteSecurite.updateMany({
       where: { tenantId: request.tenantId, traiteLe: null },
       data: { traiteLe: new Date(), traitePar: request.user.email },
     });
@@ -88,9 +88,9 @@ export async function plateformeSecuriteRoutes(app) {
   app.get("/", async (request) => {
     const where = filtres(request.query || {});
     const [alertes, synthese, ips, espaces] = await Promise.all([
-      prisma.alerteSecurite.findMany({ where, orderBy: { creeLe: "desc" }, take: 300 }),
+      principal.alerteSecurite.findMany({ where, orderBy: { creeLe: "desc" }, take: 300 }),
       resume({}),
-      prisma.ipBloquee.findMany({ where: { jusqua: { gt: new Date() } }, orderBy: { creeLe: "desc" } }),
+      principal.ipBloquee.findMany({ where: { jusqua: { gt: new Date() } }, orderBy: { creeLe: "desc" } }),
       prisma.tenant.findMany({ select: { id: true, name: true } }),
     ]);
     const nomEspace = Object.fromEntries(espaces.map((e) => [e.id, e.name]));
@@ -102,7 +102,7 @@ export async function plateformeSecuriteRoutes(app) {
   });
 
   app.post("/alertes/:id/traiter", async (request, reply) => {
-    const { count } = await prisma.alerteSecurite.updateMany({
+    const { count } = await principal.alerteSecurite.updateMany({
       where: { id: request.params.id, traiteLe: null },
       data: { traiteLe: new Date(), traitePar: request.user.email },
     });

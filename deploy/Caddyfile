@@ -1,0 +1,57 @@
+# Proxy HTTPS de CompanyOS — installé par install.sh.
+#
+# Un seul bloc pour tous les noms : le domaine du serveur ({$DOMAINE}), le
+# sous-domaine de chaque espace (akwaba.{$DOMAINE}) et les domaines
+# personnalisés. Le certificat de chaque nom est demandé au premier accès
+# (« on demand »), après accord de l'API : elle ne dit oui qu'aux noms
+# qu'elle connaît, ce qui empêche un tiers d'épuiser le quota Let's Encrypt
+# en faisant pointer des noms au hasard vers le serveur.
+
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://api:4000/api/public/tls
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+
+	encode zstd gzip
+
+	# L'API et ce qui s'y rattache. Les flux temps réel (/api/evenements)
+	# sont reconnus comme tels et transmis sans tampon.
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+	handle /health {
+		reverse_proxy api:4000
+	}
+
+	# Tout le reste : le shell.
+	handle {
+		reverse_proxy web:80
+	}
+
+	log {
+		output stdout
+		format console
+		level WARN
+	}
+}
+
+# HTTP : Caddy redirige déjà vers HTTPS. Ce bloc sert le cas d'un accès par
+# l'adresse IP (avant que le DNS ne pointe), pour dire quoi faire au lieu
+# d'une erreur de connexion.
+http:// {
+	@ip expression {host}.matches('^[0-9.]+$') || {host}.matches('^\\[')
+	handle @ip {
+		header Content-Type "text/plain; charset=utf-8"
+		respond "CompanyOS est installé. Ouvrez https://{$DOMAINE} (le domaine doit pointer vers ce serveur)." 200
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}

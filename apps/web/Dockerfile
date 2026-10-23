@@ -66,6 +66,10 @@ RUN sed -i "s|__API_ORIGIN__|${VITE_API_URL:-https:}|g" /etc/nginx/conf.d/defaul
 
 COPY --from=build /app/apps/web/build /usr/share/nginx/html
 
+# Adresse de l'API lue au démarrage plutôt que figée : la même image sert
+# n'importe quel domaine (installation par install.sh). Voir le script.
+COPY --chmod=755 apps/web/docker-entrypoint.sh /docker-entrypoint.d/40-companyos-config.sh
+
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s \
