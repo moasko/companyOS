@@ -860,3 +860,23 @@ model Courriel {
   @@index([statut, envoiLe])
   @@map("courriels")
 }
+
+/// Registre des entreprises qui ont leur propre base (une base par
+/// entreprise, voir src/db.js). Vit dans la base principale seulement : la
+/// première entreprise du serveur, elle, est dans la base principale et ne
+/// figure pas ici.
+model BaseEspace {
+  /// Le sous-domaine : <slug>.<DOMAINE>.
+  slug     String   @id
+  /// Nom de la base PostgreSQL (cos_<slug>).
+  nomBase  String   @unique
+  /// L'espace (tenant) créé dans cette base.
+  tenantId String   @unique
+  nom      String
+  /// Domaine personnalisé de l'espace, s'il en a déclaré un : sert à
+  /// aiguiller les requêtes qui arrivent sous ce nom.
+  domaine  String?  @unique
+  creeLe   DateTime @default(now())
+
+  @@map("bases_espaces")
+}

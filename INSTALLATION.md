@@ -94,7 +94,8 @@ passe).
 | `companyos mise-a-jour [version]` | sauvegarde la base, télécharge la nouvelle version, redémarre ; les migrations s'appliquent seules |
 | `companyos sauvegarde` | sauvegarde immédiate : base + fichiers |
 | `companyos sauvegardes` | liste les sauvegardes du serveur |
-| `companyos restaurer <fichier.dump>` | remplace la base par une sauvegarde (confirmation demandée) |
+| `companyos restaurer <fichier.dump>` | remplace une base par sa sauvegarde (confirmation demandée) |
+| `companyos entreprise liste\|creer\|supprimer` | les entreprises du serveur, chacune dans sa base (voir plus bas) |
 | `companyos mot-de-passe` | nouveau mot de passe pour l'administrateur du serveur |
 | `companyos config` | ouvre `.env` (SMTP, sauvegardes…) puis applique |
 | `companyos desinstaller [--tout]` | retire CompanyOS ; `--tout` supprime aussi les données |
@@ -102,6 +103,34 @@ passe).
 Les sauvegardes automatiques tournent chaque nuit à 2 h (base chaque jour,
 fichiers chaque semaine, 14 jours de conservation). Pour une copie hors du
 serveur, renseignez un stockage S3 dans la console d'exploitation.
+
+## Plusieurs entreprises sur le même serveur : une base chacune
+
+La première entreprise (créée à l'installation) est servie sur le domaine
+du serveur. Chaque entreprise ajoutée ensuite — une filiale, une société
+sœur — reçoit :
+
+- **sa propre base PostgreSQL** (`cos_<sous-domaine>`) : comptes, données,
+  réglages, applications installées ; rien n'est partagé avec les autres ;
+- **son sous-domaine** : `filiale-sud.erp.monentreprise.ci`, avec son
+  certificat HTTPS obtenu automatiquement au premier accès ;
+- **ses sauvegardes** : une archive par base, restaurable seule.
+
+```bash
+companyos entreprise creer --nom "Filiale Sud SARL" --email dg@filiale-sud.ci --admin "Koffi Aka"
+companyos entreprise liste
+companyos entreprise supprimer filiale-sud-sarl     # sauvegarde avant, confirmation demandée
+```
+
+La création affiche l'adresse et le mot de passe de l'administrateur de
+la nouvelle entreprise. Un compte n'existe que dans la base de son
+entreprise : il ne peut pas se connecter sur l'adresse d'une autre, et un
+cookie de session volé sur l'une ne vaut rien sur l'autre.
+
+Les migrations s'appliquent à toutes les bases à chaque démarrage. Les
+sauvegardes de la nuit couvrent toutes les bases (`base-<date>.dump` pour
+la principale, `base-<sous-domaine>-<date>.dump` pour les autres), et
+`companyos restaurer <fichier>` restaure la bonne base d'après le nom.
 
 ## Envoi des e-mails
 

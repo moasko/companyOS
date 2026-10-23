@@ -1,5 +1,5 @@
 import { COOKIE_SESSION } from "./auth.js";
-import { prisma } from "./db.js";
+import { prisma, principal } from "./db.js";
 import { env } from "./env.js";
 import { abonner, publier } from "./evenements.js";
 import { notifier } from "./notifier.js";
@@ -158,7 +158,7 @@ export const alerter = async ({ type, gravite, request, ip, tenantId = null, use
   if (dejaLevees.size > 20_000) dejaLevees.delete(dejaLevees.keys().next().value);
 
   // Une autre instance a pu lever la même alerte à l'instant.
-  const recente = await prisma.alerteSecurite
+  const recente = await principal.alerteSecurite
     .findFirst({
       where: {
         type,
@@ -171,7 +171,7 @@ export const alerter = async ({ type, gravite, request, ip, tenantId = null, use
     .catch(() => null);
   if (recente) return null;
 
-  const alerte = await prisma.alerteSecurite
+  const alerte = await principal.alerteSecurite
     .create({
       data: {
         type,
@@ -258,7 +258,7 @@ declarerCache("ip-bloquees", {
 });
 
 const relireBlocages = async () => {
-  const lignes = await prisma.ipBloquee.findMany({ where: { jusqua: { gt: new Date() } }, select: { ip: true, jusqua: true } });
+  const lignes = await principal.ipBloquee.findMany({ where: { jusqua: { gt: new Date() } }, select: { ip: true, jusqua: true } });
   bloquees = new Map(lignes.map((l) => [l.ip, l.jusqua.getTime()]));
   lu = Date.now();
 };
@@ -274,10 +274,10 @@ export const ipBloquee = async (ip) => {
 
 export const bloquerIp = async ({ ip, motif, request, manuel = false, parEmail = null, dureeMs = null }) => {
   if (!ip || (!manuel && confiance(ip))) return null;
-  const existante = await prisma.ipBloquee.findUnique({ where: { ip } }).catch(() => null);
+  const existante = await principal.ipBloquee.findUnique({ where: { ip } }).catch(() => null);
   const recidives = existante ? existante.recidives + (existante.jusqua < new Date() ? 1 : 0) : 0;
   const jusqua = new Date(Date.now() + (dureeMs ?? dureeBlocage(recidives)));
-  await prisma.ipBloquee.upsert({
+  await principal.ipBloquee.upsert({
     where: { ip },
     create: { ip, motif: motif.slice(0, 200), jusqua, manuel, parEmail, recidives },
     update: { motif: motif.slice(0, 200), jusqua, manuel, parEmail, recidives },
@@ -291,7 +291,7 @@ export const bloquerIp = async ({ ip, motif, request, manuel = false, parEmail =
 };
 
 export const debloquerIp = async (ip) => {
-  await prisma.ipBloquee.deleteMany({ where: { ip } });
+  await principal.ipBloquee.deleteMany({ where: { ip } });
   bloquees.delete(ip);
   sondes.oublier(ip);
   publier({ type: "ids-blocages" });
@@ -306,11 +306,11 @@ export const noterEchecConnexion = async (request, { email, user }) => {
   if (!env.idsActif) return;
   const ip = request.ip;
   try {
-    await prisma.signalSecurite.create({
+    await principal.signalSecurite.create({
       data: { type: "connexion.echec", ip, cle: email, tenantId: user?.tenantId || null, existe: !!user },
     });
 
-    const echecs = await prisma.signalSecurite.count({
+    const echecs = await principal.signalSecurite.count({
       where: { type: "connexion.echec", cle: email, creeLe: { gt: depuis(SEUILS.forceBrute.fenetre) } },
     });
     if (user && echecs >= SEUILS.forceBrute.n) {
@@ -330,7 +330,7 @@ export const noterEchecConnexion = async (request, { email, user }) => {
     // Bourrage : une adresse qui essaie beaucoup de comptes différents,
     // dont beaucoup n'existent pas. Une sortie Internet d'entreprise où
     // quelques salariés se trompent ne réunit pas ces deux conditions.
-    const parIp = await prisma.signalSecurite.groupBy({
+    const parIp = await principal.signalSecurite.groupBy({
       by: ["cle", "existe"],
       where: { type: "connexion.echec", ip, creeLe: { gt: depuis(SEUILS.bourrage.fenetre) } },
     });
@@ -349,10 +349,10 @@ export const noterEchecConnexion = async (request, { email, user }) => {
 export const noterEchecMfa = async (request, user) => {
   if (!env.idsActif || !user) return;
   try {
-    await prisma.signalSecurite.create({
+    await principal.signalSecurite.create({
       data: { type: "mfa.echec", ip: request.ip, cle: user.id, tenantId: user.tenantId },
     });
-    const echecs = await prisma.signalSecurite.count({
+    const echecs = await principal.signalSecurite.count({
       where: { type: "mfa.echec", cle: user.id, creeLe: { gt: depuis(SEUILS.mfa.fenetre) } },
     });
     if (echecs >= SEUILS.mfa.n) {
@@ -386,7 +386,7 @@ export const noterConnexion = async (request, user) => {
   if (!env.idsActif || !user) return;
   try {
     const email = user.email;
-    const echecs = await prisma.signalSecurite.count({
+    const echecs = await principal.signalSecurite.count({
       where: { type: "connexion.echec", cle: email, creeLe: { gt: depuis(30 * MIN) } },
     });
     if (echecs >= SEUILS.forceBrute.n) {
@@ -499,9 +499,9 @@ let desabonner = null;
 let menage = null;
 
 export const purgerDetection = async () => {
-  await prisma.signalSecurite.deleteMany({ where: { creeLe: { lt: depuis(24 * 60 * MIN) } } });
-  await prisma.alerteSecurite.deleteMany({ where: { creeLe: { lt: depuis(180 * 24 * 60 * MIN) } } });
-  await prisma.ipBloquee.deleteMany({ where: { jusqua: { lt: depuis(30 * 24 * 60 * MIN) } } });
+  await principal.signalSecurite.deleteMany({ where: { creeLe: { lt: depuis(24 * 60 * MIN) } } });
+  await principal.alerteSecurite.deleteMany({ where: { creeLe: { lt: depuis(180 * 24 * 60 * MIN) } } });
+  await principal.ipBloquee.deleteMany({ where: { jusqua: { lt: depuis(30 * 24 * 60 * MIN) } } });
 };
 
 export const demarrerDetection = () => {

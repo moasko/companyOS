@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { prisma } from "./db.js";
+// Propre au serveur, pas à une entreprise : toujours la base principale.
+import { listerBases, principal as prisma, urlDeBase } from "./db.js";
 import { env } from "./env.js";
 import { chargerConfig } from "./storage.js";
 import { creerPiloteS3 } from "./stockage-s3.js";
@@ -116,19 +117,21 @@ const tenter = async (type, declencheur, travail) => {
   }
 };
 
-/// Sauvegarde la base. Rend la ligne de suivi.
-export const sauvegarderBase = (declencheur = "auto") =>
+/// Sauvegarde une base : la principale (`base-<date>.dump`) ou celle d'une
+/// entreprise (`base-<slug>-<date>.dump`). Rend la ligne de suivi.
+const sauvegarderUneBase = (declencheur, entreprise) =>
   tenter("base", declencheur, async () => {
     await fs.mkdir(env.sauvegardeDossier, { recursive: true });
-    const nom = `base-${horodatage()}.dump`;
+    const nom = entreprise ? `base-${entreprise.slug}-${horodatage()}.dump` : `base-${horodatage()}.dump`;
     const fichier = path.join(env.sauvegardeDossier, nom);
+    const url = entreprise ? urlDeBase(entreprise.nomBase, env.databaseUrl) : env.databaseUrl;
 
     await executer("pg_dump", [
       "--format=custom",
       "--no-owner",
       "--no-privileges",
       `--file=${fichier}`,
-      `--dbname=${adressePgDump(env.databaseUrl)}`,
+      `--dbname=${adressePgDump(url)}`,
     ]);
 
     // Relire l'archive : sa table des matières doit au moins contenir la
@@ -150,6 +153,17 @@ export const sauvegarderBase = (declencheur = "auto") =>
 
     return { fichier: nom, octets: BigInt(size), sha256, verifiee: true, horsSite };
   });
+
+/// Sauvegarde toutes les bases du serveur — une archive par entreprise, que
+/// l'on peut restaurer seule. Rend la ligne de la base principale ; une
+/// entreprise en échec n'empêche pas les autres (son échec est consigné).
+export const sauvegarderBase = async (declencheur = "auto") => {
+  const ligne = await sauvegarderUneBase(declencheur, null);
+  for (const b of await listerBases().catch(() => [])) {
+    await sauvegarderUneBase(declencheur, b).catch(() => {});
+  }
+  return ligne;
+};
 
 /// Archive le stockage local. Sans objet quand les fichiers sont sur S3.
 export const sauvegarderFichiers = (declencheur = "auto") =>

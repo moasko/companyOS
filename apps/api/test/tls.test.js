@@ -8,12 +8,13 @@ process.env.DATABASE_URL ||= "postgresql://test@localhost:1/test";
 process.env.JWT_SECRET ||= "secret-de-test";
 process.env.DOMAINE = "https://ERP.Akwaba.ci/";
 
-const { prisma } = await import("../src/db.js");
+const { principal } = await import("../src/db.js");
 const { domaineAutorise } = await import("../src/routes/publics.js");
 
-// Pas de base : deux espaces simulés.
-prisma.tenant.findUnique = async ({ where }) => (where.slug === "akwaba" ? { id: "t1" } : null);
-prisma.tenant.findFirst = async ({ where }) => (where.domainePublic === "erp.client.ci" ? { id: "t2" } : null);
+// Pas de base : une entreprise « akwaba » au registre, un espace de la base
+// principale avec un domaine personnalisé.
+principal.baseEspace.findUnique = async ({ where }) => (where.slug === "akwaba" || where.domaine === "liens.akwaba.ci" ? { slug: "akwaba" } : null);
+principal.tenant.findFirst = async ({ where }) => (where.domainePublic === "erp.client.ci" ? { id: "t2" } : null);
 
 test("le domaine du serveur et son www sont autorisés (normalisés)", async () => {
   assert.equal(await domaineAutorise("erp.akwaba.ci"), true);
@@ -29,6 +30,7 @@ test("un sous-domaine n'est autorisé que s'il correspond à un espace", async (
 
 test("domaine personnalisé déclaré par un espace : oui ; le reste : non", async () => {
   assert.equal(await domaineAutorise("erp.client.ci"), true);
+  assert.equal(await domaineAutorise("liens.akwaba.ci"), true);
   assert.equal(await domaineAutorise("evil.com"), false);
   assert.equal(await domaineAutorise(""), false);
   assert.equal(await domaineAutorise("a b.ci"), false);

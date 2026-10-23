@@ -25,7 +25,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
 import { env } from "./env.js";
-import { prisma } from "./db.js";
+import { prisma, principal } from "./db.js";
 import { chiffrer, dechiffrer } from "./chiffrement.js";
 import { creerPiloteS3 } from "./stockage-s3.js";
 import { declarerCache } from "./caches.js";
@@ -135,7 +135,7 @@ export const chargerConfig = async () => {
 
   let ligne = null;
   try {
-    ligne = await prisma.platformConfig.findUnique({ where: { id: "global" } });
+    ligne = await principal.platformConfig.findUnique({ where: { id: "global" } });
   } catch {
     // La table n'existe pas encore (migration non appliquée) : on
     // fonctionne sur le disque local, comme avant.
@@ -170,7 +170,7 @@ export const chargerConfig = async () => {
 /// fourni : l'écran ne le renvoie jamais en clair, donc le laisser vide
 /// signifie « garde celui d'avant ».
 export const enregistrerConfig = async ({ stockage, s3 }) => {
-  const existant = await prisma.platformConfig.findUnique({ where: { id: "global" } });
+  const existant = await principal.platformConfig.findUnique({ where: { id: "global" } });
   const ancien = existant?.s3 || {};
 
   const nouveau = s3
@@ -182,7 +182,7 @@ export const enregistrerConfig = async ({ stockage, s3 }) => {
       }
     : ancien;
 
-  await prisma.platformConfig.upsert({
+  await principal.platformConfig.upsert({
     where: { id: "global" },
     create: { id: "global", stockage: stockage || "local", s3: nouveau },
     update: { stockage: stockage || "local", s3: nouveau },
@@ -370,7 +370,7 @@ export const piloteLecture = async (nom, tenantId) => {
 export const testerConfig = async ({ stockage, s3 }) => {
   if (stockage !== "s3") return piloteLocal.tester();
 
-  const existant = await prisma.platformConfig.findUnique({ where: { id: "global" } });
+  const existant = await principal.platformConfig.findUnique({ where: { id: "global" } });
   const secret = s3?.secretKey || dechiffrer(existant?.s3?.secretKey);
   if (!secret) throw new Error("La clé secrète est absente.");
 

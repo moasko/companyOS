@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
-import { prisma } from "./db.js";
+import { pourChaqueBase, prisma } from "./db.js";
 import { env } from "./env.js";
 import { journaliserPour } from "./audit.js";
 import { publier } from "./evenements.js";
@@ -453,7 +453,7 @@ export const envoyerProgrammes = async () => {
 
 export const demarrerEnvoisProgrammes = () => {
   if (minuteur) return;
-  minuteur = setInterval(() => envoyerProgrammes().catch((e) => console.error("Envois programmés :", e.message)), 30_000);
+  minuteur = setInterval(() => pourChaqueBase(envoyerProgrammes).catch((e) => console.error("Envois programmés :", e.message)), 30_000);
   minuteur.unref?.();
 };
 

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { prisma } from "./db.js";
+// Propre au serveur, pas à une entreprise : toujours la base principale.
+import { principal as prisma } from "./db.js";
 import { env } from "./env.js";
 import { envoyerMail } from "./mail.js";
 

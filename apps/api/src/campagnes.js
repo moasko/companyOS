@@ -23,7 +23,7 @@
 
 import { baseDefaut, basePublique, selFormulaire } from "./espacePublic.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { prisma } from "./db.js";
+import { pourChaqueBase, prisma } from "./db.js";
 import { env } from "./env.js";
 import { creerTransporteur, creerTransporteurEspace, envoyerVia } from "./mail.js";
 import { journaliser } from "./audit.js";
@@ -592,8 +592,11 @@ export const demarrerCampagnes = () => {
     if (enCours) return;
     enCours = true;
     try {
-      await passerLesCampagnes().catch(() => {});
-      await passerLesAutomatisations().catch(() => {});
+      // Chaque entreprise dans sa base — voir src/db.js.
+      await pourChaqueBase(async () => {
+        await passerLesCampagnes().catch(() => {});
+        await passerLesAutomatisations().catch(() => {});
+      });
     } finally {
       enCours = false;
     }

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { env } from "./env.js";
-import { prisma } from "./db.js";
+import { baseCourante, prisma } from "./db.js";
 
 export const hashPassword = (plain) => bcrypt.hash(plain, 12);
 
@@ -304,6 +304,9 @@ export const authenticate = async (request, reply) => {
 /// minuscules par `env.js`). Un ancien compte `VOUS@…` créé à côté du vrai
 /// `vous@…` n'hérite donc de rien.
 export const estExploitant = (email) =>
+  // La console du serveur ne s'ouvre que depuis la base principale : un
+  // compte homonyme dans la base d'une autre entreprise n'en hérite pas.
+  !baseCourante() &&
   typeof email === "string" &&
   email === email.toLowerCase() &&
   env.plateformeAdmins.includes(email);

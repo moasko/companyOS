@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { prisma } from "./db.js";
+import { pourChaqueBase, prisma } from "./db.js";
 
 /// L'état que plusieurs instances de l'API doivent partager.
 ///
@@ -133,6 +133,6 @@ export const purgerEtatPartage = async () => {
 let minuteur = null;
 export const demarrerPurgeEtatPartage = () => {
   if (minuteur) return;
-  minuteur = setInterval(() => purgerEtatPartage().catch(() => {}), 10 * 60 * 1000);
+  minuteur = setInterval(() => pourChaqueBase(purgerEtatPartage).catch(() => {}), 10 * 60 * 1000);
   minuteur.unref();
 };

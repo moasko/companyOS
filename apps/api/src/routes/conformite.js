@@ -2,7 +2,8 @@ import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { prisma, serialize } from "../db.js";
+import { baseCourante, prisma, serialize } from "../db.js";
+import { domaineDejaPris, noterDomaineEntreprise } from "../aiguillage.js";
 import { authenticate, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { publierFiche } from "../evenements.js";
@@ -216,8 +217,9 @@ export default async function conformiteRoutes(app) {
     if (!domaine) return reply.code(400).send({ error: "Nom de domaine invalide (ex. liens.entreprise.ci)." });
     if (domaine === new URL(baseDefaut()).hostname) return reply.code(400).send({ error: "C'est déjà l'adresse de la plateforme." });
     const pris = await prisma.tenant.findFirst({ where: { domainePublic: domaine, id: { not: request.tenantId } }, select: { id: true } });
-    if (pris) return reply.code(409).send({ error: "Ce domaine est déjà utilisé par un autre espace." });
+    if (pris || (await domaineDejaPris(domaine, baseCourante()))) return reply.code(409).send({ error: "Ce domaine est déjà utilisé par un autre espace." });
     await prisma.tenant.update({ where: { id: request.tenantId }, data: { domainePublic: domaine, domainePublicVerifie: null } });
+    await noterDomaineEntreprise(baseCourante(), domaine);
     invaliderEspacePublic(request.tenantId);
     await journaliser(request, "espace.domaine-public", domaine, { etape: "declaration" });
     return { domainePublic: domaine, domainePublicVerifie: null };
@@ -242,6 +244,7 @@ export default async function conformiteRoutes(app) {
   /// plus vers l'API.
   app.delete("/domaine", { preHandler: exigerRole("ADMIN") }, async (request) => {
     await prisma.tenant.update({ where: { id: request.tenantId }, data: { domainePublic: null, domainePublicVerifie: null } });
+    await noterDomaineEntreprise(baseCourante(), null);
     invaliderEspacePublic(request.tenantId);
     await journaliser(request, "espace.domaine-public", null, { etape: "retrait" });
     return { domainePublic: null };
