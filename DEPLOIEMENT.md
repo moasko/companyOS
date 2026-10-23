@@ -38,7 +38,7 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` | signature des sessions |
 | `ENCRYPTION_KEY` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` | chiffrement des secrets stockés (S3, SMTP) |
 | `CORS_ORIGIN` | `https://app.companyos.fr` | le shell autorisé à appeler l'API |
-| `VITE_API_URL` | `https://api.companyos.fr` | figée dans le build du shell |
+| `VITE_API_URL` | `https://api.companyos.fr` | adresse de l'API donnée au shell au démarrage du conteneur `web` (`API_URL`) |
 | `TRUST_PROXY` | `1` | un proxy devant l'API (Traefik) |
 | `JWT_EXPIRES_IN` | `7d` (défaut) | durée maximale d'une session de navigateur |
 | `SESSION_INACTIVITE_MINUTES` | `720` (défaut, 12 h) | une session de navigateur sans activité se ferme |
@@ -51,14 +51,10 @@ Onglet **Environment** du service — toutes sont exigées sauf mention :
 | `IDS_IPS_CONFIANCE` | vide (défaut) | adresses jamais bloquées automatiquement (supervision, sortie Internet du siège), séparées par des virgules |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | vide (défaut : générées et rangées en base) | clés des notifications push ; `npx web-push generate-vapid-keys` pour les fixer |
 
-> `VITE_API_URL` est cuite **au build** — et les images sont construites
-> par GitHub Actions (`.github/workflows/images.yml`), pas par Dokploy. Sa
-> valeur par défaut y est `https://api.companyos.fr` ; pour une autre,
-> déclarez la variable de dépôt `VITE_API_URL` (Settings → Secrets and
-> variables → Actions → Variables) puis relancez le workflow « Images ».
->
-> `VITE_API_URL` est cuite **au build** : la changer exige un redéploiement,
-> pas seulement un redémarrage.
+> `VITE_API_URL` n'est plus figée dans l'image : `docker-compose.prod.yml`
+> la passe au conteneur `web` (`API_URL`), qui l'écrit dans `config.js` et
+> dans la politique de sécurité à chaque démarrage. La changer demande un
+> simple redéploiement, sans reconstruire l'image.
 
 > En production (`NODE_ENV=production`), l'API **refuse de démarrer** si
 > `JWT_SECRET` fait moins de 32 caractères ou garde sa valeur d'exemple, ou
@@ -294,8 +290,8 @@ volumes traversent les redéploiements intacts.
 
 - **L'écran de connexion tourne en boucle** : `CORS_ORIGIN` ne correspond
   pas exactement au domaine du front (schéma `https://` compris).
-- **Le front appelle localhost:4000** : `VITE_API_URL` manquait au build —
-  renseignez-la puis redéployez.
+- **Le front appelle la mauvaise API** : vérifiez `VITE_API_URL` dans
+  l'onglet Environment (transmise au conteneur `web`), puis redéployez.
 - **`Error: P3009 … migration … failed`** : une migration a échoué une
   fois et Prisma refuse depuis tout déploiement. Au démarrage,
   `prisma/reparer-migrations.js` affiche dans les journaux de l'API

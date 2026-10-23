@@ -103,6 +103,10 @@ export const env = {
   //                        crée des espaces (console), personne ne s'inscrit.
   domaine: (process.env.DOMAINE || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
   inscriptionOuverte: process.env.INSCRIPTION_OUVERTE !== "false",
+  //   AUTO_HEBERGE=true    le serveur appartient à l'entreprise : pas de
+  //                        formules payantes, pas de plafond d'utilisateurs,
+  //                        un quota que seul le disque limite.
+  autoHeberge: process.env.AUTO_HEBERGE === "true",
 
   // Les exploitants de la plateforme : les adresses email autorisées à
   // ouvrir la console Plateforme (tous les espaces, toutes les formules).

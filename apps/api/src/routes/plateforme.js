@@ -558,6 +558,7 @@ export default async function plateformeRoutes(app) {
       version: process.env.COMPANYOS_VERSION || null,
       domaine: env.domaine || null,
       inscriptionOuverte: env.inscriptionOuverte,
+      autoHeberge: env.autoHeberge,
       systeme: {
         coeurs: os.cpus().length,
         charge: os.loadavg(),

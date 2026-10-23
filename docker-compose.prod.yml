@@ -21,8 +21,9 @@
 # GitHub ont 16 Go et ne font rien d'autre.
 #
 # Conséquence pratique : un déploiement ne compile plus, il télécharge.
-# Et changer de domaine impose de **reconstruire** l'image du shell, pas
-# seulement de redéployer — l'URL de l'API est figée dans son bundle.
+# L'adresse de l'API n'est plus figée dans l'image du shell : elle lui est
+# donnée au démarrage (API_URL, plus bas) — changer de domaine se fait par
+# un simple redéploiement.
 # ─────────────────────────────────────────────────────────────────────────
 #
 # ─────────────────────────────────────────────────────────────────────────
@@ -112,6 +113,11 @@ services:
     image: ${IMAGE_WEB:-ghcr.io/moasko/companyos-web:latest}
     pull_policy: always
     restart: unless-stopped
+    environment:
+      # L'image ne fige plus l'adresse de l'API : elle est lue au démarrage
+      # (voir apps/web/docker-entrypoint.sh). Ici, l'API est sur son propre
+      # domaine.
+      API_URL: ${VITE_API_URL:-https://api.companyos.fr}
     depends_on:
       - api
     expose:
