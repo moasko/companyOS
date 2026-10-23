@@ -91,6 +91,15 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Déploiement
 
+Sur un VPS vierge (Ubuntu ou Debian), en une commande — Docker, HTTPS,
+base, sauvegardes et la commande d'administration `companyos` compris :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/moasko/companyOS/master/install.sh | sudo bash
+```
+
+Voir [INSTALLATION.md](INSTALLATION.md). L'ancien déploiement par Dokploy :
+
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
@@ -105,7 +114,8 @@ des variables d'environnement.
 - [Créer une application](docs/CREER-UNE-APP.md) — ajouter un module métier
 - [Architecture](docs/ARCHITECTURE.md) — comment les morceaux tiennent ensemble
 - [Sécurité](docs/SECURITE.md) — le modèle de menace et les règles à respecter
-- [Déploiement](DEPLOIEMENT.md) — mise en production
+- [Installation](INSTALLATION.md) — un serveur CompanyOS en une commande
+- [Déploiement Dokploy](DEPLOIEMENT.md) — l'ancienne mise en production
 
 ## Origine et licence
 

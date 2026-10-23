@@ -95,6 +95,15 @@ export const env = {
   // campagnes pointent dessus.
   apiPublique: process.env.PUBLIC_API_URL || "",
 
+  // Installation par install.sh (auto-hébergement) — voir deploy/.
+  //   DOMAINE              le domaine du serveur (erp.exemple.ci) : il sert
+  //                        l'application, et chaque espace a son sous-domaine
+  //                        (<slug>.erp.exemple.ci) ;
+  //   INSCRIPTION_OUVERTE  `false` sur un serveur privé : seul l'exploitant
+  //                        crée des espaces (console), personne ne s'inscrit.
+  domaine: (process.env.DOMAINE || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
+  inscriptionOuverte: process.env.INSCRIPTION_OUVERTE !== "false",
+
   // Les exploitants de la plateforme : les adresses email autorisées à
   // ouvrir la console Plateforme (tous les espaces, toutes les formules).
   // Au-dessus des rôles d'espace — un OWNER ne voit que son entreprise,

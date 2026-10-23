@@ -22,7 +22,16 @@
 
 import { creerCacheListes, lireToutesLesPages, TAILLE_PAGE } from "./listes";
 
-export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+// L'adresse de l'API se lit d'abord dans `config.js`, écrit au démarrage du
+// conteneur (voir apps/web/docker-entrypoint.sh) : une même image sert ainsi
+// n'importe quel domaine. Une chaîne vide veut dire « même origine » — le
+// cas d'une installation par install.sh, où le proxy envoie /api à l'API.
+// À défaut, l'adresse figée au build, puis l'API locale du développement.
+const configExecution = typeof window !== "undefined" ? window.__COMPANYOS__ : undefined;
+export const BASE_URL =
+  typeof configExecution?.apiUrl === "string" ? configExecution.apiUrl.replace(/\/$/, "") : import.meta.env.VITE_API_URL || "http://localhost:4000";
+/// L'origine absolue de l'API, pour ce qui sort du navigateur (configuration MCP…).
+export const ORIGINE_API = BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
 const TEMOIN = "companyos-session";
 
 // L'ancien jeton en clair, d'avant le cookie : il ne vaut plus rien côté
@@ -153,6 +162,8 @@ const connecte = (reponse) => {
 
 export const api = {
   register: async (data) => connecte(await request("/auth/register", { method: "POST", body: data })),
+  /// Ce que l'écran de connexion doit savoir du serveur (inscriptions ouvertes…).
+  serveur: () => request("/public/serveur"),
   /// Rend soit la session ouverte, soit `{ mfa: true, defi }` : il faut
   /// alors le code de l'application d'authentification (`loginMfa`).
   login: async (data) => connecte(await request("/auth/login", { method: "POST", body: data })),

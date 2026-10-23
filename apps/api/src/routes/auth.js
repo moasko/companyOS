@@ -137,6 +137,11 @@ export default async function authRoutes(app) {
   /// et sa racine de fichiers — le tout en une transaction, pour ne jamais
   /// laisser un tenant à moitié construit.
   app.post("/register", { config: LIMITE_INSCRIPTION }, async (request, reply) => {
+    // Serveur privé (installé par install.sh) : les espaces se créent depuis
+    // la console d'exploitation, jamais par un inconnu.
+    if (!env.inscriptionOuverte) {
+      return reply.code(403).send({ error: "Les inscriptions sont fermées sur ce serveur. Demandez un accès à son administrateur." });
+    }
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply

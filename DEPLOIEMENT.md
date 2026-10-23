@@ -1,5 +1,9 @@
 # Déployer CompanyOS sur un VPS avec Dokploy
 
+> **Nouveau : installation en une commande, sans Dokploy.** Voir
+> [INSTALLATION.md](INSTALLATION.md) — c'est désormais la méthode
+> recommandée pour installer CompanyOS sur un serveur.
+
 CompanyOS se déploie en trois conteneurs — base PostgreSQL, API Fastify,
 front statique — décrits dans [docker-compose.prod.yml](docker-compose.prod.yml).
 Dokploy construit les images, applique les migrations et enchaîne les

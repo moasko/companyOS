@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# Commande d'administration d'un serveur CompanyOS (installée par install.sh
+# dans /usr/local/bin). `companyos aide` pour la liste.
+
+set -Eeuo pipefail
+
+DOSSIER="${COMPANYOS_DOSSIER:-/opt/companyos}"
+source_de() {
+  [ -n "${COMPANYOS_SOURCE:-}" ] && { printf '%s' "$COMPANYOS_SOURCE"; return; }
+  case "$1" in
+    v[0-9]*) printf 'https://raw.githubusercontent.com/moasko/companyOS/%s/deploy' "$1" ;;
+    *) printf 'https://raw.githubusercontent.com/moasko/companyOS/master/deploy' ;;
+  esac
+}
+
+if [ -t 1 ]; then
+  GRAS=$'\e[1m'; VERT=$'\e[32m'; JAUNE=$'\e[33m'; ROUGE=$'\e[31m'; FIN=$'\e[0m'
+else
+  GRAS=""; VERT=""; JAUNE=""; ROUGE=""; FIN=""
+fi
+ok() { printf '%s✓%s %s\n' "$VERT" "$FIN" "$*"; }
+avert() { printf '%s!%s %s\n' "$JAUNE" "$FIN" "$*"; }
+echec() { printf '%s✗ %s%s\n' "$ROUGE" "$*" "$FIN" >&2; exit 1; }
+
+[ "$(id -u)" = 0 ] || echec "Commande réservée à l'administrateur : sudo companyos $*"
+[ -f "$DOSSIER/.env" ] || echec "CompanyOS n'est pas installé dans $DOSSIER."
+cd "$DOSSIER"
+dc() { docker compose "$@"; }
+# `exec` lit l'entrée standard : sans </dev/null il avalerait la réponse
+# destinée au `read` suivant (confirmation de restauration…).
+dce() { docker compose exec -T "$@" </dev/null; }
+valeur() { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
+
+aide() {
+  cat <<EOF
+${GRAS}companyos${FIN} — administration du serveur CompanyOS ($DOSSIER)
+
+  statut                  état des services, mémoire, disque, certificats
+  journaux [service]      journaux en direct (api, web, caddy, postgres)
+  redemarrer              redémarre tous les services
+  arreter | demarrer      arrête ou relance CompanyOS
+  mise-a-jour [version]   télécharge et installe une version (défaut : latest)
+  sauvegarde              sauvegarde immédiate : base + fichiers
+  sauvegardes             liste les sauvegardes présentes sur le serveur
+  restaurer <fichier>     restaure la base depuis une sauvegarde (.dump)
+  mot-de-passe            nouveau mot de passe pour l'administrateur
+  config                  ouvre la configuration (.env), puis redémarre
+  desinstaller [--tout]   retire CompanyOS ; --tout supprime aussi les données
+EOF
+}
+
+statut() {
+  printf '%sCompanyOS%s — %s (version %s)\n\n' "$GRAS" "$FIN" "https://$(valeur DOMAINE)" "$(valeur COMPANYOS_VERSION)"
+  dc ps --format 'table {{.Service}}\t{{.Status}}'
+  echo
+  if dce api wget -qO- http://127.0.0.1:4000/health >/dev/null 2>&1; then ok "API : répond"; else avert "API : ne répond pas (companyos journaux api)"; fi
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "https://$(valeur DOMAINE)/health" || true)
+  if [ "$code" = 200 ]; then ok "HTTPS : https://$(valeur DOMAINE) accessible"; else avert "HTTPS : https://$(valeur DOMAINE) ne répond pas encore (DNS ? code $code)"; fi
+  echo
+  free -h | awk 'NR==1 || /Mem|Swap/'
+  echo
+  df -h / | awk 'NR==2 {print "Disque /     : "$3" utilisés sur "$2" ("$5")"}'
+  docker system df --format 'Docker {{.Type}} : {{.Size}}' 2>/dev/null | sed 's/^/  /' || true
+  echo
+  local ids
+  mapfile -t ids < <(dc ps -q)
+  [ "${#ids[@]}" -gt 0 ] && docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' "${ids[@]}" 2>/dev/null || true
+}
+
+mise_a_jour() {
+  local version="${1:-latest}"
+  echo "Mise à jour vers « $version »…"
+  local tmp SOURCE
+  SOURCE=$(source_de "$version")
+  tmp=$(mktemp -d)
+  curl -fsSL "$SOURCE/docker-compose.yml" -o "$tmp/docker-compose.yml" || echec "Téléchargement impossible : $SOURCE"
+  curl -fsSL "$SOURCE/Caddyfile" -o "$tmp/Caddyfile"
+  curl -fsSL "$SOURCE/companyos" -o "$tmp/companyos"
+  # Une sauvegarde de la base avant toute migration : un retour arrière
+  # reste possible si la nouvelle version pose problème.
+  echo "Sauvegarde de la base avant la mise à jour…"
+  dce api node src/outils/sauvegarder.js --base || avert "Sauvegarde préalable impossible — la mise à jour continue."
+  cp docker-compose.yml docker-compose.yml.precedent
+  install -m 644 "$tmp/docker-compose.yml" docker-compose.yml
+  install -m 644 "$tmp/Caddyfile" Caddyfile
+  install -m 755 "$tmp/companyos" /usr/local/bin/companyos
+  rm -rf "$tmp"
+  sed -i "s/^COMPANYOS_VERSION=.*/COMPANYOS_VERSION=$version/" .env
+  dc pull -q
+  dc up -d --remove-orphans
+  docker image prune -f >/dev/null 2>&1 || true
+  ok "CompanyOS est à jour ($version). Les migrations de la base s'appliquent au démarrage de l'API."
+}
+
+restaurer() {
+  local fichier="${1:-}"
+  [ -n "$fichier" ] || echec "Usage : companyos restaurer <fichier.dump>  (voir companyos sauvegardes)"
+  local nom
+  nom=$(basename "$fichier")
+  dce api test -f "/data/sauvegardes/$nom" || echec "Sauvegarde introuvable : $nom (companyos sauvegardes)"
+  printf '%sLa base actuelle sera remplacée par « %s ».%s\n' "$JAUNE" "$nom" "$FIN"
+  read -r -p "Tapez RESTAURER pour confirmer : " r
+  [ "$r" = "RESTAURER" ] || echec "Restauration annulée."
+  dc stop api
+  dc run --rm --no-deps --entrypoint sh api -c \
+    'pg_restore --clean --if-exists --no-owner --no-privileges --dbname="${DATABASE_URL%%\?*}" "/data/sauvegardes/'"$nom"'"' \
+    || avert "pg_restore a signalé des avertissements (souvent sans gravité)."
+  dc start api
+  ok "Base restaurée depuis $nom."
+}
+
+desinstaller() {
+  local tout="${1:-}"
+  if [ "$tout" = "--tout" ]; then
+    printf '%sToutes les données (base, fichiers, sauvegardes) seront supprimées définitivement.%s\n' "$ROUGE" "$FIN"
+    read -r -p "Tapez SUPPRIMER pour confirmer : " r
+    [ "$r" = "SUPPRIMER" ] || echec "Désinstallation annulée."
+    dc down -v --remove-orphans
+    cd / && rm -rf "$DOSSIER"
+  else
+    read -r -p "Arrêter et retirer CompanyOS (les données sont gardées) ? [o/N] " r
+    [[ "$r" =~ ^[oOyY] ]] || echec "Désinstallation annulée."
+    dc down --remove-orphans
+    avert "Données conservées (volumes Docker). Réinstaller : relancer install.sh ; tout supprimer : companyos desinstaller --tout"
+  fi
+  rm -f /usr/local/bin/companyos
+  ok "CompanyOS est retiré de ce serveur."
+}
+
+commande="${1:-aide}"
+shift || true
+case "$commande" in
+  statut|status) statut ;;
+  journaux|logs) dc logs -f --tail 100 "$@" ;;
+  redemarrer|restart) dc up -d && dc restart && ok "Redémarré." ;;
+  arreter|stop) dc stop && ok "Arrêté." ;;
+  demarrer|start) dc up -d && ok "Démarré." ;;
+  mise-a-jour|update) mise_a_jour "$@" ;;
+  sauvegarde|backup) dce api node src/outils/sauvegarder.js && ok "Sauvegarde terminée (companyos sauvegardes)." ;;
+  sauvegardes) dce api ls -lh /data/sauvegardes ;;
+  restaurer|restore) restaurer "$@" ;;
+  mot-de-passe) dce api node src/exploitant.js "$(valeur ADMIN_EMAIL)" ;;
+  config) "${EDITOR:-nano}" .env && dc up -d && ok "Configuration appliquée." ;;
+  desinstaller|uninstall) desinstaller "$@" ;;
+  aide|help|-h|--help) aide ;;
+  *) aide; exit 1 ;;
+esac

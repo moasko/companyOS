@@ -1,0 +1,122 @@
+# CompanyOS — la pile complète d'un serveur, installée par install.sh.
+#
+# Ce fichier vit dans /opt/companyos/ sur le VPS, à côté de son `.env`
+# (secrets générés à l'installation). On ne le modifie pas à la main : la
+# commande `companyos mise-a-jour` le remplace par celui de la version
+# installée.
+#
+#   caddy     le seul conteneur exposé (80 et 443). HTTPS automatique :
+#             il demande un certificat Let's Encrypt au premier accès à un
+#             nom, après avoir vérifié auprès de l'API que ce nom est bien
+#             le domaine du serveur ou celui d'un espace (voir Caddyfile).
+#   postgres  la base, jamais exposée hors du réseau interne.
+#   api       Fastify + Prisma. Applique les migrations à chaque démarrage.
+#   web       le shell (fichiers statiques), servi à la même adresse que
+#             l'API : Caddy envoie /api/* à l'API, le reste au shell.
+#
+# Les données vivent dans des volumes nommés : un redéploiement, une mise à
+# jour ou un redémarrage du VPS ne perdent rien. Seul `companyos
+# desinstaller --tout` les supprime.
+
+name: companyos
+
+x-journaux: &journaux
+  # Sans plafond, les journaux Docker finissent par remplir le disque d'un
+  # petit VPS. 3 × 10 Mo par conteneur suffisent pour diagnostiquer.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAINE: ${DOMAINE}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - web
+    <<: *journaux
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: companyos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: companyos
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U companyos -d companyos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    <<: *journaux
+
+  api:
+    image: ${IMAGE_API:-ghcr.io/moasko/companyos-api}:${COMPANYOS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://companyos:${POSTGRES_PASSWORD}@postgres:5432/companyos?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      DOMAINE: ${DOMAINE}
+      CORS_ORIGIN: https://${DOMAINE}
+      PUBLIC_URL: https://${DOMAINE}
+      PUBLIC_API_URL: https://${DOMAINE}
+      PLATFORM_ADMINS: ${ADMIN_EMAIL}
+      # Serveur privé : les espaces se créent depuis la console, pas par
+      # inscription libre. `true` pour ouvrir l'inscription au public.
+      INSCRIPTION_OUVERTE: ${INSCRIPTION_OUVERTE:-false}
+      # Shell et API à la même adresse : le cookie de session reste strict.
+      SESSION_SAMESITE: Strict
+      # Caddy est le seul saut devant l'API, sur le réseau Docker privé.
+      TRUST_PROXY: "1"
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_PATH: /data/storage
+      DEFAULT_TENANT_QUOTA: ${DEFAULT_TENANT_QUOTA:-}
+      UPLOAD_MAX_OCTETS: ${UPLOAD_MAX_OCTETS:-536870912}
+      MAIL_QUOTA_JOUR: ${MAIL_QUOTA_JOUR:-500}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SAUVEGARDE_ACTIVE: ${SAUVEGARDE_ACTIVE:-true}
+      SAUVEGARDE_HEURE: ${SAUVEGARDE_HEURE:-2}
+      SAUVEGARDE_RETENTION_JOURS: ${SAUVEGARDE_RETENTION_JOURS:-14}
+      SAUVEGARDE_FICHIERS_SEMAINES: ${SAUVEGARDE_FICHIERS_SEMAINES:-4}
+    volumes:
+      - storage-data:/data/storage
+      - sauvegardes-data:/data/sauvegardes
+    <<: *journaux
+
+  web:
+    image: ${IMAGE_WEB:-ghcr.io/moasko/companyos-web}:${COMPANYOS_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      # Vide = même origine : le shell appelle /api sur sa propre adresse.
+      API_URL: ""
+    <<: *journaux
+
+volumes:
+  postgres-data:
+  storage-data:
+  sauvegardes-data:
+  caddy-data:
+  caddy-config:
