@@ -93,8 +93,7 @@ const arrondi = (n) => Math.round(Number(n) || 0);
 /// Barème 2024 : 1 part célibataire, 1,5 veuf, 2 marié, plus une demi-part
 /// par enfant à charge. Plafonné, comme la loi le prévoit.
 export const parts = (situation, enfants = 0, reglages = REGLAGES_DEFAUT) => {
-  const base =
-    situation === "marie" ? 2 : situation === "veuf" ? 1.5 : 1;
+  const base = situation === "marie" ? 2 : situation === "veuf" ? 1.5 : 1;
   const total = base + (Number(enfants) || 0) * 0.5;
   return Math.min(total, reglages.ricf.partsMax);
 };
@@ -181,7 +180,11 @@ export const cotisations = (brut, reglages = REGLAGES_DEFAUT) => {
 /// imposables (transport), retenues (avances, prêts). Le brut imposable est
 /// le socle du calcul ; les indemnités non imposables s'ajoutent au net
 /// sans passer par l'impôt.
-export const bulletin = (salarie = {}, saisie = {}, reglagesPartiels = REGLAGES_DEFAUT) => {
+export const bulletin = (
+  salarie = {},
+  saisie = {},
+  reglagesPartiels = REGLAGES_DEFAUT,
+) => {
   const reglages = completer(reglagesPartiels);
   const base = Number(salarie.salaireBase) || 0;
   const primes = Number(saisie.primes) || 0;
@@ -196,7 +199,9 @@ export const bulletin = (salarie = {}, saisie = {}, reglagesPartiels = REGLAGES_
   // ouvrables de présence.
   const pr = saisie.prorata;
   const retenueProrata =
-    pr && pr.sur > 0 && pr.jours < pr.sur ? arrondi(base - (base * pr.jours) / pr.sur) : 0;
+    pr && pr.sur > 0 && pr.jours < pr.sur
+      ? arrondi(base - (base * pr.jours) / pr.sur)
+      : 0;
 
   // Absences non rémunérées : au trentième ouvrable du salaire de base.
   const abs = saisie.absences || {};
@@ -212,16 +217,27 @@ export const bulletin = (salarie = {}, saisie = {}, reglagesPartiels = REGLAGES_
   const lignesHs = Object.entries(reglages.majorations)
     .map(([cle, taux]) => ({ cle, taux, heures: Number(hs[cle]) || 0 }))
     .filter((x) => x.heures > 0)
-    .map((x) => ({ ...x, montant: arrondi(x.heures * tauxHoraire * (1 + x.taux / 100)) }));
+    .map((x) => ({
+      ...x,
+      montant: arrondi(x.heures * tauxHoraire * (1 + x.taux / 100)),
+    }));
   const heuresSup = lignesHs.reduce((t, x) => t + x.montant, 0);
 
-  const brut = Math.max(0, base - retenueProrata - retenueAbsences + primeAnciennete + heuresSup + primes);
+  const brut = Math.max(
+    0,
+    base - retenueProrata - retenueAbsences + primeAnciennete + heuresSup + primes,
+  );
 
   const cot = cotisations(brut, reglages);
   const impot = its(brut, situation, enfants, reglages);
-  const cmuSalarie = reglages.cmu.aLaChargeEmployeur ? 0 : reglages.cmu.montantParPersonne * nbCmu;
-  const cmuEmployeur = reglages.cmu.aLaChargeEmployeur ? reglages.cmu.montantParPersonne * nbCmu : 0;
-  const tauxFdfp = (reglages.fdfp.apprentissage || 0) + (reglages.fdfp.formationContinue || 0);
+  const cmuSalarie = reglages.cmu.aLaChargeEmployeur
+    ? 0
+    : reglages.cmu.montantParPersonne * nbCmu;
+  const cmuEmployeur = reglages.cmu.aLaChargeEmployeur
+    ? reglages.cmu.montantParPersonne * nbCmu
+    : 0;
+  const tauxFdfp =
+    (reglages.fdfp.apprentissage || 0) + (reglages.fdfp.formationContinue || 0);
   const fdfp = arrondi((brut * tauxFdfp) / 100);
 
   const totalRetenuesSalarie = cot.salariale + impot + cmuSalarie + retenues;
@@ -234,22 +250,59 @@ export const bulletin = (salarie = {}, saisie = {}, reglagesPartiels = REGLAGES_
 
   // Les rubriques du bulletin, dans l'ordre où elles s'impriment. Le
   // bulletin à l'écran, le PDF et l'export en dérivent : un seul calcul.
-  const R = (code, libelle, o = {}) => ({ code, libelle, base: "", taux: "", gain: 0, retenue: 0, patronal: 0, ...o });
+  const R = (code, libelle, o = {}) => ({
+    code,
+    libelle,
+    base: "",
+    taux: "",
+    gain: 0,
+    retenue: 0,
+    patronal: 0,
+    ...o,
+  });
   const assietteRet = Math.min(brut, reglages.cnps.plafond);
-  const assiettePf = Math.min(brut, reglages.cnps.plafondPrestations ?? reglages.cnps.plafond);
+  const assiettePf = Math.min(
+    brut,
+    reglages.cnps.plafondPrestations ?? reglages.cnps.plafond,
+  );
   const rubriques = [
     R("100", "salaireBase", { base, gain: base }),
-    retenueProrata ? R("110", "prorata", { base: `${pr.jours}/${pr.sur}`, retenue: retenueProrata }) : null,
-    primeAnciennete ? R("120", "anciennete", { base, taux: tauxAnciennete, gain: primeAnciennete, ans }) : null,
-    ...lignesHs.map((x, i) => R(`13${i}`, "heuresSup", { base: x.heures, taux: x.taux, gain: x.montant })),
+    retenueProrata
+      ? R("110", "prorata", { base: `${pr.jours}/${pr.sur}`, retenue: retenueProrata })
+      : null,
+    primeAnciennete
+      ? R("120", "anciennete", { base, taux: tauxAnciennete, gain: primeAnciennete, ans })
+      : null,
+    ...lignesHs.map((x, i) =>
+      R(`13${i}`, "heuresSup", { base: x.heures, taux: x.taux, gain: x.montant }),
+    ),
     primes ? R("140", "primes", { gain: primes }) : null,
-    retenueAbsences ? R("150", "absences", { base: joursRetenus, retenue: retenueAbsences }) : null,
+    retenueAbsences
+      ? R("150", "absences", { base: joursRetenus, retenue: retenueAbsences })
+      : null,
     R("199", "brut", { gain: brut, sousTotal: true }),
-    R("400", "cnpsRetraite", { base: assietteRet, taux: reglages.cnps.retraiteSalarie, retenue: cot.detail.retraiteSalarie, patronal: cot.detail.retraiteEmployeur }),
-    R("410", "cnpsPf", { base: assiettePf, taux: reglages.cnps.prestationsFamiliales, patronal: cot.detail.prestationsFamiliales }),
-    R("420", "cnpsAt", { base: assiettePf, taux: reglages.cnps.accidentTravail, patronal: cot.detail.accidentTravail }),
+    R("400", "cnpsRetraite", {
+      base: assietteRet,
+      taux: reglages.cnps.retraiteSalarie,
+      retenue: cot.detail.retraiteSalarie,
+      patronal: cot.detail.retraiteEmployeur,
+    }),
+    R("410", "cnpsPf", {
+      base: assiettePf,
+      taux: reglages.cnps.prestationsFamiliales,
+      patronal: cot.detail.prestationsFamiliales,
+    }),
+    R("420", "cnpsAt", {
+      base: assiettePf,
+      taux: reglages.cnps.accidentTravail,
+      patronal: cot.detail.accidentTravail,
+    }),
     R("450", "its", { base: brut, retenue: impot }),
-    R("470", "cmu", { base: nbCmu, retenue: arrondi(cmuSalarie), patronal: arrondi(cmuEmployeur) }),
+    R("470", "cmu", {
+      base: nbCmu,
+      retenue: arrondi(cmuSalarie),
+      patronal: arrondi(cmuEmployeur),
+    }),
     fdfp ? R("480", "fdfp", { base: brut, taux: tauxFdfp, patronal: fdfp }) : null,
     indemnites ? R("600", "transport", { gain: indemnites }) : null,
     frais ? R("610", "frais", { gain: frais }) : null,
@@ -294,7 +347,9 @@ export const completer = (r = {}) => ({
   anciennete: { ...REGLAGES_DEFAUT.anciennete, ...(r.anciennete || {}) },
   majorations: { ...REGLAGES_DEFAUT.majorations, ...(r.majorations || {}) },
   ricf: { ...REGLAGES_DEFAUT.ricf, ...(r.ricf || {}) },
-  its: r.its?.length ? r.its.map((t) => ({ ...t, jusqua: t.jusqua ?? Infinity })) : REGLAGES_DEFAUT.its,
+  its: r.its?.length
+    ? r.its.map((t) => ({ ...t, jusqua: t.jusqua ?? Infinity }))
+    : REGLAGES_DEFAUT.its,
 });
 
 /// Années complètes de service à la fin du mois payé.
@@ -315,7 +370,9 @@ export const tauxDAnciennete = (ans, reglages = REGLAGES_DEFAUT) => {
 };
 
 export const finDeMois = (aaaaMm) =>
-  new Date(Date.UTC(Number(aaaaMm.slice(0, 4)), Number(aaaaMm.slice(5, 7)), 0)).toISOString().slice(0, 10);
+  new Date(Date.UTC(Number(aaaaMm.slice(0, 4)), Number(aaaaMm.slice(5, 7)), 0))
+    .toISOString()
+    .slice(0, 10);
 
 // ---------------------------------------------------------------------------
 // Reprise comptable
@@ -375,7 +432,9 @@ export const recapitulatif = (bulletins = []) => {
     effectif: bulletins.length,
     brut: arrondi(somme("brut")),
     net: arrondi(somme("net")),
-    cotisations: arrondi(somme("cotisationsSalariales")) + arrondi(bulletins.reduce((s, b) => s + b.cotisations.patronale, 0)),
+    cotisations:
+      arrondi(somme("cotisationsSalariales")) +
+      arrondi(bulletins.reduce((s, b) => s + b.cotisations.patronale, 0)),
     chargesPatronales: arrondi(somme("chargesPatronales")),
     its: arrondi(somme("its")),
     coutTotal: arrondi(somme("coutTotal")),
