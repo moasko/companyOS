@@ -38,7 +38,7 @@
 // perçoit qu'à l'œil.
 // ─────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { ModuleWindow } from "../../ModuleWindow";
 import { Icon } from "../../../utils/general";
@@ -140,6 +140,19 @@ function PlateformeApp() {
   const [securite, setSecurite] = useState(null);
   const [refus, setRefus] = useState(false);
   const [section, setSection] = useState("bord");
+  // Serveur auto-hébergé (install.sh) : pas de clients ni de chiffre
+  // d'affaires à suivre — la console s'ouvre sur « Serveur » et masque le
+  // tableau de bord commercial et la liste des espaces clients du SaaS.
+  const [autoHeberge, setAutoHeberge] = useState(false);
+  useEffect(() => {
+    api.serveur().then((s) => {
+      if (s?.autoHeberge) {
+        setAutoHeberge(true);
+        setSection((x) => (x === "bord" || x === "espaces" ? "serveur" : x));
+      }
+    }).catch(() => {});
+  }, []);
+  const sections = autoHeberge ? SECTIONS.filter((s) => s.id !== "bord" && s.id !== "espaces") : SECTIONS;
   const [recherche, setRecherche] = useState("");
   const [filtre, setFiltre] = useState("tous");
   const [tri, setTri] = useState({ colonne: "stockage", croissant: false });
@@ -375,7 +388,7 @@ function PlateformeApp() {
         ) : (
           <>
             <nav className="pltNav" aria-label="Sections de la console">
-              {SECTIONS.map((s) => (
+              {sections.map((s) => (
                 <button
                   key={s.id}
                   type="button"

@@ -84,6 +84,9 @@ services:
       # Serveur privé : les espaces se créent depuis la console, pas par
       # inscription libre. `true` pour ouvrir l'inscription au public.
       INSCRIPTION_OUVERTE: ${INSCRIPTION_OUVERTE:-false}
+      # Le serveur appartient à l'entreprise : pas de formules payantes, pas
+      # de plafond d'utilisateurs, un quota que seul le disque limite.
+      AUTO_HEBERGE: "true"
       # Shell et API à la même adresse : le cookie de session reste strict.
       SESSION_SAMESITE: Strict
       # Caddy est le seul saut devant l'API, sur le réseau Docker privé.

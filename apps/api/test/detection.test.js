@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Fenetre, appareilDe, dureeBlocage, motifSuspect } from "../src/detection.js";
+
+// Comme les autres tests sans base : des valeurs factices suffisent à
+// charger la configuration (aucune connexion n'est ouverte).
+process.env.DATABASE_URL ||= "postgresql://test@localhost:1/test";
+process.env.JWT_SECRET ||= "secret-de-test";
+
+const { Fenetre, appareilDe, dureeBlocage, motifSuspect } = await import("../src/detection.js");
 
 test("sondes reconnues dans le chemin, quelle que soit la session", () => {
   assert.equal(motifSuspect("/.env"), "fichier caché de configuration");

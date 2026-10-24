@@ -31,7 +31,7 @@ export const domaineAutorise = async (nom) => {
 /// par un autre espace.
 export default async function publicsRoutes(app) {
   /// Ce que l'écran de connexion doit savoir du serveur avant toute session.
-  app.get("/serveur", async () => ({ inscriptionOuverte: env.inscriptionOuverte, domaine: env.domaine || null }));
+  app.get("/serveur", async () => ({ inscriptionOuverte: env.inscriptionOuverte, domaine: env.domaine || null, autoHeberge: env.autoHeberge }));
 
   /// Question du proxy HTTPS : « puis-je demander un certificat pour ce nom ? »
   /// (`?domain=` est le paramètre fixé par Caddy). 200 = oui, 404 = non.

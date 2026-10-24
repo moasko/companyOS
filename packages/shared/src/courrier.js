@@ -202,7 +202,9 @@ export const analyserAdresse = (brut) => {
 /// signale plutôt que de les perdre.
 export const listeAdresses = (champ) => {
   const brutes = Array.isArray(champ)
-    ? champ.map((x) => (typeof x === "string" ? x : x?.nom ? `${x.nom} <${x.email}>` : x?.email || ""))
+    ? champ.map((x) =>
+        typeof x === "string" ? x : x?.nom ? `${x.nom} <${x.email}>` : x?.email || "",
+      )
     : String(champ || "").split(/[,;](?=(?:[^"]*"[^"]*")*[^"]*$)/);
   const vues = new Set();
   const out = [];
@@ -229,20 +231,28 @@ export const formaterAdresse = ({ nom, email } = {}) => {
 export const nomAffiche = ({ nom, email } = {}) => {
   if (nom) return nom;
   const locale = String(email || "").split("@")[0];
-  return locale
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((m) => m[0].toUpperCase() + m.slice(1))
-    .join(" ") || email || "";
+  return (
+    locale
+      .split(/[._-]+/)
+      .filter(Boolean)
+      .map((m) => m[0].toUpperCase() + m.slice(1))
+      .join(" ") ||
+    email ||
+    ""
+  );
 };
 
 const PREFIXES = /^\s*((re|tr|fw|fwd|réf|ref|aw|sv|antw|rv)\s*(\[\d+\])?\s*:\s*)+/i;
 
 /// Sujet sans ses « Re: », « TR : », « Fwd: » empilés — la clé d'un fil.
-export const sujetNormalise = (sujet) => String(sujet || "").replace(PREFIXES, "").trim();
+export const sujetNormalise = (sujet) =>
+  String(sujet || "")
+    .replace(PREFIXES, "")
+    .trim();
 
 export const sujetReponse = (sujet) => `Re : ${sujetNormalise(sujet) || "(sans sujet)"}`;
-export const sujetTransfert = (sujet) => `Tr : ${sujetNormalise(sujet) || "(sans sujet)"}`;
+export const sujetTransfert = (sujet) =>
+  `Tr : ${sujetNormalise(sujet) || "(sans sujet)"}`;
 
 /// Destinataires de « Répondre à tous » : l'expéditeur, puis les autres
 /// destinataires — sauf soi-même (toutes ses adresses).
@@ -253,7 +263,9 @@ export const repondreATous = (message, mesAdresses = []) => {
     ...(message.a || []),
   ]).filter((x) => !moi.has(x.email));
   const dejaA = new Set(a.map((x) => x.email));
-  const cc = listeAdresses(message.cc || []).filter((x) => !moi.has(x.email) && !dejaA.has(x.email));
+  const cc = listeAdresses(message.cc || []).filter(
+    (x) => !moi.has(x.email) && !dejaA.has(x.email),
+  );
   return { a, cc };
 };
 
@@ -278,29 +290,39 @@ export const texteDeHtml = (html) =>
     .trim();
 
 const echapper = (s) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
 
 /// Texte brut → HTML (paragraphes, retours à la ligne, liens cliquables).
 export const htmlDeTexte = (texte) =>
   String(texte || "")
     .split(/\n{2,}/)
-    .map((p) =>
-      `<p>${echapper(p)
-        .replace(/\n/g, "<br>")
-        .replace(/\bhttps?:\/\/[^\s<]+/g, (u) => `<a href="${u}">${u}</a>`)}</p>`,
+    .map(
+      (p) =>
+        `<p>${echapper(p)
+          .replace(/\n/g, "<br>")
+          .replace(/\bhttps?:\/\/[^\s<]+/g, (u) => `<a href="${u}">${u}</a>`)}</p>`,
     )
     .join("");
 
 /// Citation du message auquel on répond, en texte et en HTML.
 export const citation = (message) => {
   const quand = message.date
-    ? new Date(message.date).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })
+    ? new Date(message.date).toLocaleString("fr-FR", {
+        dateStyle: "long",
+        timeStyle: "short",
+      })
     : "";
   const qui = formaterAdresse({ nom: message.deNom, email: message.deEmail });
   const entete = `Le ${quand}, ${qui} a écrit :`;
   const corps = message.texte || texteDeHtml(message.html);
   return {
-    texte: `\n\n${entete}\n${corps.split("\n").map((l) => `> ${l}`).join("\n")}`,
+    texte: `\n\n${entete}\n${corps
+      .split("\n")
+      .map((l) => `> ${l}`)
+      .join("\n")}`,
     html: `<p><br></p><p>${echapper(entete)}</p><blockquote style="margin:0 0 0 .8ex;border-left:2px solid #ccc;padding-left:1ex">${message.html || htmlDeTexte(corps)}</blockquote>`,
   };
 };
@@ -347,8 +369,13 @@ export const dateListe = (iso, maintenant = new Date()) => {
   const d = new Date(iso);
   const jour = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const ecart = Math.round((jour(maintenant) - jour(d)) / 86400000);
-  if (ecart === 0) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  if (ecart === 0)
+    return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   if (ecart === 1) return "hier";
   if (ecart > 1 && ecart < 7) return d.toLocaleDateString("fr-FR", { weekday: "long" });
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: d.getFullYear() === maintenant.getFullYear() ? undefined : "numeric" });
+  return d.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: d.getFullYear() === maintenant.getFullYear() ? undefined : "numeric",
+  });
 };
