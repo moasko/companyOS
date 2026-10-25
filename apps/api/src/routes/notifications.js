@@ -22,7 +22,7 @@ const envoiSchema = z.object({
   titre: z.string().min(1).max(140),
   message: z.string().max(600).optional(),
   lien: z
-    .object({ app: z.string().min(1).max(40), params: z.record(z.any()).optional() })
+    .object({ app: z.string().min(1).max(40), params: z.record(z.string(), z.any()).optional() })
     .optional(),
 });
 
