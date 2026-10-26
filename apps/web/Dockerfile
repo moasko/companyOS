@@ -53,15 +53,13 @@ ARG VITE_API_URL
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # La politique de sécurité doit nommer l'origine de l'API, sinon le
-# navigateur refuse les appels du shell vers elle. Elle est donc injectée
-# au build, à partir de la même valeur que le bundle — les deux ne peuvent
-# pas diverger.
-#
-# Le repli sur `https:` sert au cas où l'image est construite sans
-# argument : la CSP reste alors valide, quoique plus permissive, plutôt
-# que de laisser un `__API_ORIGIN__` littéral qui casserait toute la
-# directive.
-RUN sed -i "s|__API_ORIGIN__|${VITE_API_URL:-https:}|g" /etc/nginx/conf.d/default.conf \
+# navigateur refuse les appels du shell vers elle. Comme l'adresse de
+# l'API, elle est fixée au **démarrage** du conteneur (docker-entrypoint.sh),
+# à partir d'un modèle : la même image sert n'importe quel domaine.
+# L'adresse éventuellement figée au build sert de repli.
+ENV COMPANYOS_API_BUILD=${VITE_API_URL}
+RUN cp /etc/nginx/conf.d/default.conf /etc/nginx/companyos.conf.modele \
+    && sed -i "s|__API_ORIGIN__||g" /etc/nginx/conf.d/default.conf \
     && nginx -t
 
 COPY --from=build /app/apps/web/build /usr/share/nginx/html

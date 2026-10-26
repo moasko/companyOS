@@ -15,13 +15,16 @@ import { prisma, serialize } from "../db.js";
 import { authenticate, exigerRole } from "../auth.js";
 import { journaliser } from "../audit.js";
 import { FORMULES, formuleDe } from "../formules.js";
+import { env } from "../env.js";
 
 export default async function billingRoutes(app) {
   app.addHook("preHandler", authenticate);
 
   /// Les formules, celle de l'espace, et sa consommation réelle — tout ce
   /// qu'il faut pour afficher la page « Formule » sans autre appel.
-  app.get("/", async (request) => {
+  app.get("/", async (request, reply) => {
+    // Serveur auto-hébergé : rien à facturer, l'écran n'existe pas.
+    if (env.autoHeberge) return reply.code(404).send({ error: "Pas de formule sur un serveur auto-hébergé." });
     const [tenant, utilisateurs] = await Promise.all([
       prisma.tenant.findUnique({ where: { id: request.tenantId } }),
       prisma.user.count({ where: { tenantId: request.tenantId } }),
@@ -44,6 +47,7 @@ export default async function billingRoutes(app) {
     "/formule",
     { preHandler: exigerRole("OWNER") },
     async (request, reply) => {
+      if (env.autoHeberge) return reply.code(404).send({ error: "Pas de formule sur un serveur auto-hébergé." });
       const parsed = z
         .object({ plan: z.enum(["FREE", "PRO", "ENTERPRISE"]) })
         .safeParse(request.body);

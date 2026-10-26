@@ -44,5 +44,9 @@
     "globals": "^15.14.0",
     "prettier": "^3.4.2",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "dompurify": "^3.4.17",
+    "deepmerge-ts": "^8.0.2"
   }
 }

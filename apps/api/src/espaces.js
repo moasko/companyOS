@@ -2,6 +2,10 @@ import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { formuleDe } from "./formules.js";
 
+/// Quota d'un espace sur un serveur auto-hébergé : 10 To, autrement dit
+/// « le disque du serveur » (DEFAULT_TENANT_QUOTA le fixe autrement).
+export const QUOTA_AUTO_HEBERGE = 10n * 1024n ** 4n;
+
 /// Création d'un espace de travail et de son propriétaire.
 ///
 /// Partagée par l'inscription (`POST /api/auth/register`) et par la
@@ -37,7 +41,11 @@ export const creerEspace = async ({ company, name, email, passwordHash }) => {
         slug,
         // Un espace naît en formule Découverte : son quota est celui de la
         // formule, sauf offre de lancement décidée par l'exploitant.
-        quota: env.defaultTenantQuota ?? BigInt(formuleDe("FREE").quota),
+        // Serveur auto-hébergé : pas de formule à vendre, l'entreprise a
+        // tout (formule Entreprise : utilisateurs illimités) et son quota
+        // n'est borné que par le disque du serveur.
+        ...(env.autoHeberge ? { plan: "ENTERPRISE" } : {}),
+        quota: env.defaultTenantQuota ?? (env.autoHeberge ? QUOTA_AUTO_HEBERGE : BigInt(formuleDe("FREE").quota)),
       },
     });
 

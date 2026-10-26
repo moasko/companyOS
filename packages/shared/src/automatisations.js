@@ -551,7 +551,17 @@ export const COLLECTIONS = [
     module: "livraisons",
     collection: "livraisons",
     libelle: "Livraisons",
-    champs: ["numero", "statut", "date", "clientNom", "telephone", "commune", "livreurId", "montantAEncaisser", "factureId"],
+    champs: [
+      "numero",
+      "statut",
+      "date",
+      "clientNom",
+      "telephone",
+      "commune",
+      "livreurId",
+      "montantAEncaisser",
+      "factureId",
+    ],
   },
   {
     module: "courrier",
@@ -786,7 +796,8 @@ export const RECETTES = [
         {
           type: "tache",
           titre: "Devis demandé — {{fiche.deNom}}",
-          description: "Courriel de {{fiche.deEmail}} : « {{fiche.sujet}} ». Répondre sous 48 h.",
+          description:
+            "Courriel de {{fiche.deEmail}} : « {{fiche.sujet}} ». Répondre sous 48 h.",
           echeance: "{{date:+2}}",
         },
         {

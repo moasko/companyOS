@@ -13,7 +13,13 @@
 
 import { bulletin, completer, finDeMois, REGLAGES_DEFAUT } from "./paie.js";
 
-export const ETAPES = ["variables", "controles", "validation", "paiement", "declarations"];
+export const ETAPES = [
+  "variables",
+  "controles",
+  "validation",
+  "paiement",
+  "declarations",
+];
 
 /// Les états d'un cycle, dans l'ordre. Un cycle sans enregistrement est en
 /// préparation.
@@ -59,7 +65,15 @@ const borne = (date, min, max) => (date < min ? min : date > max ? max : date);
 export const absencesDuMois = (absences = [], salarieId, mois) => {
   const du = debutDeMois(mois);
   const au = finDeMois(mois);
-  const out = { conge: 0, maladie: 0, maternite: 0, permission: 0, sansSolde: 0, injustifiee: 0, liste: [] };
+  const out = {
+    conge: 0,
+    maladie: 0,
+    maternite: 0,
+    permission: 0,
+    sansSolde: 0,
+    injustifiee: 0,
+    liste: [],
+  };
   for (const a of absences) {
     const d = a.data || a;
     if (d.salarieId !== salarieId || d.etat !== "approuve") continue;
@@ -75,7 +89,9 @@ export const absencesDuMois = (absences = [], salarieId, mois) => {
 /// Les notes de frais approuvées et pas encore remboursées : elles se
 /// paient avec le salaire, sans passer par l'impôt.
 export const fraisARembourser = (notes = [], salarieId) => {
-  const liste = notes.filter((n) => (n.data || n).salarieId === salarieId && (n.data || n).etat === "approuvee");
+  const liste = notes.filter(
+    (n) => (n.data || n).salarieId === salarieId && (n.data || n).etat === "approuvee",
+  );
   return {
     total: arrondi(liste.reduce((s, n) => s + (Number((n.data || n).montant) || 0), 0)),
     ids: liste.map((n) => n.id),
@@ -87,7 +103,8 @@ export const fraisARembourser = (notes = [], salarieId) => {
 export const prorataDe = (salarie = {}, mois) => {
   const du = debutDeMois(mois);
   const au = finDeMois(mois);
-  const debut = salarie.dateEmbauche && salarie.dateEmbauche > du ? salarie.dateEmbauche : du;
+  const debut =
+    salarie.dateEmbauche && salarie.dateEmbauche > du ? salarie.dateEmbauche : du;
   const fin = salarie.dateFin && salarie.dateFin < au ? salarie.dateFin : au;
   if (debut === du && fin === au) return null;
   return { jours: joursOuvrables(debut, fin), sur: joursOuvrables(du, au), debut, fin };
@@ -103,17 +120,29 @@ export const modeParDefaut = (salarie = {}) =>
 export const payeLeMois = (salarie = {}, mois) => {
   if (salarie.dateEmbauche && salarie.dateEmbauche > finDeMois(mois)) return false;
   if (salarie.dateFin && salarie.dateFin < debutDeMois(mois)) return false;
-  return salarie.statut !== "sorti" || (salarie.dateFin && salarie.dateFin >= debutDeMois(mois));
+  return (
+    salarie.statut !== "sorti" ||
+    (salarie.dateFin && salarie.dateFin >= debutDeMois(mois))
+  );
 };
 
 /// La saisie de départ d'un salarié pour un mois : la situation familiale
 /// du dernier bulletin, les absences de Congés, les frais approuvés, le
 /// prorata d'entrée ou de sortie, l'indemnité de transport des réglages.
 /// Ce qui a déjà été saisi à la main pour ce mois l'emporte toujours.
-export const saisieInitiale = ({ salarie, mois, bulletins = [], absences = [], notes = [], reglages = REGLAGES_DEFAUT }) => {
+export const saisieInitiale = ({
+  salarie,
+  mois,
+  bulletins = [],
+  absences = [],
+  notes = [],
+  reglages = REGLAGES_DEFAUT,
+}) => {
   const r = completer(reglages);
   const s = salarie.data || salarie;
-  const existant = bulletins.find((b) => b.data.mois === mois && b.data.matricule === s.matricule);
+  const existant = bulletins.find(
+    (b) => b.data.mois === mois && b.data.matricule === s.matricule,
+  );
   const dernier = bulletins
     .filter((b) => b.data.matricule === s.matricule && b.data.mois < mois)
     .sort((a, b) => String(b.data.mois).localeCompare(String(a.data.mois)))[0];
@@ -122,7 +151,12 @@ export const saisieInitiale = ({ salarie, mois, bulletins = [], absences = [], n
   const auto = {
     mois,
     absences: { injustifiee: abs.injustifiee, sansSolde: abs.sansSolde },
-    absencesInfo: { conge: abs.conge, maladie: abs.maladie, maternite: abs.maternite, permission: abs.permission },
+    absencesInfo: {
+      conge: abs.conge,
+      maladie: abs.maladie,
+      maternite: abs.maternite,
+      permission: abs.permission,
+    },
     frais: frais.total,
     notesFrais: frais.ids,
     prorata: prorataDe(s, mois),
@@ -169,7 +203,8 @@ export const infosSalarie = (salarie, saisie = {}) => {
   };
 };
 
-export const calculer = (salarie, saisie, reglages) => bulletin(infosSalarie(salarie, saisie), saisie, reglages);
+export const calculer = (salarie, saisie, reglages) =>
+  bulletin(infosSalarie(salarie, saisie), saisie, reglages);
 
 // ---------------------------------------------------------------------------
 // Contrôles
@@ -180,7 +215,11 @@ export const calculer = (salarie, saisie, reglages) => bulletin(infosSalarie(sal
 /// Trois niveaux, comme dans le design : **bloquant** (la paie ne se
 /// valide pas), **attention** (à regarder, rien n'empêche de valider),
 /// **info** (un événement du mois qu'on aime voir passer).
-export const controles = ({ lignes = [], precedents = new Map(), reglages = REGLAGES_DEFAUT }) => {
+export const controles = ({
+  lignes = [],
+  precedents = new Map(),
+  reglages = REGLAGES_DEFAUT,
+}) => {
   const r = completer(reglages);
   const out = [];
   for (const l of lignes) {
@@ -188,25 +227,44 @@ export const controles = ({ lignes = [], precedents = new Map(), reglages = REGL
     const s = salarie.data || salarie;
     const nom = [s.prenom, s.nom].filter(Boolean).join(" ") || s.matricule || "Salarié";
     const cle = s.matricule || salarie.id;
-    const ajouter = (niveau, code, params = {}) => out.push({ niveau, code, cle, nom, salarieId: salarie.id, ...params });
+    const ajouter = (niveau, code, params = {}) =>
+      out.push({ niveau, code, cle, nom, salarieId: salarie.id, ...params });
 
     if (!s.matricule) ajouter("bloquant", "sansMatricule");
     if (!Number(s.salaireBase)) ajouter("bloquant", "sansSalaire");
     if (calcul.net <= 0) ajouter("bloquant", "netNegatif", { montant: calcul.net });
     if (!enregistre) ajouter("attention", "nonEnregistre");
-    if (saisie.modePaiement === "virement" && !s.banque) ajouter("attention", "sansBanque");
-    if (saisie.modePaiement === "mobile" && !s.telephone) ajouter("attention", "sansMobile");
+    if (saisie.modePaiement === "virement" && !s.banque)
+      ajouter("attention", "sansBanque");
+    if (saisie.modePaiement === "mobile" && !s.telephone)
+      ajouter("attention", "sansMobile");
     if (!s.numeroCnps) ajouter("attention", "sansCnps");
-    if (calcul.brut > 0 && calcul.brut < r.smig && !saisie.prorata) ajouter("attention", "sousSmig", { montant: calcul.brut });
-    if (saisie.absences?.injustifiee) ajouter("attention", "absenceInjustifiee", { jours: saisie.absences.injustifiee, montant: calcul.retenueAbsences });
+    if (calcul.brut > 0 && calcul.brut < r.smig && !saisie.prorata)
+      ajouter("attention", "sousSmig", { montant: calcul.brut });
+    if (saisie.absences?.injustifiee)
+      ajouter("attention", "absenceInjustifiee", {
+        jours: saisie.absences.injustifiee,
+        montant: calcul.retenueAbsences,
+      });
 
     const avant = precedents.get(cle);
     if (avant?.net > 0 && calcul.net > 0) {
       const ecart = (calcul.net - avant.net) / avant.net;
-      if (Math.abs(ecart) >= 0.2) ajouter("attention", "variation", { pourcent: Math.round(ecart * 100) });
+      if (Math.abs(ecart) >= 0.2)
+        ajouter("attention", "variation", { pourcent: Math.round(ecart * 100) });
     }
-    if (saisie.prorata?.debut && saisie.prorata.debut > `${saisie.mois}-01`) ajouter("info", "entree", { date: saisie.prorata.debut, jours: saisie.prorata.jours, sur: saisie.prorata.sur });
-    if (saisie.prorata?.fin && saisie.prorata.fin < finDeMois(saisie.mois)) ajouter("info", "sortie", { date: saisie.prorata.fin, jours: saisie.prorata.jours, sur: saisie.prorata.sur });
+    if (saisie.prorata?.debut && saisie.prorata.debut > `${saisie.mois}-01`)
+      ajouter("info", "entree", {
+        date: saisie.prorata.debut,
+        jours: saisie.prorata.jours,
+        sur: saisie.prorata.sur,
+      });
+    if (saisie.prorata?.fin && saisie.prorata.fin < finDeMois(saisie.mois))
+      ajouter("info", "sortie", {
+        date: saisie.prorata.fin,
+        jours: saisie.prorata.jours,
+        sur: saisie.prorata.sur,
+      });
   }
   const ordre = { bloquant: 0, attention: 1, info: 2 };
   return out.sort((a, b) => ordre[a.niveau] - ordre[b.niveau]);
@@ -227,7 +285,13 @@ export const statutLigne = (cle, liste) => {
 // ---------------------------------------------------------------------------
 
 export const totaux = (calculs = []) => {
-  const s = (f) => arrondi(calculs.reduce((t, c) => t + (Number(typeof f === "function" ? f(c) : c[f]) || 0), 0));
+  const s = (f) =>
+    arrondi(
+      calculs.reduce(
+        (t, c) => t + (Number(typeof f === "function" ? f(c) : c[f]) || 0),
+        0,
+      ),
+    );
   return {
     effectif: calculs.length,
     brut: s("brut"),
@@ -249,7 +313,10 @@ export const paiements = (lignes = []) => {
     g[mode].push(l);
   }
   return Object.fromEntries(
-    Object.entries(g).map(([mode, liste]) => [mode, { liste, total: arrondi(liste.reduce((t, l) => t + l.calcul.net, 0)) }]),
+    Object.entries(g).map(([mode, liste]) => [
+      mode,
+      { liste, total: arrondi(liste.reduce((t, l) => t + l.calcul.net, 0)) },
+    ]),
   );
 };
 
@@ -258,7 +325,9 @@ export const paiements = (lignes = []) => {
 /// CNPS peut être trimestrielle — l'échéance reste modifiable à l'écran).
 export const declarations = (calculs = [], mois) => {
   const s = (f) => arrondi(calculs.reduce((t, c) => t + (Number(f(c)) || 0), 0));
-  const retraite = s((c) => c.cotisations.detail.retraiteSalarie + c.cotisations.detail.retraiteEmployeur);
+  const retraite = s(
+    (c) => c.cotisations.detail.retraiteSalarie + c.cotisations.detail.retraiteEmployeur,
+  );
   const pf = s((c) => c.cotisations.detail.prestationsFamiliales);
   const at = s((c) => c.cotisations.detail.accidentTravail);
   const echeance = `${moisSuivant(mois)}-15`;
@@ -266,7 +335,11 @@ export const declarations = (calculs = [], mois) => {
     cnps: { montant: retraite + pf + at, retraite, pf, at, echeance },
     its: { montant: s((c) => c.its), echeance },
     fdfp: { montant: s((c) => c.fdfp || 0), echeance },
-    cmu: { montant: s((c) => c.cmuSalarie + c.cmuEmployeur), personnes: calculs.length, echeance },
+    cmu: {
+      montant: s((c) => c.cmuSalarie + c.cmuEmployeur),
+      personnes: calculs.length,
+      echeance,
+    },
   };
 };
 
@@ -277,7 +350,13 @@ export const ordreDeVirement = (lignes = [], mois) => [
     .filter((l) => l.saisie.modePaiement === "virement")
     .map((l) => {
       const s = l.salarie.data || l.salarie;
-      return [s.matricule, [s.prenom, s.nom].filter(Boolean).join(" "), s.banque || "", l.calcul.net, `SALAIRE ${mois}`];
+      return [
+        s.matricule,
+        [s.prenom, s.nom].filter(Boolean).join(" "),
+        s.banque || "",
+        l.calcul.net,
+        `SALAIRE ${mois}`,
+      ];
     }),
 ];
 
@@ -290,7 +369,15 @@ export const cumulsAnnuels = (bulletins = [], annee) => {
     if (!String(b.data.mois).startsWith(String(annee))) continue;
     const c = b.data.calcul || {};
     const k = b.data.matricule;
-    const t = m.get(k) || { matricule: k, mois: 0, brut: 0, cnpsSalarie: 0, cnpsEmployeur: 0, its: 0, net: 0 };
+    const t = m.get(k) || {
+      matricule: k,
+      mois: 0,
+      brut: 0,
+      cnpsSalarie: 0,
+      cnpsEmployeur: 0,
+      its: 0,
+      net: 0,
+    };
     t.mois += 1;
     t.brut += c.brut || 0;
     t.cnpsSalarie += c.cotisations?.salariale || 0;
@@ -299,19 +386,29 @@ export const cumulsAnnuels = (bulletins = [], annee) => {
     t.net += c.net || 0;
     m.set(k, t);
   }
-  return [...m.values()].sort((a, b) => String(a.matricule).localeCompare(String(b.matricule)));
+  return [...m.values()].sort((a, b) =>
+    String(a.matricule).localeCompare(String(b.matricule)),
+  );
 };
 
 /// Le brut qui donne un net voulu, par dichotomie sur le calcul réel :
 /// barème progressif et plafonds rendent l'inversion analytique fragile.
-export const netVersBrut = (netCible, { situation, enfants, indemnites = 0 } = {}, reglages = REGLAGES_DEFAUT) => {
+export const netVersBrut = (
+  netCible,
+  { situation, enfants, indemnites = 0 } = {},
+  reglages = REGLAGES_DEFAUT,
+) => {
   const cible = Number(netCible) || 0;
   if (cible <= 0) return 0;
   let bas = 0;
   let haut = cible * 3 + 100000;
   for (let i = 0; i < 60; i += 1) {
     const milieu = (bas + haut) / 2;
-    const net = bulletin({ salaireBase: milieu }, { situation, enfants, indemnites, personnesCmu: 1 }, reglages).net;
+    const net = bulletin(
+      { salaireBase: milieu },
+      { situation, enfants, indemnites, personnesCmu: 1 },
+      reglages,
+    ).net;
     if (net < cible) bas = milieu;
     else haut = milieu;
   }
