@@ -33,6 +33,7 @@ Les deux agents tournent dans la session Claude Code qui les a créés. Pour les
 ## Qui on a le droit d'écrire
 
 - **Seulement une adresse générique de l'entreprise, publiée par elle-même ou dans un annuaire professionnel** : `info@`, `contact@`, `hello@`, `admin@`… sur le domaine de l'entreprise.
+- **Seulement une adresse publiée sur le site actuel de l'entreprise** (vérifiée par la recherche). Pas d'adresse tirée d'un annuaire ancien, d'une fiche datée ou d'une liste d'ambassade : le 26 et le 27/10, la moitié de ces adresses ont rebondi.
 - **Jamais** une adresse Gmail, Yahoo ou Hotmail au nom d'une personne, une adresse deviné à partir d'un format (`prenom.nom@`), ou une adresse masquée sur ZoomInfo, RocketReach ou ContactOut.
 - **Jamais de particuliers**, et jamais de grande entreprise ou de groupe coté : CompanyOS vise les PME.
 - **Avant tout envoi**, chercher l'adresse dans `envois.csv` et dans le dossier `INBOX.Sent`. Si l'entreprise ou son domaine a déjà été contacté, on n'envoie pas.
